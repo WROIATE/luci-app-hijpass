@@ -1,15 +1,15 @@
 #!/bin/sh
 
-. /usr/lib/hijpass/log.sh
-
-TPROXY_MARK=$(uci get hijpass.@transport[0].tproxy_mark)
-TPROXY_PROTO=$(uci get hijpass.@transport[0].tproxy_proto)
-TPROXY_PORT=$(uci get hijpass.@transport[0].shunt_port)
-RESOLV_FILE=$(uci get dhcp.@dnsmasq[0].resolvfile)
-CONF_PATH="/etc/hijpass"
-HIJPASS_USER="hijpass"
+. /usr/lib/hijpass/app-logger.sh
 
 log_debug "$0"
+
+TPROXY_MARK=0x1
+TPROXY_PROTO=$(uci -q get hijpass.@transport[0].tproxy_proto)
+TPROXY_PORT=$(uci -q get hijpass.@transport[0].shunt_port)
+RESOLV_FILE=$(uci -q get dhcp.@dnsmasq[0].resolvfile)
+CONF_PATH="/etc/hijpass"
+HIJPASS_USER="hijpass"
 
 log_debug "Generating fw4 rules with mark:$TPROXY_MARK port:$TPROXY_PORT proto:$TPROXY_PROTO"
 

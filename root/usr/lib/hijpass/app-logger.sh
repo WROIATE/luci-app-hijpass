@@ -1,6 +1,6 @@
 #!/bin/sh
 
-LOG_FILE="/tmp/hijpass.log"
+LOG_FILE="/tmp/log/hijpass.log"
 MAX_SIZE=$((1024 * 1024)) # 1MB
 LOG_LEVEL="info"          # debug, info, warn, error
 
@@ -13,11 +13,16 @@ get_log_level_num() {
 
 check_log_size() {
     if [ -f "$LOG_FILE" ]; then
-        size=$(stat -c%s "$LOG_FILE" 2>/dev/null || stat -f%z "$LOG_FILE")
+        size=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
+        
+        case $size in
+            ''|*[!0-9]*) size=0 ;;
+        esac
+        
         if [ "$size" -gt "$MAX_SIZE" ]; then
             tmp_file="${LOG_FILE}.tmp"
-            tail -n 100 "$LOG_FILE" >"$tmp_file"
-            mv "$tmp_file" "$LOG_FILE"
+            tail -n 100 "$LOG_FILE" > "$tmp_file" 2>/dev/null
+            mv "$tmp_file" "$LOG_FILE" 2>/dev/null
         fi
     fi
 }

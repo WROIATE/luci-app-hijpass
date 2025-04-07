@@ -1,14 +1,14 @@
 #!/bin/sh
 
-. /usr/lib/hijpass/log.sh
+. /usr/lib/hijpass/app-logger.sh
+
+log_debug "$0"
 
 ACTION="$1"
 TABLE_NUMBER="233"
 TPROXY_MARK="0x1"
 RT_TABLES_FILE="/etc/iproute2/rt_tables"
 TABLE_NAME="hijpass"
-
-log_debug "$0"
 
 add_route() {
     delete_route

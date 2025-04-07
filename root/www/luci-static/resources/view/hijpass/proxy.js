@@ -19,7 +19,7 @@ return view.extend({
 
         o = s.option(form.Value, 'command', _('运行命令'),
             _('指定代理程序运行命令'));
-        o.default = '/usr/bin/hysteria -c /var/etc/hijpass/proxy.json clien';
+        o.default = '/usr/bin/xray -c /etc/hijpass/proxy.json';
         o.rmempty = false;
 
         o = s.option(form.Flag, 'log_redirect', _('日志重定向'),

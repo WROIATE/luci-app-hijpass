@@ -1,6 +1,6 @@
 #!/bin/sh /etc/rc.common
 
-. /usr/lib/hijpass/log.sh
+. /usr/lib/hijpass/app-logger.sh
 
 USE_PROCD=1
 START=99
@@ -18,21 +18,21 @@ NFT_CONF="$CONF_PATH/fw4-rules.nft"
 SHUNT_CONF="shunt.json"
 
 # Global
-ENABLE=$(uci get hijpass.@hijpass[0].enable)
-START_DELAY=$(uci get hijpass.@hijpass[0].startup_delay)
-DELAY_TIME=$(uci get hijpass.@hijpass[0].delay_time)
+ENABLE=$(uci -q get hijpass.@hijpass[0].enable || :)
+START_DELAY=$(uci -q get hijpass.@hijpass[0].startup_delay || :)
+DELAY_TIME=$(uci -q get hijpass.@hijpass[0].delay_time || :)
 
 # Shunt
-SHUNT_APP=$(uci get hijpass.@shunt[0].type)
-GEO_AUTO_UPDATE=$(uci get hijpass.@shunt[0].geo_auto_update)
-GEO_UPDATE_INTERVAL=$(uci get hijpass.@shunt[0].geo_update_interval)
-REDIRECT_SHUNT_LOG=$(uci get hijpass.@shunt[0].log_redirect)
-SHUNT_LOG_PATH=$(uci get hijpass.@shunt[0].log_path)
+SHUNT_APP=$(uci -q get hijpass.@shunt[0].type || :)
+GEO_AUTO_UPDATE=$(uci -q get hijpass.@shunt[0].geo_auto_update || :)
+GEO_UPDATE_INTERVAL=$(uci -q get hijpass.@shunt[0].geo_update_interval || :)
+REDIRECT_SHUNT_LOG=$(uci -q get hijpass.@shunt[0].log_redirect || :)
+SHUNT_LOG_PATH=$(uci -q get hijpass.@shunt[0].log_path || :)
 
 # Proxy
-PROXY_COMMAND=$(uci get hijpass.@proxy[0].command)
-REDIRECT_PROXY_LOG=$(uci get hijpass.@proxy[0].log_redirect)
-PROXY_LOG_PATH=$(uci get hijpass.@proxy[0].log_path)
+PROXY_COMMAND=$(uci -q get hijpass.@proxy[0].command || :)
+REDIRECT_PROXY_LOG=$(uci -q get hijpass.@proxy[0].log_redirect || :)
+PROXY_LOG_PATH=$(uci -q get hijpass.@proxy[0].log_path || :)
 
 start_service() {
 	[ "$ENABLE" = "0" ] && return
@@ -116,9 +116,9 @@ fw_tproxy() {
 }
 
 reset_geo_cron() {
-	sed -i '/hijpass\/geo.sh\|hijpass\/clean-log.sh/d' /etc/crontabs/root 2>/dev/null
+	sed -i '/hijpass\/geo.sh\|hijpass\/clean-service-log.sh/d' /etc/crontabs/root 2>/dev/null
 	if [ "$REDIRECT_PROXY_LOG" = "1" ] || [ "$REDIRECT_SHUNT_LOG" = "1" ]; then
-		echo "0 * * * * /usr/lib/hijpass/clean-log.sh" >>/etc/crontabs/root
+		echo "*/10 * * * * /usr/lib/hijpass/clean-service-log.sh" >>/etc/crontabs/root
 	fi
 	if [ "$GEO_AUTO_UPDATE" != "1" ] || [ "$ENABLE" != "1" ]; then
 		/etc/init.d/cron restart >/dev/null 2>&1

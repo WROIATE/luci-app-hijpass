@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. /usr/lib/hijpass/log.sh
+. /usr/lib/hijpass/app-logger.sh
 
 log_debug "$0"
 

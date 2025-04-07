@@ -13,10 +13,6 @@ PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_V2ray_Geodata
 
-define Package/$(PKG_NAME)
-  USERID:=root=0:hijpass=4396
-endef
-
 define Package/$(PKG_NAME)/config
 menu "Configuration"
 	depends on PACKAGE_$(PKG_NAME)
@@ -45,6 +41,19 @@ define Package/$(PKG_NAME)/conffiles
 /etc/hijpass/white-v4.conf
 /etc/hijpass/white-v6.conf
 /etc/hijpass/shunt.json
+/etc/hijpass/proxy.json
+endef
+
+define Package/$(PKG_NAME)/postinst
+#!/bin/sh
+if ! grep -q "^hijpass:" /etc/passwd; then
+    if ! grep -q "^hijpass:" /etc/group; then
+        echo "hijpass:x:4396:hijpass" >> /etc/group
+    fi
+    echo "hijpass:x:0:4396:hijpass:/var/run/hijpass:/bin/false" >> /etc/passwd
+    echo "hijpass:x:0:0:99999:7:::" >> /etc/shadow
+fi
+exit 0
 endef
 
 define Package/$(PKG_NAME)/postrm

@@ -1,11 +1,11 @@
 #!/bin/sh
 
-. /usr/lib/hijpass/log.sh
+. /usr/lib/hijpass/app-logger.sh
 
 log_debug "$0"
 
-GEO_IP_URL=$(uci get hijpass.@shunt[0].geo_ip_url)
-GEO_SITE_URL=$(uci get hijpass.@shunt[0].geo_site_url)
+GEO_IP_URL=$(uci -q get hijpass.@shunt[0].geo_ip_url || :)
+GEO_SITE_URL=$(uci -q get hijpass.@shunt[0].geo_site_url || :)
 DATA_DIR="/usr/share/v2ray"
 
 check_url() {

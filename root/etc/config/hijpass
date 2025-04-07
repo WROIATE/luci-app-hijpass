@@ -1,6 +1,7 @@
 config hijpass
 	option enable '0'
-    option startup_delay '0'
+    option startup_delay '1'
+    option delay_time '10'
     
 config transport
     option tproxy_proto 'tcp,udp'
@@ -8,8 +9,8 @@ config transport
 
 config proxy
     option command ''
-    option log_redirect '0'
-    option log_path ''
+    option log_redirect '1'
+    option log_path '/tmp/log/hijpass-proxy.log'
 
 config shunt
     option type 'xray'
@@ -17,3 +18,5 @@ config shunt
     option geo_site_url 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat'
     option geo_auto_update '0'
     option interval '0'
+    option log_redirect '1'
+    option log_path '/tmp/log/hijpass-shunt.log'

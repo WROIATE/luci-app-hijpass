@@ -7,7 +7,7 @@ log_debug "$0"
 REDIRECT_PROXY_LOG=$(uci -q get hijpass.@proxy[0].log_redirect || :)
 PROXY_LOG_PATH=$(uci -q get hijpass.@proxy[0].log_path || :)
 REDIRECT_SHUNT_LOG=$(uci -q get hijpass.@shunt[0].log_redirect || :)
-SHUNT_LOG_PATH=$(uci get -q hijpass.@shunt[0].log_path || :)
+SHUNT_LOG_PATH=$(uci -q get hijpass.@shunt[0].log_path || :)
 
 clean_log() {
     log_file="$1"

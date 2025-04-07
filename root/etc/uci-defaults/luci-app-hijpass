@@ -1,0 +1,14 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	delete firewall.hijapss
+	set firewall.hijapss=include
+	set firewall.hijapss.type=script
+	set firewall.hijapss.path=/usr/lib/hijpass/fw4.sh
+	commit firewall
+EOF
+
+chmod +x /usr/lib/hijpass/*
+
+rm -rf /tmp/luci-*cache
+exit 0

@@ -1,0 +1,19 @@
+config hijpass
+	option enable '0'
+    option startup_delay '0'
+    
+config transport
+    option tproxy_proto 'tcp,udp'
+    option shunt_port '1041'
+
+config proxy
+    option command ''
+    option log_redirect '0'
+    option log_path ''
+
+config shunt
+    option type 'xray'
+    option geo_ip_url 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat'
+    option geo_site_url 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat'
+    option geo_auto_update '0'
+    option interval '0'

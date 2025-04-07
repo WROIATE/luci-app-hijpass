@@ -1,0 +1,48 @@
+{
+    "luci-app-hijpass": {
+        "description": "Grant access to hijpass configurations",
+        "read": {
+            "file": {
+                "/etc/hijpass/shunt.json": [
+                    "read"
+                ],
+                "/etc/hijpass/fw4-template.nft": [
+                    "read"
+                ],
+                "/etc/hijpass/white-v4.conf": [
+                    "read"
+                ],
+                "/etc/hijpass/white-v6.conf": [
+                    "read"
+                ]
+            },
+            "ubus": {
+                "service": [
+                    "list"
+                ]
+            },
+            "uci": [
+                "hijpass"
+            ]
+        },
+        "write": {
+            "file": {
+                "/etc/hijpass/shunt.json": [
+                    "write"
+                ],
+                "/etc/hijpass/fw4-template.nft": [
+                    "write"
+                ],
+                "/etc/hijpass/white-v4.conf": [
+                    "write"
+                ],
+                "/etc/hijpass/white-v6.conf": [
+                    "write"
+                ]
+            },
+            "uci": [
+                "hijpass"
+            ]
+        }
+    }
+}

@@ -1,0 +1,82 @@
+{
+    "admin/services/hijpass": {
+        "title": "HiJpass",
+        "order": 1,
+        "action": {
+            "type": "view",
+            "path": "hijpass/overview"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-hijpass"
+            ],
+            "uci": {
+                "hijpass": true
+            }
+        }
+    },
+    "admin/services/hijpass/overview": {
+        "title": "HiJpass",
+        "order": 1,
+        "action": {
+            "type": "view",
+            "path": "hijpass/overview"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-hijpass"
+            ],
+            "uci": {
+                "hijpass": true
+            }
+        }
+    },
+    "admin/services/hijpass/shunt": {
+        "title": "Shunt",
+        "order": 2,
+        "action": {
+            "type": "view",
+            "path": "hijpass/shunt"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-hijpass"
+            ],
+            "uci": {
+                "hijpass": true
+            }
+        }
+    },
+    "admin/services/hijpass/proxy": {
+        "title": "Proxy",
+        "order": 3,
+        "action": {
+            "type": "view",
+            "path": "hijpass/proxy"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-hijpass"
+            ],
+            "uci": {
+                "hijpass": true
+            }
+        }
+    },
+    "admin/services/hijpass/transport": {
+        "title": "Transport",
+        "order": 4,
+        "action": {
+            "type": "view",
+            "path": "hijpass/transport"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-hijpass"
+            ],
+            "uci": {
+                "hijpass": true
+            }
+        }
+    }
+}

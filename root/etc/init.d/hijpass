@@ -1,0 +1,143 @@
+#!/bin/sh /etc/rc.common
+
+. /usr/lib/hijpass/log.sh
+
+USE_PROCD=1
+START=99
+STOP=15
+
+NAME=hijpass
+
+LIB_PATH="/usr/lib/$NAME"
+FW4_GEN_SCRIPT="$LIB_PATH/gen-fw4.sh"
+ROUTE_SCRIPT="$LIB_PATH/route.sh"
+GEO_UPDATE_SCRIPT="$LIB_PATH/geo.sh"
+
+CONF_PATH="/etc/$NAME"
+NFT_CONF="$CONF_PATH/fw4-rules.nft"
+SHUNT_CONF="shunt.json"
+
+# Global
+ENABLE=$(uci get hijpass.@hijpass[0].enable)
+START_DELAY=$(uci get hijpass.@hijpass[0].startup_delay)
+DELAY_TIME=$(uci get hijpass.@hijpass[0].delay_time)
+
+# Shunt
+SHUNT_APP=$(uci get hijpass.@shunt[0].type)
+GEO_AUTO_UPDATE=$(uci get hijpass.@shunt[0].geo_auto_update)
+GEO_UPDATE_INTERVAL=$(uci get hijpass.@shunt[0].geo_update_interval)
+REDIRECT_SHUNT_LOG=$(uci get hijpass.@shunt[0].log_redirect)
+SHUNT_LOG_PATH=$(uci get hijpass.@shunt[0].log_path)
+
+# Proxy
+PROXY_COMMAND=$(uci get hijpass.@proxy[0].command)
+REDIRECT_PROXY_LOG=$(uci get hijpass.@proxy[0].log_redirect)
+PROXY_LOG_PATH=$(uci get hijpass.@proxy[0].log_path)
+
+start_service() {
+	[ "$ENABLE" = "0" ] && return
+	log_info "Starting proxy service..."
+	run_proxy
+	sleep 2
+	log_info "Starting shunt service..."
+	run_shunt
+	sleep 1
+	log_info "Configuring firewall rules..."
+	fw_tproxy
+	log_info "Resetting geo cron jobs..."
+	reset_geo_cron
+	log_info "Service started successfully"
+}
+
+stop_service() {
+	log_info "Stopping service..."
+	$ROUTE_SCRIPT remove_hijpass_route
+	rm -f $NFT_CONF
+	fw4 reload >/dev/null 2>&1
+	reset_geo_cron
+	log_info "Service stopped successfully"
+}
+
+service_triggers() {
+	procd_add_reload_trigger "$NAME"
+	procd_add_interface_trigger "interface.*.up" "wan" /etc/init.d/$NAME restart
+}
+
+reload_service() {
+	stop
+	start
+}
+
+boot() {
+	[ "$START_DELAY" = "1" ] && sleep "$DELAY_TIME"
+	restart
+}
+
+run_proxy() {
+	proxy_command="$PROXY_COMMAND"
+	if [ "$REDIRECT_PROXY_LOG" = "1" ]; then
+		proxy_command="$proxy_command &> $PROXY_LOG_PATH"
+	fi
+	open_instance "proxy" "$proxy_command" "$NAME"
+}
+
+run_shunt() {
+	shunt_command="$SHUNT_APP -c $CONF_PATH/$SHUNT_CONF"
+	if [ "$REDIRECT_SHUNT_LOG" = "1" ]; then
+		shunt_command="$shunt_command &> $SHUNT_LOG_PATH"
+	fi
+	open_instance "shunt" "$shunt_command" "$NAME"
+}
+
+open_instance() {
+	instance_name="hijpass-$1"
+	cmd=$2
+	user=$3
+	procd_open_instance "$instance_name"
+	procd_set_param command /bin/sh -c "$cmd"
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_set_param pidfile "/var/run/$instance_name.pid"
+	procd_set_param user "$user"
+	procd_close_instance
+}
+
+fw_tproxy() {
+	script=$($FW4_GEN_SCRIPT)
+	cat <<-EOF >>$NFT_CONF
+		$script
+	EOF
+	if ! fw4 reload >/dev/null 2>&1; then
+		log_error "Failed to reload firewall rules: $script"
+		stop
+		exit 1
+	fi
+	$ROUTE_SCRIPT reset_hijpass_route
+}
+
+reset_geo_cron() {
+	sed -i '/hijpass\/geo.sh\|hijpass\/clean-log.sh/d' /etc/crontabs/root 2>/dev/null
+	if [ "$REDIRECT_PROXY_LOG" = "1" ] || [ "$REDIRECT_SHUNT_LOG" = "1" ]; then
+		echo "0 * * * * /usr/lib/hijpass/clean-log.sh" >>/etc/crontabs/root
+	fi
+	if [ "$GEO_AUTO_UPDATE" != "1" ] || [ "$ENABLE" != "1" ]; then
+		/etc/init.d/cron restart >/dev/null 2>&1
+		return 0
+	fi
+
+	if [ -z "$GEO_UPDATE_INTERVAL" ] || [ "$GEO_UPDATE_INTERVAL" -le 0 ]; then
+		return
+	fi
+
+	minutes="0"
+	hours="*/$((GEO_UPDATE_INTERVAL / 60))"
+
+	if [ "$GEO_UPDATE_INTERVAL" -lt 60 ]; then
+		minutes="*/$GEO_UPDATE_INTERVAL"
+		hours="*"
+	fi
+
+	echo "$minutes $hours * * * $GEO_UPDATE_SCRIPT" >>/etc/crontabs/root
+
+	/etc/init.d/cron restart >/dev/null 2>&1
+}

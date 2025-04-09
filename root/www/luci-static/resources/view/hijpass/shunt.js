@@ -33,6 +33,12 @@ return view.extend({
         o.default = 'sing-box';
         o.rmempty = false;
 
+        o = s.taboption('general', form.Value, 'dns_port', _('dns端口'),
+            _('指定dns查询'));
+        o.default = '15353';
+        o.datatype = 'port';
+        o.rmempty = false;
+
         o = s.taboption('general', form.Value, 'geo_ip_url', _('Geo IP 下载地址'),
             _('指定 Geo IP 数据库下载地址'));
         o.default = 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat';

@@ -12,7 +12,7 @@ SHUNT_LOG_PATH=$(uci -q get hijpass.@shunt[0].log_path || :)
 clean_log() {
     log_file="$1"
     if [ -f "$log_file" ]; then
-        tail -n 1000 "$log_file" >"$log_file.tmp" && mv "$log_file.tmp" "$log_file"
+        tail -n 1000 "$log_file" >"$log_file.tmp" && cat "$log_file.tmp" > "$log_file"
         log_info "Successfully cleaned log file: $log_file"
     fi
 }

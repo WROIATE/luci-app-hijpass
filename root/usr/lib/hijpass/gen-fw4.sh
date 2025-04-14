@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . /usr/lib/hijpass/app-logger.sh
+. /lib/functions/network.sh
 
 log_debug "$0"
 
@@ -10,6 +11,14 @@ TPROXY_PORT=$(uci -q get hijpass.@transport[0].shunt_port)
 RESOLV_FILE=$(uci -q get dhcp.@dnsmasq[0].resolvfile)
 CONF_PATH="/etc/hijpass"
 HIJPASS_USER="hijpass"
+
+network_flush_cache
+network_find_wan NET_IF
+network_find_wan6 NET_IF6
+network_get_physdev NET_L2D "${NET_IF}"
+network_get_physdev NET_L2D6 "${NET_IF6}"
+
+INPUT_WAN_L2_DEV="$NET_L2D, $NET_L2D6"
 
 log_debug "Generating fw4 rules with mark:$TPROXY_MARK port:$TPROXY_PORT proto:$TPROXY_PROTO"
 
@@ -47,6 +56,7 @@ define HIJPASS_USER = $HIJPASS_USER
 define TPROXY_MARK = $TPROXY_MARK
 define TPROXY_PORT = $TPROXY_PORT
 define TPROXY_PROTO = { $TPROXY_PROTO }
+define WAN_DEV = { $INPUT_WAN_L2_DEV }
 define IP_V4_LIST = {
 $IP_V4_LIST
 }

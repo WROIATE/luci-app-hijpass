@@ -1,19 +1,37 @@
 table inet hijpass {
     chain pre-mangle {
-        type filter hook prerouting priority mangle - 1; policy accept;
-        meta l4proto $TPROXY_PROTO socket transparent 1 meta mark set $TPROXY_MARK counter
+        type filter hook prerouting priority mangle; policy accept;
+        iif $WAN_DEV counter return
+        iif "lo" meta mark != $TPROXY_MARK counter return
+        meta l4proto != $TPROXY_PROTO counter return
+        meta l4proto udp socket transparent 1 meta mark set $TPROXY_MARK counter
+        meta l4proto tcp socket transparent 1 meta mark set $TPROXY_MARK counter
         ip daddr @bypass4list counter return
         ip6 daddr @bypass6list counter return
-        meta l4proto $TPROXY_PROTO counter tproxy to :$TPROXY_PORT meta mark set $TPROXY_MARK accept
+        jump tproxy-mark
+        meta mark $TPROXY_MARK tproxy to :$TPROXY_PORT counter
     }
 
     chain out-mangle {
-        type route hook output priority mangle - 1; policy accept;
+        type route hook output priority mangle; policy accept;
         meta l4proto != $TPROXY_PROTO counter return
         meta skgid $HIJPASS_USER counter return
         ip daddr @bypass4list counter return
         ip6 daddr @bypass6list counter return
-        meta mark set $TPROXY_MARK counter
+        jump tproxy-mark
+    }
+
+    chain tproxy-mark {
+        # Get exist connection ct mark and set fwmark
+        meta set mark ct mark counter
+        # Return if matched tproxy mark (ps. if )
+        meta l4proto udp mark $TPROXY_MARK return counter
+        meta l4proto tcp mark $TPROXY_MARK return counter
+        # Set Mark for TCP connection
+        tcp flags &(fin|syn|rst|ack) == syn meta mark set mark and 0x0 xor $TPROXY_MARK counter
+        # Set Mark for UDP connection
+        meta l4proto udp ct state new meta mark set mark and 0x0 xor $TPROXY_MARK counter
+        ct mark set mark counter
     }
 
     set bypass4list {

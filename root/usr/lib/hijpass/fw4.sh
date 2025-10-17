@@ -2,7 +2,7 @@
 
 . /usr/lib/hijpass/app-logger.sh
 
-log_debug "$0"
+log_debug "/usr/lib/hijpass/fw4.sh"
 
 NFT_CONF=/etc/hijpass/fw4-rules.nft
 TABLE_NAME=hijpass

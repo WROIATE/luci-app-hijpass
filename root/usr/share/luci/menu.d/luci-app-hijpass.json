@@ -63,12 +63,63 @@
             }
         }
     },
-    "admin/services/hijpass/transport": {
-        "title": "Transport",
+    "admin/services/hijpass/dns": {
+        "title": "DNS",
         "order": 4,
         "action": {
             "type": "view",
-            "path": "hijpass/transport"
+            "path": "hijpass/dns"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-hijpass"
+            ],
+            "uci": {
+                "hijpass": true
+            }
+        }
+    },
+    "admin/services/hijpass/firewall": {
+        "title": "Firewall",
+        "order": 5,
+        "action": {
+            "type": "view",
+            "path": "hijpass/firewall"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-hijpass"
+            ],
+            "uci": {
+                "hijpass": true
+            }
+        }
+    },
+    "admin/services/hijpass/rule": {
+        "title": "Rule",
+        "order": 6,
+        "action": {
+            "type": "view",
+            "path": "hijpass/rule"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-hijpass"
+            ],
+            "fs": {
+                "/usr/lib/hijpass/rules.sh": "executable"
+            },
+            "uci": {
+                "hijpass": true
+            }
+        }
+    },
+    "admin/services/hijpass/log": {
+        "title": "Log",
+        "order": 7,
+        "action": {
+            "type": "view",
+            "path": "hijpass/log"
         },
         "depends": {
             "acl": [

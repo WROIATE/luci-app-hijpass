@@ -1,34 +1,33 @@
 #!/bin/sh
 
 LOG_FILE="/tmp/log/hijpass.log"
-MAX_SIZE=$((1024 * 1024)) # 1MB
-LOG_LEVEL="info"          # debug, info, warn, error
+MAX_SIZE=2000                                                        # Line
+LOG_LEVEL=$(uci -q get hijpass.@hijpass[0].log_level || echo "INFO") # debug, info, warn, error
 
-LOG_LEVELS="debug:1 info:2 warn:3 error:4"
+LOG_LEVELS="DEBUG:1 INFO:2 WARN:3 ERROR:4"
 
 get_log_level_num() {
-    level=$1
+    local level="$1"
     echo "$LOG_LEVELS" | tr ' ' '\n' | grep "^$level:" | cut -d':' -f2
 }
 
 check_log_size() {
     if [ -f "$LOG_FILE" ]; then
-        size=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
-        
-        case $size in
-            ''|*[!0-9]*) size=0 ;;
-        esac
-        
+        local size tmp_file
+        size="$(wc -l "$LOG_FILE" | cut -d' ' -f1)"
         if [ "$size" -gt "$MAX_SIZE" ]; then
             tmp_file="${LOG_FILE}.tmp"
-            tail -n 100 "$LOG_FILE" > "$tmp_file" 2>/dev/null
-            mv "$tmp_file" "$LOG_FILE" 2>/dev/null
+            tail -n 100 "$LOG_FILE" >"$tmp_file" 2>/dev/null
+            cat "$tmp_file" >"$LOG_FILE"
+            rm $tmp_file
+            log_info "Log file rotated"
         fi
     fi
 }
 
 log() {
-    level=$1
+    local level level_num min_level_num message datetime
+    level=$(echo "$1" | tr 'a-z' 'A-Z')
     shift
     message=$*
     level_num=$(get_log_level_num "$level")
@@ -38,7 +37,11 @@ log() {
         if [ "$level_num" -ge "$min_level_num" ]; then
             check_log_size
             datetime=$(date "+%Y-%m-%d %H:%M:%S")
-            printf "[%s] [%s] %s\n" "$datetime" "${level}" "$message" >>"$LOG_FILE"
+            if [ "$LOG_LEVEL" = "DEBUG" ]; then
+                printf "%s   %-8s%-40s%s\n" "[$datetime]" "${level}" "$0" "$message" >>"$LOG_FILE"
+            else
+                printf "%s   %-8s%s\n" "[$datetime]" "${level}" "$message" >>"$LOG_FILE"
+            fi
         fi
     fi
 }

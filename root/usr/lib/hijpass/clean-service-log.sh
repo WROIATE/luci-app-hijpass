@@ -4,19 +4,25 @@
 
 log_debug "$0"
 
-REDIRECT_PROXY_LOG=$(uci -q get hijpass.@proxy[0].log_redirect || :)
-PROXY_LOG_PATH=$(uci -q get hijpass.@proxy[0].log_path || :)
-REDIRECT_SHUNT_LOG=$(uci -q get hijpass.@shunt[0].log_redirect || :)
-SHUNT_LOG_PATH=$(uci -q get hijpass.@shunt[0].log_path || :)
-
 clean_log() {
-    log_file="$1"
+    local log_file
+    config_get log_file "$1" log_path
+    [ -z "$log_file" ] && return
     if [ -f "$log_file" ]; then
-        tail -n 1000 "$log_file" >"$log_file.tmp" && cat "$log_file.tmp" > "$log_file"
+        tail -n 1000 "$log_file" >"$log_file.tmp" && cat "$log_file.tmp" >"$log_file"
         log_info "Successfully cleaned log file: $log_file"
+        rm "$log_file.tmp"
     fi
 }
 
-[ "$REDIRECT_PROXY_LOG" = "1" ] && clean_log "$PROXY_LOG_PATH"
-
-[ "$REDIRECT_SHUNT_LOG" = "1" ] && clean_log "$SHUNT_LOG_PATH"
+case "$1" in
+clean)
+    ehco "" >"$2"
+    log_info "Manually trigger log cleanup, log file: $2"
+    ;;
+*)
+    config_load hijpass
+    config_foreach clean_log proxy_node
+    config_foreach clean_log shunt
+    ;;
+esac

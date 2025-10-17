@@ -15,12 +15,36 @@
         "domainMatcher": "hybrid",
         "rules": [
             {
-                "type": "field",
-                "outboundTag": "direct"
+                "inboundTag": [
+                    "dns-in"
+                ],
+                "outboundTag": "dns-out",
+                "ruleTag": "DNS-IN"
+            },
+            {
+                "inboundTag": [
+                    "entrance"
+                ],
+                "outboundTag": "direct",
+                "ruleTag": "Direct"
             }
         ]
     },
-    "dns": {},
+    "dns": {
+        "disableFallback": true,
+        "queryStrategy": "UseIP",
+        "disableFallbackIfMatch": true,
+        "disableCache": true,
+        "tag": "dns-global",
+        "servers": [
+            {
+                "queryStrategy": "UseIP",
+                "port": 53,
+                "tag": "dns-direct",
+                "address": "223.5.5.5"
+            }
+        ]
+    },
     "inbounds": [
         {
             "port": 1041,
@@ -45,29 +69,19 @@
                 "followRedirect": true
             },
             "tag": "entrance"
+        },
+        {
+            "port": 10153,
+            "protocol": "dokodemo-door",
+            "settings": {
+                "network": "tcp,udp",
+                "address": "0.0.0.0"
+            },
+            "tag": "dns-in",
+            "listen": "127.0.0.1"
         }
     ],
     "outbounds": [
-        {
-            "settings": {
-                "servers": [
-                    {
-                        "password": "",
-                        "port": 2084,
-                        "address": "127.0.0.1"
-                    }
-                ]
-            },
-            "streamSettings": {
-                "network": "tcp",
-                "security": "none"
-            },
-            "mux": {
-                "enabled": false
-            },
-            "protocol": "socks",
-            "tag": "proxy"
-        },
         {
             "settings": {
                 "domainStrategy": "UseIP"
@@ -76,8 +90,20 @@
             "tag": "direct"
         },
         {
-            "tag": "dns-out",
-            "protocol": "dns"
+            "proxySettings": {
+                "tag": "direct"
+            },
+            "settings": {
+                "port": 53,
+                "network": "udp",
+                "address": "223.5.5.5",
+                "blockTypes": [
+                    65
+                ],
+                "nonIPQuery": "skip"
+            },
+            "protocol": "dns",
+            "tag": "dns-out"
         }
     ]
 }

@@ -11,10 +11,11 @@ LUCI_DEPENDS:= +curl +sing-box +xray-core \
 
 define Package/$(PKG_NAME)/conffiles
 /etc/hijpass/fw4-template.nft
-/etc/hijpass/white-v4.conf
-/etc/hijpass/white-v6.conf
 /etc/hijpass/shunt.json
-/etc/hijpass/proxy.json
+/etc/hijpass/rules/domain-direct.txt
+/etc/hijpass/rules/domain-proxy.txt
+/etc/hijpass/rules/ip-direct.txt
+/etc/hijpass/rules/ip-proxy.txt
 endef
 
 define Package/$(PKG_NAME)/postinst

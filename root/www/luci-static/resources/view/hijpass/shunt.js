@@ -4,93 +4,80 @@
 'require ui';
 'require fs';
 'require uci';
-'require view.hijpass.common as common'
+'require view.hijpass.hijpass as hj'
+
+
+const XRAY_STRATEGY_VALUES = ['UseIP', 'UseIPv4', 'UseIPv6', 'UseSystem']
+const SING_BOX_STRATEGY_VALUES = ['prefer_ipv4', 'prefer_ipv6', 'ipv4_only', 'ipv6_only']
 
 return view.extend({
     load: function () {
         return Promise.all([
-            uci.load('hijpass')
+            uci.load(hj.CONF_NAME)
         ]);
     },
 
     render: function () {
-        var m, s, o;
+        let m, s;
 
-        m = new form.Map('hijpass', _('分流设置'),
+        m = new form.Map(hj.CONF_NAME, _('分流设置'),
             _('配置分流规则和设置'));
 
-        s = m.section(form.TypedSection, 'shunt');
+        s = m.section(form.TypedSection, hj.SHUNT_SECTION_TYPE);
         s.anonymous = true;
         s.addremove = false;
 
-        s.tab('general', _('基本设置'));
-        s.tab('config', _('分流配置'));
+        // 创建标签页
+        createTabs(s);
 
-        o = s.taboption('general', form.ListValue, 'type', _('程序类型'),
-            _('选择分流程序类型'));
-        o.value('sing-box', 'sing-box');
-        o.value('xray', 'xray');
-        o.default = 'sing-box';
-        o.rmempty = false;
-
-        o = s.taboption('general', form.Value, 'dns_port', _('dns端口'),
-            _('指定dns查询'));
-        o.default = '15353';
-        o.datatype = 'port';
-        o.rmempty = false;
-
-        o = s.taboption('general', form.Value, 'geo_ip_url', _('Geo IP 下载地址'),
-            _('指定 Geo IP 数据库下载地址'));
-        o.default = 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat';
-        o.depends('type', 'xray');
-        o.rmempty = false;
-
-        o = s.taboption('general', form.Value, 'geo_site_url', _('Geo Site 下载地址'),
-            _('指定 Geo Site 数据库下载地址'));
-        o.default = 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat';
-        o.depends('type', 'xray');
-        o.rmempty = false;
-
-        o = s.taboption('general', form.Flag, 'geo_auto_update', _('自动更新 Geo'),
-            _('启用 Geo 数据库自动更新'));
-        o.depends('type', 'xray');
-        o.rmempty = false;
-
-        o = s.taboption('general', form.Value, 'geo_update_interval', _('更新间隔'),
-            _('指定更新间隔（分钟）'));
-        o.depends('geo_auto_update', '1');
-        o.default = '120';
-        o.datatype = 'uinteger';
-        o.rmempty = false;
-
-        o = s.taboption('general', form.Flag, 'log_redirect', _('日志重定向'),
-            _('重定向执行日志到文件，不开启默认输出至系统日志'));
-        o.default = '0';
-        o.rmempty = false;
-
-        o = s.taboption('general', form.Value, 'log_path', _('日志路径'),
-            _('指定记录日志的具体路径'));
-        o.depends('log_redirect', '1');
-        o.default = '/tmp/log/hijpass-shunt.log'
-        o.rmempty = false;
-
-        o = s.taboption('config', form.TextValue, '_shunt_config', null,
-            _('编辑分流配置文件'));
-        o.rows = 20;
-        o.monospace = true;
-
-        o.cfgvalue = function (section_id) {
-            return fs.trimmed(common.CONF_PATH + '/shunt.json').then(function (value) {
-                if (!value) {
-                    return '{}';
-                }
-                return value;
-            });
-        };
-        o.write = function (section_id, value) {
-            return fs.write(common.CONF_PATH + '/shunt.json', value.trim().replace(/\r\n/g, '\n') + '\n');
-        };
-
+        // 创建基础配置选项
+        createBasicOptions(s);
+        createConfigEditor(s)
         return m.render();
     }
-}); 
+});
+
+// 创建基础配置选项
+function createBasicOptions(s) {
+    let o;
+
+    // 分流类型
+    o = s.taboption('basic', form.ListValue, 'type', _('分流类型'),
+        _('选择分流程序类型'));
+    o.value('xray', 'xray');
+    o.value('sing-box', 'sing-box');
+    o.default = 'xray';
+    o.rmempty = false;
+
+    // 分流监听端口
+    o = s.taboption('basic', form.Value, 'shunt_listen_port', _('分流监听端口'),
+        _('指定分流监听端口号'));
+    o.default = '1041';
+    o.datatype = 'port';
+    o.rmempty = false;
+
+    // DNS监听端口
+    o = s.taboption('basic', form.Value, 'dns_listen_port', _('DNS监听端口'),
+        _('指定DNS监听端口号'));
+    o.default = '10153';
+    o.datatype = 'port';
+    o.rmempty = false;
+
+    // 日志路径
+    o = s.taboption('basic', form.Value, 'log_path', _('日志路径'),
+        _('指定记录日志的具体路径'));
+    o.default = '/tmp/log/hijpass-shunt.log';
+    o.rmempty = false;
+}
+
+
+function createConfigEditor(s) {
+    let o = s.taboption('config', form.TextValue, 'shunt_hash', null, '修改分流配置文件');
+    hj.setEditorOptionMembers(o, hj.getFilePath('shunt_conf'), 'shunt_hash');
+}
+
+// 创建所有标签页
+function createTabs(s) {
+    s.tab('basic', _('基础配置'));
+    s.tab('config', _('分流配置编辑'));
+}

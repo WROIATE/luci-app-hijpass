@@ -1,22 +1,52 @@
 config hijpass
-	option enable '0'
-    option startup_delay '1'
-    option delay_time '10'
+	option enabled '0'
+	option startup_delay '1'
+	option delay_time '10'
+	option ip_direct '/etc/hijpass/rules/ip-direct.txt'
+	option ip_proxy '/etc/hijpass/rules/ip-proxy.txt'
+	option domain_direct '/etc/hijpass/rules/domain-direct.txt'
+	option domain_proxy '/etc/hijpass/rules/domain-proxy.txt'
+	option gfw_list '/etc/hijpass/rules/gfw-list.txt'
+	option chn_route '/etc/hijpass/rules/chn-route.txt'
+	option chn_route6 '/etc/hijpass/rules/chn-route6.txt'
+	option chn_list '/etc/hijpass/rules/chn-list.txt'
+	option nft '/etc/hijpass/fw4-template.nft'
+	option shunt_conf '/etc/hijpass/shunt.json'
     
-config transport
-    option tproxy_proto 'tcp,udp'
-    option shunt_port '1041'
-
-config proxy
-    option command ''
-    option log_redirect '1'
-    option log_path '/tmp/log/hijpass-proxy.log'
+config firewall
+	option tproxy_proto 'tcp,udp'
+	option shunt_port '1041'
+	option use_chnroute '0'
+	option nft_hash ''
+	option ip_proxy_hash ''
+	option ip_direct_hash ''
 
 config shunt
-    option type 'xray'
-    option geo_ip_url 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat'
-    option geo_site_url 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat'
-    option geo_auto_update '0'
-    option interval '0'
-    option log_redirect '1'
-    option log_path '/tmp/log/hijpass-shunt.log'
+	option type 'xray'
+	option shunt_listen_port '1041'
+	option dns_listen_port '10153'
+	option log_path '/tmp/log/hijpass-shunt.log'
+	option shunt_hash ''
+
+config proxy_node 'opbykn2o'
+	option name 'proxy2'
+	option enabled '1'
+	option command '/usr/bin/xray -c /etc/hijpass/proxy.json'
+	option listen_port '2084'
+	option log_path '/tmp/log/hijpass-proxy2.log'
+
+config proxy_node 'blkqtz3k'
+	option name 'proxy'
+	option enabled '0'
+	option command '/usr/bin/xray -c /etc/hijpass/proxy.json'
+	option listen_port '2081'
+	option log_path '/tmp/log/hijpass-proxy.log'
+
+config dns
+	option dns_service 'dnsmasq'
+	option direct_dns 'system'
+	option proxy_dns '127.0.0.1#10153'
+	option domain_proxy_hash ''
+	option doamin_direct_hash ''
+
+config rule

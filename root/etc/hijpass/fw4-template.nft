@@ -2,49 +2,225 @@ table inet hijpass {
     chain pre-mangle {
         type filter hook prerouting priority mangle; policy accept;
         iif $WAN_DEV counter return
-        iif "lo" meta mark != $TPROXY_MARK counter return
+        iif "br-lan" counter return
+        iif "lo" meta mark & $TPROXY_MARK != $TPROXY_MARK counter return
         meta l4proto != $TPROXY_PROTO counter return
-        meta l4proto udp socket transparent 1 meta mark set $TPROXY_MARK counter
-        meta l4proto tcp socket transparent 1 meta mark set $TPROXY_MARK counter
-        ip daddr @bypass4list counter return
-        ip6 daddr @bypass6list counter return
-        jump tproxy-mark
-        meta mark $TPROXY_MARK tproxy to :$TPROXY_PORT counter
+
+        # reset mark for route
+        meta mark set 0x0
+
+        meta l4proto $TPROXY_PROTO socket transparent 1 meta mark set ct mark counter
+
+        # user custom proxy list
+        ip daddr @proxy4list counter jump tproxy-mark
+        ip6 daddr @proxy6list counter jump tproxy-mark
+        ip daddr @dnsproxy4list counter jump tproxy-mark
+        ip6 daddr @dnsproxy6list counter jump tproxy-mark
+
+        # user custom direct list
+        ip daddr @bypass4list meta mark != $TPROXY_MARK counter return
+        ip6 daddr @bypass6list meta mark != $TPROXY_MARK counter return
+        ip daddr @dnsbypass4list meta mark != $TPROXY_MARK counter return
+        ip6 daddr @dnsbypass6list meta mark != $TPROXY_MARK counter return
+
+        # gfwlist
+        ip daddr @gfw4list counter jump tproxy-mark
+        ip6 daddr @gfw6list counter jump tproxy-mark
+
+        meta l4proto $TPROXY_PROTO meta mark $TPROXY_MARK tproxy to :$TPROXY_PORT counter accept
+
+        # chnroute
+        ip daddr @chnroute4list counter return
+        ip6 daddr @chnroute6list counter return
+
+        # chnlist
+        ip daddr @chn4list counter return
+        ip6 daddr @chn6list counter return
+
+        counter jump tproxy-shunt-mark
+        meta l4proto $TPROXY_PROTO meta mark $TPROXY_SHUNT_MARK tproxy to :$TPROXY_SHUNT_PORT counter
     }
 
     chain out-mangle {
         type route hook output priority mangle; policy accept;
         meta l4proto != $TPROXY_PROTO counter return
         meta skgid $HIJPASS_USER counter return
+
+        ip daddr @proxy4list counter goto tproxy-mark
+        ip6 daddr @proxy6list counter goto tproxy-mark
+        ip daddr @dnsproxy4list counter goto tproxy-mark
+        ip6 daddr @dnsproxy6list counter goto tproxy-mark
+
         ip daddr @bypass4list counter return
         ip6 daddr @bypass6list counter return
-        jump tproxy-mark
+        ip daddr @dnsbypass4list counter return
+        ip6 daddr @dnsbypass6list counter return
+
+        ip daddr @gfw4list counter goto tproxy-mark
+        ip6 daddr @gfw6list counter goto tproxy-mark
+
+        ip daddr @chn4list counter return
+        ip6 daddr @chn6list counter return
+
+        ip daddr @chnroute4list counter return
+        ip6 daddr @chnroute6list counter return
+
+        counter jump tproxy-shunt-mark
     }
 
-    chain tproxy-mark {
+    chain tproxy-shunt-mark {
         # Get exist connection ct mark and set fwmark
-        meta set mark ct mark counter
+        meta mark set ct mark counter
         # Return if matched tproxy mark (ps. if )
-        meta l4proto udp mark $TPROXY_MARK return counter
-        meta l4proto tcp mark $TPROXY_MARK return counter
+        meta l4proto udp mark $TPROXY_SHUNT_MARK counter return
+        meta l4proto tcp mark $TPROXY_SHUNT_MARK counter return
         # Set Mark for TCP connection
-        tcp flags &(fin|syn|rst|ack) == syn meta mark set mark and 0x0 xor $TPROXY_MARK counter
+        tcp flags &(fin|syn|rst|ack) == syn meta mark set $TPROXY_SHUNT_MARK counter
         # Set Mark for UDP connection
-        meta l4proto udp ct state new meta mark set mark and 0x0 xor $TPROXY_MARK counter
+        meta l4proto udp ct state new meta mark set $TPROXY_SHUNT_MARK counter
         ct mark set mark counter
     }
 
+
+    chain tproxy-mark {
+        # Get exist connection ct mark and set fwmark
+        meta mark set ct mark counter
+        # Return if matched tproxy mark (ps. if )
+        meta l4proto udp mark $TPROXY_MARK counter return
+        meta l4proto tcp mark $TPROXY_MARK counter return
+        # Set Mark for TCP connection
+        tcp flags &(fin|syn|rst|ack) == syn meta mark set $TPROXY_MARK counter
+        # Set Mark for UDP connection
+        meta l4proto udp ct state new meta mark set $TPROXY_MARK counter
+        ct mark set mark counter
+    }
+
+    # chnroute
+    set chnroute4list {
+        type ipv4_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+        elements = {
+            $IP4_CHNROUTE_LIST
+        }
+    }
+
+    set chnroute6list {
+        type ipv6_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+        elements = {
+            $IP6_CHNROUTE_LIST
+        }
+    }
+
+    # gfwlist
+    set gfw4list {
+        type ipv4_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+    }
+
+    set gfw6list {
+        type ipv6_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+    }
+
+    # chnlist
+    set chn4list {
+        type ipv4_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+    }
+
+    set chn6list {
+        type ipv6_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+    }
+
+    # user custom proxy domain list
+    set dnsproxy4list {
+        type ipv4_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+    }
+
+    set dnsproxy6list {
+        type ipv6_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+    }
+
+    # user custom direct domain list
+    set dnsbypass4list {
+        type ipv4_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+    }
+
+    set dnsbypass6list {
+        type ipv6_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+    }
+
+    # user custom proxy ip list
     set bypass4list {
         type ipv4_addr
         flags interval
         auto-merge
-        elements = $IP_V4_LIST
+        elements = {
+            $IP4_DIRECT_NFT_LIST
+        }
     }
 
+    set proxy4list {
+        type ipv4_addr
+        flags interval
+        auto-merge
+        elements = {
+            $IP4_PROXY_NFT_LIST
+        }
+    }
+
+    # user custom direct ip list
     set bypass6list {
         type ipv6_addr
         flags interval
         auto-merge
-        elements = $IP_V6_LIST
+        elements = {
+            $IP6_DIRECT_NFT_LIST
+        }
+    }
+
+    set proxy6list {
+        type ipv6_addr
+        flags interval
+        auto-merge
+        elements = {
+            $IP6_PROXY_NFT_LIST
+        }
     }
 }

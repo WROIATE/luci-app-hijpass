@@ -186,18 +186,17 @@ function setEditorOptionMembers(o, filePath, fieldName) {
     };
 
     function writeFile(sectionId, formvalue) {
-        return this.load(sectionId).then(function (value) {
-            if (value == formvalue) {
-                return
-            }
-            uci.set(CONF_NAME, sectionId, fieldName, simpleHash(formvalue))
-            return fs.write(filePath, (formvalue || '').trim().replace(/\r\n/g, '\n') + '\n');
-        });
+        let curretnHash = simpleHash(formvalue)
+        let oldHash = uci.get_first(CONF_NAME, sectionId, fieldName)
+        if (curretnHash == oldHash) {
+            return
+        }
+        uci.set(CONF_NAME, sectionId, fieldName, simpleHash(formvalue))
+        return fs.write(filePath, (formvalue || '').trim().replace(/\r\n/g, '\n') + '\n');
     }
 
     // 写入文件
     o.write = writeFile
-    o.remove = writeFile
     o.monospace = true;
 
     return o;
@@ -235,5 +234,6 @@ return baseclass.extend({
     generateUniqueSectionId: generateUniqueSectionId,
     setAnonymousGridSectionMembers: setAnonymousGridSectionMembers,
     setGridSectionMembers: setGridSectionMembers,
-    setEditorOptionMembers: setEditorOptionMembers
+    setEditorOptionMembers: setEditorOptionMembers,
+    simpleHash: simpleHash
 });

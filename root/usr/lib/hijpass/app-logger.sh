@@ -1,7 +1,7 @@
 #!/bin/sh
 
 LOG_FILE="/tmp/log/hijpass.log"
-MAX_SIZE=2000                                                        # Line
+MAX_SIZE=20000                                                        # Line
 LOG_LEVEL=$(uci -q get hijpass.@hijpass[0].log_level || echo "INFO") # debug, info, warn, error
 
 LOG_LEVELS="DEBUG:1 INFO:2 WARN:3 ERROR:4"
@@ -17,7 +17,7 @@ check_log_size() {
         size="$(wc -l "$LOG_FILE" | cut -d' ' -f1)"
         if [ "$size" -gt "$MAX_SIZE" ]; then
             tmp_file="${LOG_FILE}.tmp"
-            tail -n 100 "$LOG_FILE" >"$tmp_file" 2>/dev/null
+            tail -n 5000 "$LOG_FILE" >"$tmp_file" 2>/dev/null
             cat "$tmp_file" >"$LOG_FILE"
             rm $tmp_file
             log_info "Log file rotated"

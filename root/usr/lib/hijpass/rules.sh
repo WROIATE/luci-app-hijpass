@@ -472,9 +472,8 @@ main() {
         download_chn_route_ipv6
         download_geosite
         download_geoip
-        [ "$ENABLED" != "1" ] && log_info "Skip reload hijpass" && return 0
-        $NFT_SCRIPT reset
-        $DNSMASQ_SCRIPT reset
+        [ "$ENABLED" != "1" ] && log_info "Skip restart hijpass" && return 0
+        /etc/init.d/hijpass restart
         ;;
     *)
         echo "Usage: $0 [chnlist|chnroute|geo|all]"

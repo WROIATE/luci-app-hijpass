@@ -57,6 +57,9 @@ function createGridDisplayOptions(s) {
     o = createListenPortOption(s);
     o.modalonly = false;
 
+    o = createSocksPortOption(s)
+    o.modalonly = false;
+
     o = createEnabledOption(s);
     o.editable = true;
     o.modalonly = false;
@@ -84,7 +87,17 @@ function createCommandOption(s) {
 // 修改其他选项为编辑表单专用
 function createListenPortOption(s) {
     let o = s.option(form.Value, 'listen_port', _('监听端口'),
-        _('指定代理程序监听端口号'));
+        _('指定透明代理监听端口号'));
+    o.datatype = 'port';
+    o.rmempty = false;
+    o.modalonly = true;
+    o.validate = hj.validateProxyPortConflict
+    return o;
+}
+
+function createSocksPortOption(s) {
+    let o = s.option(form.Value, 'socks_port', _('socks监听端口号'),
+        _('指定socks监听端口号'));
     o.datatype = 'port';
     o.rmempty = false;
     o.modalonly = true;
@@ -118,6 +131,7 @@ function createProxyOptions(s) {
     // 创建编辑表单选项
     createCommandOption(s);
     createListenPortOption(s);
+    createSocksPortOption(s);
     createProcdEnvOption(s);
     createLogRedirectOption(s);
 }

@@ -4,16 +4,18 @@
 'require ui';
 'require fs';
 'require uci';
+'require network'
 'require view.hijpass.hijpass as hj'
 
 return view.extend({
     load: function () {
         return Promise.all([
-            uci.load(hj.CONF_NAME)
+            uci.load(hj.CONF_NAME),
+            network.getDevices()
         ]);
     },
 
-    render: function () {
+    render: function (data) {
         let m, s;
 
         m = new form.Map(hj.CONF_NAME, _('防火墙配置'),
@@ -126,6 +128,9 @@ function createTextOptions(s) {
 
     // 防火墙规则
     createTextOption(s, 'nftables', 'nft_hash', null, _('编辑防火墙 nftables 规则'), hj.getFilePath('nft'));
+
+    // 用户自定义启动脚本
+    createTextOption(s, 'hook', 'nft_hook_hash', null, _('用户自定义脚本，会在服务服务规则初始化后执行脚本内容，不会在停止时执行，因此请不要在脚本中修改hijpass表以外的规则'), hj.getFilePath('nft_hook'));
 }
 
 // 创建所有标签页
@@ -133,7 +138,6 @@ function createTabs(s) {
     s.tab('basic', _('基本设置'));
     s.tab('ip_direct', _('IP 直连列表'));
     s.tab('ip_proxy', _('IP 代理列表'));
-    s.tab('domain_direct', _('域名直连列表'));
-    s.tab('domain_proxy', _('域名代理列表'));
     s.tab('nftables', _('防火墙规则'));
+    s.tab('hook', _('自定义脚本'));
 }

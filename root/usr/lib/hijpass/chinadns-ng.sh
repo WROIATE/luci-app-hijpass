@@ -1,0 +1,73 @@
+#!/bin/sh
+. /usr/lib/hijpass/app-logger.sh
+log_debug "$0"
+
+GFW_FILE_PATH=$(uci -q get hijpass.@hijpass[0].gfw_list)
+CHN_FILE_PATH=$(uci -q get hijpass.@hijpass[0].chn_list)
+DOMAIN_PROXY_FILE_PATH=$(uci -q get hijpass.@hijpass[0].domain_proxy)
+DOMAIN_DIRECT_FILE_PATH=$(uci -q get hijpass.@hijpass[0].domain_direct)
+DIRECT_DNS=$(uci -q get hijpass.@dns[0].direct_dns)
+PROXY_DNS=$(uci -q get hijpass.@dns[0].proxy_dns)
+ENABLE_GFW=$(uci -q get hijpass.@dns[0].use_gfw)
+ENABLE_CHN=$(uci -q get hijpass.@dns[0].use_chn)
+CHINADNS_NG_CONF="/etc/hijpass/chinadns-ng.conf"
+
+if [ "$DIRECT_DNS" = "custom" ]; then
+    DIRECT_DNS="$(uci -q get hijpass.@dns[0].direct_dns_custom)"
+fi
+if [ "$DIRECT_DNS" = "system" ]; then
+    DIRECT_DNS=""
+    dnsmasq_port=$(uci -q get dhcp.@dnsmasq[0].port || :)
+    [ -n "$dnsmasq_port" ] && DIRECT_DNS="127.0.0.1#$dnsmasq_port"
+fi
+if [ "$PROXY_DNS" = "custom" ]; then
+    PROXY_DNS="$(uci -q get hijpass.@dns[0].proxy_dns_custom)"
+fi
+
+CONF="
+# 监听地址和端口
+bind-addr 0.0.0.0
+bind-port 53653
+
+# 国内上游、可信上游
+china-dns $DIRECT_DNS
+trust-dns $PROXY_DNS
+
+# 域名列表，用于分流
+$([ "$ENABLE_CHN" = "1" ] && echo "chnlist-file  $CHN_FILE_PATH")
+$([ "$ENABLE_GFW" = "1" ] && echo "gfwlist-file  $GFW_FILE_PATH")
+
+$([ "$ENABLE_CHN" = "1" ] && [ "$ENABLE_GFW" != "1" ] && echo "default-tag gfw")
+$([ "$ENABLE_GFW" = "1" ] && [ "$ENABLE_CHN" != "1" ] && echo "default-tag chn")
+
+group userdirect
+group-dnl $DOMAIN_DIRECT_FILE_PATH
+group-upstream $DIRECT_DNS
+group-ipset inet@hijpass@dnsbypass4list,inet@hijpass@dnsbypass6list
+
+group userproxy
+group-dnl $DOMAIN_PROXY_FILE_PATH
+group-upstream $PROXY_DNS
+group-ipset inet@hijpass@dnsproxy4list,inet@hijpass@dnsproxy6list
+
+# 收集 tag:chn、tag:gfw 域名的 IP (可选)
+add-tagchn-ip inet@hijpass@chn4list,inet@hijpass@chn6list
+add-taggfw-ip inet@hijpass@gfw4list,inet@hijpass@gfw6list
+
+# 测试 tag:none 域名的 IP (针对国内上游)
+$([ "$ENABLE_CHN" = "1" ] && [ "$ENABLE_GFW" = "1" ] && echo "ipset-name4 inet@hijpass@chnroute4list
+ipset-name6 inet@hijpass@chnroute6list")
+
+# dns 缓存
+# cache 4096
+# cache-stale 86400
+# cache-refresh 20
+
+# verdict 缓存 (用于 tag:none 域名)
+verdict-cache 4096
+
+# 详细日志
+# verbose
+"
+
+echo "$CONF" >"$CHINADNS_NG_CONF"

@@ -5,9 +5,9 @@ PKG_VERSION:=25.4.6
 PKG_RELEASE:=1
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
-LUCI_DEPENDS:= +curl +sing-box +xray-core \
+LUCI_DEPENDS:= +curl +file +sing-box +xray-core \
 	+kmod-nft-socket +kmod-nft-tproxy +kmod-nft-nat \
-	+v2ray-geosite +v2ray-geoip +geoview +hysteria
+	+v2ray-geosite +v2ray-geoip +geoview +hysteria +chinadns-ng
 
 define Package/$(PKG_NAME)/conffiles
 /etc/hijpass/fw4-template.nft

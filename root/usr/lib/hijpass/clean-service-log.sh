@@ -2,6 +2,8 @@
 
 . /usr/lib/hijpass/app-logger.sh
 
+. /lib/functions.sh
+
 log_debug "$0"
 
 clean_log() {
@@ -9,8 +11,8 @@ clean_log() {
     config_get log_file "$1" log_path
     [ -z "$log_file" ] && return
     if [ -f "$log_file" ]; then
-        tail -n 1000 "$log_file" >"$log_file.tmp" && cat "$log_file.tmp" >"$log_file"
-        log_info "Successfully cleaned log file: $log_file"
+        tail -n 30000 "$log_file" >"$log_file.tmp" && cat "$log_file.tmp" >"$log_file"
+        log_debug "Successfully cleaned log file: $log_file"
         rm "$log_file.tmp"
     fi
 }

@@ -138,21 +138,13 @@ $FW4_TEMPLATE
 
 if [ -z "$TPROXY_SHUNT_PORT" ]; then
     fw_rules=$(echo "$fw_rules" | grep -v "TPROXY_SHUNT_PORT")
-    fw_rules=$(echo "$fw_rules" | grep -v "jump tproxy-shunt-mark")
+    fw_rules=$(echo "$fw_rules" | grep -v "shunt mark")
     fw_rules=$(echo "$fw_rules" | grep -v "@chnroute")
     fw_rules=$(echo "$fw_rules" | grep -Ev "@chn.list")
-    fw_rules=$(echo "$fw_rules" | sed '/chain tproxy-shunt-mark {/,/^    }/d')
 fi
 
 if [ -z "$TPROXY_PORT" ]; then
     fw_rules=$(echo "$fw_rules" | grep -v "TPROXY_PORT")
-    fw_rules=$(echo "$fw_rules" | sed 's/jump tproxy-mark/jump tproxy-shunt-mark/g')
-    fw_rules=$(echo "$fw_rules" | sed 's/goto tproxy-mark/goto tproxy-shunt-mark/g')
-    fw_rules=$(echo "$fw_rules" | sed '/chain tproxy-mark {/,/^    }/d')
-fi
-
-if [ -z "$INPUT_WAN_L2_DEV" ]; then
-    fw_rules=$(echo "$fw_rules" | grep -v "WAN_DEV")
 fi
 
 if [ -z "$ENABLE_CHN_ROUTE" ]; then
@@ -170,9 +162,9 @@ if [ -z "$ENABLE_CHN_LIST" ]; then
     fw_rules=$(echo "$fw_rules" | sed '/set chn.list {/,/^    }/d')
 fi
 
-if [ "$DNS_SERVICE" != "dnsmasq" ]; then
+if [ "$DNS_SERVICE" = "custom" ]; then
     fw_rules=$(echo "$fw_rules" | grep -Ev "@dns.*\dlist")
-    fw_rules=$(echo "$fw_rules" | sed '/set dns.*\dlist {/,/^    }/d')  
+    fw_rules=$(echo "$fw_rules" | sed '/set dns.*\dlist {/,/^    }/d')
 fi
 
 echo "$fw_rules"

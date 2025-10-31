@@ -1,109 +1,11 @@
 {
     "log": {
-        "loglevel": "warning"
+        "disabled": false,
+        "level": "info",
+        "timestamp": true
     },
-    "policy": {
-        "levels": {
-            "0": {
-                "statsUserUplink": false,
-                "statsUserDownlink": false
-            }
-        }
-    },
-    "routing": {
-        "domainStrategy": "IPIfNonMatch",
-        "domainMatcher": "hybrid",
-        "rules": [
-            {
-                "inboundTag": [
-                    "dns-in"
-                ],
-                "outboundTag": "dns-out",
-                "ruleTag": "DNS-IN"
-            },
-            {
-                "inboundTag": [
-                    "entrance"
-                ],
-                "outboundTag": "direct",
-                "ruleTag": "Direct"
-            }
-        ]
-    },
-    "dns": {
-        "disableFallback": true,
-        "queryStrategy": "UseIP",
-        "disableFallbackIfMatch": true,
-        "disableCache": true,
-        "tag": "dns-global",
-        "servers": [
-            {
-                "queryStrategy": "UseIP",
-                "port": 53,
-                "tag": "dns-direct",
-                "address": "223.5.5.5"
-            }
-        ]
-    },
-    "inbounds": [
-        {
-            "port": 1041,
-            "protocol": "dokodemo-door",
-            "streamSettings": {
-                "sockopt": {
-                    "tproxy": "tproxy"
-                }
-            },
-            "sniffing": {
-                "enabled": true,
-                "routeOnly": true,
-                "destOverride": [
-                    "http",
-                    "tls",
-                    "quic"
-                ],
-                "metadataOnly": false
-            },
-            "settings": {
-                "network": "tcp,udp",
-                "followRedirect": true
-            },
-            "tag": "entrance"
-        },
-        {
-            "port": 10153,
-            "protocol": "dokodemo-door",
-            "settings": {
-                "network": "tcp,udp",
-                "address": "0.0.0.0"
-            },
-            "tag": "dns-in",
-            "listen": "127.0.0.1"
-        }
-    ],
-    "outbounds": [
-        {
-            "settings": {
-                "domainStrategy": "UseIP"
-            },
-            "protocol": "freedom",
-            "tag": "direct"
-        },
-        {
-            "proxySettings": {
-                "tag": "direct"
-            },
-            "settings": {
-                "port": 53,
-                "network": "udp",
-                "address": "223.5.5.5",
-                "blockTypes": [
-                    65
-                ],
-                "nonIPQuery": "skip"
-            },
-            "protocol": "dns",
-            "tag": "dns-out"
-        }
-    ]
+    "dns": {},
+    "inbounds": [],
+    "outbounds": [],
+    "route": {}
 }

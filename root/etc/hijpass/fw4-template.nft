@@ -1,63 +1,46 @@
 table inet hijpass {
-    chain pre-mangle {
-        type filter hook prerouting priority mangle; policy accept;
-        iif $WAN_DEV counter return
-        iif "br-lan" counter return
-        iif "lo" meta mark & $TPROXY_MARK != $TPROXY_MARK counter return
+    chain pre-filter {
+        type filter hook prerouting priority filter; policy accept;
+
+        fib saddr type != local iif != br-lan counter return
+        fib daddr type local counter return
+        ct direction reply counter return
         meta l4proto != $TPROXY_PROTO counter return
 
-        # reset mark for route
-        meta mark set 0x0
+        ct state new,related counter jump tproxy-shunt
+        ct mark != { $TPROXY_MARK, $TPROXY_SHUNT_MARK } counter return
 
-        meta l4proto $TPROXY_PROTO socket transparent 1 meta mark set ct mark counter
-
-        # user custom proxy list
-        ip daddr @proxy4list counter jump tproxy-mark
-        ip6 daddr @proxy6list counter jump tproxy-mark
-        ip daddr @dnsproxy4list counter jump tproxy-mark
-        ip6 daddr @dnsproxy6list counter jump tproxy-mark
-
-        # user custom direct list
-        ip daddr @bypass4list meta mark != $TPROXY_MARK counter return
-        ip6 daddr @bypass6list meta mark != $TPROXY_MARK counter return
-        ip daddr @dnsbypass4list meta mark != $TPROXY_MARK counter return
-        ip6 daddr @dnsbypass6list meta mark != $TPROXY_MARK counter return
-
-        # gfwlist
-        ip daddr @gfw4list counter jump tproxy-mark
-        ip6 daddr @gfw6list counter jump tproxy-mark
-
-        meta l4proto $TPROXY_PROTO meta mark $TPROXY_MARK tproxy to :$TPROXY_PORT counter accept
-
-        # chnroute
-        ip daddr @chnroute4list counter return
-        ip6 daddr @chnroute6list counter return
-
-        # chnlist
-        ip daddr @chn4list counter return
-        ip6 daddr @chn6list counter return
-
-        counter jump tproxy-shunt-mark
-        meta l4proto $TPROXY_PROTO meta mark $TPROXY_SHUNT_MARK tproxy to :$TPROXY_SHUNT_PORT counter
+        meta l4proto $TPROXY_PROTO ct mark $TPROXY_MARK tproxy to :$TPROXY_PORT meta mark set $TPROXY_MARK counter accept
+        meta l4proto $TPROXY_PROTO ct mark { $TPROXY_MARK, $TPROXY_SHUNT_MARK } tproxy to :$TPROXY_SHUNT_PORT meta mark set $TPROXY_MARK counter
     }
 
-    chain out-mangle {
-        type route hook output priority mangle; policy accept;
+    chain out-route {
+        type route hook output priority filter; policy accept;
+
+        fib daddr type local counter return
+        ct direction reply counter return
         meta l4proto != $TPROXY_PROTO counter return
         meta skgid $HIJPASS_USER counter return
 
-        ip daddr @proxy4list counter goto tproxy-mark
-        ip6 daddr @proxy6list counter goto tproxy-mark
-        ip daddr @dnsproxy4list counter goto tproxy-mark
-        ip6 daddr @dnsproxy6list counter goto tproxy-mark
+        ct state new,related counter jump tproxy-shunt
+        counter jump tproxy-mark
+    }
+
+    chain tproxy-shunt {
+        ct mark { $TPROXY_MARK, $TPROXY_SHUNT_MARK } return
+
+        ip daddr @proxy4list ct mark set $TPROXY_MARK counter return
+        ip6 daddr @proxy6list ct mark set $TPROXY_MARK counter return
+        ip daddr @dnsproxy4list ct mark set $TPROXY_MARK counter return
+        ip6 daddr @dnsproxy6list ct mark set $TPROXY_MARK counter return
 
         ip daddr @bypass4list counter return
         ip6 daddr @bypass6list counter return
         ip daddr @dnsbypass4list counter return
         ip6 daddr @dnsbypass6list counter return
 
-        ip daddr @gfw4list counter goto tproxy-mark
-        ip6 daddr @gfw6list counter goto tproxy-mark
+        ip daddr @gfw4list counter ct mark set $TPROXY_MARK counter return
+        ip6 daddr @gfw6list counter ct mark set $TPROXY_MARK counter return
 
         ip daddr @chn4list counter return
         ip6 daddr @chn6list counter return
@@ -65,34 +48,11 @@ table inet hijpass {
         ip daddr @chnroute4list counter return
         ip6 daddr @chnroute6list counter return
 
-        counter jump tproxy-shunt-mark
+        ct mark set $TPROXY_SHUNT_MARK counter comment "shunt mark"
     }
-
-    chain tproxy-shunt-mark {
-        # Get exist connection ct mark and set fwmark
-        meta mark set ct mark counter
-        # Return if matched tproxy mark (ps. if )
-        meta l4proto udp mark $TPROXY_SHUNT_MARK counter return
-        meta l4proto tcp mark $TPROXY_SHUNT_MARK counter return
-        # Set Mark for TCP connection
-        tcp flags &(fin|syn|rst|ack) == syn meta mark set $TPROXY_SHUNT_MARK counter
-        # Set Mark for UDP connection
-        meta l4proto udp ct state new meta mark set $TPROXY_SHUNT_MARK counter
-        ct mark set mark counter
-    }
-
 
     chain tproxy-mark {
-        # Get exist connection ct mark and set fwmark
-        meta mark set ct mark counter
-        # Return if matched tproxy mark (ps. if )
-        meta l4proto udp mark $TPROXY_MARK counter return
-        meta l4proto tcp mark $TPROXY_MARK counter return
-        # Set Mark for TCP connection
-        tcp flags &(fin|syn|rst|ack) == syn meta mark set $TPROXY_MARK counter
-        # Set Mark for UDP connection
-        meta l4proto udp ct state new meta mark set $TPROXY_MARK counter
-        ct mark set mark counter
+        ct mark { $TPROXY_MARK, $TPROXY_SHUNT_MARK } meta mark set $TPROXY_MARK
     }
 
     # chnroute

@@ -10,18 +10,18 @@
 return view.extend({
     load: function () {
         return Promise.all([
-            uci.load(hj.CONF_NAME),
+            uci.load(hj.HijpassEnum.CONF_NAME),
             network.getDevices()
         ]);
     },
 
-    render: function (data) {
+    render: function () {
         let m, s;
 
-        m = new form.Map(hj.CONF_NAME, _('防火墙配置'),
+        m = new form.Map(hj.HijpassEnum.CONF_NAME, _('防火墙配置'),
             _('配置nftables相关功能'));
 
-        s = m.section(form.TypedSection, hj.FIREWALL_SECTION_TYPE);
+        s = m.section(form.TypedSection, hj.HijpassEnum.FIREWALL_SECTION_TYPE);
         s.anonymous = true;
         s.addremove = false;
 
@@ -66,7 +66,7 @@ function createPortOptions(s) {
 
 
     // 动态添加代理节点端口选项
-    uci.sections(hj.CONF_NAME, hj.PROXY_NODE_TYPE, (section) => {
+    uci.sections(hj.HijpassEnum.CONF_NAME, hj.HijpassEnum.PROXY_NODE_TYPE, (section) => {
         if (section.listen_port) {
             let displayName = _('代理节点 %s: %s').format(section.name, section.listen_port);
             o.value(section.listen_port, displayName);
@@ -80,13 +80,13 @@ function createPortOptions(s) {
         _('选择分流应用端口号，可从分流端口或代理节点端口中选择'));
 
     // 动态添加分流端口选项
-    let shuntListenPort = uci.get_first(hj.CONF_NAME, hj.SHUNT_SECTION_TYPE, 'shunt_listen_port');
+    let shuntListenPort = uci.get_first(hj.HijpassEnum.CONF_NAME, hj.HijpassEnum.SHUNT_SECTION_TYPE, 'shunt_listen_port');
     if (shuntListenPort) {
         o.value(shuntListenPort, _('分流端口: %s').format(shuntListenPort));
     }
 
     // 动态添加代理节点端口选项
-    uci.sections(hj.CONF_NAME, hj.PROXY_NODE_TYPE, (section) => {
+    uci.sections(hj.HijpassEnum.CONF_NAME, hj.HijpassEnum.PROXY_NODE_TYPE, (section) => {
         if (section.listen_port) {
             let displayName = _('代理节点 %s: %s').format(section.name, section.listen_port);
             o.value(section.listen_port, displayName);
@@ -110,7 +110,7 @@ function createListOptions(s) {
 // 创建文本编辑器选项
 function createTextOption(s, tabName, fieldName, title, description, filePath) {
     let o = s.taboption(tabName, form.TextValue, fieldName, title, description);
-    hj.setEditorOptionMembers(o, filePath, fieldName);
+    hj.WebUtils.setEditorOptionMembers(o, filePath, fieldName);
     return o;
 }
 
@@ -120,17 +120,19 @@ function createTextOptions(s) {
     // IP 直连列表（IPv4 + IPv6）
     createTextOption(s, 'ip_direct', 'ip_direct_hash', null,
         _('编辑 IP CIDR 直连列表配置（支持 IPv4 和 IPv6）'),
-        hj.getFilePath('ip_direct'));
+        hj.WebUtils.getFilePath('ip_direct'));
 
     // IP 代理列表（IPv4 + IPv6）
     createTextOption(s, 'ip_proxy', 'ip_proxy_hash', null,
-        _('编辑 IP CIDR 代理列表配置（支持 IPv4 和 IPv6）'), hj.getFilePath('ip_proxy'));
+        _('编辑 IP CIDR 代理列表配置（支持 IPv4 和 IPv6）'), hj.WebUtils.getFilePath('ip_proxy'));
 
     // 防火墙规则
-    createTextOption(s, 'nftables', 'nft_hash', null, _('编辑防火墙 nftables 规则'), hj.getFilePath('nft'));
+    createTextOption(s, 'nftables', 'nft_hash', null, _('编辑防火墙 nftables 规则'), hj.WebUtils.getFilePath('nft'));
 
     // 用户自定义启动脚本
-    createTextOption(s, 'hook', 'nft_hook_hash', null, _('用户自定义脚本，会在服务服务规则初始化后执行脚本内容，不会在停止时执行，因此请不要在脚本中修改hijpass表以外的规则'), hj.getFilePath('nft_hook'));
+    createTextOption(s, 'hook', 'nft_hook_hash', null,
+         _('用户自定义脚本，会在服务服务规则初始化后执行脚本内容，不会在停止时执行，因此请不要在脚本中修改hijpass表以外的规则'), 
+         hj.WebUtils.getFilePath('nft_hook'));
 }
 
 // 创建所有标签页

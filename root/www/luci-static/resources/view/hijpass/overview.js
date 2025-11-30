@@ -9,20 +9,20 @@
 return view.extend({
     load: function () {
         return Promise.all([
-            uci.load(hj.CONF_NAME)
+            uci.load(hj.HijpassEnum.CONF_NAME)
         ]);
     },
 
     render: function () {
         var m, s, o;
 
-        m = new form.Map(hj.CONF_NAME, _('HiJpass'));
+        m = new form.Map(hj.HijpassEnum.CONF_NAME, _('HiJpass'));
 
         s = m.section(form.TypedSection);
         s.anonymous = true;
-        s.render = hj.getServiceStatus;
+        s.render = hj.Luci.renderServiceStatus;
 
-        s = m.section(form.TypedSection, hj.GLOBAL_SECTION_TYPE);
+        s = m.section(form.TypedSection, hj.HijpassEnum.GLOBAL_SECTION_TYPE);
         s.anonymous = true;
         s.addremove = false;
 

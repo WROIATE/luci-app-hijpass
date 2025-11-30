@@ -9,16 +9,16 @@
 return view.extend({
     load: function () {
         return Promise.all([
-            uci.load(hj.CONF_NAME)
+            uci.load(hj.HijpassEnum.CONF_NAME)
         ]);
     },
 
     render: function () {
         var m, s, o;
 
-        m = new form.Map(hj.CONF_NAME, _('规则配置'), _('路由相关文件规则配置'));
+        m = new form.Map(hj.HijpassEnum.CONF_NAME, _('规则配置'), _('路由相关文件规则配置'));
 
-        s = m.section(form.TypedSection, hj.RULE_SECTION_TYPE);
+        s = m.section(form.TypedSection, hj.HijpassEnum.RULE_SECTION_TYPE);
         s.anonymous = true;
         s.addremove = false;
 

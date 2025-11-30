@@ -9,7 +9,7 @@
 return view.extend({
     load: function () {
         return Promise.all([
-            uci.load(hj.CONF_NAME)
+            uci.load(hj.HijpassEnum.CONF_NAME)
         ]);
     },
     handleSaveApply: null,
@@ -18,7 +18,7 @@ return view.extend({
     render: function () {
         let m, s, o;
 
-        m = new form.Map(hj.CONF_NAME, _('日志查看'),
+        m = new form.Map(hj.HijpassEnum.CONF_NAME, _('日志查看'),
             _('查看和管理 HiJpass 相关日志'));
 
         s = m.section(form.TypedSection, 'logs_display');
@@ -40,7 +40,7 @@ function createLogFileOptions() {
     options.push(E('option', { 'value': '/tmp/log/hijpass.log' }, _('主日志')));
 
     // 添加分流日志
-    let shuntLogPath = uci.get_first(hj.CONF_NAME, hj.SHUNT_SECTION_TYPE, 'log_path');
+    let shuntLogPath = uci.get_first(hj.HijpassEnum.CONF_NAME, hj.HijpassEnum.SHUNT_SECTION_TYPE, 'log_path');
     if (shuntLogPath) {
         options.push(E('option', { 'value': shuntLogPath }, _('分流日志')));
     } else {
@@ -48,7 +48,7 @@ function createLogFileOptions() {
     }
 
     // 动态添加代理节点日志
-    uci.sections(hj.CONF_NAME, hj.PROXY_NODE_TYPE, (proxySection) => {
+    uci.sections(hj.HijpassEnum.CONF_NAME, hj.HijpassEnum.PROXY_NODE_TYPE, (proxySection) => {
         let proxyName = proxySection['.name'];
         let displayName = proxySection.name || proxyName;
         let logPath = proxySection.log_path;

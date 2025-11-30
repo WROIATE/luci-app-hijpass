@@ -1,0 +1,366 @@
+'use strict';
+
+
+import {LuciFlied} from "../enum/hijpass";
+import {
+    RuleDTO,
+    DnsNode,
+    DnsSection,
+    RouteSection,
+    ShuntRouteRule,
+    ShuntSection,
+    LoadBalanceNode, RuleSetDTO
+} from "../module/luci";
+import rpc from "rpc";
+import poll from "poll";
+import uci from "uci";
+import fs from "fs";
+
+
+const callServiceList = rpc.declare({
+    object: 'service',
+    method: 'list',
+    params: ['name'],
+    expect: {'': {}}
+})
+
+const MiscUtils = {
+    checkServiceRunning: function () {
+        return L.resolveDefault(callServiceList(LuciFlied.CONF_NAME), {}).then(function (res) {
+            let isRunning = false;
+            try {
+                uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
+                    let sectionName = section['.name'] + "-" + section.name
+                    if (res && res[LuciFlied.CONF_NAME] && res[LuciFlied.CONF_NAME]['instances']
+                        && res[LuciFlied.CONF_NAME]['instances'][sectionName]) {
+                        isRunning = isRunning
+                            || res[LuciFlied.CONF_NAME]['instances'][sectionName]['running'];
+                    }
+                })
+            } catch (e) {
+                console.error('Error getting service status:', e);
+            }
+            return isRunning;
+        });
+    },
+
+    renderServiceStatus: function (isRunning: any) {
+        let renderHTML = "";
+        let spanTemp = '<em><span style="color:%s"><strong>%s %s</strong></span></em>';
+
+        if (isRunning) {
+            renderHTML += spanTemp.format('green', _("HiJpass"), _("运行中"));
+        } else {
+            renderHTML += spanTemp.format('red', _("HiJpass"), _("未运行"));
+        }
+
+        return renderHTML;
+    },
+
+
+    parseRuleSetPath: function (line: string, type: string): RuleSetDTO {
+        let pathOrUrl = line.substring(type === 'remote' ? 16 : 15);
+        let filename = pathOrUrl.split('/').pop();
+        let tag = filename.substring(0, filename.lastIndexOf('.')) || filename;
+        let format = (type === 'remote' ? pathOrUrl : filename).endsWith('srs') ? 'binary' : 'source';
+        return {tag: tag, type: type, format: format, pathOrUrl: pathOrUrl}
+    },
+
+    camelToSnake: function (str: string) {
+        return str.replace(/([A-Z])/g, function (match) {
+            return '_' + match.toLowerCase();
+        });
+    },
+
+    transFromUci: function (object: any, section: any) {
+        Object.keys(object).forEach(key => {
+            let uciOption = MiscUtils.camelToSnake(key)
+            if (section[uciOption]) {
+                object[key] = section[uciOption]
+            }
+        });
+    },
+};
+
+const LuciUtils = {
+    renderServiceStatus: function (section_id: string) {
+        poll.add(function () {
+            return L.resolveDefault(MiscUtils.checkServiceRunning()).then(function (res) {
+                let view = document.getElementById("service_status");
+                if (view) view.innerHTML = MiscUtils.renderServiceStatus(res);
+            });
+        });
+
+        return E('div', {class: 'cbi-map'},
+            E('fieldset', {class: 'cbi-section'}, [
+                E('p', {id: 'service_status'},
+                    _('正在获取状态...'))
+            ])
+        );
+    }
+}
+
+const ShuntUtils = {
+    getShuntSection: function () {
+        let shuntSection = new ShuntSection();
+        let uSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
+        MiscUtils.transFromUci(shuntSection, uSection)
+        shuntSection.loadBalance = ShuntUtils.getLoadBalanceSection()
+        shuntSection.dns = ShuntUtils.getDnsSection()
+        shuntSection.route = ShuntUtils.getRouteSection()
+        return shuntSection;
+    },
+
+    getRouteSection: function () {
+        let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
+        let routeSection = new RouteSection();
+        MiscUtils.transFromUci(routeSection, shuntSection)
+
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section) {
+            let rule = new ShuntRouteRule()
+            MiscUtils.transFromUci(rule, section)
+            routeSection.rules.push(rule)
+        })
+        return routeSection;
+    },
+
+    getDnsSection: function () {
+        let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
+        let dnsSection = new DnsSection();
+        dnsSection.nodes = []
+        MiscUtils.transFromUci(dnsSection, shuntSection)
+
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, function (section) {
+            let server = new DnsNode()
+            MiscUtils.transFromUci(server, section)
+            dnsSection.nodes.push(server)
+        })
+        return dnsSection;
+    },
+
+    getLoadBalanceSection: function () {
+        let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
+        let loadBalanceSection = new LoadBalanceNode();
+        MiscUtils.transFromUci(loadBalanceSection, shuntSection)
+        return loadBalanceSection;
+    },
+
+    /**
+     * 解析规则列表，根据前缀分类
+     * @param {string} ruleList - 规则列表字符串，每行一个规则
+     * @param {string} type - 'domain' 或 'ip'
+     * @returns {Object} 包含不同类型规则的对象
+     */
+    parseRuleList: function (ruleList: string, type: string): RuleDTO {
+        // 初始化结果对象
+        let result = new RuleDTO();
+        if (!ruleList || ruleList.trim() === '') {
+            return result;
+        }
+
+        // 按行分割并处理
+        let lines = ruleList.split('\n');
+
+        for (let line of lines) {
+            line = line.trim();
+
+            // 跳过空行和注释
+            if (line === '' || line.startsWith('#')) {
+                continue;
+            }
+
+            // 处理rule-set（域名和IP通用）
+            if (line.startsWith('rule-set:')) {
+                let type = line.startsWith('rule-set:remote:') ? 'remote' : 'local';
+                let ruleSet = MiscUtils.parseRuleSetPath(line, type);
+                result.ruleSet.push(ruleSet);
+                continue;
+            }
+
+            // 处理域名特有规则
+            if (type === 'domain') {
+                if (line.startsWith('regexp:')) {
+                    result.domainRegex.push(line.substring(7));
+                } else if (line.startsWith('domain:')) {
+                    result.domainSuffix.push(line.substring(7));
+                } else if (line.startsWith('full:')) {
+                    result.domain.push(line.substring(5));
+                } else if (line.startsWith('geosite:')) {
+                    result.geoSite.push(line)
+                } else {
+                    result.domainKeyword.push(line);
+                }
+            } else { // 处理IP规则
+                if (line.startsWith('geoip:')) {
+                    result.geoIp.push(line)
+                } else {
+                    result.ipCidr.push(line);
+                }
+            }
+        }
+
+        return result;
+    }
+
+}
+
+const WebUtils = {
+    // 创建标签验证器
+    createTagValidator: function (sectionType: string, fieldName: string) {
+        return function (section_id: any, value: any) {
+            // 验证名称格式
+            let formatResult = WebUtils.validateNameFormat(section_id, value);
+            if (formatResult !== true) {
+                return formatResult;
+            }
+
+            // 验证标签是否重复
+            let duplicate = false;
+            uci.sections(LuciFlied.CONF_NAME, sectionType, function (section) {
+                if (section['.name'] !== section_id && section[fieldName] === value) {
+                    duplicate = true;
+                }
+            });
+
+            if (duplicate) {
+                return _('%s已存在，请使用其他%s').format(fieldName === 'tag' ? _('标签') : _('名称'), fieldName === 'tag' ? _('标签') : _('名称'));
+            }
+
+            return true;
+        };
+    },
+
+
+    // 端口冲突检查函数
+    validateProxyPortConflict: function (sectionId, value) {
+        // 检查是否与shunt配置的端口冲突
+        let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
+        if (shuntSection && shuntSection['.name'] != sectionId) {
+            if ((shuntSection.dns_listen_port && shuntSection.dns_listen_port === value)
+                || (shuntSection.shunt_listen_port && shuntSection.shunt_listen_port === value)) {
+                return _('端口 %s 已被分流配置占用').format(value);
+            }
+        }
+
+        // 检查是否与其他proxy节点的端口冲突
+        let proxySections = uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE);
+        for (let i = 0; i < proxySections.length; i++) {
+            let section = proxySections[i]
+            let sectionName = section['.name'];
+
+            // 跳过当前正在编辑的节点
+            if (sectionName === sectionId) {
+                continue;
+            }
+
+            if (section.listen_port && section.listen_port === value) {
+                return _('端口 %s 已被代理节点 "%s" 使用').format(value, section.name);
+            }
+        }
+        return true;
+    },
+
+    validateNameFormat: function (sectionId: any, value: any) {
+        if (!value || value === '') {
+            return _('节点名称不能为空');
+        }
+
+        // 检查是否只包含英文字符、数字、下划线和连字符
+        if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+            return _('节点名称只能包含英文字母、数字、下划线和连字符');
+        }
+
+        return true;
+    },
+
+    // 生成唯一的section ID
+    generateUniqueSectionId: function () {
+        let chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let result = '';
+
+        for (; ;) {
+            result = '';
+            // 生成8位随机字符串
+            for (let i = 0; i < 8; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+
+            // 检查是否已存在（检查所有可能的section类型）
+            if (!uci.get(LuciFlied.CONF_NAME, result)) {
+                break
+            }
+        }
+
+        return result;
+    },
+
+    setAnonymousGridSectionMembers: function (section: any) {
+        WebUtils.setGridSectionMembers(section);
+        section.anonymous = true;
+        section.sectiontitle = function (sectionId: any) {
+            return uci.get(LuciFlied.CONF_NAME, sectionId, 'name')
+                || uci.get(LuciFlied.CONF_NAME, sectionId, 'tag')
+                || sectionId;
+        };
+    },
+
+    setGridSectionMembers: function (section: any) {
+        section.anonymous = false;
+        section.addremove = true;
+        section.sortable = true;
+        section.nodescriptions = true;
+        section.rowcolors = true;
+    },
+
+    simpleHash: function (str: string) {
+        let hash = 0;
+        str = str ? str : '';
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0; // 转32位整数
+        }
+        return hash;
+    },
+
+    setEditorOptionMembers: function (o, filePath, fieldName) {
+        o.rows = 20;
+        // 从文件读取内容
+        o.load = function (sectionId) {
+            return fs.trimmed(filePath);
+        };
+
+        function writeFile(sectionId, formvalue) {
+            let curretnHash = WebUtils.simpleHash(formvalue)
+            let oldHash = uci.get_first(LuciFlied.CONF_NAME, sectionId, fieldName)
+            if (curretnHash == oldHash) {
+                return
+            }
+            uci.set(LuciFlied.CONF_NAME, sectionId, fieldName, WebUtils.simpleHash(formvalue))
+            return fs.write(filePath, (formvalue || '').trim().replace(/\r\n/g, '\n') + '\n');
+        }
+
+        // 写入文件
+        o.write = writeFile
+        o.remove = writeFile
+        o.monospace = true;
+
+        return o;
+    },
+
+    getFilePath: function (option: any) {
+        let path = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.GLOBAL_SECTION_TYPE, option)
+        if (path) {
+            return path
+        }
+        console.log(option + ' path is empty')
+        return ''
+    },
+
+    // 设置TypedSection为单例
+    setAnonymousSection: function (subsection: any) {
+        subsection.anonymous = true;
+        subsection.addremove = false;
+    },
+}
+
+export {LuciUtils, WebUtils, ShuntUtils}

@@ -9,16 +9,16 @@
 return view.extend({
     load: function () {
         return Promise.all([
-            uci.load(hj.CONF_NAME)
+            uci.load(hj.HijpassEnum.CONF_NAME)
         ]);
     },
 
     render: function () {
         var m, s, o;
 
-        m = new form.Map(hj.CONF_NAME, _('DNS分流设置'), _('配置DNS分流相关设置'));
+        m = new form.Map(hj.HijpassEnum.CONF_NAME, _('DNS分流设置'), _('配置DNS分流相关设置'));
 
-        s = m.section(form.TypedSection, hj.DNS_SECTION_TYPE);
+        s = m.section(form.TypedSection, hj.HijpassEnum.DNS_SECTION_TYPE);
         s.anonymous = true;
         s.addremove = false;
 
@@ -115,12 +115,12 @@ return view.extend({
         // 域名直连列表
         o = createTextOption(s, 'domain_direct', 'domain_direct_hash', null,
             _('编辑域名直连列表配置'),
-            hj.getFilePath('domain_direct'));
+            hj.WebUtils.getFilePath('domain_direct'));
 
         // 域名代理列表
         o = createTextOption(s, 'domain_proxy', 'domain_proxy_hash', null,
             _('编辑域名代理列表配置，仅在DNS使用dnsmasq时使用'),
-            hj.getFilePath('domain_proxy'));
+            hj.WebUtils.getFilePath('domain_proxy'));
 
         return m.render();
     }
@@ -129,6 +129,6 @@ return view.extend({
 // 创建文本编辑器选项
 function createTextOption(s, tabName, fieldName, title, description, filePath) {
     let o = s.taboption(tabName, form.TextValue, fieldName, title, description);
-    hj.setEditorOptionMembers(o, filePath, fieldName);
+    hj.WebUtils.setEditorOptionMembers(o, filePath, fieldName);
     return o;
 }

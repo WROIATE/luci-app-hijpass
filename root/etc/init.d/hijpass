@@ -26,7 +26,7 @@ DELAY_TIME=$(uci -q get hijpass.@hijpass[0].delay_time || :)
 SHUNT_APP=$(uci -q get hijpass.@shunt[0].type || :)
 SHUNT_LOG_PATH=$(uci -q get hijpass.@shunt[0].log_path || :)
 
-# Rule
+# RuleDTO
 CRON_CONF=$(uci -q get hijpass.@rule[0].update_schedule || :)
 
 # Log
@@ -75,8 +75,7 @@ service_triggers() {
 }
 
 reload_service() {
-	stop
-	start
+  /etc/init.d/$NAME restart
 }
 
 boot() {
@@ -203,7 +202,7 @@ reset_geo_cron() {
 		return 0
 	fi
 
-	echo "$CRON_CONF $RULE_UPDATE_SCRIPT" >>/etc/crontabs/root
+	echo "$CRON_CONF $RULE_UPDATE_SCRIPT update" >>/etc/crontabs/root
 	log_info "Rule update cron job added: $CRON_CONF $RULE_UPDATE_SCRIPT"
 
 	/etc/init.d/cron restart >/dev/null 2>&1

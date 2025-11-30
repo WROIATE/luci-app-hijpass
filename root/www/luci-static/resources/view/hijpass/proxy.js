@@ -9,18 +9,18 @@
 return view.extend({
     load: function () {
         return Promise.all([
-            uci.load(hj.CONF_NAME)
+            uci.load(hj.HijpassEnum.CONF_NAME)
         ]);
     },
 
     render: function () {
         let m, s;
 
-        m = new form.Map(hj.CONF_NAME, _('代理设置'),
+        m = new form.Map(hj.HijpassEnum.CONF_NAME, _('代理设置'),
             _('配置代理程序设置'));
 
-        s = m.section(form.GridSection, hj.PROXY_NODE_TYPE)
-        hj.setAnonymousGridSectionMembers(s);
+        s = m.section(form.GridSection, hj.HijpassEnum.PROXY_NODE_TYPE)
+        hj.WebUtils.setAnonymousGridSectionMembers(s);
 
         // 创建所有代理配置选项
         createProxyOptions(s);
@@ -47,7 +47,7 @@ function createGridDisplayOptions(s) {
     o = createCommandOption(s);
     o.modalonly = false;
     o.cfgvalue = function (section_id) {
-        let command = uci.get(hj.CONF_NAME, section_id, 'command');
+        let command = uci.get(hj.HijpassEnum.CONF_NAME, section_id, 'command');
         if (command && command.length > 50) {
             return command.substring(0, 47) + '...';
         }
@@ -70,7 +70,7 @@ function createNodeNameOption(s) {
     let o = s.option(form.Value, 'name', _('节点名称'),
         _('修改节点的名称，用于标识不同的代理节点'));
     o.modalonly = true;
-    o.validate = hj.validateNameFormat;
+    o.validate = hj.WebUtils.createTagValidator(hj.HijpassEnum.SHUNT_ROUTE_RULE_TYPE, 'name')
     return o;
 }
 
@@ -91,7 +91,7 @@ function createListenPortOption(s) {
     o.datatype = 'port';
     o.rmempty = false;
     o.modalonly = true;
-    o.validate = hj.validateProxyPortConflict
+    o.validate = hj.WebUtils.validateProxyPortConflict
     return o;
 }
 
@@ -101,7 +101,7 @@ function createSocksPortOption(s) {
     o.datatype = 'port';
     o.rmempty = false;
     o.modalonly = true;
-    o.validate = hj.validateProxyPortConflict
+    o.validate = hj.WebUtils.validateProxyPortConflict
     return o;
 }
 

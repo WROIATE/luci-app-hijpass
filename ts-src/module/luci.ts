@@ -8,6 +8,7 @@ export class DnsNode {
 export class DnsSection {
     defaultDnsNode: string;
     defaultStrategy: string;
+    useCache: string;
     nodes: DnsNode[];
 
     constructor() {
@@ -77,8 +78,12 @@ export class RuleDTO {
     domainRegex: string[];
     domainKeyword: string[];
     domainSuffix: string[];
-    network: string[];
     ipCidr: string[];
+
+    network: string[];
+    protocol: string[];
+    port: number[];
+    portRange: string[];
 
     ruleSet: RuleSetDTO[]; // 规则集合
     geoIp: string[];
@@ -94,6 +99,37 @@ export class RuleDTO {
         this.geoIp = [];
         this.geoSite = [];
         this.network = [];
+    }
+
+    containDomain(): boolean {
+        return this.domain.length > 0
+            || this.domainRegex.length > 0
+            || this.domainRegex.length > 0
+            || this.domainKeyword.length > 0
+    }
+
+    containGeo(): boolean {
+        return this.geoSite.length > 0 || this.geoIp.length > 0
+    }
+
+    containRuleSet(): boolean {
+        return this.ruleSet.length > 0
+    }
+
+    containIp(): boolean {
+        return this.ipCidr.length > 0
+            || this.geoIp.length > 0
+    }
+
+    isEmpty(collectionType: "geo" | "set"): boolean {
+        return !(this.containDomain()
+            || this.containIp()
+            || (collectionType === "geo" && this.containGeo())
+            || (collectionType === "set" && this.containRuleSet())
+            || this.network.length > 0
+            || this.port.length > 0
+            || this.portRange.length > 0
+            || this.protocol.length > 0)
     }
 }
 

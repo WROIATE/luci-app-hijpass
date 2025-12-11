@@ -17,10 +17,8 @@ GEO_SITE_FILE="/usr/share/v2ray/geosite.dat"
 GEO_IP_FILE="/usr/share/v2ray/geoip.dat"
 
 ENABLED=$(uci -q get hijpass.@hijpass[0].enabled || :)
-NFT_SCRIPT="/usr/lib/hijpass/nft.sh"
-DNSMASQ_SCRIPT="/usr/lib/hijpass/dnsmasq.sh"
 
-# 下载函数
+# 下载函数（单个文件）
 download_file() {
     local url output temp_file backup_file processed_file
     url="$1"
@@ -77,6 +75,105 @@ download_file() {
         log_warn "Failed to download: $url"
         rm -f "$temp_file"
         return 1
+    fi
+}
+
+# 下载多个URL并合并去重
+download_and_merge_files() {
+    local urls output temp_file backup_file merged_file processed_file
+    urls="$1"
+    output="$2"
+    temp_file="${output}.tmp"
+    backup_file="${output}.bak"
+    merged_file="${output}.merged"
+    processed_file="${output}.processed"
+
+    log_info "Downloading and merging from multiple URLs..."
+
+    # 备份现有文件
+    if [ -f "$output" ]; then
+        cp "$output" "$backup_file"
+        log_debug "Backed up existing file: $backup_file"
+    fi
+
+    # 清空合并文件
+    >"$merged_file"
+
+    local success_count=0
+    local total_count=0
+
+    # 下载所有URL
+    for _url in $urls; do
+        if [ -n "$_url" ]; then
+            total_count=$((total_count + 1))
+            local retry=0
+            local downloaded=0
+
+            while [ $retry -lt "$RETRY_COUNT" ]; do
+                if curl -L --connect-timeout "$DOWNLOAD_TIMEOUT" \
+                    --max-time "$((DOWNLOAD_TIMEOUT * 2))" \
+                    -o "$temp_file" "$_url" 2>/dev/null; then
+
+                    # 检查文件是否有效
+                    if [ -s "$temp_file" ] && [ "$(wc -c <"$temp_file")" -gt 100 ]; then
+                        log_info "Successfully downloaded from: $_url"
+                        cat "$temp_file" >>"$merged_file"
+                        rm -f "$temp_file"
+                        success_count=$((success_count + 1))
+                        downloaded=1
+                        break
+                    fi
+                fi
+                retry=$((retry + 1))
+                if [ $retry -lt "$RETRY_COUNT" ]; then
+                    log_warn "Retry $retry/$RETRY_COUNT for: $_url"
+                    sleep 2
+                fi
+            done
+
+            if [ $downloaded -eq 0 ]; then
+                log_warn "Failed to download from: $_url after $RETRY_COUNT retries"
+            fi
+        fi
+    done
+
+    # 检查是否至少有一个URL下载成功
+    if [ $success_count -eq 0 ]; then
+        log_error "Failed to download from all URLs"
+        # 恢复备份文件
+        if [ -f "$backup_file" ]; then
+            mv "$backup_file" "$output"
+            log_info "Restored backup file: $output"
+        fi
+        rm -f "$merged_file" "$temp_file"
+        return 1
+    fi
+
+    log_info "Downloaded from $success_count/$total_count URLs successfully"
+
+    # 处理合并后的文件（去重）
+    if process_domain_file "$merged_file" "$processed_file" "$output"; then
+        mv "$processed_file" "$output"
+        rm -f "$backup_file" "$merged_file" "$temp_file"
+        log_info "Successfully merged and processed: $output ($(wc -c <"$output") bytes)"
+        return 0
+    else
+        # 如果处理失败，直接使用合并文件
+        if [ -s "$merged_file" ]; then
+            # 对合并文件进行基础去重
+            sort "$merged_file" | uniq >"$output"
+            rm -f "$backup_file" "$merged_file" "$temp_file"
+            log_info "Successfully merged (without processing): $output ($(wc -c <"$output") bytes)"
+            return 0
+        else
+            log_error "Merged file is empty"
+            if [ -f "$backup_file" ]; then
+                mv "$backup_file" "$output"
+                log_info "Restored backup file: $output"
+            fi
+            rm -f "$merged_file" "$temp_file"
+            return 1
+        fi
     fi
 }
 
@@ -262,24 +359,14 @@ download_chn_list() {
 
     log_info "Downloading CHN list..."
 
-    # 尝试每个URL
-    for _url in $chn_domain_list; do
-        if [ -n "$_url" ]; then
-            local retry=0
-            while [ $retry -lt "$RETRY_COUNT" ]; do
-                if download_file "$_url" "$CHN_LIST_FILE"; then
-                    log_info "CHN list downloaded successfully"
-                    return 0
-                fi
-                retry=$((retry + 1))
-                log_warn "Retry $retry/$RETRY_COUNT for CHN list"
-                sleep 2
-            done
-        fi
-    done
-
-    log_error "Failed to download CHN list from all URLs"
-    return 1
+    # 下载所有URL并合并去重
+    if download_and_merge_files "$chn_domain_list" "$CHN_LIST_FILE"; then
+        log_info "CHN list downloaded and merged successfully"
+        return 0
+    else
+        log_error "Failed to download CHN list from all URLs"
+        return 1
+    fi
 }
 
 # 下载CHN Route IPv4
@@ -297,24 +384,14 @@ download_chn_route_ipv4() {
 
     log_info "Downloading CHN route IPv4..."
 
-    # 尝试每个URL
-    for _url in $chn_v4_route; do
-        if [ -n "$_url" ]; then
-            local retry=0
-            while [ $retry -lt "$RETRY_COUNT" ]; do
-                if download_file "$_url" "$CHN_ROUTE_FILE"; then
-                    log_info "CHN route IPv4 downloaded successfully"
-                    return 0
-                fi
-                retry=$((retry + 1))
-                log_warn "Retry $retry/$RETRY_COUNT for CHN route IPv4"
-                sleep 2
-            done
-        fi
-    done
-
-    log_error "Failed to download CHN route IPv4 from all URLs"
-    return 1
+    # 下载所有URL并合并去重
+    if download_and_merge_files "$chn_v4_route" "$CHN_ROUTE_FILE"; then
+        log_info "CHN route IPv4 downloaded and merged successfully"
+        return 0
+    else
+        log_error "Failed to download CHN route IPv4 from all URLs"
+        return 1
+    fi
 }
 
 # 下载CHN Route IPv6
@@ -333,24 +410,14 @@ download_chn_route_ipv6() {
 
     log_info "Downloading CHN route IPv6..."
 
-    # 尝试每个URL
-    for _url in $chn_v6_route; do
-        if [ -n "$_url" ]; then
-            local retry=0
-            while [ $retry -lt "$RETRY_COUNT" ]; do
-                if download_file "$_url" "$CHN_ROUTE6_FILE"; then
-                    log_info "CHN route IPv6 downloaded successfully"
-                    return 0
-                fi
-                retry=$((retry + 1))
-                log_warn "Retry $retry/$RETRY_COUNT for CHN route IPv6"
-                sleep 2
-            done
-        fi
-    done
-
-    log_error "Failed to download CHN route IPv6 from all URLs"
-    return 1
+    # 下载所有URL并合并去重
+    if download_and_merge_files "$chn_v6_route" "$CHN_ROUTE6_FILE"; then
+        log_info "CHN route IPv6 downloaded and merged successfully"
+        return 0
+    else
+        log_error "Failed to download CHN route IPv6 from all URLs"
+        return 1
+    fi
 }
 
 # 下载GeoSite
@@ -412,28 +479,64 @@ download_gfw_list() {
         log_warn "GFW list file path not configured"
         return 1
     fi
-    local url retry
-    url=$(uci -q get hijpass.@rule[0].gfw_list)
-    if [ -z "$url" ]; then
-        log_warn "GFW download URL not configured"
+    local urls
+    urls=$(uci -q get hijpass.@rule[0].gfw_list)
+    if [ -z "$urls" ]; then
+        log_warn "GFW download URLs not configured"
         return 1
     fi
 
     log_info "Downloading GFW list..."
 
-    retry=0
-    while [ $retry -lt "$RETRY_COUNT" ]; do
-        if download_file "$url" "$GFW_LIST_FILE"; then
-            log_info "GFW list downloaded successfully"
-            return 0
-        fi
-        retry=$((retry + 1))
-        log_warn "Retry $retry/$RETRY_COUNT for GFW list"
-        sleep 2
-    done
+    # 下载所有URL并合并去重
+    if download_and_merge_files "$urls" "$GFW_LIST_FILE"; then
+        log_info "GFW list downloaded and merged successfully"
+        return 0
+    else
+        log_error "Failed to download GFW list from all URLs"
+        return 1
+    fi
+}
 
-    log_error "Failed to download GFW list"
-    return 1
+query_rule() {
+  find "/etc/hijpass/rules/" -type f -name "*.txt" | while read -r file; do
+    # 用 awk 检查该文件是否命中
+    if awk -v id="$1" '
+      {
+        for (i = 1; i <= NF; i++) {
+          d = $i
+          n = length(id)
+          m = length(d)
+
+          # 1) 完全相等: id == d
+          if (id == d) {
+            found = 1
+            exit
+          }
+
+          # 2) id 以 "." + d 结尾:
+          #    例如: id = www.bilibili.com, d = bilibili.com
+          if (n > m) {
+            if (substr(id, n - m + 1) == d && substr(id, n - m, 1) == ".") {
+              found = 1
+              exit
+            }
+          }
+        }
+      }
+      END {
+        if (found == 1) {
+          exit 0   # 命中 -> awk 返回 0
+        } else {
+          exit 1   # 未命中 -> awk 返回 1
+        }
+      }
+    ' "$file"
+    then
+      # awk 返回 0，说明文件命中；只输出不带路径的文件名
+      basename "$file"
+    fi
+  done | sort -u
 }
 
 # 主函数
@@ -475,8 +578,11 @@ main() {
         [ "$ENABLED" != "1" ] && log_info "Skip restart hijpass" && return 0
         /etc/init.d/hijpass restart
         ;;
+    "query")
+        query_rule "$2"
+        ;;
     *)
-        echo "Usage: $0 [chnlist|chnroute|geo|all]"
+        echo "Usage: $0 [chnlist|chnroute|geo|all|update|query]"
         exit 1
         ;;
     esac

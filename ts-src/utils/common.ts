@@ -1,6 +1,3 @@
-'use strict';
-
-
 import {LuciFlied} from "../enum/hijpass";
 import {
     RuleDTO,
@@ -15,6 +12,10 @@ import rpc from "rpc";
 import poll from "poll";
 import uci from "uci";
 import fs from "fs";
+import form from "form";
+import ui from "ui";
+import {ShuntConfFactory} from "./factory";
+import view from "view";
 
 
 const callServiceList = rpc.declare({
@@ -25,38 +26,54 @@ const callServiceList = rpc.declare({
 })
 
 const MiscUtils = {
-    checkServiceRunning: function () {
-        return L.resolveDefault(callServiceList(LuciFlied.CONF_NAME), {}).then(function (res) {
-            let isRunning = false;
-            try {
-                uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
-                    let sectionName = section['.name'] + "-" + section.name
-                    if (res && res[LuciFlied.CONF_NAME] && res[LuciFlied.CONF_NAME]['instances']
-                        && res[LuciFlied.CONF_NAME]['instances'][sectionName]) {
-                        isRunning = isRunning
-                            || res[LuciFlied.CONF_NAME]['instances'][sectionName]['running'];
-                    }
-                })
-            } catch (e) {
-                console.error('Error getting service status:', e);
-            }
-            return isRunning;
-        });
+    getServiceInfo: async function () {
+        const s = await L.resolveDefault(callServiceList(LuciFlied.CONF_NAME), {});
+        let instances = s[LuciFlied.CONF_NAME]['instances'];
+        return {
+            proxyInfos: MiscUtils.getInstanceName(LuciFlied.PROXY_NODE_TYPE).map(
+                (name) => {
+                    return instances[name];
+                }
+            ).filter(instance => instance),
+            shuntInfo: instances[MiscUtils.getInstanceName(LuciFlied.SHUNT_SECTION_TYPE)[0]],
+            dnsInfo: instances[MiscUtils.getInstanceName(LuciFlied.DNS_SECTION_TYPE)[0]]
+        }
     },
 
-    renderServiceStatus: function (isRunning: any) {
+    renderServiceStatus: function (res: any) {
         let renderHTML = "";
         let spanTemp = '<em><span style="color:%s"><strong>%s %s</strong></span></em>';
+        let isProxyRunning = (res?.proxyInfos ?? [])
+            .filter(instance => instance?.running)
+            .length > 1
+        let isShuntRunning = res?.shuntInfo?.running ?? false
+        let isDnsRunning = res?.dnsInfo?.running ?? false
 
-        if (isRunning) {
-            renderHTML += spanTemp.format('green', _("HiJpass"), _("运行中"));
-        } else {
-            renderHTML += spanTemp.format('red', _("HiJpass"), _("未运行"));
+        let getColorSpan = function (title: string, isRunning: any) {
+            if (isRunning) {
+                return spanTemp.format('green', _(title), _("运行中"));
+            } else {
+                return spanTemp.format('red', _(title), _("未运行"));
+            }
         }
+
+        renderHTML += getColorSpan(_("代理节点"), isProxyRunning)
+        renderHTML += getColorSpan(_("分流服务"), isShuntRunning)
+        renderHTML += getColorSpan(_("DNS"), isDnsRunning)
 
         return renderHTML;
     },
 
+    getInstanceName: function (sectionType: string): string[] {
+        return uci.sections(LuciFlied.CONF_NAME, sectionType).map((section) => {
+            let cid = section['.name'];
+            let name = section['name'] ?? section['tag'] ?? section['dns_service']
+            if (!name) {
+                name = sectionType
+            }
+            return cid + '-' + name;
+        })
+    },
 
     parseRuleSetPath: function (line: string, type: string): RuleSetDTO {
         let pathOrUrl = line.substring(type === 'remote' ? 16 : 15);
@@ -83,21 +100,37 @@ const MiscUtils = {
 };
 
 const LuciUtils = {
-    renderServiceStatus: function (section_id: string) {
-        poll.add(function () {
-            return L.resolveDefault(MiscUtils.checkServiceRunning()).then(function (res) {
-                let view = document.getElementById("service_status");
-                if (view) view.innerHTML = MiscUtils.renderServiceStatus(res);
-            });
+    renderServiceStatus: function () {
+        poll.add(async function () {
+            const res = await L.resolveDefault(MiscUtils.getServiceInfo());
+            let view = document.getElementById("service_status");
+            if (view) view.innerHTML = MiscUtils.renderServiceStatus(res);
         });
 
         return E('div', {class: 'cbi-map'},
             E('fieldset', {class: 'cbi-section'}, [
-                E('p', {id: 'service_status'},
+                E('p', {id: 'service_status', style: 'display: flex; gap: 1rem;'},
                     _('正在获取状态...'))
             ])
         );
-    }
+    },
+
+    genHandleSaveApply: function (notNotice: boolean) {
+        return async function (ev: Event) {
+            try {
+                await this.handleSave(ev)
+                let data = ShuntUtils.getShuntConfData()
+                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
+                    await fs.write(WebUtils.getFilePath('shunt_conf'), data);
+                }
+                ui.changes.apply(true);
+            } catch (e) {
+                if (!notNotice) {
+                    alert(e)
+                }
+            }
+        }
+    },
 }
 
 const ShuntUtils = {
@@ -147,38 +180,50 @@ const ShuntUtils = {
 
     /**
      * 解析规则列表，根据前缀分类
-     * @param {string} ruleList - 规则列表字符串，每行一个规则
-     * @param {string} type - 'domain' 或 'ip'
-     * @returns {Object} 包含不同类型规则的对象
+     * @returns {RuleDTO} 包含不同类型规则的对象
      */
-    parseRuleList: function (ruleList: string, type: string): RuleDTO {
+    parseRuleList: function (rule: ShuntRouteRule): RuleDTO {
         // 初始化结果对象
         let result = new RuleDTO();
-        if (!ruleList || ruleList.trim() === '') {
-            return result;
+        let domainRules = rule.domainList
+        let ipRules = rule.ipList
+
+        result.network = rule.network ? rule.network : []
+        result.protocol = rule.protocol ? rule.protocol : []
+
+        if (rule.port) {
+            result.port = rule.port
+                .map(port => parseInt(port, 10))
+                .filter(port => !isNaN(port))
         }
 
-        // 按行分割并处理
-        let lines = ruleList.split('\n');
+        if (rule.portRange) {
+            result.portRange = rule.portRange
+                .map(range => range.replace('-', ':'))
+                .filter(range => range.length > 0)
+        }
 
-        for (let line of lines) {
-            line = line.trim();
+        if (domainRules && domainRules.trim() !== '') {
+            // 按行分割并处理
+            let lines = domainRules.split('\n');
 
-            // 跳过空行和注释
-            if (line === '' || line.startsWith('#')) {
-                continue;
-            }
+            for (let line of lines) {
+                line = line.trim();
 
-            // 处理rule-set（域名和IP通用）
-            if (line.startsWith('rule-set:')) {
-                let type = line.startsWith('rule-set:remote:') ? 'remote' : 'local';
-                let ruleSet = MiscUtils.parseRuleSetPath(line, type);
-                result.ruleSet.push(ruleSet);
-                continue;
-            }
+                // 跳过空行和注释
+                if (line === '' || line.startsWith('#')) {
+                    continue;
+                }
 
-            // 处理域名特有规则
-            if (type === 'domain') {
+                // 处理rule-set（域名和IP通用）
+                if (line.startsWith('rule-set:')) {
+                    let type = line.startsWith('rule-set:remote:') ? 'remote' : 'local';
+                    let ruleSet = MiscUtils.parseRuleSetPath(line, type);
+                    result.ruleSet.push(ruleSet);
+                    continue;
+                }
+
+                // 处理域名特有规则
                 if (line.startsWith('regexp:')) {
                     result.domainRegex.push(line.substring(7));
                 } else if (line.startsWith('domain:')) {
@@ -190,7 +235,26 @@ const ShuntUtils = {
                 } else {
                     result.domainKeyword.push(line);
                 }
-            } else { // 处理IP规则
+            }
+        }
+
+        if (ipRules && ipRules.trim() !== '') {
+            // 按行分割并处理
+            let lines = ipRules.split('\n');
+            for (let line of lines) {
+                // 跳过空行和注释
+                if (line === '' || line.startsWith('#')) {
+                    continue;
+                }
+
+                // 处理rule-set（域名和IP通用）
+                if (line.startsWith('rule-set:')) {
+                    let type = line.startsWith('rule-set:remote:') ? 'remote' : 'local';
+                    let ruleSet = MiscUtils.parseRuleSetPath(line, type);
+                    result.ruleSet.push(ruleSet);
+                    continue;
+                }
+
                 if (line.startsWith('geoip:')) {
                     result.geoIp.push(line)
                 } else {
@@ -200,8 +264,34 @@ const ShuntUtils = {
         }
 
         return result;
-    }
+    },
 
+    getShuntConfData: function () {
+        let data = "";
+        if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
+            let type = uci.get_first(LuciFlied.CONF_NAME,
+                LuciFlied.SHUNT_SECTION_TYPE, 'type')
+            data = JSON.stringify(ShuntConfFactory.getShuntUtils(type).genShuntConf(), ShuntUtils.omitEmptyReplacer, 2)
+    }
+        return data;
+    },
+
+    omitEmptyReplacer: function (_: string, value: any) {
+        // 过滤 value 本身为空数组的情况
+        if (Array.isArray(value) && value.length === 0) {
+            return undefined;  // JSON.stringify 会跳过该属性
+        }
+        if (value === null) {
+            return undefined;
+        }
+        if (typeof value === 'number' && !Number.isFinite(value)) {
+            return undefined;
+        }
+        if (typeof value === 'string' && !value.trim()) {
+            return undefined;
+        }
+        return value;
+    }
 }
 
 const WebUtils = {
@@ -322,28 +412,34 @@ const WebUtils = {
         return hash;
     },
 
-    setEditorOptionMembers: function (o, filePath, fieldName) {
-        o.rows = 20;
+    setEditorOptionMembers: function (o: LuCI.form.TextValue, filePath: string, fieldName: string) {
+        o.rows = 30;
         // 从文件读取内容
-        o.load = function (sectionId) {
+        o.load = function (_) {
             return fs.trimmed(filePath);
         };
 
-        function writeFile(sectionId, formvalue) {
-            let curretnHash = WebUtils.simpleHash(formvalue)
+        async function writeFile(sectionId: string, formvalue: string) {
+            let currentHash = WebUtils.simpleHash(formvalue)
             let oldHash = uci.get_first(LuciFlied.CONF_NAME, sectionId, fieldName)
-            if (curretnHash == oldHash) {
+            if (currentHash == oldHash) {
                 return
             }
             uci.set(LuciFlied.CONF_NAME, sectionId, fieldName, WebUtils.simpleHash(formvalue))
-            return fs.write(filePath, (formvalue || '').trim().replace(/\r\n/g, '\n') + '\n');
+            await fs.write(filePath, (formvalue || '').trim().replace(/\r\n/g, '\n') + '\n');
         }
 
         // 写入文件
         o.write = writeFile
-        o.remove = writeFile
         o.monospace = true;
 
+        return o;
+    },
+
+    createTextOption: function (s: LuCI.form.AbstractSection, tabName: string,
+                                fieldName: string, title: string, description: string, filePath: string) {
+        let o = s.taboption(tabName, form.TextValue, fieldName, title, description);
+        WebUtils.setEditorOptionMembers(o, filePath, fieldName);
         return o;
     },
 

@@ -4,7 +4,7 @@ import {
     DNS,
     DnsInbound, DnsRule,
     DnsServer, LocalRuleSet, Log, RemoteRuleSet,
-    Route, RouteRule, RuleDTO, RuleSet,
+    Route, RouteRule, RuleSet,
     Socks,
     TproxyInbound,
     URLTest
@@ -12,7 +12,7 @@ import {
 import {ShuntUtils} from "./common";
 import {LuciFlied, ShuntTag} from "../enum/hijpass";
 import {SingBoxEnum} from "../enum/singbox";
-import {RuleSetDTO, ShuntConfigUtils, ShuntRouteRule} from "../module/luci";
+import {RuleSetDTO, ShuntConfigUtils} from "../module/luci";
 import uci from "uci";
 
 export const SingBoxUtils: ShuntConfigUtils = {
@@ -30,7 +30,9 @@ function genConf() {
     let dnsConf = shuntSection.dns
     let routeConf = shuntSection.route
     let route = new Route(transOutTag(routeConf.defaultProxyNode), dnsConf.defaultDnsNode)
-    let dns = new DNS(dnsConf.defaultDnsNode, transDnsStrategy(dnsConf.defaultStrategy))
+    let dns = new DNS(dnsConf.defaultDnsNode,
+        transDnsStrategy(dnsConf.defaultStrategy),
+        dnsConf.useCache === "1")
 
     dnsConf.nodes.forEach(function (dnsNode) {
         let server = new DnsServer(dnsNode.type, dnsNode.tag,
@@ -78,7 +80,15 @@ function genConf() {
             return
         }
         // 生成公共rule
-        let rule = genRule(routeRule, ruleSetMap)
+        let luciRuleDTO = ShuntUtils.parseRuleList(routeRule);
+
+        if (luciRuleDTO.isEmpty("set")) {
+            return;
+        }
+
+        for (let rs of luciRuleDTO.ruleSet) {
+            ruleSetMap.set(rs.tag, genRuleSet(rs));
+        }
 
         // 生成路由规则
         let action = 'route'
@@ -89,15 +99,12 @@ function genConf() {
             outbound = undefined
         }
         // 添加路由规则
-        route.rules.push(new RouteRule(action, outbound).initRule(rule))
-
-        // 检查规则中是否存在域名相关规则
-        let hasDomainRule = rule.domain || rule.domain_suffix ||
-            rule.domain_keyword || rule.domain_regex ||
-            (rule.rule_set && rule.rule_set.length > 0);
+        route.rules.push(new RouteRule(action, outbound).initRule(luciRuleDTO))
 
         // 只有存在域名规则时才添加DNS规则
-        if (hasDomainRule || rule.ip_cidr) {
+        if (luciRuleDTO.containDomain()
+            || luciRuleDTO.containIp()
+            || luciRuleDTO.containRuleSet()) {
             let dnsTag = routeRule.dnsNode
             let detour = transOutTag(routeRule.dnsProxyNode)
             detour = detour ? detour : outbound
@@ -112,7 +119,7 @@ function genConf() {
             dns.servers.push(server)
             dns.rules.push(
                 new DnsRule(action, transDnsTag(routeRule.name), transDnsStrategy(routeRule.dnsStrategy))
-                    .initRule(rule))
+                    .initRule(luciRuleDTO))
         }
     })
 
@@ -132,52 +139,6 @@ function genConf() {
     return fullConfig
 }
 
-function genRule(routeRule: ShuntRouteRule, ruleSetMap: Map<string, RuleSet>) {
-    let rule = new RuleDTO()
-    rule.network = routeRule.network
-    rule.protocol = routeRule.protocol
-    if (routeRule.port) {
-        rule.port = routeRule.port
-            .map(port => parseInt(port, 10))
-            .filter(port => !isNaN(port))
-    }
-    if (routeRule.portRange) {
-        rule.port_range = routeRule.portRange
-            .map(range => range.replace('-', ':'))
-            .filter(range => range.length > 0)
-    }
-
-    let domainMap = ShuntUtils.parseRuleList(routeRule.domainList, 'domain');
-    if (domainMap) {
-        rule.domain = domainMap.domain
-        rule.domain_suffix = domainMap.domainSuffix
-        rule.domain_keyword = domainMap.domainKeyword
-        rule.domain_regex = domainMap.domainRegex
-        if (domainMap.ruleSet) {
-            rule.rule_set = rule.rule_set ? rule.rule_set : []
-            for (let rs of domainMap.ruleSet) {
-                rule.rule_set.push(rs.tag)
-                ruleSetMap.set(rs.tag, genRuleSet(rs));
-            }
-        }
-    }
-
-    let ipMap = ShuntUtils.parseRuleList(routeRule.ipList, 'ip');
-    if (ipMap) {
-        rule.ip_cidr = ipMap.ipCidr
-        if (ipMap.ruleSet) {
-            rule.rule_set = rule.rule_set ? rule.rule_set : []
-            for (let rs of ipMap.ruleSet) {
-                rule.rule_set.push(rs.tag)
-                ruleSetMap.set(rs.tag, genRuleSet(rs));
-            }
-        }
-    }
-
-    return rule;
-}
-
-
 function genDnsFromTmpl(tag: string, detour: string, tmpl: DnsServer) {
     return new DnsServer(tmpl.type, tag, tmpl.server, tmpl.port, detour);
 }
@@ -189,7 +150,6 @@ function genRuleSet(rs: RuleSetDTO) {
         return new LocalRuleSet(rs.tag, rs.format, rs.pathOrUrl)
     }
 }
-
 
 function transDnsStrategy(strategy: string) {
     switch (strategy) {

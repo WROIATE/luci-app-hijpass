@@ -12,9 +12,10 @@
   },
   "include": [
     "views/**/*.ts",
-    "types/**/luci.d.ts",
+    "types/**/*.d.ts",
     "enum/**/*.ts",
     "module/**/*.ts",
-    "utils/**/*.ts"
+    "utils/**/*.ts",
+    "static/**/*.svg"
   ],
 }

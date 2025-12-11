@@ -2,98 +2,312 @@
 
 declare namespace LuCI {
     interface View {
-        extend(def: any): any;
+        extend?(view: View): View;
 
-        load(): Promise<void>;
+        load?(): any | Promise<any>;
 
-        render(): HTMLElement;
+        render?(load_results?: any | null): Node | Promise.<Node>;
 
-        handleSave(): void;
+        handleSave?(ev?: Event): any | Promise<any>;
 
-        handleSaveApply(): void;
+        handleSaveApply?(ev?: Event): any | Promise<any>;
 
-        prototype: View;
+        handleReset?(ev?: Event): any | Promise<any>;
+
+        addFooter?(): DocumentFragment
+
+        prototype?: View;
     }
 
     interface L {
-        resolveDefault<T>(promise: Promise<T>, defaultValue?: T): Promise<T>;
+        Poll: LuCI.poll.Poll
+        dom: LuCI.dom.DOM
+
+        resolveDefault(value: any, defvalue?: any): Promise<any>;
     }
 
-    interface Form {
-        Map: new (config: string, title: string, description?: string) => any;
-        TypedSection: new (type?: string, ...args: any[]) => any;
-        Value: new (...args: any[]) => any;
-        Flag: new (...args: any[]) => any;
-        ListValue: new (...args: any[]) => any;
-        Button: new (...args: any[]) => any;
-        DynamicList: new (...args: any[]) => any;
-        SectionValue: new (...args: any[]) => any;
-        TextValue: new (...args: any[]) => any;
-        GridSection: new (...args: any[]) => any;
-        MultiValue: new (...args: any[]) => any;
+    declare namespace form {
+        interface Form {
+            Map: new (config: string, title: string, description?: string) => LuCI.form.Map;
+            TypedSection: LuCI.form.TypedSection;
+            Value: LuCI.form.Value;
+            Flag: LuCI.form.FlagValue;
+            ListValue: LuCI.form.ListValue;
+            Button: LuCI.form.ButtonValue;
+            DynamicList: LuCI.form.DynamicList;
+            SectionValue: LuCI.form.SectionValue;
+            TextValue: LuCI.form.TextValue;
+            GridSection: LuCI.form.GridSection;
+            MultiValue: LuCI.form.MultiValue;
+            AbstractElement: LuCI.form.AbstractElement;
+            DummyValue: LuCI.form.DummyValue;
+        }
+
+        interface AbstractElement {
+            append(obj): void
+
+            parse(): Promise<void>
+
+            render(): Node | Promise.<Node>;
+
+            stripTags(s): string
+
+            titleFn(property, fmt_args): (string | null)
+        }
+
+        interface AbstractValue extends LuCI.form.AbstractElement {
+            datatype: string
+            default: any
+            editable: boolean
+            modalonly: boolean
+            onchange: function
+            optional: boolean
+            readonly: boolean
+            retain: boolean
+            rmempty: boolean
+            uciconfig: string
+            ucioption: string
+            ucisection: string
+            validate: function
+            width: number | string
+
+            cbid(section_id: string): string
+
+            cfgvalue(section_id: string): any
+
+            depends(field: (string | Object.<string, (string | RegExp)>), value?: (string | RegExp)): void
+
+            formvalue(section_id: string): any
+
+            getUIElement(section_id: string): (LuCI.ui.AbstractElement | null)
+
+            getValidationError(section_id: string): string
+
+            isActive(section_id: string): boolean
+
+            isValid(section_id: string): boolean
+
+            load(section_id: string): (* | Promise<*>)
+
+            parse(section_id: string): (Promise<void>)
+
+            remove(section_id: string): void
+
+            textvalue(section_id: string): string | Node
+
+            write(section_id: string, formvalue: string | Array<string>): void
+
+            remove(section_id: string): void
+
+        }
+
+        interface AbstractSection extends LuCI.form.AbstractElement {
+            parentoption: AbstractValue
+
+            append(obj): Array.<string>
+
+            cfgvalue(section_id: string, option: string): any
+
+            filter(section_id: string): boolean
+
+            formvalue(section_id: string, option: string): any
+
+            getOption(option: string): null | LuCI.form.AbstractValue | Object.<string, LuCI.form.AbstractValue>
+
+            getUIElement(section_id, option): null | LuCI.ui.AbstractElement | Object.<string, (null | LuCI.ui.AbstractElement)>
+
+            load(): (Promise.<void>)
+
+            option<T extends LuCI.form.AbstractValue>(optionclass: T, ...classargs: any): T
+
+            parse(): Promise.<void>
+
+            tab(name: string, title?: string, description?: string)
+
+            // 重载签名 1：有 subsection 参数，返回 T
+            taboption<T extends LuCI.form.AbstractSection>(
+                tabName: string,
+                optionclass: LuCI.form.SectionValue,
+                option: string,
+                subsection: T,
+                ...classargs: any[]
+            ): LuCI.form.SectionValue<T>;
+
+            // 重载签名 2：没有 subsection，只传一个 optionclass，返回 T
+            taboption<T extends LuCI.form.AbstractValue>(
+                tabName: string,
+                optionclass: T,
+                ...classargs: any[]
+            ): T;
+        }
+
+        interface Map extends LuCI.form.AbstractElement {
+            section<T extends LuCI.form.AbstractSection>(sectionclass: T, ...classargs: any): T
+        }
+
+        interface TypedSection extends LuCI.form.AbstractSection {
+
+            anonymous: boolean;
+            addremove: boolean;
+            sortable: boolean;
+            nodescriptions: boolean;
+            rowcolors: boolean;
+
+            sectiontitle(sectionId: string): string;
+        }
+
+        interface MultiValue extends LuCI.form.DynamicList {
+        }
+
+        interface FlagValue extends LuCI.form.Value {
+        }
+
+        interface ListValue extends LuCI.form.Value {
+            widget: string;
+        }
+
+        interface ButtonValue extends LuCI.form.Value {
+            inputtitle: string;
+            inputstyle: string;
+            onclick: function;
+        }
+
+        interface DynamicList extends LuCI.form.Value {
+        }
+
+        interface SectionValue<T extends LuCI.form.AbstractSection> extends LuCI.form.Value {
+            readonly subsection: T;
+        }
+
+        interface TextValue extends LuCI.form.Value {
+        }
+
+        interface Value extends LuCI.form.AbstractValue {
+            prototype: Value
+            monospace: boolean;
+            rows: number;
+            placeholder: string
+
+            value(key: string, display?: string): void;
+        }
+
+        interface GridSection extends LuCI.form.TableSection {
+            modaltitle: string | function;
+        }
+
+        interface TableSection extends LuCI.form.TypedSection {
+            rowcolors: boolean
+        }
+
+        interface DummyValue extends LuCI.form.Value {
+        }
+
     }
 
-    interface UCI {
-        load(config: string): Promise<void>;
+    declare namespace ui {
+        interface UI {
+            changes(): void;
 
-        sections(config: string, type: string, callback: (section: any) => void): any[];
+            showModal(modal: any, e: any): void;
 
-        sections(config: string, type: string): any[];
+            hideModal(): void;
+        }
 
-        get(config: string, sectionId: string, option?: string): any;
+        interface AbstractElement {
+            getValidationError(): string
 
-        get_first(config: string, type: string, option?: string): any;
+            getValue(): string | Array<string> | null
 
-        set(config: string, sectionId: string, option: string, value: any): void;
+            isChanged(): boolean
 
-        remove(config: string, sectionId: string): void;
+            isValid(): boolean
 
-        clone(config: string, type: string, sectionId: string, anonymous?: boolean, name?: string): void;
+            registerEvents(targetNode: Node, synevent: string, events: Array<String>)
 
-        set_first(config: string, sectionId: string, option: string, value: any): void;
+            render(): Node
+
+            setChangeEvents(targetNode: Node, events: string)
+
+            setPlaceholder(value: string | Array<string> | null)
+
+            setUpdateEvents(targetNode: Node, events: string)
+
+            setValue(value: string | Array<string> | null)
+
+            triggerValidation()
+        }
     }
 
-    interface FS {
-        exec(command: string, args?: string[]): Promise<{ code: number; stdout: string; stderr: string; }>;
+    declare namespace uci {
+        interface UCI {
+            load(config: string): Promise<void>;
 
-        write(path: string, content: string): Promise<void>;
+            sections(config: string, type: string, callback: (section: any) => void): any[];
 
-        trimmed(path: string): Promise<string>;
+            sections(config: string, type: string): any[];
+
+            get(config: string, sectionId: string, option?: string): any;
+
+            get_first(config: string, type: string, option?: string): any;
+
+            set(config: string, sectionId: string, option: string, value: any): void;
+
+            remove(config: string, sectionId: string): void;
+
+            clone(config: string, type: string, sectionId: string, anonymous?: boolean, name?: string): void;
+
+            set_first(config: string, sectionId: string, option: string, value: any): void;
+        }
     }
 
-    interface RPC {
-        declare(spec: {
-            object: string;
-            method: string;
-            params: string[];
-            expect: any;
-        }): (...args: any[]) => Promise<any>;
+    declare namespace fs {
+        interface FS {
+            exec(command: string, args?: string[]): Promise<{ code: number; stdout: string; stderr: string; }>;
+
+            write(path: string, content: string): Promise<void>;
+
+            trimmed(path: string): Promise<string>;
+
+            read(logFile: any): any;
+
+            exec_direct(command: string, params?: string[], type?: "blob" | "text" | "json", latin1?: boolean): Promise<any>;
+        }
     }
 
-    interface Poll {
-        add(callback: () => Promise<void>): void;
+    declare namespace rpc {
+        interface RPC {
+            declare(spec: {
+                object: string;
+                method: string;
+                params: string[];
+                expect: any;
+            }): (...args: any[]) => Promise<any>;
+        }
     }
 
-    interface BaseClass {
-        extend(obj: any): any;
+    declare namespace poll {
+        interface Poll {
+            add(fn: function, interval?: number): boolean;
+
+            remove(fn: function): boolean;
+        }
     }
 
-    interface UI {
-        changes(): void;
-
-        showModal(modal: any, e: any): void;
-
-        hideModal(): void;
+    declare namespace baseclass {
+        interface BaseClass {
+            extend(obj: any): any;
+        }
     }
 }
 
 // 运行时存在的全局（由 luci 注入）
 // declare const view: LuCI.View;
 declare const L: LuCI.L;
+
 // 全局函数
 declare function _(text: string): string;
 
-declare function E(tag: string, attrs?: Record<string, any>, ...children: any[]): HTMLElement;
+declare function E(tag: string, attrs?: Record<string, any>, ...children: any[]): Node;
 
 // 声明String.format方法
 declare interface String {
@@ -108,131 +322,36 @@ declare module 'view' {
 }
 
 declare module 'form' {
-    const f: LuCI.Form;
+    const f: LuCI.form.Form;
     export default f;
-
-    export class Map {
-        constructor(config: string, title: string, description?: string);
-
-        section(type: any, ...args: any[]): any;
-
-        render(): HTMLElement;
-    }
-
-    export class TypedSection {
-        constructor(type?: string, ...args: any[]);
-
-        anonymous: boolean;
-        addremove: boolean;
-        sortable: boolean;
-        nodescriptions: boolean;
-        rowcolors: boolean;
-        sectiontitle?: (sectionId: string) => string;
-        render?: () => HTMLElement;
-
-        taboption(tab: string, type: any, name: string, ...args: any[]): any;
-
-        option(type: any, name: string, ...args: any[]): any;
-    }
-
-    export class Value {
-        constructor(...args: any[]);
-
-        default: any;
-        datatype?: string;
-        rmempty: boolean;
-        modalonly?: boolean;
-
-        value(key: string, display?: string): void;
-
-        load?: (sectionId: string) => any;
-        write?: (sectionId: string, value: any) => any;
-        remove?: (sectionId: string) => any;
-        monospace?: boolean;
-        rows?: number;
-        validate?: (sectionId: string, value: any) => boolean | string;
-        depends?: Record<string, any>;
-        inputtitle?: string;
-    }
-
-    export class Flag extends Value {
-    }
-
-    export class ListValue extends Value {
-    }
-
-    export class Button extends Value {
-    }
-
-    export class DynamicList extends Value {
-    }
-
-    export class SectionValue extends Value {
-    }
 }
 
 declare module 'uci' {
-    const u: LuCI.UCI;
-    export default u;
-
-    export function load(config: string): Promise<void>;
-
-    export function sections(config: string, type: string, callback: (section: any) => void): any[];
-
-    export function get(config: string, sectionId: string, option?: string): any;
-
-    export function get_first(config: string, type: string, option?: string): any;
-
-    export function set(config: string, sectionId: string, option: string, value: any): void;
-
-    export function remove(config: string, sectionId: string): void;
-
-    export function clone(config: string, type: string, sectionId: string, anonymous?: boolean, name?: string): void;
+    const uci: LuCI.uci.UCI
+    export default uci
 }
 
 declare module 'fs' {
-    const f: LuCI.FS;
+    const f: LuCI.fs.FS;
     export default f;
-
-    export function exec(command: string, args?: string[]): Promise<{ code: number; stdout: string; stderr: string; }>;
-
-    export function write(path: string, content: string): Promise<void>;
-
-    export function trimmed(path: string): Promise<string>;
 }
 
 declare module 'rpc' {
-    const r: LuCI.RPC;
+    const r: LuCI.rpc.RPC;
     export default r;
-
-    export function declare(spec: {
-        object: string;
-        method: string;
-        params: string[];
-        expect: any;
-    }): (...args: any[]) => Promise<any>;
 }
 
 declare module 'poll' {
-    const p: LuCI.Poll;
+    const p: LuCI.poll.Poll;
     export default p;
-
-    export function add(callback: () => Promise<void>): void;
-}
-
-declare module 'network' {
-    const n: any;
-    export default n;
 }
 
 declare module 'baseclass' {
-    const b: LuCI.BaseClass;
+    const b: LuCI.baseclass.BaseClass;
     export default b;
-
-    export function extend(obj: any): any;
 }
 
 declare module 'ui' {
-    const u: LuCI.UI;
+    const u: LuCI.ui.UI;
     export default u;
 }

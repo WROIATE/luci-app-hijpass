@@ -1,4 +1,5 @@
 import {SingBoxEnum} from "../enum/singbox";
+import {RuleDTO} from "./luci";
 
 export class Log {
     disabled: boolean;
@@ -42,40 +43,13 @@ export class DNS {
     disable_expire: boolean;
     final: string;
 
-    constructor(defaultTag: string, defaultStrategy: string) {
+    constructor(defaultTag: string, defaultStrategy: string, cache: boolean) {
         this.servers = []
         this.rules = []
         this.strategy = defaultStrategy || SingBoxEnum.DEFAULT_DNS_STRATEGY
-        this.disable_cache = true
-        this.disable_expire = true
+        this.disable_cache = cache
+        this.disable_expire = cache
         this.final = defaultTag
-    }
-}
-
-// RuleDTO Template
-export class RuleDTO {
-    protocol: string[];
-    port: number[];
-    port_range: string[];
-    domain: string[];
-    domain_suffix: string[];
-    domain_keyword: string[];
-    domain_regex: string[];
-    rule_set: string[];
-    ip_cidr: string[];
-    network: string[];
-
-    constructor() {
-        this.protocol = [];
-        this.port = [];
-        this.port_range = [];
-        this.domain = [];
-        this.domain_suffix = [];
-        this.domain_keyword = [];
-        this.domain_regex = [];
-        this.rule_set = [];
-        this.ip_cidr = [];
-        this.network = [];
     }
 }
 
@@ -109,13 +83,13 @@ export class RouteRule extends Rule {
         this.network = rule.network;
         this.protocol = rule.protocol;
         this.port = rule.port;
-        this.port_range = rule.port_range;
+        this.port_range = rule.portRange.map(range => range.replace('-', ':'))
         this.domain = rule.domain;
-        this.domain_suffix = rule.domain_suffix;
-        this.domain_keyword = rule.domain_keyword;
-        this.domain_regex = rule.domain_regex;
-        this.rule_set = rule.rule_set;
-        this.ip_cidr = rule.ip_cidr;
+        this.domain_suffix = rule.domainSuffix;
+        this.domain_keyword = rule.domainKeyword;
+        this.domain_regex = rule.domainRegex;
+        this.rule_set = rule.ruleSet.map((r) => r.tag);
+        this.ip_cidr = rule.ipCidr;
         return this
     }
 }
@@ -142,10 +116,10 @@ export class DnsRule extends Rule {
 
     initRule(rule: RuleDTO): DnsRule {
         this.domain = rule.domain;
-        this.domain_suffix = rule.domain_suffix;
-        this.domain_keyword = rule.domain_keyword;
-        this.domain_regex = rule.domain_regex;
-        this.rule_set = rule.rule_set
+        this.domain_suffix = rule.domainSuffix;
+        this.domain_keyword = rule.domainKeyword;
+        this.domain_regex = rule.domainRegex;
+        this.rule_set = rule.ruleSet.map((r) => r.tag);
         return this
     }
 }

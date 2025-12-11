@@ -1,5 +1,7 @@
 export enum LuciFlied {
     CONF_NAME = 'hijpass',
+    SERVER_CONF_NAME = 'hijserver',
+
     // 匿名节点类型
     GLOBAL_SECTION_TYPE = 'hijpass',
 
@@ -8,10 +10,13 @@ export enum LuciFlied {
     FIREWALL_SECTION_TYPE = 'firewall',
     DNS_SECTION_TYPE = 'dns',
     RULE_SECTION_TYPE = 'rule',
+    SERVER_SECTION_TYPE = 'server',
+
     // 命名节点类型
     SHUNT_ROUTE_RULE_TYPE = 'shunt_route_rule',
     SHUNT_DNS_NODE_TYPE = 'shunt_dns_node',
-    PROXY_NODE_TYPE = 'proxy_node'
+    PROXY_NODE_TYPE = 'proxy_node',
+    SERVER_NODE_TYPE = 'server_node'
 }
 
 export const HijpassValues = {

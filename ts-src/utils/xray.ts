@@ -1,6 +1,6 @@
 import uci from 'uci'
 
-import {XrayEnum} from "../enum/xrayEnum";
+import {XrayEnum} from "../enum/xray";
 import {ShuntUtils} from "./common";
 import {
     Balancer, BurstObservatory,
@@ -29,7 +29,7 @@ function genConf() {
     let route = new Route()
 
     let dnsConf = shuntSection.dns
-    let dns = new DNS(transDnsStrategy(dnsConf.defaultStrategy))
+    let dns = new DNS(transDnsStrategy(dnsConf.defaultStrategy), dnsConf.useCache === "1")
     dnsConf.nodes.forEach(function (dnsNode) {
         let server = new DnsServer(dnsNode.type, dnsNode.tag, dnsNode.server, Number(dnsNode.port))
         dnsServerMap.set(dnsNode.tag, server)
@@ -76,29 +76,30 @@ function genConf() {
         let ruleOutBoundTag = transOutTag(rule.proxyNode)
         ruleOutBoundTag = ruleOutBoundTag ? ruleOutBoundTag : outbounds[0].tag
         let routeRule = new RouteRule(rule.name, ruleOutBoundTag)
-        routeRule.network = rule.network
-        routeRule.protocol = transRouteProtocol(rule.protocol)
-        let portValue = rule.port || []
-        if (rule.portRange) {
-            portValue.concat(rule.portRange)
-        }
-        routeRule.port = portValue.join(',')
-        if (routeRule.port === "") {
-            routeRule.port = undefined
+
+        let luciRuleDTO = ShuntUtils.parseRuleList(rule);
+        if (luciRuleDTO.isEmpty("geo")) {
+            return;
         }
 
-        let domainMap = ShuntUtils.parseRuleList(rule.domainList, 'domain');
-        let ipMap = ShuntUtils.parseRuleList(rule.ipList, 'ip');
+        routeRule.network = luciRuleDTO.network
+        routeRule.protocol = transRouteProtocol(luciRuleDTO.protocol)
+        routeRule.port = luciRuleDTO.port.join(',')
+        if (luciRuleDTO.portRange) {
+            luciRuleDTO.portRange.concat(routeRule.port)
+        }
+        routeRule.port = luciRuleDTO.portRange.join(',')
+
         const domainArrays: string[][] = [
-            addPrefixToElements(domainMap.domain, 'full:'),
-            addPrefixToElements(domainMap.domainSuffix, 'domain:'),
-            domainMap.domainKeyword,
-            addPrefixToElements(domainMap.domainRegex, 'regexp:'),
-            domainMap.geoSite
+            addPrefixToElements(luciRuleDTO.domain, 'full:'),
+            addPrefixToElements(luciRuleDTO.domainSuffix, 'domain:'),
+            luciRuleDTO.domainKeyword,
+            addPrefixToElements(luciRuleDTO.domainRegex, 'regexp:'),
+            luciRuleDTO.geoSite
         ];
         const ipArrays = [
-            ipMap.ipCidr,
-            ipMap.geoIp
+            luciRuleDTO.ipCidr,
+            luciRuleDTO.geoIp
         ]
         routeRule.domain = [].concat(...domainArrays.filter(item => Array.isArray(item) && item.length > 0))
         routeRule.domain = routeRule.domain.length > 0 ? routeRule.domain : undefined
@@ -120,7 +121,9 @@ function genConf() {
         }
 
         // 只有存在域名规则时才添加DNS规则
-        if (routeRule.domain || routeRule.ip) {
+        if (luciRuleDTO.containDomain()
+            || luciRuleDTO.containIp()
+            || luciRuleDTO.containGeo()) {
             let dnsTmpl: DnsServer;
             let outboundTag = transOutTag(rule.dnsProxyNode)
             outboundTag = outboundTag ? outboundTag : ruleOutBoundTag
@@ -222,7 +225,7 @@ function transRouteProtocol(protocol: string[]) {
             case "bittorrent":
                 return pro
             default:
-                return undefined;
+                throw new Error("Unsupported xray rule protocol: " + pro)
         }
     }).filter(pro => pro !== undefined)
     if (res.length === 0) {

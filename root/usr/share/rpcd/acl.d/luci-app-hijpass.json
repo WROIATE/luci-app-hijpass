@@ -38,6 +38,21 @@
                 ],
                 "/usr/lib/hijpass/rules.sh update": [
                     "exec"
+                ],
+                "/usr/lib/hijpass/rules.sh query *": [
+                    "exec"
+                ],
+                "/usr/lib/hijpass/connect.sh https://* [0-9]*": [
+                    "exec"
+                ],
+                "/usr/lib/hijpass/net.sh port [0-9]*": [
+                    "exec"
+                ],
+                "/usr/lib/hijpass/geoview.sh -e *": [
+                    "exec"
+                ],
+                "/usr/lib/hijpass/geoview.sh -l *": [
+                  "exec"
                 ]
             },
             "uci": [

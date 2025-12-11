@@ -1,4 +1,4 @@
-import {XrayEnum} from "../enum/xrayEnum";
+import {XrayEnum} from "../enum/xray";
 
 class Log {
     loglevel: string;
@@ -41,15 +41,12 @@ class DnsServer {
                 this.address = address
                 this.port = port
                 break
-            case "tls":
-                this.address = "tls://" + address
-                this.port = port
-                break
+            default:
+                throw new Error("Invalid xray DNS server type: " + type)
         }
         this.tag = tag
         this.domains = []
         this.skipFallback = true
-        this.disableCache = true
     }
 }
 
@@ -59,14 +56,18 @@ class DNS {
     rules: DnsRule[];
     queryStrategy: string;
     disableCache: boolean;
+    serveStale: boolean;
+    serveExpiredTTL: number;
     disableFallback: boolean;
     disableFallbackIfMatch: boolean;
 
-    constructor(queryStrategy: string) {
+    constructor(queryStrategy: string, cache: boolean) {
         this.servers = []
         this.rules = []
         this.queryStrategy = queryStrategy || XrayEnum.DEFAULT_DNS_STRATEGY
-        this.disableCache = true
+        this.disableCache = !cache
+        this.serveStale = !cache
+        this.serveExpiredTTL = 3600
         this.disableFallback = false
         this.disableFallbackIfMatch = true
     }

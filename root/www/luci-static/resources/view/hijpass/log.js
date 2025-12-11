@@ -1,434 +1,420 @@
+
 'use strict';
+'require fs';
 'require view';
 'require form';
-'require ui';
-'require fs';
 'require uci';
-'require view.hijpass.hijpass as hj';
 
-return view.extend({
-    load: function () {
-        return Promise.all([
-            uci.load(hj.HijpassEnum.CONF_NAME)
-        ]);
+var LuciView = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // views/log.ts
+  var log_exports = {};
+  __export(log_exports, {
+    default: () => log_default
+  });
+
+  // luci-virtual:fs
+  var fs_default = fs;
+
+  // luci-virtual:view
+  var view_default = view;
+
+  // luci-virtual:form
+  var form_default = form;
+
+  // luci-virtual:uci
+  var uci_default = uci;
+
+  // views/log.ts
+  var v = view_default.extend({
+    load: function() {
+      return Promise.all([
+        uci_default.load("hijpass" /* CONF_NAME */)
+      ]);
     },
     handleSaveApply: null,
     handleReset: null,
     handleSave: null,
-    render: function () {
-        let m, s, o;
-
-        m = new form.Map(hj.HijpassEnum.CONF_NAME, _('日志查看'),
-            _('查看和管理 HiJpass 相关日志'));
-
-        s = m.section(form.TypedSection, 'logs_display');
-        s.anonymous = true;
-        s.addremove = false;
-        s.render = function () {
-            return createLogControlPanel();
-        };
-
-        return m.render();
+    render: function() {
+      let m = new form_default.Map(
+        "hijpass" /* CONF_NAME */,
+        _("\u65E5\u5FD7\u67E5\u770B"),
+        _("\u67E5\u770B\u548C\u7BA1\u7406 HiJpass \u76F8\u5173\u65E5\u5FD7")
+      );
+      let s = m.section(form_default.TypedSection, "logs_display");
+      s.anonymous = true;
+      s.addremove = false;
+      s.render = function() {
+        return createLogControlPanel();
+      };
+      return m.render();
     }
-});
-
-// 创建日志文件选项
-function createLogFileOptions() {
+  });
+  function createLogFileOptions() {
     let options = [];
-
-    // 添加系统日志
-    options.push(E('option', { 'value': '/tmp/log/hijpass.log' }, _('主日志')));
-
-    // 添加分流日志
-    let shuntLogPath = uci.get_first(hj.HijpassEnum.CONF_NAME, hj.HijpassEnum.SHUNT_SECTION_TYPE, 'log_path');
+    options.push(E("option", { "value": "/tmp/log/hijpass.log" }, _("\u4E3B\u65E5\u5FD7")));
+    let shuntLogPath = uci_default.get_first("hijpass" /* CONF_NAME */, "shunt" /* SHUNT_SECTION_TYPE */, "log_path");
     if (shuntLogPath) {
-        options.push(E('option', { 'value': shuntLogPath }, _('分流日志')));
+      options.push(E("option", { "value": shuntLogPath }, _("\u5206\u6D41\u65E5\u5FD7")));
     } else {
-        options.push(E('option', { 'value': '/tmp/log/hijpass-shunt.log' }, _('分流日志')));
+      options.push(E("option", { "value": "/tmp/log/hijpass-shunt.log" }, _("\u5206\u6D41\u65E5\u5FD7")));
     }
-
-    // 动态添加代理节点日志
-    uci.sections(hj.HijpassEnum.CONF_NAME, hj.HijpassEnum.PROXY_NODE_TYPE, (proxySection) => {
-        let proxyName = proxySection['.name'];
-        let displayName = proxySection.name || proxyName;
-        let logPath = proxySection.log_path;
-
-        if (logPath) {
-            let optionText = _('代理日志') + ' - ' + displayName;
-            options.push(E('option', { 'value': logPath }, optionText));
-        }
+    uci_default.sections("hijpass" /* CONF_NAME */, "proxy_node" /* PROXY_NODE_TYPE */, (proxySection) => {
+      let proxyName = proxySection[".name"];
+      let displayName = proxySection.name || proxyName;
+      let logPath = proxySection.log_path;
+      if (logPath) {
+        let optionText = _("\u4EE3\u7406\u65E5\u5FD7") + " - " + displayName;
+        options.push(E("option", { "value": logPath }, optionText));
+      }
     });
-
     return options;
-}
-
-// 创建日志控制面板
-function createLogControlPanel() {
-    // 添加事件监听器
-    requestAnimationFrame(function () {
-        setupLogEventListeners();
-        loadLogs(); // 初始加载日志
+  }
+  function createLogControlPanel() {
+    requestAnimationFrame(function() {
+      setupLogEventListeners();
+      loadLogs();
     });
-    return E('div', { 'class': 'cbi-section', 'style': 'display: flex;flex-direction: column;gap: 20px;' }, [
-        E('div', { 'class': 'cbi-section-node' }, [
-            E('div', { 'class': 'cbi-value' }, [
-                E('label', { 'class': 'cbi-value-title' }, _('日志文件')),
-                E('div', { 'class': 'cbi-value-field' }, [
-                    E('select', {
-                        'id': 'log-file-select',
-                        'class': 'cbi-input-select',
-                        'style': 'margin-right: 10px;'
-                    }, createLogFileOptions())
-                ])
-            ]),
-            E('div', { 'class': 'cbi-value' }, [
-                E('label', { 'class': 'cbi-value-title' }, _('日志级别过滤')),
-                E('div', { 'class': 'cbi-value-field' }, [
-                    E('select', {
-                        'id': 'log-level-filter',
-                        'class': 'cbi-input-select',
-                        'style': 'margin-right: 10px;'
-                    }, [
-                        E('option', { 'value': '' }, _('全部')),
-                        E('option', { 'value': 'DEBUG' }, _('调试')),
-                        E('option', { 'value': 'INFO' }, _('信息')),
-                        E('option', { 'value': 'WARN' }, _('警告')),
-                        E('option', { 'value': 'ERROR' }, _('错误'))
-                    ])
-                ])
-            ]),
-            E('div', { 'class': 'cbi-value' }, [
-                E('label', { 'class': 'cbi-value-title' }, _('显示行数')),
-                E('div', { 'class': 'cbi-value-field' }, [
-                    E('select', {
-                        'id': 'log-lines-count',
-                        'class': 'cbi-input-select',
-                        'style': 'margin-right: 10px;'
-                    }, [
-                        E('option', { 'value': '50' }, '50'),
-                        E('option', { 'value': '100', 'selected': 'selected' }, '100'),
-                        E('option', { 'value': '200' }, '200'),
-                        E('option', { 'value': '500' }, '500'),
-                        E('option', { 'value': '1000' }, '1000')
-                    ])
-                ])
-            ]),
-            E('div', { 'class': 'cbi-value' }, [
-                E('label', { 'class': 'cbi-value-title' }, _('操作')),
-                E('div', { 'class': 'cbi-value-field' }, [
-                    E('button', {
-                        'class': 'cbi-button cbi-button-action',
-                        'id': 'refresh-logs',
-                        'style': 'margin-right: 5px;'
-                    }, _('刷新')),
-                    E('button', {
-                        'class': 'cbi-button cbi-button-neutral',
-                        'id': 'auto-refresh-toggle',
-                        'style': 'margin-right: 5px;'
-                    }, _('自动刷新')),
-                    E('button', {
-                        'class': 'cbi-button cbi-button-positive',
-                        'id': 'download-logs',
-                        'style': 'margin-right: 5px;'
-                    }, _('下载')),
-                    E('button', {
-                        'class': 'cbi-button cbi-button-negative',
-                        'id': 'clear-logs'
-                    }, _('清空'))
-                ])
-            ]),
-            E('div', { 'class': 'cbi-value' }, [
-                E('div', { 'id': 'log-status', 'style': 'font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' }),
-                E('div', {
-                    'id': 'log-content',
-                    'class': 'log-display',
-                    'style': 'width: 100%; height: 500px; font-family: monospace; font-size: 12px; background: #101010; color: #eee; border: 1px solid #ccc; padding: 10px; overflow: auto; white-space: pre; line-height: 1.4;'
-                }, _('日志内容将在这里显示...'))
+    return E("div", { "class": "cbi-section", "style": "display: flex;flex-direction: column;gap: 20px;" }, [
+      E("div", { "class": "cbi-section-node" }, [
+        E("div", { "class": "cbi-value" }, [
+          E("label", { "class": "cbi-value-title" }, _("\u65E5\u5FD7\u6587\u4EF6")),
+          E("div", { "class": "cbi-value-field" }, [
+            E("select", {
+              "id": "log-file-select",
+              "class": "cbi-input-select",
+              "style": "margin-right: 10px;"
+            }, createLogFileOptions())
+          ])
+        ]),
+        E("div", { "class": "cbi-value" }, [
+          E("label", { "class": "cbi-value-title" }, _("\u65E5\u5FD7\u7EA7\u522B\u8FC7\u6EE4")),
+          E("div", { "class": "cbi-value-field" }, [
+            E("select", {
+              "id": "log-level-filter",
+              "class": "cbi-input-select",
+              "style": "margin-right: 10px;"
+            }, [
+              E("option", { "value": "" }, _("\u5168\u90E8")),
+              E("option", { "value": "DEBUG" }, _("\u8C03\u8BD5")),
+              E("option", { "value": "INFO" }, _("\u4FE1\u606F")),
+              E("option", { "value": "WARN" }, _("\u8B66\u544A")),
+              E("option", { "value": "ERROR" }, _("\u9519\u8BEF"))
             ])
+          ])
+        ]),
+        E("div", { "class": "cbi-value" }, [
+          E("label", { "class": "cbi-value-title" }, _("\u663E\u793A\u884C\u6570")),
+          E("div", { "class": "cbi-value-field" }, [
+            E("select", {
+              "id": "log-lines-count",
+              "class": "cbi-input-select",
+              "style": "margin-right: 10px;"
+            }, [
+              E("option", { "value": "50" }, "50"),
+              E("option", { "value": "100", "selected": "selected" }, "100"),
+              E("option", { "value": "200" }, "200"),
+              E("option", { "value": "500" }, "500"),
+              E("option", { "value": "1000" }, "1000")
+            ])
+          ])
+        ]),
+        E("div", { "class": "cbi-value" }, [
+          E("label", { "class": "cbi-value-title" }, _("\u64CD\u4F5C")),
+          E("div", { "class": "cbi-value-field" }, [
+            E("button", {
+              "class": "cbi-button cbi-button-action",
+              "id": "refresh-logs",
+              "style": "margin-right: 5px;"
+            }, _("\u5237\u65B0")),
+            E("button", {
+              "class": "cbi-button cbi-button-neutral",
+              "id": "auto-refresh-toggle",
+              "style": "margin-right: 5px;"
+            }, _("\u81EA\u52A8\u5237\u65B0")),
+            E("button", {
+              "class": "cbi-button cbi-button-positive",
+              "id": "download-logs",
+              "style": "margin-right: 5px;"
+            }, _("\u4E0B\u8F7D")),
+            E("button", {
+              "class": "cbi-button cbi-button-negative",
+              "id": "clear-logs"
+            }, _("\u6E05\u7A7A"))
+          ])
+        ]),
+        E("div", { "class": "cbi-value" }, [
+          E("div", {
+            "id": "log-status",
+            "style": "font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+          }),
+          E("div", {
+            "id": "log-content",
+            "class": "log-display",
+            "style": "width: 100%; height: 500px; font-family: monospace; font-size: 12px; background: #101010; color: #eee; border: 1px solid #ccc; padding: 10px; overflow: auto; white-space: pre; line-height: 1.4;"
+          }, _("\u65E5\u5FD7\u5185\u5BB9\u5C06\u5728\u8FD9\u91CC\u663E\u793A..."))
         ])
+      ])
     ]);
-}
-
-// 设置事件监听器
-function setupLogEventListeners() {
+  }
+  function setupLogEventListeners() {
     let autoRefreshInterval = null;
     let isAutoRefresh = false;
-
-    // 刷新按钮
-    document.getElementById('refresh-logs').addEventListener('click', function () {
-        loadLogs();
+    document.getElementById("refresh-logs").addEventListener("click", function() {
+      loadLogs();
     });
-
-    // 自动刷新切换
-    document.getElementById('auto-refresh-toggle').addEventListener('click', function () {
-        isAutoRefresh = !isAutoRefresh;
-        let button = this;
-
-        if (isAutoRefresh) {
-            button.textContent = _('停止自动刷新');
-            button.className = 'cbi-button cbi-button-negative';
-            autoRefreshInterval = setInterval(loadLogs, 3000); // 每3秒刷新
-            updateLogStatus(_('自动刷新已启用'));
-        } else {
-            button.textContent = _('自动刷新');
-            button.className = 'cbi-button cbi-button-neutral';
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-                autoRefreshInterval = null;
-            }
-            updateLogStatus(_('自动刷新已停用'));
+    document.getElementById("auto-refresh-toggle").addEventListener("click", function() {
+      isAutoRefresh = !isAutoRefresh;
+      let button = this;
+      if (isAutoRefresh) {
+        button.textContent = _("\u505C\u6B62\u81EA\u52A8\u5237\u65B0");
+        button.className = "cbi-button cbi-button-negative";
+        autoRefreshInterval = setInterval(loadLogs, 3e3);
+        updateLogStatus(_("\u81EA\u52A8\u5237\u65B0\u5DF2\u542F\u7528"));
+      } else {
+        button.textContent = _("\u81EA\u52A8\u5237\u65B0");
+        button.className = "cbi-button cbi-button-neutral";
+        if (autoRefreshInterval) {
+          clearInterval(autoRefreshInterval);
+          autoRefreshInterval = null;
         }
+        updateLogStatus(_("\u81EA\u52A8\u5237\u65B0\u5DF2\u505C\u7528"));
+      }
     });
-
-    // 下载日志
-    document.getElementById('download-logs').addEventListener('click', function () {
-        downloadLogs();
+    document.getElementById("download-logs").addEventListener("click", function() {
+      downloadLogs();
     });
-
-    // 清空日志
-    document.getElementById('clear-logs').addEventListener('click', function () {
-        if (confirm(_('确定要清空日志文件吗？此操作不可恢复。'))) {
-            clearLogs();
-        }
+    document.getElementById("clear-logs").addEventListener("click", function() {
+      if (confirm(_("\u786E\u5B9A\u8981\u6E05\u7A7A\u65E5\u5FD7\u6587\u4EF6\u5417\uFF1F\u6B64\u64CD\u4F5C\u4E0D\u53EF\u6062\u590D\u3002"))) {
+        clearLogs();
+      }
     });
-
-    // 日志文件选择变化
-    document.getElementById('log-file-select').addEventListener('change', function () {
-        loadLogs();
+    document.getElementById("log-file-select").addEventListener("change", function() {
+      loadLogs();
     });
-
-    // 日志级别过滤变化
-    document.getElementById('log-level-filter').addEventListener('change', function () {
-        loadLogs();
+    document.getElementById("log-level-filter").addEventListener("change", function() {
+      loadLogs();
     });
-
-    // 显示行数变化
-    document.getElementById('log-lines-count').addEventListener('change', function () {
-        loadLogs();
+    document.getElementById("log-lines-count").addEventListener("change", function() {
+      loadLogs();
     });
-}
-
-// 加载日志内容
-function loadLogs() {
-    let logFile = document.getElementById('log-file-select').value;
-    let levelFilter = document.getElementById('log-level-filter').value;
-    let linesCount = document.getElementById('log-lines-count').value;
-
-    updateLogStatus(_('正在加载日志...'));
-
-    fs.exec('/usr/bin/tail', ['-n', linesCount, logFile]).then(function (result) {
-        let logContent = result.stdout || '';
-
-        // 应用级别过滤
-        if (levelFilter) {
-            let lines = logContent.split('\n');
-            let filteredLines = lines.filter(function (line) {
-                let upperLine = line.toUpperCase();
-                let upperFilter = levelFilter.toUpperCase();
-
-                // 如果选择WARN，同时匹配WARN和WARNING
-                if (upperFilter === 'WARN') {
-                    return upperLine.includes('WARN') || upperLine.includes('WARNING');
-                }
-
-                return upperLine.includes(upperFilter);
-            });
-            logContent = filteredLines.join('\n');
-        }
-
-        // 添加颜色高亮
-        logContent = highlightLogContent(logContent);
-
-        let textarea = document.getElementById('log-content');
-        textarea.innerHTML = logContent;
-
-        // 滚动到底部
-        textarea.scrollTop = textarea.scrollHeight;
-
-        updateLogStatus(_('日志已更新') + ' - ' + new Date().toLocaleTimeString());
-    }).catch(function (error) {
-        updateLogStatus(_('加载日志失败: ') + error.message);
-        document.getElementById('log-content').textContent = _('无法加载日志文件: ') + logFile;
+  }
+  function loadLogs() {
+    let logFile = document.getElementById("log-file-select").value;
+    let levelFilter = document.getElementById("log-level-filter").value;
+    let linesCount = document.getElementById("log-lines-count").value;
+    updateLogStatus(_("\u6B63\u5728\u52A0\u8F7D\u65E5\u5FD7..."));
+    fs_default.exec("/usr/bin/tail", ["-n", linesCount, logFile]).then(function(result) {
+      let logContent = result.stdout || "";
+      if (levelFilter) {
+        let lines = logContent.split("\n");
+        let filteredLines = lines.filter(function(line) {
+          let upperLine = line.toUpperCase();
+          let upperFilter = levelFilter.toUpperCase();
+          if (upperFilter === "WARN") {
+            return upperLine.includes("WARN") || upperLine.includes("WARNING");
+          }
+          return upperLine.includes(upperFilter);
+        });
+        logContent = filteredLines.join("\n");
+      }
+      logContent = highlightLogContent(logContent);
+      let textarea = document.getElementById("log-content");
+      textarea.innerHTML = logContent;
+      textarea.scrollTop = textarea.scrollHeight;
+      updateLogStatus(_("\u65E5\u5FD7\u5DF2\u66F4\u65B0") + " - " + (/* @__PURE__ */ new Date()).toLocaleTimeString());
+    }).catch(function(error) {
+      updateLogStatus(_("\u52A0\u8F7D\u65E5\u5FD7\u5931\u8D25: ") + error.message);
+      document.getElementById("log-content").textContent = _("\u65E0\u6CD5\u52A0\u8F7D\u65E5\u5FD7\u6587\u4EF6: ") + logFile;
     });
-}
-
-// 高亮日志内容
-function highlightLogContent(content) {
-    // 转义HTML字符
-    content = content.replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-
-    // 处理ANSI颜色代码
+  }
+  function highlightLogContent(content) {
+    content = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     content = convertAnsiToHtml(content);
-
-    // 添加日志级别颜色高亮（如果没有ANSI颜色）
-    // 匹配行开头的时间戳和日志级别（支持带/不带中括号）
-    content = content.replace(/\s+\[?(ERROR|WARN|WARNING|INFO|DEBUG)\]?\s+/gmi, function (match, level) {
-        if (match.includes('<span')) return match;
-        let color = getLogLevelColor(level);
-        return '<span style="color: ' + color + '; font-weight: bold;">' + match + '</span>';
+    content = content.replace(/\s+\[?(ERROR|WARN|WARNING|INFO|DEBUG)\]?\s+/gmi, function(match, level) {
+      if (match.includes("<span")) return match;
+      let color = getLogLevelColor(level);
+      return '<span style="color: ' + color + '; font-weight: bold;">' + match + "</span>";
     });
-
     return content;
-}
-
-// 获取日志级别对应的颜色
-function getLogLevelColor(level) {
+  }
+  function getLogLevelColor(level) {
     switch (level.toUpperCase()) {
-        case 'ERROR':
-            return '#ff6b6b';
-        case 'WARN':
-        case 'WARNING':
-            return '#ffa500';
-        case 'INFO':
-            return '#4ecdc4';
-        case 'DEBUG':
-            return '#95a5a6';
-        default:
-            return '#ffffff';
+      case "ERROR":
+        return "#ff6b6b";
+      case "WARN":
+      case "WARNING":
+        return "#ffa500";
+      case "INFO":
+        return "#4ecdc4";
+      case "DEBUG":
+        return "#95a5a6";
+      default:
+        return "#ffffff";
     }
-}
-
-// 将ANSI颜色代码转换为HTML
-function convertAnsiToHtml(text) {
-    // ANSI颜色代码映射表
+  }
+  function convertAnsiToHtml(text) {
     const ansiColorMap = {
-        // 标准前景色
-        '30': '#2e3436', // 黑色
-        '31': '#cc0000', // 红色
-        '32': '#4e9a06', // 绿色
-        '33': '#c4a000', // 黄色
-        '34': '#3465a4', // 蓝色
-        '35': '#75507b', // 洋红
-        '36': '#06989a', // 青色
-        '37': '#d3d7cf', // 白色
-        // 亮色前景色
-        '90': '#555753', // 亮黑色（灰色）
-        '91': '#ef2929', // 亮红色
-        '92': '#8ae234', // 亮绿色
-        '93': '#fce94f', // 亮黄色
-        '94': '#729fcf', // 亮蓝色
-        '95': '#ad7fa8', // 亮洋红
-        '96': '#34e2e2', // 亮青色
-        '97': '#eeeeec'  // 亮白色
+      // 标准前景色
+      "30": "#2e3436",
+      // 黑色
+      "31": "#cc0000",
+      // 红色
+      "32": "#4e9a06",
+      // 绿色
+      "33": "#c4a000",
+      // 黄色
+      "34": "#3465a4",
+      // 蓝色
+      "35": "#75507b",
+      // 洋红
+      "36": "#06989a",
+      // 青色
+      "37": "#d3d7cf",
+      // 白色
+      // 亮色前景色
+      "90": "#555753",
+      // 亮黑色（灰色）
+      "91": "#ef2929",
+      // 亮红色
+      "92": "#8ae234",
+      // 亮绿色
+      "93": "#fce94f",
+      // 亮黄色
+      "94": "#729fcf",
+      // 亮蓝色
+      "95": "#ad7fa8",
+      // 亮洋红
+      "96": "#34e2e2",
+      // 亮青色
+      "97": "#eeeeec"
+      // 亮白色
     };
-
-    // 背景色映射表
     const ansiBgColorMap = {
-        '40': '#2e3436', // 黑色背景
-        '41': '#cc0000', // 红色背景
-        '42': '#4e9a06', // 绿色背景
-        '43': '#c4a000', // 黄色背景
-        '44': '#3465a4', // 蓝色背景
-        '45': '#75507b', // 洋红背景
-        '46': '#06989a', // 青色背景
-        '47': '#d3d7cf', // 白色背景
-        // 亮色背景
-        '100': '#555753', // 亮黑色背景
-        '101': '#ef2929', // 亮红色背景
-        '102': '#8ae234', // 亮绿色背景
-        '103': '#fce94f', // 亮黄色背景
-        '104': '#729fcf', // 亮蓝色背景
-        '105': '#ad7fa8', // 亮洋红背景
-        '106': '#34e2e2', // 亮青色背景
-        '107': '#eeeeec'  // 亮白色背景
+      "40": "#2e3436",
+      // 黑色背景
+      "41": "#cc0000",
+      // 红色背景
+      "42": "#4e9a06",
+      // 绿色背景
+      "43": "#c4a000",
+      // 黄色背景
+      "44": "#3465a4",
+      // 蓝色背景
+      "45": "#75507b",
+      // 洋红背景
+      "46": "#06989a",
+      // 青色背景
+      "47": "#d3d7cf",
+      // 白色背景
+      // 亮色背景
+      "100": "#555753",
+      // 亮黑色背景
+      "101": "#ef2929",
+      // 亮红色背景
+      "102": "#8ae234",
+      // 亮绿色背景
+      "103": "#fce94f",
+      // 亮黄色背景
+      "104": "#729fcf",
+      // 亮蓝色背景
+      "105": "#ad7fa8",
+      // 亮洋红背景
+      "106": "#34e2e2",
+      // 亮青色背景
+      "107": "#eeeeec"
+      // 亮白色背景
     };
-
     let result = text;
     let openTags = [];
-
-    // 处理ANSI转义序列
-    result = result.replace(/\x1b\[([0-9;]*)m/g, function (match, codes) {
-        if (!codes) codes = '0';
-
-        let codeArray = codes.split(';');
-        let html = '';
-
-        for (let code of codeArray) {
-            code = code.trim();
-
-            if (code === '0' || code === '') {
-                // 重置所有格式
-                while (openTags.length > 0) {
-                    html += '</span>';
-                    openTags.pop();
-                }
-            } else if (code === '1') {
-                // 粗体
-                html += '<span style="font-weight: bold;">';
-                openTags.push('bold');
-            } else if (code === '4') {
-                // 下划线
-                html += '<span style="text-decoration: underline;">';
-                openTags.push('underline');
-            } else if (ansiColorMap[code]) {
-                // 前景色
-                html += '<span style="color: ' + ansiColorMap[code] + ';">';
-                openTags.push('color');
-            } else if (ansiBgColorMap[code]) {
-                // 背景色
-                html += '<span style="background-color: ' + ansiBgColorMap[code] + ';">';
-                openTags.push('bgcolor');
-            }
+    result = result.replace(/\x1b\[([0-9;]*)m/g, function(match, codes) {
+      if (!codes) codes = "0";
+      let codeArray = codes.split(";");
+      let html = "";
+      for (let code of codeArray) {
+        code = code.trim();
+        if (code === "0" || code === "") {
+          while (openTags.length > 0) {
+            html += "</span>";
+            openTags.pop();
+          }
+        } else if (code === "1") {
+          html += '<span style="font-weight: bold;">';
+          openTags.push("bold");
+        } else if (code === "4") {
+          html += '<span style="text-decoration: underline;">';
+          openTags.push("underline");
+        } else if (ansiColorMap[code]) {
+          html += '<span style="color: ' + ansiColorMap[code] + ';">';
+          openTags.push("color");
+        } else if (ansiBgColorMap[code]) {
+          html += '<span style="background-color: ' + ansiBgColorMap[code] + ';">';
+          openTags.push("bgcolor");
         }
-
-        return html;
+      }
+      return html;
     });
-
-    // 在文本末尾关闭所有未关闭的标签
     while (openTags.length > 0) {
-        result += '</span>';
-        openTags.pop();
+      result += "</span>";
+      openTags.pop();
     }
-
     return result;
-}
-
-// 下载日志
-function downloadLogs() {
-    let logFile = document.getElementById('log-file-select').value;
-
-    updateLogStatus(_('正在准备下载...'));
-
-    fs.read(logFile).then(function (content) {
-
-        // 创建下载链接
-        let blob = new Blob([content], { type: 'text/plain' });
-        let url = window.URL.createObjectURL(blob);
-        let a = document.createElement('a');
-        a.href = url;
-        a.download = logFile.split('/').pop() + '_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.log';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
-        updateLogStatus(_('日志下载完成'));
-    }).catch(function (error) {
-        updateLogStatus(_('下载失败: ') + error.message);
+  }
+  function downloadLogs() {
+    let logFile = document.getElementById("log-file-select").value;
+    updateLogStatus(_("\u6B63\u5728\u51C6\u5907\u4E0B\u8F7D..."));
+    fs_default.read(logFile).then(function(content) {
+      let blob = new Blob([content], { type: "text/plain" });
+      let url = window.URL.createObjectURL(blob);
+      let a = document.createElement("a");
+      a.href = url;
+      a.download = logFile.split("/").pop() + "_" + (/* @__PURE__ */ new Date()).toISOString().slice(0, 19).replace(/:/g, "-") + ".log";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      updateLogStatus(_("\u65E5\u5FD7\u4E0B\u8F7D\u5B8C\u6210"));
+    }).catch(function(error) {
+      updateLogStatus(_("\u4E0B\u8F7D\u5931\u8D25: ") + error.message);
     });
-}
-
-// 清空日志
-function clearLogs() {
-    let logFile = document.getElementById('log-file-select').value;
-
-    updateLogStatus(_('正在清空日志...'));
-
-    fs.write(logFile, null).then(function () {
-        updateLogStatus(_('日志已清空'));
-        loadLogs(); // 重新加载显示空日志
-    }).catch(function (error) {
-        updateLogStatus(_('清空失败: ') + error.message);
+  }
+  function clearLogs() {
+    let logFile = document.getElementById("log-file-select").value;
+    updateLogStatus(_("\u6B63\u5728\u6E05\u7A7A\u65E5\u5FD7..."));
+    fs_default.write(logFile, null).then(function() {
+      updateLogStatus(_("\u65E5\u5FD7\u5DF2\u6E05\u7A7A"));
+      loadLogs();
+    }).catch(function(error) {
+      updateLogStatus(_("\u6E05\u7A7A\u5931\u8D25: ") + error.message);
     });
-}
-
-// 更新日志状态
-function updateLogStatus(message) {
-    let statusElement = document.getElementById('log-status');
+  }
+  function updateLogStatus(message) {
+    let statusElement = document.getElementById("log-status");
     if (statusElement) {
-        statusElement.textContent = message;
-        statusElement.style.color = '#666';
+      statusElement.textContent = message;
+      statusElement.style.color = "#666";
     }
-}
+  }
+  var log_default = v;
+  return __toCommonJS(log_exports);
+})();
+
+
+return LuciView.default;

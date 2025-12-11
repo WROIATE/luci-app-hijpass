@@ -11,6 +11,12 @@ PROXY_DNS=$(uci -q get hijpass.@dns[0].proxy_dns)
 ENABLE_GFW=$(uci -q get hijpass.@dns[0].use_gfw)
 ENABLE_CHN=$(uci -q get hijpass.@dns[0].use_chn)
 CHINADNS_NG_CONF="/etc/hijpass/chinadns-ng.conf"
+GEOVIEW_SCRIPT="/usr/lib/hijpass/geoview.sh"
+DOMAIN_PROXY_TEMP_FILE_PATH=/tmp/domain_proxy.tmp
+DOMAIN_DIRECT_TEMP_FILE_PATH=/tmp/domain_direct.tmp
+
+touch $DOMAIN_PROXY_TEMP_FILE_PATH
+touch $DOMAIN_DIRECT_TEMP_FILE_PATH
 
 if [ "$DIRECT_DNS" = "custom" ]; then
     DIRECT_DNS="$(uci -q get hijpass.@dns[0].direct_dns_custom)"
@@ -23,6 +29,25 @@ fi
 if [ "$PROXY_DNS" = "custom" ]; then
     PROXY_DNS="$(uci -q get hijpass.@dns[0].proxy_dns_custom)"
 fi
+proxy_domain_list="$(cat "$DOMAIN_PROXY_FILE_PATH")"
+geosite_proxy_lines=$(echo "$proxy_domain_list" | grep '^geosite:' | sed 's/^geosite://' | tr '\n' ',')
+if [ -n "$geosite_proxy_lines" ]; then
+    geosite_proxy_domains=$($GEOVIEW_SCRIPT -e "geosite" "${geosite_proxy_lines%,}")
+    proxy_domain_list=$(echo "$proxy_domain_list" | grep -v '^geosite:')
+    proxy_domain_list="$proxy_domain_list
+$geosite_proxy_domains"
+fi
+echo "$proxy_domain_list" > "$DOMAIN_PROXY_TEMP_FILE_PATH"
+
+direct_domain_list="$(cat "$DOMAIN_DIRECT_FILE_PATH")"
+geosite_direct_lines=$(echo "$direct_domain_list" | grep '^geosite:' | sed 's/^geosite://' | tr '\n' ',')
+if [ -n "$geosite_direct_lines" ]; then
+    geosite_direct_domains=$($GEOVIEW_SCRIPT -e "geosite" "${geosite_direct_lines%,}")
+    direct_domain_list=$(echo "$direct_domain_list" | grep -v '^geosite:')
+    direct_domain_list="$direct_domain_list
+$geosite_direct_domains"
+fi
+echo "$direct_domain_list" > "$DOMAIN_DIRECT_TEMP_FILE_PATH"
 
 CONF="
 # 监听地址和端口
@@ -41,12 +66,12 @@ $([ "$ENABLE_CHN" = "1" ] && [ "$ENABLE_GFW" != "1" ] && echo "default-tag gfw")
 $([ "$ENABLE_GFW" = "1" ] && [ "$ENABLE_CHN" != "1" ] && echo "default-tag chn")
 
 group userdirect
-group-dnl $DOMAIN_DIRECT_FILE_PATH
+group-dnl $DOMAIN_DIRECT_TEMP_FILE_PATH
 group-upstream $DIRECT_DNS
 group-ipset inet@hijpass@dnsbypass4list,inet@hijpass@dnsbypass6list
 
 group userproxy
-group-dnl $DOMAIN_PROXY_FILE_PATH
+group-dnl $DOMAIN_PROXY_TEMP_FILE_PATH
 group-upstream $PROXY_DNS
 group-ipset inet@hijpass@dnsproxy4list,inet@hijpass@dnsproxy6list
 

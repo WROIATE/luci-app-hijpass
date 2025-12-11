@@ -11,20 +11,6 @@ get_log_level_num() {
     echo "$LOG_LEVELS" | tr ' ' '\n' | grep "^$level:" | cut -d':' -f2
 }
 
-check_log_size() {
-    if [ -f "$LOG_FILE" ]; then
-        local size tmp_file
-        size="$(wc -l "$LOG_FILE" | cut -d' ' -f1)"
-        if [ "$size" -gt "$MAX_SIZE" ]; then
-            tmp_file="${LOG_FILE}.tmp"
-            tail -n 5000 "$LOG_FILE" >"$tmp_file" 2>/dev/null
-            cat "$tmp_file" >"$LOG_FILE"
-            rm $tmp_file
-            log_info "Log file rotated"
-        fi
-    fi
-}
-
 log() {
     local level level_num min_level_num message datetime
     level=$(echo "$1" | tr 'a-z' 'A-Z')
@@ -35,12 +21,22 @@ log() {
 
     if [ -n "$level_num" ] && [ -n "$min_level_num" ]; then
         if [ "$level_num" -ge "$min_level_num" ]; then
-            check_log_size
             datetime=$(date "+%Y-%m-%d %H:%M:%S")
+            # 处理多行消息的对齐
             if [ "$LOG_LEVEL" = "DEBUG" ]; then
-                printf "%s   %-8s%-40s%s\n" "[$datetime]" "${level}" "$0" "$message" >>"$LOG_FILE"
+                # DEBUG模式下，第一行包含脚本名和时间戳
+                printf "%s   %-8s%-40s%s\n" "[$datetime]" "${level}" "$0" "$(echo "$message" | head -n1)" >>"$LOG_FILE"
+                # 后续行只保留缩进，不显示时间戳
+                echo "$message" | tail -n +2 | while IFS= read -r line; do
+                    printf "%-23s%-8s%-40s%s\n" "" "" "" "$line" >>"$LOG_FILE"
+                done
             else
-                printf "%s   %-8s%s\n" "[$datetime]" "${level}" "$message" >>"$LOG_FILE"
+                # 普通模式下，第一行正常输出
+                printf "%s   %-8s%s\n" "[$datetime]" "${level}" "$(echo "$message" | head -n1)" >>"$LOG_FILE"
+                # 后续行只保留缩进，不显示时间戳
+                echo "$message" | tail -n +2 | while IFS= read -r line; do
+                    printf "%-23s%-8s%s\n" "" "" "$line" >>"$LOG_FILE"
+                done
             fi
         fi
     fi

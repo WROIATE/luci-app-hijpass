@@ -12,7 +12,6 @@ LIB_PATH="/usr/lib/$NAME"
 NFT_SCRIPT="$LIB_PATH/nft.sh"
 ROUTE_SCRIPT="$LIB_PATH/route.sh"
 RULE_UPDATE_SCRIPT="$LIB_PATH/rules.sh"
-DNSMASQ_SCRIPT="$LIB_PATH/dnsmasq.sh"
 CHINANDS_NG_SCRIPT="$LIB_PATH/chinadns-ng.sh"
 
 CONF_PATH="/etc/$NAME"
@@ -157,15 +156,12 @@ remove_fw_tproxy() {
 }
 
 start_dns_service() {
-	if [ "$DNS_SERVICE" = "dnsmasq" ]; then
-		$DNSMASQ_SCRIPT reset
-		/etc/init.d/dnsmasq restart >/dev/null 2>&1 && log_info "dnsmasq restart success" && return 0
-		log_warn "dnsmasq restart failed"
-	fi
 	if [ "$DNS_SERVICE" = "chinadns-ng" ]; then
 		log_info "use chinadns-ng service"
 		$CHINANDS_NG_SCRIPT
-		open_instance "1" "chinadns-ng" "$DNS_SERVICE -C $CHINADNS_NG_CONF"
+		local cid
+		cid="$(uci show hijpass.@dns[0] | grep 'dns$' | awk -F '[.=]' '{print $2}')"
+		open_instance "$cid" "chinadns-ng" "$DNS_SERVICE -C $CHINADNS_NG_CONF"
 	fi
 	if [ -n "$DNS_START_HOOK" ]; then
 		[ ! -f "$DNS_START_HOOK" ] && log_warn "Custom DNS start hook script $DNS_START_HOOK not found" && return 1
@@ -175,11 +171,6 @@ start_dns_service() {
 }
 
 stop_dns_service() {
-	if [ "$DNS_SERVICE" = "dnsmasq" ]; then
-		$DNSMASQ_SCRIPT remove
-		/etc/init.d/dnsmasq restart >/dev/null 2>&1 && log_info "dnsmasq restart success" && return 0
-		log_warn "dnsmasq restart failed"
-	fi
 	if [ "$DNS_SERVICE" = "chinadns-ng" ]; then
 		log_info "delete chinadns-ng conf"
 		rm $CHINADNS_NG_CONF

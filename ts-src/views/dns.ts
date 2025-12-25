@@ -12,11 +12,12 @@ const v = view.extend({
         ]);
     },
 
-    handleSaveApply: LuciUtils.genHandleSaveApply(false),
+    handleSaveApply: LuciUtils.genHandleSaveApply(),
 
     render: function () {
 
         let m = new form.Map(LuciFlied.CONF_NAME, _('DNS分流设置'), _('配置DNS分流相关设置'));
+        WebUtils.createServiceStatusSection(m, 'dns');
 
         let s = m.section(form.TypedSection, LuciFlied.DNS_SECTION_TYPE);
         s.anonymous = true;
@@ -37,7 +38,7 @@ const v = view.extend({
         dnsService.rmempty = false;
 
         let chinaDnsPort = s.taboption('basic', form.Value, 'cdg_port', _('监听端口'),
-            _('指定ChinaDNS-NG的监听端口'));
+            _('指定ChinaDNS-NG的监听端口（默认不会重定向DNS端口，请自行配置）'));
         chinaDnsPort.depends('dns_service', 'chinadns-ng');
         chinaDnsPort.default = '53653';
         chinaDnsPort.datatype = "port"
@@ -77,7 +78,6 @@ const v = view.extend({
             });
         }
 
-        proxyDns.value('custom', _('自定义DNS'));
         proxyDns.default = defaultDnsPort || 'custom';
         proxyDns.rmempty = false;
 

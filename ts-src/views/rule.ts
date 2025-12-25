@@ -12,7 +12,7 @@ const v = view.extend({
         ]);
     },
 
-    handleSaveApply: LuciUtils.genHandleSaveApply(false),
+    handleSaveApply: LuciUtils.genHandleSaveApply(),
 
     render: function () {
         let m = new form.Map(LuciFlied.CONF_NAME, _('规则配置'), _('路由相关文件规则配置'));
@@ -56,27 +56,27 @@ const v = view.extend({
         gfwList.default = 'https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/gfw.txt';
         gfwList.rmempty = true;
 
-        // GeoSite 下载地址
-        let geosite = s.taboption('config', form.Value, 'geosite', _('GeoSite 下载地址'),
+        // Geo Site 下载地址
+        let geosite = s.taboption('config', form.Value, 'geosite', _('Geo Site 下载地址'),
             _('配置 GeoSite 数据库文件的下载地址'));
         geosite.default = 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat';
-        geosite.rmempty = true;
+        geosite.rmempty = false;
 
-        // GeoIP 下载地址
-        let geoip = s.taboption('config', form.Value, 'geoip', _('GeoIP 下载地址'),
+        // Geo IP 下载地址
+        let geoip = s.taboption('config', form.Value, 'geoip', _('Geo IP 下载地址'),
             _('配置 GeoIP 数据库文件的下载地址'));
         geoip.default = 'https://github.com/Loyalsoldier/geoip/releases/latest/download/geoip.dat';
-        geoip.rmempty = true;
+        geoip.rmempty = false;
 
         // 自动更新时间
         let updateSchedule = s.taboption('config', form.ListValue, 'update_schedule', _('自动更新时间'),
             _('设置规则文件的自动更新时间'));
         updateSchedule.value('', _('禁用自动更新'));
         updateSchedule.value('0 5 * * *', _('每天凌晨5点'));
+        updateSchedule.value('0 0 * * *', _('每天午夜12点'));
         updateSchedule.value('0 5 * * 0', _('每周日凌晨5点'));
-        updateSchedule.value('0 5 * * 1', _('每月1日凌晨5点'));
         updateSchedule.value('0 5 * * 1', _('每周一凌晨5点'));
-        updateSchedule.value('0 5 * * *', _('每天午夜12点'));
+        updateSchedule.value('0 5 1 * *', _('每月1日凌晨5点'));
         updateSchedule.default = '0 5 * * 1';
         updateSchedule.rmempty = true;
 
@@ -172,6 +172,7 @@ function createQueryPanel() {
                     }, [
                         E('option', {'value': 'domain'}, _('域名查询')),
                         E('option', {'value': 'geosite'}, _('GeoSite')),
+                        E('option', {'value': 'shunt'}, _('分流查询')),
                     ])
                 ])
             ]),
@@ -183,16 +184,9 @@ function createQueryPanel() {
                         'type': 'text',
                         'id': 'query-keyword',
                         'class': 'cbi-input-text',
-                        'placeholder': _('输入域名或GeoSite标签')
-                    })
-                ])
-            ]),
-
-
-            // 查询按钮
-            E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 20px;'}, [
-                E('label', {'class': 'cbi-value-title'}, _('操作')),
-                E('div', {'class': 'cbi-value-field'}, [
+                        'placeholder': _('输入域名或GeoSite标签'),
+                        'style': 'margin-right: 10px;'
+                    }),
                     E('button', {
                         'class': 'cbi-button cbi-button-action',
                         'id': 'query-btn',
@@ -206,8 +200,8 @@ function createQueryPanel() {
             ]),
 
             // 输出区域
-            E('div', {'class': 'cbi-value', 'style': 'margin-top: 30px;'}, [
-                E('label', {'class': 'cbi-value-title'}, _('查询结果')),
+            E('div', {'class': 'cbi-value'}, [
+                E('label', {'class': 'cbi-value-title', 'style': 'visibility: hidden'}, _('查询结果')),
                 E('div', {'class': 'cbi-value-field'}, [
                     E('textarea', {
                         'id': 'query-output',
@@ -276,6 +270,9 @@ function performQuery() {
         case 'geosite':
             queryGeoTag(keyword, 'geosite', outputElement, statusElement);
             break;
+        case 'shunt':
+            queryShunt(keyword, outputElement, statusElement);
+            break;
         default:
             if (statusElement) {
                 statusElement.textContent = _('未知的查询类型');
@@ -293,7 +290,13 @@ function queryDomain(keyword: string, outputElement, statusElement) {
     fs.exec('/usr/lib/hijpass/rules.sh', ['query', keyword])
         .then(setOutput(outputElement, statusElement, '# 本地规则文件\n'))
         .catch(setError(statusElement));
+}
 
+function queryShunt(keyword: string, outputElement, statusElement) {
+    clearQuery()
+    fs.exec('/usr/lib/hijpass/route-match.sh', [keyword])
+        .then(setOutput(outputElement, statusElement, '# 分流规则\n'))
+        .catch(setError(statusElement))
 }
 
 // 查询 GEO Tag

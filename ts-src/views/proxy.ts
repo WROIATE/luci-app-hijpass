@@ -12,7 +12,7 @@ const v = view.extend({
         ]);
     },
 
-    handleSaveApply: LuciUtils.genHandleSaveApply(false),
+    handleSaveApply: LuciUtils.genHandleSaveApply(),
 
     render: async function () {
         let m = new form.Map(LuciFlied.CONF_NAME, _('代理设置'),
@@ -20,6 +20,7 @@ const v = view.extend({
 
         let s = m.section(form.GridSection, LuciFlied.PROXY_NODE_TYPE)
         WebUtils.setAnonymousGridSectionMembers(s);
+        s.cloneable = true;
         // 创建所有代理配置选项
         let data = await getPortStatus();
         createProxyOptions(s, data);
@@ -82,7 +83,7 @@ function createNodeNameOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.Value, 'name', _('节点名称'),
         _('修改节点的名称，用于标识不同的代理节点'));
     o.modalonly = true;
-    o.validate = WebUtils.createTagValidator(LuciFlied.PROXY_NODE_TYPE, 'name')
+    o.validate = WebUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, 'name')
     return o;
 }
 
@@ -124,14 +125,18 @@ function createProcdEnvOption(s: LuCI.form.AbstractSection) {
     return o;
 }
 
-function createLogRedirectOption(s: LuCI.form.AbstractSection) {
-    let o = s.option(form.Value, 'log_path', _('日志路径'),
-        _('指定记录日志的具体路径'));
-    o.default = '/tmp/log/hijpass-proxy.log';
-    o.rmempty = false;
-    o.modalonly = true; // 只在编辑表单中显示
-    return o;
+function createLogEnabledOption(s: LuCI.form.AbstractSection) {
+    return WebUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, undefined);
 }
+
+// function createLogRedirectOption(s: LuCI.form.AbstractSection) {
+//     let o = s.option(form.Value, 'log_path', _('日志路径'),
+//         _('指定记录日志的具体路径'));
+//     o.default = '/tmp/log/hijpass-proxy.log';
+//     o.rmempty = false;
+//     o.modalonly = true; // 只在编辑表单中显示
+//     return o;
+// }
 
 // 创建所有代理配置选项
 function createProxyOptions(s: LuCI.form.AbstractSection, data: { [key: string]: boolean }) {
@@ -145,7 +150,8 @@ function createProxyOptions(s: LuCI.form.AbstractSection, data: { [key: string]:
     createListenPortOption(s);
     createSocksPortOption(s);
     createProcdEnvOption(s);
-    createLogRedirectOption(s);
+    createLogEnabledOption(s);
+    // createLogRedirectOption(s);
 }
 
 async function getPortStatus() {

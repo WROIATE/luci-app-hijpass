@@ -8,6 +8,7 @@ export class DnsNode {
 export class DnsSection {
     defaultDnsNode: string;
     defaultStrategy: string;
+    rulesetDnsNode: string;
     useCache: string;
     nodes: DnsNode[];
 
@@ -42,6 +43,8 @@ export class ShuntRouteRule {
 
 export class RouteSection {
     defaultProxyNode: string;
+    rulesetOutNode: string;
+    rulesetConvert: string;
     rules: ShuntRouteRule[];
 
     constructor() {
@@ -104,7 +107,7 @@ export class RuleDTO {
     containDomain(): boolean {
         return this.domain.length > 0
             || this.domainRegex.length > 0
-            || this.domainRegex.length > 0
+            || this.domainSuffix.length > 0
             || this.domainKeyword.length > 0
     }
 

@@ -3,25 +3,24 @@ import view from 'view';
 import uci from 'uci';
 import form from "form";
 import fs from "fs";
-import {LuciUtils} from "../utils/common";
+import {LuciUtils, WebUtils} from "../utils/common";
 
 const v = view.extend({
     load: function () {
         return Promise.all([
-            uci.load(LuciFlied.CONF_NAME)
+            uci.load(LuciFlied.CONF_NAME),
+            uci.load(LuciFlied.SERVER_CONF_NAME)
         ]);
     },
 
-    handleSaveApply: LuciUtils.genHandleSaveApply(false),
+    handleSaveApply: LuciUtils.genHandleSaveApply(),
 
-    render: function () {
+    render: async function () {
         let m = new form.Map(LuciFlied.CONF_NAME, _('HiJpass'));
 
-        let s = m.section(form.TypedSection);
-        s.anonymous = true;
-        s.render = LuciUtils.renderServiceStatus;
+        WebUtils.createServiceStatusSection(m);
 
-        s = m.section(form.TypedSection, LuciFlied.GLOBAL_SECTION_TYPE);
+        let s = m.section(form.TypedSection, LuciFlied.GLOBAL_SECTION_TYPE);
         s.anonymous = true;
         s.addremove = false;
 
@@ -69,7 +68,7 @@ function createActionButtons() {
     });
 
     return E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 2rem;'}, [
-        E('label', {'class': 'cbi-value-title'}, _('服务控制')),
+        E('label', {'class': 'cbi-value-title', 'style': 'visibility: hidden'}, _('服务控制')),
         E('div', {'class': 'cbi-value-field'}, [
             E('button', {
                 'class': 'cbi-button cbi-button-action',
@@ -77,7 +76,7 @@ function createActionButtons() {
                 'style': 'margin-right: 10px;'
             }, _('重启服务')),
             E('button', {
-                'class': 'cbi-button cbi-button-neutral',
+                'class': 'cbi-button cbi-button-action',
                 'id': 'reload-firewall',
                 'style': 'margin-right: 10px;'
             }, _('刷新防火墙')),

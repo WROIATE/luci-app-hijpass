@@ -12,11 +12,12 @@ import {
 import {ShuntUtils} from "./common";
 import {LuciFlied, ShuntTag} from "../enum/hijpass";
 import {SingBoxEnum} from "../enum/singbox";
-import {RuleSetDTO, ShuntConfigUtils} from "../module/luci";
+import {RuleDTO, RuleSetDTO} from "../module/luci";
 import uci from "uci";
 
-export const SingBoxUtils: ShuntConfigUtils = {
-    genShuntConf: genConf
+export const SingBoxUtils = {
+    genShuntConf: genConf,
+    writeGeoRule: writeGeoRule
 }
 
 function genConf() {
@@ -41,14 +42,15 @@ function genConf() {
     })
 
     // block出口暂未使用，预留
-    let outbounds = [
+    let outbounds: any[] = []
+    outbounds = [
         new DirectOutbound(SingBoxEnum.DIRECT_OUTBOUND_TAG),
         new BlockOutbound(SingBoxEnum.BLOCK_OUTBOUND_TAG)
     ]
 
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section) {
         if (section.enabled === '1') {
-            let proxyNode = new Socks("127.0.0.1", parseInt(section.socks_port, 10), section.name)
+            let proxyNode = new Socks("127.0.0.1", Number(section.socks_port), section.name)
             outbounds.push(proxyNode)
         }
     })
@@ -75,6 +77,24 @@ function genConf() {
         dns.servers.push(server)
     }
 
+    if (routeConf.rulesetOutNode) {
+        let outTag = transOutTag(routeConf.rulesetOutNode)
+        let node = outbounds.find(function (outbound) {
+            return outbound.tag === outTag
+        })
+        if (node) {
+            let rulesetOutNode = structuredClone(node)
+            rulesetOutNode.tag = SingBoxEnum.RULESET_OUTBOUND_TAG
+            if (dnsConf.rulesetDnsNode) {
+                rulesetOutNode.domain_resolver = SingBoxEnum.RULESET_DNS_NAME;
+                let dnsTmpl = dnsServerMap.get(dnsConf.rulesetDnsNode)
+                let server = genDnsFromTmpl(SingBoxEnum.RULESET_DNS_NAME, SingBoxEnum.RULESET_OUTBOUND_TAG, dnsTmpl)
+                dns.servers.push(server)
+            }
+            outbounds.push(rulesetOutNode)
+        }
+    }
+
     routeConf.rules.forEach(function (routeRule) {
         if (routeRule.enabled !== "1") {
             return
@@ -82,12 +102,16 @@ function genConf() {
         // 生成公共rule
         let luciRuleDTO = ShuntUtils.parseRuleList(routeRule);
 
+        if (routeConf.rulesetConvert === '1') {
+            convertGeoRule(luciRuleDTO)
+        }
+
         if (luciRuleDTO.isEmpty("set")) {
-            return;
+            throw new Error("Empty rule: " + routeRule.name);
         }
 
         for (let rs of luciRuleDTO.ruleSet) {
-            ruleSetMap.set(rs.tag, genRuleSet(rs));
+            ruleSetMap.set(rs.tag, genRuleSet(rs, routeConf.rulesetOutNode ? SingBoxEnum.RULESET_OUTBOUND_TAG : undefined));
         }
 
         // 生成路由规则
@@ -100,6 +124,10 @@ function genConf() {
         }
         // 添加路由规则
         route.rules.push(new RouteRule(action, outbound).initRule(luciRuleDTO))
+
+        if (action === 'reject') {
+            return;
+        }
 
         // 只有存在域名规则时才添加DNS规则
         if (luciRuleDTO.containDomain()
@@ -143,9 +171,9 @@ function genDnsFromTmpl(tag: string, detour: string, tmpl: DnsServer) {
     return new DnsServer(tmpl.type, tag, tmpl.server, tmpl.port, detour);
 }
 
-function genRuleSet(rs: RuleSetDTO) {
+function genRuleSet(rs: RuleSetDTO, detour: string) {
     if (rs.type === 'remote') {
-        return new RemoteRuleSet(rs.tag, rs.format, rs.pathOrUrl, undefined, undefined)
+        return new RemoteRuleSet(rs.tag, rs.format, rs.pathOrUrl, detour, undefined)
     } else if (rs.type === 'local') {
         return new LocalRuleSet(rs.tag, rs.format, rs.pathOrUrl)
     }
@@ -180,4 +208,43 @@ function transOutTag(tag: string) {
 
 function transDnsTag(name: string) {
     return name + '-dns'
+}
+
+function convertGeoRule(luciRuleDTO: RuleDTO) {
+    luciRuleDTO.ruleSet = []
+    for (let geo of luciRuleDTO.geoSite) {
+        let tag = geo.replace('geosite:', 'geosite-')
+        luciRuleDTO.ruleSet.push({
+            tag: tag,
+            type: 'local',
+            format: 'binary',
+            pathOrUrl: '/etc/hijpass/ruleset/' + tag + '.srs'
+        })
+    }
+    for (let geo of luciRuleDTO.geoIp) {
+        let tag = geo.replace('geoip:', 'geoip-')
+        luciRuleDTO.ruleSet.push({
+            tag: tag,
+            type: 'local',
+            format: 'binary',
+            pathOrUrl: '/etc/hijpass/ruleset/' + tag + '.srs'
+        })
+    }
+}
+
+function writeGeoRule() {
+    let routeConf = ShuntUtils.getRouteSection()
+    let geositeList = new Set()
+    let geoipList = new Set()
+    for (let rule of routeConf.rules) {
+        let luciRuleDTO = ShuntUtils.parseRuleList(rule);
+        for (let geo of luciRuleDTO.geoSite) {
+            geositeList.add(geo.replace('geosite:', ''))
+        }
+        for (let geo of luciRuleDTO.geoIp) {
+            geoipList.add(geo.replace('geoip:', ''))
+        }
+    }
+    uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geosite_ruleset', [...geositeList])
+    uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geoip_ruleset', [...geoipList])
 }

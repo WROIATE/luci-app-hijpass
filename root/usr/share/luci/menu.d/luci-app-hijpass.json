@@ -4,11 +4,6 @@
     "order": 1,
     "action": {
       "type": "firstchild"
-    },
-    "depends": {
-      "acl": [
-        "luci-app-hijpass"
-      ]
     }
   },
   "admin/services/hijpass/overview": {
@@ -17,11 +12,6 @@
     "action": {
       "type": "view",
       "path": "hijpass/overview"
-    },
-    "depends": {
-      "acl": [
-        "luci-app-hijpass"
-      ]
     }
   },
   "admin/services/hijpass/shunt": {
@@ -30,11 +20,6 @@
     "action": {
       "type": "view",
       "path": "hijpass/shunt"
-    },
-    "depends": {
-      "acl": [
-        "luci-app-hijpass"
-      ]
     }
   },
   "admin/services/hijpass/proxy": {
@@ -43,63 +28,46 @@
     "action": {
       "type": "view",
       "path": "hijpass/proxy"
-    },
-    "depends": {
-      "acl": [
-        "luci-app-hijpass"
-      ]
+    }
+  },
+  "admin/services/hijpass/server": {
+    "title": "Server",
+    "order": 4,
+    "action": {
+      "type": "view",
+      "path": "hijpass/server"
     }
   },
   "admin/services/hijpass/dns": {
     "title": "DNS",
-    "order": 4,
+    "order": 5,
     "action": {
       "type": "view",
       "path": "hijpass/dns"
-    },
-    "depends": {
-      "acl": [
-        "luci-app-hijpass"
-      ]
     }
   },
   "admin/services/hijpass/firewall": {
     "title": "Firewall",
-    "order": 5,
+    "order": 6,
     "action": {
       "type": "view",
       "path": "hijpass/firewall"
-    },
-    "depends": {
-      "acl": [
-        "luci-app-hijpass"
-      ]
     }
   },
   "admin/services/hijpass/rule": {
     "title": "Rule",
-    "order": 6,
+    "order": 7,
     "action": {
       "type": "view",
       "path": "hijpass/rule"
-    },
-    "depends": {
-      "acl": [
-        "luci-app-hijpass"
-      ]
     }
   },
   "admin/services/hijpass/log": {
     "title": "Log",
-    "order": 7,
+    "order": 8,
     "action": {
       "type": "view",
       "path": "hijpass/log"
-    },
-    "depends": {
-      "acl": [
-        "luci-app-hijpass"
-      ]
     }
   }
 }

@@ -1,12 +1,10 @@
 import {LuciUtils, ShuntUtils, WebUtils} from "../utils/common";
 
 import {HijpassValues, LuciFlied, ShuntTag} from "../enum/hijpass";
-import fs from 'fs';
 import ui from 'ui';
 import form from "form";
 import view from 'view';
 import uci from 'uci';
-import {ShuntConfFactory} from "../utils/factory";
 
 const v = view.extend({
     load: function () {
@@ -18,17 +16,17 @@ const v = view.extend({
     handleSave: async function (ev: Event) {
         try {
             await view.prototype.handleSave(ev)
-            ShuntUtils.getShuntConfData()
         } catch (e) {
-            alert(e)
+            WebUtils.showErrorNotification(_('配置保存失败'), _(e.message), 5000);
         }
     },
 
-    handleSaveApply: LuciUtils.genHandleSaveApply(true),
+    handleSaveApply: LuciUtils.genHandleSaveApply(),
 
     render: function () {
         let m = new form.Map(LuciFlied.CONF_NAME, _('分流设置'),
             _('配置分流规则和设置'));
+        WebUtils.createServiceStatusSection(m, 'shunt');
 
         let s = m.section(form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE);
         s.anonymous = true;
@@ -77,22 +75,19 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     dnsListenPort.datatype = 'port';
     dnsListenPort.rmempty = false;
 
-    // 日志路径
-    let logLevel = s.taboption('basic', form.ListValue, 'log_level', _('日志等级'), _('日志记录等级'));
-    HijpassValues.SING_BOX_LOG_LEVELS.forEach(function (level) {
-        logLevel.value(level, level);
-    })
-    logLevel.rmempty = false;
+    // 日志开关
+    WebUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, 'basic');
 
     // 日志路径
-    let logPath = s.taboption('basic', form.Value, 'log_path', _('日志路径'),
-        _('指定记录日志的具体路径'));
-    logPath.default = '/tmp/log/hijpass-shunt.log';
-    logPath.rmempty = false;
+    let logLevel = s.taboption('basic', form.ListValue, 'log_level', _('日志等级'), _('日志记录等级'));
+    HijpassValues.SHUNT_LOG_LEVELS.forEach(function (level) {
+        logLevel.value(level);
+    })
+    logLevel.depends('log_enabled','1');
 
     // 预览配置按钮
     let previewConfigButton = s.taboption('basic', form.Button, '_preview_config', _('预览配置'),
-        _('点击预览生成的Sing-Box配置'));
+        _('点击预览配置'));
     previewConfigButton.depends('config_type', 'tmpl');
     previewConfigButton.inputtitle = _('预览配置');
     previewConfigButton.inputstyle = 'apply';
@@ -114,21 +109,28 @@ function createConfigEditor(s: LuCI.form.AbstractSection) {
 function createRouteOptions(s: LuCI.form.AbstractSection) {
     // 默认全局路由出口配置
     let routeTypeSectionValue = createSectionContainer(s, 'route', '_route_global',
-        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('路由全局配置'));
+        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _(''));
 
     let routeTypeSection = routeTypeSectionValue.subsection;
     WebUtils.setAnonymousSection(routeTypeSection);
 
     let defaultProxyNode = createRequiredListValue(routeTypeSection, 'default_proxy_node', _('默认全局出口'),
-        _('选择默认使用的出口节点，未命中的路由、rule-set更新会使用该出口'),
+        _('选择默认使用的出口节点，未命中的路由会使用该出口'),
         function (section_id: any, value: any) {
             if (!value) {
                 return _('请先配置全局出口');
             }
             return true;
         });
-    loadProxyNodeOptions(defaultProxyNode, 'slb-only');
+    loadProxyNodeOptions(defaultProxyNode, true);
 
+    let rulesetOutNode = routeTypeSection.option(form.ListValue, 'ruleset_out_node', _('规则集出口'),
+        _('rule-set下载使用出口（sing-box配置）'));
+    loadProxyNodeOptions(rulesetOutNode, false);
+
+    let rulesetConvert = routeTypeSection.option(form.Flag, 'ruleset_convert',
+        _('使用geosite规则集'), _('通过geoview将geo规则转换为规则集（sing-box配置）'));
+    rulesetConvert.rmempty = false;
     // 路由规则配置
     let routeGridSectionValue = s.taboption('route', form.SectionValue, '_route_rule',
         form.GridSection, LuciFlied.SHUNT_ROUTE_RULE_TYPE, _('路由规则配置'));
@@ -147,7 +149,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
 
     // 规则名称
     let name = routeGridSection.taboption('_rule', form.Value, 'name', _('规则名称'));
-    name.validate = WebUtils.createTagValidator(LuciFlied.SHUNT_ROUTE_RULE_TYPE, 'name')
+    name.validate = WebUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, 'name')
     name.rmempty = false;
     name.modalonly = true;
 
@@ -175,13 +177,10 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
         return _('-');
     }
 
-    let dnsStrategy = routeGridSection.taboption('_dns', form.ListValue, 'dns_strategy', _('DNS策略'), _('4：只使用v4<br>'
-        + '6：只使用v6<br>'
-        + '46：优先v4（只在sing-box模式下生效，xray自动替换为双栈）<br>'
-        + '64：优先v6（只在sing-box模式下生效，xray自动替换为双栈）<br>'));
+    let dnsStrategy = routeGridSection.taboption('_dns', form.ListValue, 'dns_strategy', _('DNS解析策略'));
     dnsStrategy.value('', _('使用全局默认解析策略'))
     HijpassValues.DNS_STRATEGY_VALUES.forEach(function (strategy) {
-        dnsStrategy.value(strategy, strategy);
+        dnsStrategy.value(strategy.value, strategy.label);
     });
     dnsStrategy.modalonly = true;
 
@@ -306,7 +305,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
 function createDNSOptions(s: LuCI.form.AbstractSection) {
 
     let dnsTypeSectionValue = createSectionContainer(s, 'dns', '_dns_global',
-        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('DNS全局配置'));
+        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _(''));
 
     let dnsTypeSection = dnsTypeSectionValue.subsection;
     WebUtils.setAnonymousSection(dnsTypeSection);
@@ -322,13 +321,13 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
         });
     loadDNSServerOptions(defaultDNSNode, false);
 
-    let defaultStrategy = dnsTypeSection.option(form.ListValue, 'default_strategy', _('默认DNS解析策略'),
-        _('4：只使用v4<br>'
-            + '6：只使用v6<br>'
-            + '46：优先v4（只在sing-box模式下生效，xray自动替换为双栈）<br>'
-            + '64：优先v6（只在sing-box模式下生效，xray自动替换为双栈）<br>'));
+    let rulesetDNSNode = dnsTypeSection.option(form.ListValue, 'ruleset_dns_node',
+        _('规则集DNS'), _('选择用于解析rule-set链接域名的DNS服务器（sing-box配置）'));
+    loadDNSServerOptions(rulesetDNSNode, false);
+
+    let defaultStrategy = dnsTypeSection.option(form.ListValue, 'default_strategy', _('默认解析策略'));
     HijpassValues.DNS_STRATEGY_VALUES.forEach(function (strategy) {
-        defaultStrategy.value(strategy, strategy);
+        defaultStrategy.value(strategy.value, strategy.label);
     });
     defaultStrategy.rmempty = false;
 
@@ -366,7 +365,7 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
         _('DNS服务器的唯一标识'));
     tag.placeholder = 'dns-local';
     tag.rmempty = false;
-    tag.validate = WebUtils.createTagValidator(LuciFlied.SHUNT_DNS_NODE_TYPE, 'tag')
+    tag.validate = WebUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, 'tag')
     tag.modalonly = true
 
     // DNS服务器地址
@@ -386,9 +385,8 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
 
 // 创建负载均衡选项
 function createSLBOptions(s: LuCI.form.AbstractSection) {
-    let o = s.taboption('slb', form.SectionValue, '_slb_global',
-        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('负载均衡配置'));
-    o.depends({config_type: "tmpl"})
+    let o = createSectionContainer(s, 'slb', '_slb_global',
+        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _(''))
     let ss = o.subsection;
     ss.anonymous = true;
     ss.addremove = false;
@@ -477,15 +475,14 @@ function preview() {
                         // 复制配置到剪贴板
                         let content = document.getElementById('config-preview-content').textContent;
                         navigator.clipboard.writeText(content).then(function () {
-                            alert(_('配置已复制到剪贴板'));
+                            WebUtils.showSuccessNotification("成功", "配置已复制到剪贴板", 3000);
                         })
                     }
                 }, _('复制配置'))
             ])
         ]);
     } catch (err) {
-        alert(_('生成配置失败：') + err.message);
-        console.error('Config generation error:', err);
+        WebUtils.showErrorNotification("配置生成失败", _(err.message), 5000);
     }
 }
 
@@ -501,7 +498,7 @@ function shuntConfWrite(func: Function) {
 }
 
 // 封装：动态加载代理节点选项
-function loadProxyNodeOptions(option: LuCI.form.AbstractValue, includeSLB: boolean | string) {
+function loadProxyNodeOptions(option: LuCI.form.AbstractValue, includeSLB: boolean) {
     option.load = function (section_id) {
         delete this.keylist;
         delete this.vallist;

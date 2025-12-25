@@ -15,7 +15,9 @@ import fs from "fs";
 import form from "form";
 import ui from "ui";
 import {ShuntConfFactory} from "./factory";
-import view from "view";
+import {SingBoxUtils} from "./singbox";
+import notificationManager from "../module/notification";
+import b from "baseclass";
 
 
 const callServiceList = rpc.declare({
@@ -27,23 +29,33 @@ const callServiceList = rpc.declare({
 
 const MiscUtils = {
     getServiceInfo: async function () {
-        const s = await L.resolveDefault(callServiceList(LuciFlied.CONF_NAME), {});
-        let instances = s[LuciFlied.CONF_NAME]['instances'];
+        const hijpass = await callServiceList(LuciFlied.CONF_NAME);
+        const hijserver = await callServiceList(LuciFlied.SERVER_CONF_NAME);
+        let serverInstances = hijserver?.[LuciFlied.SERVER_CONF_NAME]?.['instances'] ?? {};
+        let instances = hijpass?.[LuciFlied.CONF_NAME]?.['instances'] ?? {};
         return {
-            proxyInfos: MiscUtils.getInstanceName(LuciFlied.PROXY_NODE_TYPE).map(
+            proxyInfos: MiscUtils.getInstanceName(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE).map(
                 (name) => {
-                    return instances[name];
+                    return instances?.[name] ?? undefined;
                 }
             ).filter(instance => instance),
-            shuntInfo: instances[MiscUtils.getInstanceName(LuciFlied.SHUNT_SECTION_TYPE)[0]],
-            dnsInfo: instances[MiscUtils.getInstanceName(LuciFlied.DNS_SECTION_TYPE)[0]]
+            shuntInfo: instances?.[MiscUtils.getInstanceName(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)[0]] ?? undefined,
+            dnsInfo: instances?.[MiscUtils.getInstanceName(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE)[0]] ?? undefined,
+            serverInfos: MiscUtils.getInstanceName(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE).map(
+                (name) => {
+                    return serverInstances?.[name] ?? undefined;
+                }
+            ).filter(instance => instance),
         }
     },
 
-    renderServiceStatus: function (res: any) {
+    renderServiceStatus: function (res: any, type?: string) {
         let renderHTML = "";
         let spanTemp = '<em><span style="color:%s"><strong>%s %s</strong></span></em>';
         let isProxyRunning = (res?.proxyInfos ?? [])
+            .filter(instance => instance?.running)
+            .length > 1
+        let isServerRunning = (res?.serverInfos ?? [])
             .filter(instance => instance?.running)
             .length > 1
         let isShuntRunning = res?.shuntInfo?.running ?? false
@@ -57,15 +69,31 @@ const MiscUtils = {
             }
         }
 
-        renderHTML += getColorSpan(_("代理节点"), isProxyRunning)
-        renderHTML += getColorSpan(_("分流服务"), isShuntRunning)
-        renderHTML += getColorSpan(_("DNS"), isDnsRunning)
+        switch (type) {
+            case 'dns':
+                renderHTML += getColorSpan(_("DNS"), isDnsRunning)
+                break;
+            case 'shunt':
+                renderHTML += getColorSpan(_("分流服务"), isShuntRunning)
+                break;
+            case 'server':
+                renderHTML += getColorSpan(_("服务端"), isServerRunning)
+                break;
+            case 'proxy':
+                renderHTML += getColorSpan(_("代理节点"), isProxyRunning)
+                break;
+            default:
+                renderHTML += getColorSpan(_("代理节点"), isProxyRunning)
+                renderHTML += getColorSpan(_("分流服务"), isShuntRunning)
+                renderHTML += getColorSpan(_("DNS"), isDnsRunning)
+                renderHTML += getColorSpan(_("服务端"), isServerRunning)
+        }
 
         return renderHTML;
     },
 
-    getInstanceName: function (sectionType: string): string[] {
-        return uci.sections(LuciFlied.CONF_NAME, sectionType).map((section) => {
+    getInstanceName: function (confName: string, sectionType: string): string[] {
+        return uci.sections(confName, sectionType).map((section) => {
             let cid = section['.name'];
             let name = section['name'] ?? section['tag'] ?? section['dns_service']
             if (!name) {
@@ -100,34 +128,41 @@ const MiscUtils = {
 };
 
 const LuciUtils = {
-    renderServiceStatus: function () {
-        poll.add(async function () {
+    refreshServiceStatus: function (type: string) {
+        return async function () {
             const res = await L.resolveDefault(MiscUtils.getServiceInfo());
             let view = document.getElementById("service_status");
-            if (view) view.innerHTML = MiscUtils.renderServiceStatus(res);
-        });
-
-        return E('div', {class: 'cbi-map'},
-            E('fieldset', {class: 'cbi-section'}, [
-                E('p', {id: 'service_status', style: 'display: flex; gap: 1rem;'},
-                    _('正在获取状态...'))
-            ])
-        );
+            if (view) view.innerHTML = MiscUtils.renderServiceStatus(res, type);
+        }
     },
 
-    genHandleSaveApply: function (notNotice: boolean) {
+    renderServiceStatus: function (type?: string) {
+        return function () {
+            poll.add(LuciUtils.refreshServiceStatus(type));
+
+            return E('div', {class: 'cbi-map'},
+                E('fieldset', {class: 'cbi-section'}, [
+                    E('p', {id: 'service_status', style: 'display: flex; gap: 1rem;'},
+                        _('正在获取状态...'))
+                ])
+            );
+        }
+    },
+
+    genHandleSaveApply: function () {
         return async function (ev: Event) {
             try {
-                await this.handleSave(ev)
+                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === 'sing-box') {
+                    SingBoxUtils.writeGeoRule()
+                }
                 let data = ShuntUtils.getShuntConfData()
+                await this.handleSave(ev)
                 if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
                     await fs.write(WebUtils.getFilePath('shunt_conf'), data);
                 }
                 ui.changes.apply(true);
             } catch (e) {
-                if (!notNotice) {
-                    alert(e)
-                }
+                WebUtils.showErrorNotification("配置应用失败", _(e.message), 5000);
             }
         }
     },
@@ -272,7 +307,7 @@ const ShuntUtils = {
             let type = uci.get_first(LuciFlied.CONF_NAME,
                 LuciFlied.SHUNT_SECTION_TYPE, 'type')
             data = JSON.stringify(ShuntConfFactory.getShuntUtils(type).genShuntConf(), ShuntUtils.omitEmptyReplacer, 2)
-    }
+        }
         return data;
     },
 
@@ -296,7 +331,7 @@ const ShuntUtils = {
 
 const WebUtils = {
     // 创建标签验证器
-    createTagValidator: function (sectionType: string, fieldName: string) {
+    createTagValidator: function (confName: string, sectionType: string, fieldName: string) {
         return function (section_id: any, value: any) {
             // 验证名称格式
             let formatResult = WebUtils.validateNameFormat(section_id, value);
@@ -306,7 +341,7 @@ const WebUtils = {
 
             // 验证标签是否重复
             let duplicate = false;
-            uci.sections(LuciFlied.CONF_NAME, sectionType, function (section) {
+            uci.sections(confName, sectionType, function (section) {
                 if (section['.name'] !== section_id && section[fieldName] === value) {
                     duplicate = true;
                 }
@@ -457,6 +492,82 @@ const WebUtils = {
         subsection.anonymous = true;
         subsection.addremove = false;
     },
+
+    /**
+     * 显示通知（支持 title 和 content）
+     */
+    showNotification: function (options: any) {
+        return notificationManager.show(options);
+    },
+
+    /**
+     * 显示成功通知（支持 title 和 content）
+     */
+    showSuccessNotification: function (title: string, content?: string, duration?: number) {
+        return notificationManager.show({title, content, type: 'success', duration});
+    },
+
+    /**
+     * 显示错误通知（支持 title 和 content）
+     */
+    showErrorNotification: function (title: string, content?: string, duration?: number) {
+        return notificationManager.show({title, content, type: 'error', duration});
+    },
+
+    /**
+     * 显示警告通知（支持 title 和 content）
+     */
+    showWarningNotification: function (title: string, content?: string, duration?: number) {
+        return notificationManager.show({title, content, type: 'warning', duration});
+    },
+
+    /**
+     * 显示信息通知（支持 title 和 content）
+     */
+    showInfoNotification: function (title: string, content?: string, duration?: number) {
+        return notificationManager.show({title, content, type: 'info', duration});
+    },
+
+    /**
+     * 清空所有通知
+     */
+    clearNotifications: function () {
+        return notificationManager.clear();
+    },
+
+    createLogFlagOption: function (s: LuCI.form.AbstractSection, conf_type: string, tab: string) {
+        let log_dir = uci.get_first(conf_type, conf_type, 'log_dir');
+
+        let o = tab ? s.taboption(tab, form.Flag, 'log_enabled', _('记录日志'))
+            : s.option(form.Flag, 'log_enabled', _('记录日志'));
+        o.write = function (section_id: string, value: string) {
+            let log_file = 'shunt.log'
+            let name = uci.get(conf_type, section_id, 'name');
+            if (name) {
+                log_file = name + '-' + section_id + '.log'
+            }
+
+            uci.set(conf_type, section_id, 'log_path', log_dir + '/' + log_file);
+        }
+        o.remove = function (section_id: string) {
+            uci.unset(conf_type, section_id, 'log_path');
+        }
+        o.load = function (section_id: string) {
+            if (uci.get(conf_type, section_id, 'log_path')) {
+                return '1'
+            }
+            return '0'
+        }
+        o.rmempty = true;
+        return o;
+    },
+
+    createServiceStatusSection: function (m: LuCI.form.Map, type?: string) {
+        let s = m.section(form.TypedSection);
+        s.anonymous = true;
+        s.render = LuciUtils.renderServiceStatus(type);
+        return s;
+    }
 }
 
 export {LuciUtils, WebUtils, ShuntUtils}

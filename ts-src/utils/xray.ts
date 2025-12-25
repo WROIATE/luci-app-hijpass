@@ -79,7 +79,7 @@ function genConf() {
 
         let luciRuleDTO = ShuntUtils.parseRuleList(rule);
         if (luciRuleDTO.isEmpty("geo")) {
-            return;
+            throw new Error("Empty rule: " + rule.name)
         }
 
         routeRule.network = luciRuleDTO.network
@@ -120,14 +120,18 @@ function genConf() {
             routeRules.push(routeRule)
         }
 
+        if (routeRule.outboundTag === XrayEnum.BLOCK_OUTBOUND_TAG) {
+            return;
+        }
+
         // 只有存在域名规则时才添加DNS规则
         if (luciRuleDTO.containDomain()
             || luciRuleDTO.containIp()
             || luciRuleDTO.containGeo()) {
             let dnsTmpl: DnsServer;
-            let outboundTag = transOutTag(rule.dnsProxyNode)
-            outboundTag = outboundTag ? outboundTag : ruleOutBoundTag
-            let dnsTag = transDnsTag(rule.name)
+            let outboundTag = transOutTag(rule.dnsProxyNode);
+            outboundTag = outboundTag ? outboundTag : ruleOutBoundTag;
+            let dnsTag = transDnsTag(rule.name);
             if (dnsInOutMap.has(outboundTag)) {
                 dnsInOutMap.get(outboundTag).push(dnsTag)
             } else {
@@ -138,11 +142,11 @@ function genConf() {
             } else {
                 dnsTmpl = defaultDnsTmpl
             }
-            let server = structuredClone(dnsTmpl)
-            server.tag = dnsTag
-            server.queryStrategy = transDnsStrategy(rule.dnsStrategy)
-            server.domains = routeRule.domain
-            dns.servers.push(server)
+            let server = structuredClone(dnsTmpl);
+            server.tag = dnsTag;
+            server.queryStrategy = transDnsStrategy(rule.dnsStrategy);
+            server.domains = routeRule.domain;
+            dns.servers.push(server);
         }
     })
 

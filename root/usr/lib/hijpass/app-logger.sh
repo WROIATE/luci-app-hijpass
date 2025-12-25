@@ -1,7 +1,6 @@
 #!/bin/sh
 
-LOG_FILE="/tmp/log/hijpass.log"
-MAX_SIZE=20000                                                        # Line
+LOG_FILE=$(uci -q get hijpass.@hijpass[0].log_path || :)
 LOG_LEVEL=$(uci -q get hijpass.@hijpass[0].log_level || echo "INFO") # debug, info, warn, error
 
 LOG_LEVELS="DEBUG:1 INFO:2 WARN:3 ERROR:4"

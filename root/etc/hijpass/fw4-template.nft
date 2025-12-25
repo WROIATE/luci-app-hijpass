@@ -1,21 +1,37 @@
 table inet hijpass {
     chain pre-filter {
-        type filter hook prerouting priority filter; policy accept;
+        type filter hook prerouting priority filter - 50; policy accept;
 
-        fib saddr type != local iif != br-lan counter return
+        # 过滤来源非本地内网的请求
+        # fib saddr type != local iif != br-lan counter return
+
+        # 过滤访问本地的请求
         fib daddr type local counter return
+
+        # 过滤回包
         ct direction reply counter return
+
+        # 不满足代理协议，返回原链
         meta l4proto != $TPROXY_PROTO counter return
 
+        # 新连接设置代理、分流标记
         ct state new,related counter jump tproxy-shunt
+
+        # 未标记连接，返回原链
         ct mark != { $TPROXY_MARK, $TPROXY_SHUNT_MARK } counter return
 
+        # 过滤代理端口
+        counter jump proxy-port-filter
+
+        # 代理标记，通过代理节点进行透明代理
         meta l4proto $TPROXY_PROTO ct mark $TPROXY_MARK tproxy to :$TPROXY_PORT meta mark set $TPROXY_MARK counter accept
+
+        # 分流、代理标记，通过分流节点进行透明代理
         meta l4proto $TPROXY_PROTO ct mark { $TPROXY_MARK, $TPROXY_SHUNT_MARK } tproxy to :$TPROXY_SHUNT_PORT meta mark set $TPROXY_MARK counter
     }
 
     chain out-route {
-        type route hook output priority filter; policy accept;
+        type route hook output priority filter - 50; policy accept;
 
         fib daddr type local counter return
         ct direction reply counter return
@@ -23,6 +39,8 @@ table inet hijpass {
         meta skgid $HIJPASS_USER counter return
 
         ct state new,related counter jump tproxy-shunt
+
+        counter jump proxy-port-filter
         counter jump tproxy-mark
     }
 
@@ -52,7 +70,19 @@ table inet hijpass {
     }
 
     chain tproxy-mark {
+        # 根据 ct mark 设置 meta mark
         ct mark { $TPROXY_MARK, $TPROXY_SHUNT_MARK } meta mark set $TPROXY_MARK
+    }
+
+    chain proxy-port-filter {
+        # 禁止quic代理
+        meta l4proto udp udp dport 443 counter reject
+
+        # 不代理非DNS的UDP请求
+        meta l4proto udp udp dport != 53 ct mark set 0 counter return
+
+        # 非指定代理请求，仅代理常用TCP端口
+        meta l4proto tcp ct mark != $TPROXY_MARK tcp dport != { 22, 25, 53, 143, 465, 587, 853, 993, 995, 80, 443} ct mark set 0 counter return
     }
 
     # chnroute

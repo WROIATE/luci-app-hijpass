@@ -16,6 +16,5 @@
     "enum/**/*.ts",
     "module/**/*.ts",
     "utils/**/*.ts",
-    "static/**/*.svg"
   ],
 }

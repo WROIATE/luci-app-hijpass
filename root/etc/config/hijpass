@@ -13,7 +13,10 @@ config hijpass
 	option nft '/etc/hijpass/fw4-template.nft'
 	option nft_hook '/etc/hijpass/hook/nft-hook.sh'
 	option shunt_conf '/etc/hijpass/shunt.json'
-    
+	option log_level 'INFO'
+	option log_path '/tmp/log/hijpass/hijpass.log'
+	option log_dir '/tmp/log/hijpass'
+
 config firewall
 	option tproxy_proto 'tcp,udp'
 	option shunt_port '18081'
@@ -23,31 +26,55 @@ config firewall
 	option ip_direct_hash ''
 
 config shunt
-	option type 'xray'
+	option type 'sing-box'
 	option shunt_listen_port '18081'
 	option dns_listen_port '10153'
+	option config_type 'tmpl'
+	option log_path '/tmp/hijpass/log/shunt.log'
+	option log_level 'info'
 	option log_path '/tmp/log/hijpass-shunt.log'
+	option ruleset_convert '1'
+	option use_cache '1'
 	option shunt_hash ''
 
-config proxy_node 'opbykn2o'
-	option name 'proxy2'
-	option enabled '1'
-	option command '/usr/bin/xray -c /etc/hijpass/proxy.json'
-	option listen_port '2084'
-	option log_path '/tmp/log/hijpass-proxy2.log'
-
-config proxy_node 'blkqtz3k'
-	option name 'proxy'
-	option enabled '0'
-	option command '/usr/bin/xray -c /etc/hijpass/proxy.json'
-	option listen_port '2081'
-	option log_path '/tmp/log/hijpass-proxy.log'
-
 config dns
-	option dns_service 'dnsmasq'
+	option dns_service 'chinadns-ng'
 	option direct_dns 'system'
 	option proxy_dns '127.0.0.1#10153'
+	option cdg_port '53653'
 	option domain_proxy_hash ''
 	option doamin_direct_hash ''
 
-config rule
+list chn_domain_list 'https://fastly.jsdelivr.net/gh/felixonmars/dnsmasq-china-list/accelerated-domains.china.conf'
+    option gfw_list 'https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/gfw.txt'
+    option geosite 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat'
+    option geoip 'https://github.com/Loyalsoldier/geoip/releases/latest/download/geoip.dat'
+    option download_timeout '3'
+    list chn_v4_route 'https://fastly.jsdelivr.net/gh/gaoyifan/china-operator-ip@ip-lists/china.txt'
+    list chn_v4_route 'https://ispip.clang.cn/all_cn.txt'
+    list chn_v6_route 'https://fastly.jsdelivr.net/gh/gaoyifan/china-operator-ip@ip-lists/china6.txt'
+    list chn_v6_route 'https://ispip.clang.cn/all_cn_ipv6.txt'
+
+config shunt_dns_node
+    option enabled '1'
+    option type 'https'
+    option tag 'Ali'
+    option server '223.5.5.5'
+
+config shunt_dns_node
+    option type 'https'
+    option tag 'Google'
+    option server '8.8.8.8'
+    option enabled '0'
+
+config shunt_dns_node
+    option enabled '1'
+    option type 'https'
+    option tag 'Cloudflare'
+    option server '1.1.1.1'
+
+config shunt_dns_node
+   option enabled '1'
+   option type 'https'
+   option tag 'Quad9'
+   option server '9.9.9.9'

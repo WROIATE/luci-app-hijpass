@@ -193,6 +193,7 @@ declare namespace LuCI {
 
         interface GridSection extends LuCI.form.TableSection {
             modaltitle: string | function;
+            cloneable: boolean;
         }
 
         interface TableSection extends LuCI.form.TypedSection {
@@ -211,6 +212,8 @@ declare namespace LuCI {
             showModal(modal: any, e: any): void;
 
             hideModal(): void;
+
+            addTimeLimitedNotification(title?: string, children: any, timeout?: number, classes?: string): Node
         }
 
         interface AbstractElement {
@@ -251,6 +254,8 @@ declare namespace LuCI {
             get_first(config: string, type: string, option?: string): any;
 
             set(config: string, sectionId: string, option: string, value: any): void;
+
+            unset(conf: string, sid: string, opt: string): void
 
             remove(config: string, sectionId: string): void;
 

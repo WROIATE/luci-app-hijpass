@@ -209,6 +209,7 @@ export class BlockOutbound extends Outbound {
 }
 
 export class DirectOutbound extends Outbound {
+    domain_resolver: string;
     constructor(tag: string) {
         super('direct', tag);
     }
@@ -218,6 +219,7 @@ export class Socks extends Outbound {
     server: string;
     server_port: number;
     version: string;
+    domain_resolver: string;
 
     constructor(server: string, server_port: number, tag: string) {
         super('socks', tag);

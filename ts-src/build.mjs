@@ -83,7 +83,7 @@ async function buildOne(entryPath) {
         target: ['es2017'],
         outfile: outFile,
         sourcemap: false,
-        minify: false,
+        minify: true,
         globalName: 'LuciView',
         plugins: [luciPlugin]
     });

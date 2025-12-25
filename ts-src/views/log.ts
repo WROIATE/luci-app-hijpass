@@ -8,7 +8,8 @@ import uci from "uci";
 const v = view.extend({
     load: function () {
         return Promise.all([
-            uci.load(LuciFlied.CONF_NAME)
+            uci.load(LuciFlied.CONF_NAME),
+            uci.load(LuciFlied.SERVER_CONF_NAME)
         ]);
     },
     handleSaveApply: null,
@@ -34,26 +35,36 @@ const v = view.extend({
 function createLogFileOptions() {
     let options = [];
 
+    let hijpassLog = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.CONF_NAME, 'log_path');
     // 添加系统日志
-    options.push(E('option', {'value': '/tmp/log/hijpass.log'}, _('主日志')));
+    options.push(E('option', {'value': hijpassLog}, _('主日志')));
 
     // 添加分流日志
-    let shuntLogPath = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'log_path');
-    if (shuntLogPath) {
-        options.push(E('option', {'value': shuntLogPath}, _('分流日志')));
-    } else {
-        options.push(E('option', {'value': '/tmp/log/hijpass-shunt.log'}, _('分流日志')));
+    let shuntLog = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'log_path');
+    if (shuntLog) {
+        options.push(E('option', {'value': shuntLog}, _('分流日志')));
     }
 
     // 动态添加代理节点日志
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (proxySection) => {
         let proxyName = proxySection['.name'];
         let displayName = proxySection.name || proxyName;
-        let logPath = proxySection.log_path;
+        let log_path = proxySection.log_path;
 
-        if (logPath) {
+        if (log_path) {
             let optionText = _('代理日志') + ' - ' + displayName;
-            options.push(E('option', {'value': logPath}, optionText));
+            options.push(E('option', {'value': log_path}, optionText));
+        }
+    });
+
+    uci.sections(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (serverSection) => {
+        let proxyName = serverSection['.name'];
+        let displayName = serverSection.name || proxyName;
+        let log_path = serverSection.log_path;
+
+        if (log_path) {
+            let optionText = _('服务器日志') + ' - ' + displayName;
+            options.push(E('option', {'value': log_path}, optionText));
         }
     });
 

@@ -12,7 +12,7 @@ const v = view.extend({
         ]);
     },
 
-    handleSaveApply: LuciUtils.genHandleSaveApply(false),
+    handleSaveApply: LuciUtils.genHandleSaveApply(),
 
     render: function () {
         let m = new form.Map(LuciFlied.CONF_NAME, _('防火墙配置'),

@@ -18,6 +18,8 @@ GEO_IP_FILE="/usr/share/v2ray/geoip.dat"
 
 ENABLED=$(uci -q get hijpass.@hijpass[0].enabled || :)
 
+LUA_SCRIPT="/usr/lib/hijpass/luci-utils.lua"
+
 # 下载函数（单个文件）
 download_file() {
     local url output temp_file backup_file processed_file
@@ -97,7 +99,7 @@ download_and_merge_files() {
     fi
 
     # 清空合并文件
-    >"$merged_file"
+    : >"$merged_file"
 
     local success_count=0
     local total_count=0
@@ -499,44 +501,19 @@ download_gfw_list() {
 }
 
 query_rule() {
-  find "/etc/hijpass/rules/" -type f -name "*.txt" | while read -r file; do
-    # 用 awk 检查该文件是否命中
-    if awk -v id="$1" '
-      {
-        for (i = 1; i <= NF; i++) {
-          d = $i
-          n = length(id)
-          m = length(d)
-
-          # 1) 完全相等: id == d
-          if (id == d) {
-            found = 1
-            exit
-          }
-
-          # 2) id 以 "." + d 结尾:
-          #    例如: id = www.bilibili.com, d = bilibili.com
-          if (n > m) {
-            if (substr(id, n - m + 1) == d && substr(id, n - m, 1) == ".") {
-              found = 1
-              exit
-            }
-          }
-        }
-      }
-      END {
-        if (found == 1) {
-          exit 0   # 命中 -> awk 返回 0
-        } else {
-          exit 1   # 未命中 -> awk 返回 1
-        }
-      }
-    ' "$file"
-    then
-      # awk 返回 0，说明文件命中；只输出不带路径的文件名
-      basename "$file"
+    if lua $LUA_SCRIPT iptype "$1" >/dev/null 2>&1; then
+        find "/etc/hijpass/rules/" -type f \( -name "chn-route*" -o -name "ip*" \) | while read -r file; do
+            if lua $LUA_SCRIPT ipmatch "$1" -f "$file" >/dev/null 2>&1; then
+                basename "$file"
+            fi
+        done | sort -u
+    else
+        find "/etc/hijpass/rules/" -type f \( -name "*list.txt" -o -name "domain*" \) | while read -r file; do
+              if lua $LUA_SCRIPT domainmatch "$1" "$file" >/dev/null 2>&1; then
+                  basename "$file"
+              fi
+        done | sort -u
     fi
-  done | sort -u
 }
 
 # 主函数

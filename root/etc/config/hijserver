@@ -1,0 +1,2 @@
+config hijserver
+	option enabled '0'

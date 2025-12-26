@@ -234,17 +234,27 @@ function convertGeoRule(luciRuleDTO: RuleDTO) {
 
 function writeGeoRule() {
     let routeConf = ShuntUtils.getRouteSection()
-    let geositeList = new Set()
-    let geoipList = new Set()
+    let geoSiteSet = new Set()
+    let geoIpSet = new Set()
     for (let rule of routeConf.rules) {
         let luciRuleDTO = ShuntUtils.parseRuleList(rule);
         for (let geo of luciRuleDTO.geoSite) {
-            geositeList.add(geo.replace('geosite:', ''))
+            geoSiteSet.add(geo.replace('geosite:', ''))
         }
         for (let geo of luciRuleDTO.geoIp) {
-            geoipList.add(geo.replace('geoip:', ''))
+            geoIpSet.add(geo.replace('geoip:', ''))
         }
     }
-    uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geosite_ruleset', [...geositeList])
-    uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geoip_ruleset', [...geoipList])
+    let geoSiteList = [...geoSiteSet];
+    let geoIpList = [...geoIpSet];
+    if (geoIpList.length > 0) {
+        uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geoip_ruleset', geoIpList)
+    } else {
+        uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geoip_ruleset', undefined)
+    }
+    if (geoSiteList.length > 0) {
+        uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geosite_ruleset', geoSiteList)
+    } else {
+        uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geosite_ruleset', undefined)
+    }
 }

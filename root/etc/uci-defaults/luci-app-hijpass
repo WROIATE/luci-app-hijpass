@@ -1,5 +1,15 @@
 #!/bin/sh
 
+if ! grep -q "^hijpass:" /etc/group; then
+    echo "hijpass:x:4396:hijpass" >>/etc/group
+fi
+if ! grep -q "^hijpass:" /etc/passwd; then
+    echo "hijpass:x:0:4396:hijpass:/var/run/hijpass:/bin/false" >>/etc/passwd
+fi
+if ! grep -q "^hijpass:" /etc/shadow; then
+    echo "hijpass:x:0:0:99999:7:::" >>/etc/shadow
+fi
+
 uci -q batch <<-EOF >/dev/null
 	delete firewall.hijapss
 	set firewall.hijapss=include
@@ -9,6 +19,7 @@ uci -q batch <<-EOF >/dev/null
 EOF
 
 chmod +x /usr/lib/hijpass/*
+chmod +x /etc/hijpass/hook/*
 
 rm -rf /tmp/luci-*cache
 exit 0

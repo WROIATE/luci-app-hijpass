@@ -54,10 +54,10 @@ const MiscUtils = {
         let spanTemp = '<em><span style="color:%s"><strong>%s %s</strong></span></em>';
         let isProxyRunning = (res?.proxyInfos ?? [])
             .filter(instance => instance?.running)
-            .length > 1
+            .length > 0
         let isServerRunning = (res?.serverInfos ?? [])
             .filter(instance => instance?.running)
-            .length > 1
+            .length > 0
         let isShuntRunning = res?.shuntInfo?.running ?? false
         let isDnsRunning = res?.dnsInfo?.running ?? false
 

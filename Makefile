@@ -67,27 +67,15 @@ endmenu
 endef
 
 define Package/$(PKG_NAME)/conffiles
-/etc/hijpass/fw4-template.nft
-/etc/hijpass/shunt.json
-/etc/hijpass/rules/domain-direct.txt
-/etc/hijpass/rules/domain-proxy.txt
-/etc/hijpass/rules/ip-direct.txt
-/etc/hijpass/rules/ip-proxy.txt
+/etc/hijpass/
 /etc/config/hijpass
 /etc/config/hijserver
 endef
 
-define Package/$(PKG_NAME)/postinst
+define Package/$(PKG_NAME)/prerm
 #!/bin/sh
-if ! grep -q "^hijpass:" /etc/group; then
-    echo "hijpass:x:4396:hijpass" >>/etc/group
-fi
-if ! grep -q "^hijpass:" /etc/passwd; then
-    echo "hijpass:x:0:4396:hijpass:/var/run/hijpass:/bin/false" >>/etc/passwd
-fi
-if ! grep -q "^hijpass:" /etc/shadow; then
-    echo "hijpass:x:0:0:99999:7:::" >>/etc/shadow
-fi
+/etc/init.d/hijpass stop
+/etc/init.d/hijserver stop
 exit 0
 endef
 

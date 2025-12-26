@@ -15,8 +15,8 @@ config hijpass
 	option nft_hook '/etc/hijpass/hook/nft-hook.sh'
 	option shunt_conf '/etc/hijpass/shunt.json'
 	option log_level 'INFO'
-	option log_path '/tmp/log/hijpass/hijpass.log'
-	option log_dir '/tmp/log/hijpass'
+	option log_path '/tmp/hijpass/log/hijpass.log'
+	option log_dir '/tmp/hijpass/log'
 
 config firewall
 	option tproxy_proto 'tcp,udp'
@@ -28,7 +28,7 @@ config shunt
 	option shunt_listen_port '18081'
 	option dns_listen_port '10153'
 	option config_type 'tmpl'
-	option log_path '/tmp/log/hijpass/shunt.log'
+	option log_path '/tmp/hijpass/log/shunt.log'
 	option log_level 'info'
 	option ruleset_convert '1'
 	option use_cache '1'

@@ -1,2 +1,3 @@
 config hijserver
 	option enabled '0'
+	option log_dir '/tmp/hijserver/log'

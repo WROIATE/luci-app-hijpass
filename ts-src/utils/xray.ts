@@ -164,7 +164,7 @@ function genConf() {
     route.rules = route.rules.concat(routeRules)
 
     let burstObservatory = undefined
-    if (shuntSection.loadBalance) {
+    if (shuntSection.loadBalance.lbNodeList.length > 0) {
         let lbConf = shuntSection.loadBalance
         let balancer = new Balancer(XrayEnum.LOAD_BALANCE_OUTBOUND_TAG)
         balancer.selector = lbConf.lbNodeList

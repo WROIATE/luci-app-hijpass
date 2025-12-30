@@ -55,7 +55,7 @@ function genConf() {
         }
     })
 
-    if (shuntSection.loadBalance) {
+    if (shuntSection.loadBalance.lbNodeList.length > 0) {
         let lbConf = shuntSection.loadBalance
         let testNode = new URLTest(SingBoxEnum.LOAD_BALANCE_OUTBOUND_TAG, lbConf.url,
             parseInt(lbConf.interval, 10),

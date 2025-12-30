@@ -29,7 +29,7 @@ start_service() {
   log_info "Configuring server firewall rules..."
   reset_fw_tproxy
   reset_geo_cron
-  log_info "HiJserver started successfully"
+  log_info "Hijserver started successfully"
 }
 
 stop_service() {
@@ -114,7 +114,7 @@ reset_fw_tproxy() {
 		        return
 		}
 	EOF
-  cat <<- EOF >> $NFT_CHAIN_PRE
+  cat <<- EOF > $NFT_CHAIN_PRE
 		jump $NAME comment "hijserver rule"
 	EOF
   if ! fw4 reload > /dev/null 2>&1; then
@@ -137,7 +137,7 @@ reset_geo_cron() {
   sed -i '/hijpass\/clean-service-log.sh hijserver/d' /etc/crontabs/root 2> /dev/null
   if [ "$REDIRECT_LOG" = "1" ]; then
     echo "*/10 * * * * /usr/lib/hijpass/clean-service-log.sh hijserver" >> /etc/crontabs/root
-    log_info "Clean service log cron job added: */10 * * * * /usr/lib/hijpass/clean-service-log.sh hijserver"
+    log_info "Added log split service cron job: */10 * * * * /usr/lib/hijpass/clean-service-log.sh hijserver"
   fi
 
   /etc/init.d/cron restart > /dev/null 2>&1

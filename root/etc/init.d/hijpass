@@ -40,11 +40,11 @@ start_service() {
   [ -d "$LOG_DIR" ] || mkdir -p "$LOG_DIR"
   # 启动进程
   config_load $NAME
-  log_info "Starting service..."
-  log_info "Starting proxy..."
+  log_info "===================== Starting service ======================="
+  log_info "Running proxy..."
   config_foreach run_proxy proxy_node
   sleep 2
-  log_info "Starting shunt..."
+  log_info "Running shunt..."
   config_foreach run_shunt shunt
   sleep 1
   # 配置防火墙
@@ -56,15 +56,15 @@ start_service() {
   # 启动DNS劫持
   log_info "DNS hijacking..."
   start_dns_service
-  log_info "Service started successfully"
+  log_info "================ Service started successfully ================"
 }
 
 stop_service() {
-  log_info "Stopping service..."
+  log_info "===================== Stopping service ======================="
   reset_geo_cron
   remove_fw_tproxy
   stop_dns_service
-  log_info "Service stopped successfully"
+  log_info "================ Service stopped successfully ================"
 }
 
 service_triggers() {
@@ -98,8 +98,7 @@ run_proxy() {
   else
     command="$command > /dev/null 2>&1"
   fi
-  open_instance "$1" "$name" "$command" "$enable_std_log" && log_info "Proxy $name started successfully" && return 0
-  log_warn "Proxy $name start failed"
+  open_instance "$1" "$name" "$command" "$enable_std_log"
 }
 
 run_shunt() {
@@ -119,8 +118,7 @@ run_shunt() {
   else
     shunt_command="$shunt_command > /dev/null 2>&1"
   fi
-  open_instance "$1" "shunt" "$shunt_command" "$enable_std_log" && log_info "Shunt started successfully" && return 0
-  log_warn "Shunt start failed"
+  open_instance "$1" "shunt" "$shunt_command" "$enable_std_log"
 }
 
 open_instance() {
@@ -141,6 +139,7 @@ open_instance() {
   fi
   procd_set_param pidfile "/var/run/$instance_name.pid"
   procd_set_param user "hijpass"
+  procd_set_param respawn 10 5 2
   procd_close_instance
 }
 
@@ -193,7 +192,7 @@ reset_geo_cron() {
   sed -i '/hijpass\/rules.sh\|hijpass\/clean-service-log.sh hijpass/d' /etc/crontabs/root 2> /dev/null
   if [ "$REDIRECT_LOG" = "1" ]; then
     echo "*/10 * * * * /usr/lib/hijpass/clean-service-log.sh hijpass" >> /etc/crontabs/root
-    log_info "Clean service log cron job added: */10 * * * * /usr/lib/hijpass/clean-service-log.sh hijpass"
+    log_info "Added log split service cron job: */10 * * * * /usr/lib/hijpass/clean-service-log.sh hijpass"
   fi
   if [ -z "$CRON_CONF" ] || [ "$ENABLED" != "1" ]; then
     /etc/init.d/cron restart > /dev/null 2>&1
@@ -201,7 +200,7 @@ reset_geo_cron() {
   fi
 
   echo "$CRON_CONF $RULE_UPDATE_SCRIPT update" >> /etc/crontabs/root
-  log_info "Rule update cron job added: $CRON_CONF $RULE_UPDATE_SCRIPT"
+  log_info "Added rule update cron job: $CRON_CONF $RULE_UPDATE_SCRIPT update"
 
   /etc/init.d/cron restart > /dev/null 2>&1
 }

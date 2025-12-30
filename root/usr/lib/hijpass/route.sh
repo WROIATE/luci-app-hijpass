@@ -43,13 +43,13 @@ delete_route() {
     done
 
     if ip route del local default dev lo table "$TABLE_NUMBER" 2>/dev/null; then
-        log_debug "Successfully removed $TABLE_NUMBER existing IPv4 default route"
+        log_debug "Removed $TABLE_NUMBER existing IPv4 default route Successfully"
     else
         log_debug "No existing IPv4 default route to remove"
     fi
 
     if ip -6 route del local default dev lo table "$TABLE_NUMBER" 2>/dev/null; then
-        log_debug "Successfully removed $TABLE_NUMBER existing IPv6 default route"
+        log_debug "Removed $TABLE_NUMBER existing IPv6 default route Successfully"
     else
         log_debug "No existing IPv6 default route to remove"
     fi
@@ -69,7 +69,7 @@ add_table() {
 delete_table() {
     if grep -qE "^\s*${TABLE_NUMBER}\s+${TABLE_NAME}\s*$" "$RT_TABLES_FILE"; then
         sed -i "/^\s*${TABLE_NUMBER}\s\+${TABLE_NAME}\s*$/d" "$RT_TABLES_FILE"
-        log_debug "Table ${TABLE_NAME} with number ${TABLE_NUMBER} deleted"
+        log_debug "Deleted table ${TABLE_NAME} with number ${TABLE_NUMBER}"
     else
         log_debug "Table ${TABLE_NAME} with number ${TABLE_NUMBER} does not exist"
     fi
@@ -86,14 +86,14 @@ fi
 
 case "$ACTION" in
 reset_hijpass_route)
-    log_info "Starting to configure hijpass routing..."
+    log_info "Configuring hijpass routing..."
     add_route
-    log_info "Hijpass routing configuration completed successfully"
+    log_info "Configured hijpass routing successfully"
     ;;
 remove_hijpass_route)
-    log_info "Starting to remove hijpass routing configuration..."
+    log_info "Removing hijpass routing configuration..."
     delete_route
-    log_info "Hijpass routing configuration removal completed successfully"
+    log_info "Removed hijpass routing configuration successfully"
     ;;
 *)
     usage

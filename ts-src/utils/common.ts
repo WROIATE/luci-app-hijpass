@@ -155,8 +155,8 @@ const LuciUtils = {
                 if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === 'sing-box') {
                     SingBoxUtils.writeGeoRule()
                 }
-                let data = ShuntUtils.getShuntConfData()
                 await this.handleSave(ev)
+                let data = ShuntUtils.getShuntConfData()
                 if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
                     await fs.write(WebUtils.getFilePath('shunt_conf'), data);
                 }

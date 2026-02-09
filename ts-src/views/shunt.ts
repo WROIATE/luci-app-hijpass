@@ -83,7 +83,7 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     HijpassValues.SHUNT_LOG_LEVELS.forEach(function (level) {
         logLevel.value(level);
     })
-    logLevel.depends('log_enabled','1');
+    logLevel.depends('log_enabled', '1');
 
     // 预览配置按钮
     let previewConfigButton = s.taboption('basic', form.Button, '_preview_config', _('预览配置'),
@@ -169,12 +169,20 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     let dnsNode = routeGridSection.taboption('_dns', form.ListValue, 'dns_node', _('DNS服务器'), _('仅在规则中存在域名、geosite、rule_set时生效'));
     // dnsNode.modalonly = true;
     loadDNSServerOptions(dnsNode, true);  // 包含默认选项
-    dnsNode.cfgvalue = function (sectionId) {
+    dnsNode.textvalue = function (sectionId) {
         let dnsNode = uci.get(LuciFlied.CONF_NAME, sectionId, 'dns_node');
-        if (dnsNode) {
-            return dnsNode;
+        if (!dnsNode) {
+            return _('-');
         }
-        return _('-');
+        let dnsProxyNode = uci.get(LuciFlied.CONF_NAME, sectionId, 'dns_proxy_node');
+        let value: string;
+        if (!dnsProxyNode) {
+            value = dnsNode
+        } else {
+            dnsProxyNode = dnsProxyNode == 'hijpass-direct' ? '直连' : dnsProxyNode;
+            value = dnsNode + ' -> ' + dnsProxyNode;
+        }
+        return value;
     }
 
     let dnsStrategy = routeGridSection.taboption('_dns', form.ListValue, 'dns_strategy', _('DNS解析策略'));
@@ -325,7 +333,8 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
         _('规则集DNS'), _('选择用于解析rule-set链接域名的DNS服务器（sing-box配置）'));
     loadDNSServerOptions(rulesetDNSNode, false);
 
-    let defaultStrategy = dnsTypeSection.option(form.ListValue, 'default_strategy', _('默认解析策略'));
+    let defaultStrategy = dnsTypeSection.option(form.ListValue, 'default_strategy', _('内部DNS解析策略'),
+        _('选择 sing-box or xray 的域名解析策略'));
     HijpassValues.DNS_STRATEGY_VALUES.forEach(function (strategy) {
         defaultStrategy.value(strategy.value, strategy.label);
     });

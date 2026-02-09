@@ -138,6 +138,15 @@ function createLogEnabledOption(s: LuCI.form.AbstractSection) {
 //     return o;
 // }
 
+// 创建启用状态选项
+function createNestProxyEnabledOption(s) {
+    let o = s.option(form.Flag, 'nest_proxy', _('允许嵌套代理'), _(''));
+    o.modalonly = true;
+    o.default = '0';
+    o.rmempty = false;
+    return o;
+}
+
 // 创建所有代理配置选项
 function createProxyOptions(s: LuCI.form.AbstractSection, data: { [key: string]: boolean }) {
     // 创建Grid表格显示选项
@@ -149,6 +158,7 @@ function createProxyOptions(s: LuCI.form.AbstractSection, data: { [key: string]:
     createCommandOption(s);
     createListenPortOption(s);
     createSocksPortOption(s);
+    createNestProxyEnabledOption(s);
     createProcdEnvOption(s);
     createLogEnabledOption(s);
     // createLogRedirectOption(s);

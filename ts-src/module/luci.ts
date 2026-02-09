@@ -111,17 +111,16 @@ export class RuleDTO {
             || this.domainKeyword.length > 0
     }
 
+    containIp(): boolean {
+        return this.ipCidr.length > 0
+    }
+
     containGeo(): boolean {
         return this.geoSite.length > 0 || this.geoIp.length > 0
     }
 
     containRuleSet(): boolean {
         return this.ruleSet.length > 0
-    }
-
-    containIp(): boolean {
-        return this.ipCidr.length > 0
-            || this.geoIp.length > 0
     }
 
     isEmpty(collectionType: "geo" | "set"): boolean {

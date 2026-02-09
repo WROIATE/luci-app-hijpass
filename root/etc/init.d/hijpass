@@ -82,13 +82,14 @@ boot() {
 }
 
 run_proxy() {
-  local command log_path name enabled
+  local command log_path name enabled nest_proxy
   local enable_std_log="1"
   config_get enabled "$1" enabled
   [ "$enabled" != "1" ] && return
   config_get command "$1" command
   config_get log_path "$1" log_path
   config_get name "$1" name
+  config_get nest_proxy "$1" nest_proxy
 
   if [ -n "$log_path" ]; then
     : > "$log_path"
@@ -98,7 +99,7 @@ run_proxy() {
   else
     command="$command > /dev/null 2>&1"
   fi
-  open_instance "$1" "$name" "$command" "$enable_std_log"
+  open_instance "$1" "$name" "$command" "$enable_std_log" "$nest_proxy"
 }
 
 run_shunt() {
@@ -126,6 +127,7 @@ open_instance() {
   local instance_name="$1-$2"
   local cmd="$3"
   local enable_std_log="$4"
+  local nest_proxy="$5"
   procd_open_instance "$instance_name"
   procd_set_param command /bin/sh -c "$cmd"
   if [ "$2" = "shunt" ]; then
@@ -138,7 +140,11 @@ open_instance() {
     procd_set_param stderr 1
   fi
   procd_set_param pidfile "/var/run/$instance_name.pid"
-  procd_set_param user "hijpass"
+  if [ "$nest_proxy" = "1" ]; then
+    procd_set_param user "root"
+  else
+    procd_set_param user "hijpass"
+  fi
   procd_set_param respawn 10 5 2
   procd_close_instance
 }

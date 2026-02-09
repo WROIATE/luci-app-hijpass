@@ -131,7 +131,6 @@ function genConf() {
 
         // 只有存在域名规则时才添加DNS规则
         if (luciRuleDTO.containDomain()
-            || luciRuleDTO.containIp()
             || luciRuleDTO.containRuleSet()) {
             let dnsTag = routeRule.dnsNode
             let detour = transOutTag(routeRule.dnsProxyNode)

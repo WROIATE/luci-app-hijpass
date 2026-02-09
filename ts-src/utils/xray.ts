@@ -126,7 +126,6 @@ function genConf() {
 
         // 只有存在域名规则时才添加DNS规则
         if (luciRuleDTO.containDomain()
-            || luciRuleDTO.containIp()
             || luciRuleDTO.containGeo()) {
             let dnsTmpl: DnsServer;
             let outboundTag = transOutTag(rule.dnsProxyNode);

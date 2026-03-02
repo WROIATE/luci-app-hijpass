@@ -65,6 +65,9 @@
         ],
         "/usr/lib/hijpass/route-match.sh *": [
           "exec"
+        ],
+        "/usr/lib/hijpass/rm.sh proxy *": [
+          "exec"
         ]
       }
     }

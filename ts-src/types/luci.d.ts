@@ -24,6 +24,8 @@ declare namespace LuCI {
         dom: LuCI.dom.DOM
 
         resolveDefault(value: any, defvalue?: any): Promise<any>;
+
+        bind(fn: function, self, ...args?): function
     }
 
     declare namespace form {
@@ -104,13 +106,15 @@ declare namespace LuCI {
         interface AbstractSection extends LuCI.form.AbstractElement {
             parentoption: AbstractValue
 
+            prototype?: AbstractSection;
+
             append(obj): Array.<string>
 
             cfgvalue(section_id: string, option: string): any
 
             filter(section_id: string): boolean
 
-            formvalue(section_id: string, option: string): any
+            formvalue(section_id: string, option?: string): any
 
             getOption(option: string): null | LuCI.form.AbstractValue | Object.<string, LuCI.form.AbstractValue>
 
@@ -142,6 +146,8 @@ declare namespace LuCI {
         }
 
         interface Map extends LuCI.form.AbstractElement {
+            data: any;
+
             section<T extends LuCI.form.AbstractSection>(sectionclass: T, ...classargs: any): T
         }
 
@@ -154,6 +160,10 @@ declare namespace LuCI {
             rowcolors: boolean;
 
             sectiontitle(sectionId: string): string;
+
+            handleAdd?(ev: Event, name?: string): any;
+
+            handleRemove?(ev: Event, name?: string): any;
         }
 
         interface MultiValue extends LuCI.form.DynamicList {
@@ -183,15 +193,18 @@ declare namespace LuCI {
         }
 
         interface Value extends LuCI.form.AbstractValue {
+            forcewrite: boolean;
             prototype: Value
             monospace: boolean;
             rows: number;
             placeholder: string
+            password: boolean;
 
             value(key: string, display?: string): void;
         }
 
         interface GridSection extends LuCI.form.TableSection {
+            prototype?: GridSection;
             modaltitle: string | function;
             cloneable: boolean;
         }
@@ -243,6 +256,8 @@ declare namespace LuCI {
 
     declare namespace uci {
         interface UCI {
+            state: object;
+
             load(config: string): Promise<void>;
 
             sections(config: string, type: string, callback: (section: any) => void): any[];
@@ -262,6 +277,8 @@ declare namespace LuCI {
             clone(config: string, type: string, sectionId: string, anonymous?: boolean, name?: string): void;
 
             set_first(config: string, sectionId: string, option: string, value: any): void;
+
+            changes(): Promise.<Object.<string, Array.<string>>>
         }
     }
 

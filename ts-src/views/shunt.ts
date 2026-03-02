@@ -67,6 +67,13 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     shuntListenPort.default = '1041';
     shuntListenPort.datatype = 'port';
     shuntListenPort.rmempty = false;
+    shuntListenPort.validate = function (sectionId: string, value: string) {
+        let dns_listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "dns_listen_port");
+        if (dns_listen_port == value) {
+            return _("与DNS端口冲突")
+        }
+        return WebUtils.validatePortConflict.call(this, sectionId, value);
+    }
 
     // DNS监听端口
     let dnsListenPort = s.taboption('basic', form.Value, 'dns_listen_port', _('DNS监听端口'),
@@ -74,6 +81,13 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     dnsListenPort.default = '10153';
     dnsListenPort.datatype = 'port';
     dnsListenPort.rmempty = false;
+    dnsListenPort.validate = function (sectionId: string, value: string) {
+        let shunt_listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "shunt_listen_port");
+        if (shunt_listen_port == value) {
+            return _("与分流端口冲突")
+        }
+        return WebUtils.validatePortConflict.call(this, sectionId, value);
+    }
 
     // 日志开关
     WebUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, 'basic');

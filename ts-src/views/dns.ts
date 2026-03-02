@@ -43,6 +43,7 @@ const v = view.extend({
         chinaDnsPort.default = '53653';
         chinaDnsPort.datatype = "port"
         chinaDnsPort.rmempty = false;
+        chinaDnsPort.validate = WebUtils.validatePortConflict;
 
         let directDns = s.taboption('basic', form.ListValue, 'direct_dns', _('直连域名DNS'),
             _('选择直连域名使用的DNS服务器'));

@@ -192,44 +192,100 @@ export class Route {
     }
 }
 
-export class Outbound {
-    type: string;
+
+export interface Inbound {
+    type: 'tproxy' | 'direct' | 'socks';
+    tag: string;
+    listen: string;
+    listen_port: number;
+}
+
+export interface Listener {
+    listen: string;
+    listen_port: number;
+}
+
+export class TproxyInbound implements Inbound, Listener {
+    type: 'tproxy' = 'tproxy';
+    tag: string;
+    listen: string;
+    listen_port: number;
+
+    constructor(port: number, tag: string, address?: string) {
+        this.type = 'tproxy';
+        this.tag = tag;
+        address ? this.listen = address : this.listen = "::";
+        this.listen_port = port;
+    }
+}
+
+export class DnsInbound implements Inbound, Listener {
+    type: 'direct' = 'direct';
+    tag: string;
+    listen: string;
+    listen_port: number;
+
+    constructor(port: number, tag: string) {
+        this.type = 'direct';
+        this.tag = tag;
+        this.listen = "::";
+        this.listen_port = port;
+    }
+}
+
+export class SocksInbound implements Inbound, Listener {
+    type: 'socks' = 'socks';
+    tag: string;
+    listen: string;
+    listen_port: number;
+    users?: [
+        {
+            username: string,
+            password: string
+        }
+    ]
+
+    constructor(port: number, tag: string, address?: string) {
+        this.type = 'socks';
+        this.tag = tag;
+        address ? this.listen = address : this.listen = "::";
+        this.listen_port = port;
+    }
+}
+
+export interface Outbound {
+    type: 'block' | 'direct' | 'urltest' | 'socks'
+        | 'hysteria2' | 'shadowsocks' | 'tuic' | 'shadowtls' | 'vless';
+    tag: string;
+}
+
+export interface Server {
+    server: string;
+    server_port: number;
+}
+
+export class BlockOutbound implements Outbound {
+    type: 'block' = "block";
     tag: string;
 
-    constructor(type: string, tag: string) {
-        this.type = type
+    constructor(tag: string) {
         this.tag = tag
     }
 }
 
-export class BlockOutbound extends Outbound {
-    constructor(tag: string) {
-        super('block', tag);
-    }
-}
-
-export class DirectOutbound extends Outbound {
-    domain_resolver: string;
-    constructor(tag: string) {
-        super('direct', tag);
-    }
-}
-
-export class Socks extends Outbound {
-    server: string;
-    server_port: number;
-    version: string;
+export class DirectOutbound implements Outbound {
+    type: 'direct' = 'direct';
+    tag: string;
     domain_resolver: string;
 
-    constructor(server: string, server_port: number, tag: string) {
-        super('socks', tag);
-        this.server = server
-        this.server_port = server_port
-        this.version = '5'
+    constructor(tag: string) {
+        this.tag = tag;
     }
 }
 
-export class URLTest extends Outbound {
+export class URLTest implements Outbound {
+    type: 'urltest' = 'urltest';
+    tag: string;
     url: string;
     interval: number;
     tolerance: number;
@@ -238,7 +294,7 @@ export class URLTest extends Outbound {
     outbounds: string[];
 
     constructor(tag: string, url: string, interval: number, tolerance: number, idle_timeout: number, interrupt_exist_connections: boolean) {
-        super('urltest', tag)
+        this.tag = tag
         this.outbounds = []
         this.url = url
         this.interval = interval
@@ -248,28 +304,219 @@ export class URLTest extends Outbound {
     }
 }
 
-export class Inbound {
-    type: string;
+export class SocksOutbound implements Server, Outbound {
+    type: 'socks' = 'socks';
     tag: string;
-    listen: string;
-    listen_port: number;
+    server: string;
+    server_port: number;
+    version: '4' | '5' = '5';
+    domain_resolver: string;
 
-    constructor(type: string, port: number, tag: string) {
-        this.type = type
-        this.tag = tag
-        this.listen = "::"
-        this.listen_port = port
+    constructor(server: string, server_port: number, tag: string) {
+        this.type = 'socks';
+        this.tag = tag;
+        this.server = server;
+        this.server_port = server_port;
+        this.version = '5'
     }
 }
 
-export class TproxyInbound extends Inbound {
-    constructor(port: number, tag: string) {
-        super("tproxy", port, tag)
+export class Hysteria2Outbound implements Server, Outbound {
+    type: 'hysteria2' = 'hysteria2';
+    tag: string;
+    server: string;
+    server_port: number;
+    password?: string;
+    obfs?: ObfsConfig;
+    up_mbps?: number;
+    down_mbps?: number;
+    server_ports?: string[];
+    hop_interval?: string;
+    network?: string;
+    tls: TlsConfig;
+
+    constructor(tag: string, server: string, server_port: number, serverName: string) {
+        this.type = 'hysteria2';
+        this.tag = tag;
+        this.server = server;
+        this.server_port = server_port;
+        this.tls = new TlsConfig(serverName);
     }
 }
 
-export class DnsInbound extends Inbound {
-    constructor(port: number, tag: string) {
-        super("direct", port, tag)
+export class ShadowsocksOutbound implements Server, Outbound {
+    type: 'shadowsocks' = 'shadowsocks';
+    tag: string;
+    server: string;
+    server_port: number;
+    method: string;
+    password: string;
+    network?: 'tcp' | 'udp';
+    udp_over_tcp?: boolean;
+    plugin?: string;
+    plugin_opts?: string;
+    multiplex?: MultiplexConfig;
+
+    constructor(tag: string, server: string, server_port: number, method: string, password: string) {
+        this.type = 'shadowsocks';
+        this.tag = tag;
+        this.server = server;
+        this.server_port = server_port;
+        this.method = method;
+        this.password = password;
     }
 }
+
+export class TuicOutbound implements Server, Outbound {
+    type: 'tuic' = 'tuic';
+    tag: string;
+    server: string;
+    server_port: number;
+    uuid: string;
+    password: string;
+    congestion_control?: 'bbr' | 'cubic' | 'new_reno';
+    udp_relay_mode?: 'native' | 'quic';
+    udp_over_stream?: boolean;
+    zero_rtt_handshake?: boolean;
+    heartbeat?: string;
+    network?: 'tcp' | 'udp';
+    tls: TlsConfig;
+
+    constructor(tag: string, server: string, server_port: number, uuid: string, password: string, serverName: string) {
+        this.type = 'tuic';
+        this.tag = tag;
+        this.server = server;
+        this.server_port = server_port;
+        this.uuid = uuid;
+        this.password = password;
+        this.tls = new TlsConfig(serverName);
+    }
+}
+
+export class ShadowTLSOutbound implements Server, Outbound {
+    type: 'shadowtls' = 'shadowtls';
+    tag: string;
+    server: string;
+    server_port: number;
+    version: number;
+    password?: string;
+    tls: TlsConfig;
+
+    constructor(tag: string, server: string, server_port: number, version: number, serverName: string) {
+        this.type = 'shadowtls';
+        this.tag = tag;
+        this.server = server;
+        this.server_port = server_port;
+        this.version = version;
+        this.tls = new TlsConfig(serverName);
+    }
+}
+
+export class VlessOutbound implements Server, Outbound {
+    type: 'vless' = 'vless';
+    tag: string;
+    server: string;
+    server_port: number;
+    uuid: string;
+    flow?: 'xtls-rprx-vision';
+    network?: 'tcp' | 'udp';
+    packet_encoding?: 'packetaddr' | 'xudp';
+    tls: TlsConfig;
+    transport?: TransportConfig;
+    multiplex?: MultiplexConfig;
+
+    constructor(tag: string, server: string, server_port: number, uuid: string, serverName: string) {
+        this.type = 'vless';
+        this.tag = tag;
+        this.server = server;
+        this.server_port = server_port;
+        this.uuid = uuid;
+        this.tls = new TlsConfig(serverName);
+    }
+}
+
+// TLS 配置类
+export class TlsConfig {
+    enabled: boolean;
+    server_name: string;
+    insecure?: boolean;
+    reality?: { enabled: boolean; public_key: string; short_id: string };
+
+    constructor(serverName: string) {
+        this.enabled = true;
+        this.server_name = serverName;
+    }
+}
+
+// Obfuscation 配置类（用于 Hysteria2）
+export class ObfsConfig {
+    type: 'salamander';
+    password?: string;
+
+    constructor(password: string) {
+        this.type = "salamander";
+        this.password = password;
+    }
+}
+
+// Brutal 配置类
+export class BrutalConfig {
+    enabled: boolean;
+    up_mbps?: number;
+    down_mbps?: number;
+
+    constructor() {
+        this.enabled = true;
+    }
+}
+
+// Multiplex 配置类
+export class MultiplexConfig {
+    enabled: boolean;
+    protocol?: "smux" | "yamux" | "h2mux";
+    max_connections?: number;
+    min_streams?: number;
+    max_streams?: number;
+    brutal?: BrutalConfig;
+
+    constructor() {
+        this.enabled = true;
+    }
+}
+
+// 传输层配置类型
+export interface HttpTransport {
+    type: 'http';
+    host?: string;
+    path?: string;
+    method?: string;
+    idle_timeout?: string;
+    ping_timeout?: string;
+}
+
+export interface WebSocketTransport {
+    type: 'websocket';
+    path?: string;
+    max_early_data?: number;
+    early_data_header_name?: string;
+}
+
+export interface GrpcTransport {
+    type: 'grpc';
+    service_name?: string;
+    idle_timeout?: string;
+    ping_timeout?: string;
+    permit_without_stream?: boolean;
+}
+
+export interface HttpUpgradeTransport {
+    type: 'httpupgrade';
+    host?: string;
+    path?: string;
+}
+
+export type TransportConfig = HttpTransport
+    | WebSocketTransport
+    | GrpcTransport
+    | HttpUpgradeTransport
+    | { type: string; [key: string]: any };

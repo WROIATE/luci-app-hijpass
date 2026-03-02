@@ -127,20 +127,34 @@ class Route<T extends Rule> {
     }
 }
 
-class Outbound {
+// Outbound 接口
+interface Outbound {
+    settings?: any;
+    protocol: string;
+    tag: string;
+    streamSettings?: any;
+}
+
+class BlockOutbound implements Outbound {
+    settings?: any;
+    protocol: string;
+    tag: string;
+    streamSettings?: any;
+
+    constructor(tag: string) {
+        this.protocol = 'blackhole';
+        this.tag = tag;
+    }
+}
+
+class Socks implements Outbound {
     settings: any;
     protocol: string;
     tag: string;
 
-    constructor(protocol: string, tag: string) {
-        this.protocol = protocol
-        this.tag = tag
-    }
-}
-
-class Socks extends Outbound {
     constructor(address: string, port: number, tag: string) {
-        super('socks', tag);
+        this.protocol = 'socks';
+        this.tag = tag;
         this.settings = {
             address: address,
             port: port
@@ -148,22 +162,135 @@ class Socks extends Outbound {
     }
 }
 
-class DnsOutbound extends Outbound {
+class DnsOutbound implements Outbound {
+    settings: any;
+    protocol: string;
+    tag: string;
+
     constructor(tag: string) {
-        super('dns', tag);
+        this.protocol = 'dns';
+        this.tag = tag;
         this.settings = {
             nonIPQuery: "reject"
         }
     }
 }
 
-class Freedom extends Outbound {
+class Freedom implements Outbound {
+    settings: any;
+    protocol: string;
+    tag: string;
+
     constructor(tag: string) {
-        super('freedom', tag);
+        this.protocol = 'freedom';
+        this.tag = tag;
         this.settings = {
             domainStrategy: XrayEnum.DEFAULT_DNS_STRATEGY
         }
     }
+}
+
+// VLESS 出站类
+// 参考文档: https://xtls.github.io/config/outbounds/vless.html
+class VlessOutbound implements Outbound {
+    settings: any;
+    protocol: string;
+    tag: string;
+    streamSettings?: any;
+
+    constructor(
+        address: string,
+        port: number,
+        id: string,
+        tag: string,
+        encryption: string = 'none',
+        flow?: string,
+        level: number = 0
+    ) {
+        this.protocol = 'vless';
+        this.tag = tag;
+        this.settings = {
+            address: address,
+            port: port,
+            id: id,
+            encryption: encryption,
+            level: level
+        };
+
+        // 如果指定了 flow (XTLS 流控)，添加到设置
+        if (flow) {
+            this.settings.flow = flow;
+        }
+    }
+}
+
+// Xray StreamSettings 配置对象
+// 参考: https://xtls.github.io/config/transport.html#streamsettingsobject
+interface VlessStreamSettings {
+    // 网络类型：raw(tcp) | xhttp
+    network?: string;
+    security: string
+    // XHTTP 配置
+    xhttpSettings?: XHTTPObject;
+
+    // Reality 配置
+    realitySettings?: RealityObject;
+    tlsSettings?: TlsObject;
+    // Socket 层选项
+    sockopt?: SockoptObject;
+}
+
+// XHTTP 配置
+interface XHTTPObject {
+    host?: string;
+    path?: string;
+    mode?: string;
+}
+
+interface TlsObject {
+    serverName: string;
+    allowInsecure?: boolean;
+    alpn?: string[];
+}
+
+// Reality 配置对象（仅服务端）
+interface RealityObject {
+    show?: boolean;
+    target?: string;
+    xver?: number;
+    serverNames?: string[];
+    privateKey?: string;
+    minClientVer?: string;
+    maxClientVer?: string;
+    maxTimeDiff?: number;
+    shortIds?: string[];
+    mldsa65Seed?: string;
+    // 客户端参数
+    fingerprint?: string;
+    serverName?: string;
+    password?: string;
+    shortId?: string;
+    mldsa65Verify?: string;
+    spiderX?: string;
+}
+
+// Socket 选项对象
+interface SockoptObject {
+    mark?: number;
+    tcpMaxSeg?: number;
+    tcpFastOpen?: boolean | number;
+    tproxy?: string;
+    domainStrategy?: string;
+    dialerProxy?: string;
+    acceptProxyProtocol?: boolean;
+    tcpKeepAliveInterval?: number;
+    tcpKeepAliveIdle?: number;
+    tcpUserTimeout?: number;
+    tcpCongestion?: string;
+    interface?: string;
+    v6only?: boolean;
+    tcpWindowClamp?: number;
+    tcpMptcp?: boolean;
 }
 
 class Balancer {
@@ -259,6 +386,12 @@ export {
     Socks,
     DnsOutbound,
     Freedom,
+    VlessOutbound,
+    VlessStreamSettings,
+    XHTTPObject,
+    RealityObject,
+    SockoptObject,
     Balancer,
+    BlockOutbound,
     BurstObservatory,
 }

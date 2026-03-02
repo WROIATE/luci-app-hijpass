@@ -80,7 +80,7 @@ async function buildOne(entryPath) {
         bundle: true,
         platform: 'browser',
         format: 'iife',
-        target: ['es2017'],
+        target: ['es2022'],
         outfile: outFile,
         sourcemap: false,
         minify: true,

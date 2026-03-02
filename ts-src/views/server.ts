@@ -111,7 +111,7 @@ function createListenPortOption(s: LuCI.form.AbstractSection) {
     o.datatype = 'port';
     o.rmempty = false;
     o.modalonly = true;
-    o.validate = WebUtils.validateProxyPortConflict
+    o.validate = WebUtils.validatePortConflict
     return o;
 }
 

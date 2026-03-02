@@ -1,7 +1,7 @@
 import uci from 'uci'
 
-import {XrayEnum} from "../enum/xray";
-import {ShuntUtils} from "./common";
+import {XrayEnum} from "../../enum/xray";
+import {ShuntUtils} from "../common";
 import {
     Balancer, BurstObservatory,
     DNS,
@@ -9,17 +9,21 @@ import {
     DnsRule,
     DnsServer,
     Freedom,
-    Inbound, Log,
+    Inbound,
+    Log,
     Outbound,
     Route,
     RouteRule,
-    Socks
-} from "../module/xray";
-import {LuciFlied, ShuntTag} from "../enum/hijpass";
-import {ShuntConfigUtils} from "../module/luci";
+    Socks,
+    VlessOutbound,
+    BlockOutbound, VlessStreamSettings
+} from "../../module/xray";
+import {LuciFlied, ShuntTag} from "../../enum/hijpass";
+import {ProxyNode, ShuntConfigUtils, VlessConfig} from "../../module/luci";
 
 export const XrayUtils: ShuntConfigUtils = {
-    genShuntConf: genConf
+    genShuntConf: genConf,
+    genProxyConf: genProxyConf
 }
 
 function genConf() {
@@ -36,7 +40,7 @@ function genConf() {
     })
 
     let routeConf = shuntSection.route
-    let outbounds = []
+    let outbounds: Outbound[] = []
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section) {
         if (section.enabled === '1') {
             let proxyNode = new Socks("127.0.0.1",
@@ -53,7 +57,7 @@ function genConf() {
     } else {
         outbounds.push(new Freedom(XrayEnum.DIRECT_OUTBOUND_TAG))
     }
-    outbounds.push(new Outbound('blackhole', XrayEnum.BLOCK_OUTBOUND_TAG))
+    outbounds.push(new BlockOutbound(XrayEnum.BLOCK_OUTBOUND_TAG))
 
     outbounds.push(new DnsOutbound(XrayEnum.DNS_OUTBOUND_TAG))
 
@@ -243,4 +247,96 @@ function addPrefixToElements(arr: string[], prefix: string) {
     }
     return arr.map(item => prefix + item);
 }
+
+function genProxyConf(config: ProxyNode): {} {
+    switch (config.type) {
+        case "vless":
+            return {
+                log: {
+                    loglevel: "info",
+                    dnsLog: false
+                },
+                inbounds: [
+                    function () {
+                        let inbound = new Inbound("tproxy", Number(config.listen_port), "tproxy-in")
+                        inbound.sniffing = undefined;
+                        return inbound;
+                    }(),
+                    function () {
+                        let inbound = new Inbound("socks", Number(config.socks_port), "socks-in");
+                        inbound.settings = {
+                            udp: true
+                        }
+                        inbound.protocol = "socks"
+                        return inbound;
+                    }()
+                ],
+                outbounds: [createVlessOutbound(config)],
+            }
+        default:
+            throw new Error("为支持的");
+    }
+}
+
+/**
+ * 创建 VLESS 出站配置
+ * 参考: https://xtls.github.io/config/outbounds/vless.html
+ * 参考: https://xtls.github.io/config/transport.html#streamsettingsobject
+ */
+function createVlessOutbound(config: ProxyNode): VlessOutbound {
+
+    // 从 section 创建 VLESS 出站
+    const vlessConfig = config as VlessConfig;
+    if (vlessConfig.transport_type != "xhttp") {
+        throw new Error("transport type must be a xhttp object")
+    }
+    const outbound = new VlessOutbound(
+        vlessConfig.server,
+        Number(vlessConfig.server_port),
+        vlessConfig.uuid,
+        transOutTag(vlessConfig.name),
+        'none', // 加密方式，xray 中默认使用 none
+        vlessConfig.flow || undefined, // XTLS 流控模式
+        0 // 用户等级
+    );
+
+    // 设置 streamSettings（流传输层配置）
+    const streamSettings: VlessStreamSettings = {
+        network: 'xhttp',
+        security: "none"
+    };
+
+    streamSettings.xhttpSettings = {
+        host: vlessConfig.transport_xhttp_host || "",
+        path: vlessConfig.transport_xhttp_path || '/',
+        mode: vlessConfig.transport_xhttp_mode || 'auto'
+    };
+
+    // Reality 配置
+    if (vlessConfig.tls_reality_enabled === '1') {
+        streamSettings.security = "reality"
+        streamSettings.realitySettings = {
+            fingerprint: 'chrome',
+            serverName: vlessConfig.tls_server_name || vlessConfig.server,
+            password: vlessConfig.tls_reality_public_key || '',
+            shortId: vlessConfig.tls_reality_short_id || ''
+        };
+    } else {
+        streamSettings.security = "tls"
+        streamSettings.tlsSettings = {
+            allowInsecure: false,
+            alpn: ["h2", "http/1.1"],
+            serverName: vlessConfig.tls_server_name || vlessConfig.server,
+        }
+    }
+
+
+    // 设置 streamSettings 到 outbound
+    if (Object.keys(streamSettings).length > 0) {
+        outbound['streamSettings'] = streamSettings;
+    }
+
+    return outbound;
+}
+
 

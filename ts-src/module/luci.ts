@@ -111,16 +111,17 @@ export class RuleDTO {
             || this.domainKeyword.length > 0
     }
 
-    containIp(): boolean {
-        return this.ipCidr.length > 0
-    }
-
     containGeo(): boolean {
         return this.geoSite.length > 0 || this.geoIp.length > 0
     }
 
     containRuleSet(): boolean {
         return this.ruleSet.length > 0
+    }
+
+    containIp(): boolean {
+        return this.ipCidr.length > 0
+            || this.geoIp.length > 0
     }
 
     isEmpty(collectionType: "geo" | "set"): boolean {
@@ -144,4 +145,259 @@ export interface RuleSetDTO {
 
 export interface ShuntConfigUtils {
     genShuntConf: () => {}
+    genProxyConf: (ProxyNode: ProxyNode) => {}
+}
+
+export interface LuciConvertUtils {
+    convert: (ProxyNode: ProxyNode) => {}
+}
+
+/**
+ * 代理节点基础配置
+ */
+export interface ProxyNode {
+    name: string;
+    type: string;
+    enabled: string;
+    listen_port: string;
+    socks_port: string;
+    procd_env: string[];
+    log_path: string;
+}
+
+/**
+ * 自定义代理配置
+ */
+export class CustomProxyNode implements ProxyNode {
+    name: string;
+    type: 'custom' = 'custom';
+    enabled: string = '1';
+    command: string;
+    listen_port: string;
+    socks_port: string;
+    procd_env: string[];
+    log_enabled: string;
+    log_path: string;
+
+    constructor() {
+        this.type = 'custom';
+        this.enabled = '1';
+        this.procd_env = [];
+    }
+}
+
+/**
+ * Hysteria2 代理配置
+ */
+export class Hysteria2Config implements ProxyNode {
+    name: string;
+    type: 'hysteria2' = 'hysteria2';
+    enabled: string = '1';
+    server: string;
+    server_port: string;
+    server_ports: string[];
+    hop_interval: string;
+    up_mbps: string;
+    down_mbps: string;
+    obfs_type: string;
+    obfs_password: string;
+    password: string;
+    network: string;
+    tls_server_name: string;
+    tls_insecure: string;
+    brutal_debug: string;
+    listen_port: string;
+    socks_port: string;
+
+    procd_env: string[];
+    log_path: string;
+
+    constructor() {
+        this.type = 'hysteria2';
+        this.enabled = '1';
+        this.server_ports = [];
+        this.network = '';
+        this.brutal_debug = '0';
+        this.tls_insecure = '0';
+        // TLS 默认启用（不可配置）
+    }
+}
+
+/**
+ * Shadowsocks 代理配置
+ */
+export class ShadowsocksConfig implements ProxyNode {
+    name: string;
+    type: 'shadowsocks' = 'shadowsocks';
+    enabled: string = '1';
+    server: string;
+    server_port: string;
+    method: string;
+    password: string;
+    plugin: string;
+    plugin_opts: string;
+    network: string;
+    udp_over_tcp: string;
+    listen_port: string;
+    socks_port: string;
+    multiplex_enabled: string;
+    multiplex_protocol: string;
+    multiplex_max_connections: string;
+    multiplex_min_streams: string;
+    multiplex_max_streams: string;
+    multiplex_brutal_enabled: string;
+    multiplex_brutal_up_mbps: string;
+    multiplex_brutal_down_mbps: string;
+
+    procd_env: string[];
+    log_path: string;
+
+    constructor() {
+        this.type = 'shadowsocks';
+        this.enabled = '1';
+        this.network = '';
+        this.udp_over_tcp = '0';
+        this.multiplex_enabled = '0';
+        this.multiplex_protocol = 'h2mux';
+        this.multiplex_brutal_enabled = '0';
+    }
+}
+
+/**
+ * TUIC 代理配置
+ */
+export class TuicConfig implements ProxyNode {
+    name: string;
+    type: 'tuic' = 'tuic';
+    enabled: string = '1';
+    server: string;
+    server_port: string;
+    uuid: string;
+    password: string;
+    congestion_control: string;
+    udp_relay_mode: string;
+    udp_over_stream: string;
+    zero_rtt_handshake: string;
+    heartbeat: string;
+    network: string;
+    tls_server_name: string;
+    tls_insecure: string;
+    listen_port: string;
+    socks_port: string;
+
+    procd_env: string[];
+    log_path: string;
+
+    constructor() {
+        this.type = 'tuic';
+        this.enabled = '1';
+        this.congestion_control = 'cubic';
+        this.udp_relay_mode = '';
+        this.udp_over_stream = '0';
+        this.zero_rtt_handshake = '0';
+        this.heartbeat = '10s';
+        this.network = '';
+        this.tls_insecure = '0';
+    }
+}
+
+/**
+ * ShadowTLS 代理配置
+ */
+export class ShadowTLSConfig implements ProxyNode {
+    name: string;
+    type: 'shadowtls' = 'shadowtls';
+    enabled: string = '1';
+    server: string;
+    server_port: string;
+    version: string;
+    password: string;
+    tls_server_name: string;
+    tls_insecure: string;
+    listen_port: string;
+    socks_port: string;
+    procd_env: string[];
+    log_path: string;
+
+    constructor() {
+        this.type = 'shadowtls';
+        this.enabled = '1';
+        this.version = '1';
+        this.tls_insecure = '0';
+    }
+}
+
+/**
+ * VLESS 代理配置
+ */
+export class VlessConfig implements ProxyNode {
+    name: string;
+    type: 'vless' = 'vless';
+    enabled: string = '1';
+    server: string;
+    server_port: string;
+    uuid: string;
+    flow: string;
+    network: string;
+    packet_encoding: string;
+    tls_server_name: string;
+    tls_insecure: string;
+    tls_reality_enabled: string;
+    tls_reality_public_key: string;
+    tls_reality_short_id: string;
+    listen_port: string;
+    socks_port: string;
+    multiplex_enabled: string;
+    multiplex_protocol: string;
+    multiplex_max_connections: string;
+    multiplex_min_streams: string;
+    multiplex_max_streams: string;
+    multiplex_brutal_enabled: string;
+    multiplex_brutal_up_mbps: string;
+    multiplex_brutal_down_mbps: string;
+    // V2Ray 传输层
+    transport_type: string;
+    transport_http_host: string;
+    transport_http_path: string;
+    transport_http_method: string;
+    transport_http_idle_timeout: string;
+    transport_http_ping_timeout: string;
+    transport_ws_path: string;
+    transport_ws_max_early_data: string;
+    transport_ws_early_data_header_name: string;
+    transport_grpc_service_name: string;
+    transport_grpc_idle_timeout: string;
+    transport_grpc_ping_timeout: string;
+    transport_grpc_permit_without_stream: string;
+    transport_httpupgrade_host: string;
+    transport_httpupgrade_path: string;
+    // XHTTP 传输层
+    transport_xhttp_host: string;
+    transport_xhttp_path: string;
+    transport_xhttp_mode: string;
+
+    procd_env: string[];
+    log_path: string;
+
+    constructor() {
+        this.type = 'vless';
+        this.enabled = '1';
+        this.network = 'tcp';
+        this.packet_encoding = '';
+        this.tls_insecure = '0';
+        this.tls_reality_enabled = '0';
+        this.multiplex_enabled = '0';
+        this.multiplex_protocol = 'h2mux';
+        this.multiplex_brutal_enabled = '0';
+        // 传输层默认值
+        this.transport_type = '';
+        this.transport_http_idle_timeout = '15s';
+        this.transport_http_ping_timeout = '15s';
+        this.transport_grpc_idle_timeout = '15s';
+        this.transport_grpc_ping_timeout = '15s';
+        this.transport_grpc_permit_without_stream = '0';
+        // XHTTP 传输层默认值
+        this.transport_xhttp_path = '/';
+        this.transport_xhttp_mode = 'auto';
+    }
 }

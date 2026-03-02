@@ -1,4 +1,4 @@
-import {LuciFlied} from "../enum/hijpass";
+import {HijpassValues, LuciFlied, PROXY_TYPE} from "../enum/hijpass";
 import {
     RuleDTO,
     DnsNode,
@@ -6,7 +6,13 @@ import {
     RouteSection,
     ShuntRouteRule,
     ShuntSection,
-    LoadBalanceNode, RuleSetDTO
+    LoadBalanceNode, RuleSetDTO,
+    ProxyNode,
+    Hysteria2Config,
+    ShadowsocksConfig,
+    TuicConfig,
+    ShadowTLSConfig,
+    VlessConfig
 } from "../module/luci";
 import rpc from "rpc";
 import poll from "poll";
@@ -14,10 +20,9 @@ import uci from "uci";
 import fs from "fs";
 import form from "form";
 import ui from "ui";
-import {ShuntConfFactory} from "./factory";
-import {SingBoxUtils} from "./singbox";
+import {LuciConverterFactory, ShuntConfFactory, FactoryType} from "./factory";
+import {SingBoxUtils} from "./singbox/config";
 import notificationManager from "../module/notification";
-import b from "baseclass";
 
 
 const callServiceList = rpc.declare({
@@ -152,13 +157,47 @@ const LuciUtils = {
     genHandleSaveApply: function () {
         return async function (ev: Event) {
             try {
-                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === 'sing-box') {
+                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === FactoryType.SING_BOX) {
                     SingBoxUtils.writeGeoRule()
                 }
-                await this.handleSave(ev)
                 let data = ShuntUtils.getShuntConfData()
+                await this.handleSave(ev)
                 if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
                     await fs.write(WebUtils.getFilePath('shunt_conf'), data);
+                }
+                let changes = await uci.changes()
+                if (changes && changes.hijpass) {
+                    for (let change of changes.hijpass) {
+                        if (change.length === 2 && change[0] === "remove") {
+                            await fs.exec("/usr/lib/hijpass/rm.sh", ['proxy', change[1]]);
+                        }
+                        if (change.length === 4 && change[0] === "set" && change[2] === "name") {
+                            await fs.exec("/usr/lib/hijpass/rm.sh", ['proxy', change[1]]);
+                        }
+                    }
+                }
+                let tasks = uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
+                    // 根据类型创建对应的配置类
+                    const proxyConfig = ProxyUtils.createProxyConfigFromSection(section);
+                    let proxyConf: {};
+                    if (proxyConfig) {
+                        if (proxyConfig.type === "vless" && (proxyConfig as VlessConfig).transport_type === "xhttp") {
+                            proxyConf = LuciConverterFactory.genProxyConf(FactoryType.XRAY, proxyConfig);
+                        } else {
+                            proxyConf = LuciConverterFactory.genProxyConf(FactoryType.SING_BOX, proxyConfig);
+                        }
+                        let outData = JSON.stringify(proxyConf, ShuntUtils.omitEmptyReplacer, 2)
+                        return fs.write(WebUtils.getFilePath('client_dir')
+                            + "/" + section.name + "-" + section[".name"] + ".json", outData);
+                    }
+                });
+                if (tasks && tasks.length !== 0) {
+                    const results = await Promise.allSettled(tasks);
+                    results.forEach(result => {
+                        if (result.status === 'rejected') {
+                            throw new Error(result.reason.message);
+                        }
+                    });
                 }
                 ui.changes.apply(true);
             } catch (e) {
@@ -329,6 +368,47 @@ const ShuntUtils = {
     }
 }
 
+const ProxyUtils = {
+
+    /**
+     * 从 UCI 配置段创建对应的 ProxyNode 配置类
+     */
+    createProxyConfigFromSection: function (section: any): ProxyNode | null {
+        const type = section.type;
+        let config: ProxyNode;
+
+        switch (type) {
+            case PROXY_TYPE.HYSTERIA2:
+                config = new Hysteria2Config();
+                break;
+            case PROXY_TYPE.SHADOWSOCKS:
+                config = new ShadowsocksConfig();
+                break;
+            case PROXY_TYPE.TUIC:
+                config = new TuicConfig();
+                break;
+            case PROXY_TYPE.SHADOWTLS:
+                config = new ShadowTLSConfig();
+                break;
+            case PROXY_TYPE.VLESS:
+                config = new VlessConfig();
+                break;
+            case PROXY_TYPE.CUSTOM:
+            default:
+                return null;
+        }
+
+        // 从 UCI 配置复制所有字段
+        Object.keys(section).forEach((key) => {
+            if (key !== '.type' && key !== '.name' && key !== '.anonymous') {
+                (config as any)[key] = section[key];
+            }
+        });
+
+        return config;
+    }
+}
+
 const WebUtils = {
     // 创建标签验证器
     createTagValidator: function (confName: string, sectionType: string, fieldName: string) {
@@ -356,29 +436,86 @@ const WebUtils = {
     },
 
 
+    /**
+     * 获取所有已占用的端口
+     */
+    getUsedPorts: function (): number[] {
+        let usedPorts: number[] = [];
+
+        // 收集所有 proxy 节点的端口
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
+            if (section.listen_port) {
+                usedPorts.push(Number(section.listen_port));
+            }
+            if (section.socks_port) {
+                usedPorts.push(Number(section.socks_port));
+            }
+        });
+
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (section) => {
+            if (section.listen_port) {
+                usedPorts.push(Number(section.listen_port));
+            }
+        });
+
+        // 收集 shunt 配置占用的端口
+        let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
+        if (shuntSection) {
+            if (shuntSection.shunt_listen_port) {
+                usedPorts.push(Number(shuntSection.shunt_listen_port));
+            }
+            if (shuntSection.dns_listen_port) {
+                usedPorts.push(Number(shuntSection.dns_listen_port));
+            }
+        }
+
+        // 收集 shunt 配置占用的端口
+        let dnsSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE);
+        if (dnsSection) {
+            if (dnsSection.cdg_port) {
+                usedPorts.push(Number(dnsSection.cdg_port));
+            }
+        }
+
+        return usedPorts;
+    },
+
     // 端口冲突检查函数
-    validateProxyPortConflict: function (sectionId, value) {
+    validatePortConflict: function (sectionId: string, value: string) {
         // 检查是否与shunt配置的端口冲突
         let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
-        if (shuntSection && shuntSection['.name'] != sectionId) {
-            if ((shuntSection.dns_listen_port && shuntSection.dns_listen_port === value)
-                || (shuntSection.shunt_listen_port && shuntSection.shunt_listen_port === value)) {
-                return _('端口 %s 已被分流配置占用').format(value);
-            }
+        if (shuntSection[".name"] !== sectionId && (shuntSection.dns_listen_port === value
+            || shuntSection.shunt_listen_port === value)) {
+            return _('端口 %s 已被分流配置占用').format(value);
+        }
+
+        // 检查是否与dns配置的端口冲突
+        let dnsSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE)
+        if (dnsSection[".name"] !== sectionId && dnsSection.cdg_port === value) {
+            return _('端口 %s 已被DNS配置占用').format(value);
         }
 
         // 检查是否与其他proxy节点的端口冲突
         let proxySections = uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE);
         for (let i = 0; i < proxySections.length; i++) {
             let section = proxySections[i]
-            let sectionName = section['.name'];
+            if (section[".name"] === sectionId) {
+                continue
+            }
+            if (section.listen_port === value || section.socks_port === value) {
+                return _('端口 %s 已被代理节点 "%s" 使用').format(value, section.name);
+            }
+        }
 
-            // 跳过当前正在编辑的节点
-            if (sectionName === sectionId) {
-                continue;
+        // 检查是否与其他server节点的端口冲突
+        let serverSections = uci.sections(LuciFlied.CONF_NAME, LuciFlied.SERVER_NODE_TYPE);
+        for (let i = 0; i < serverSections.length; i++) {
+            let section = serverSections[i]
+            if (section[".name"] === sectionId) {
+                continue
             }
 
-            if (section.listen_port && section.listen_port === value) {
+            if (section.listen_port === value) {
                 return _('端口 %s 已被代理节点 "%s" 使用').format(value, section.name);
             }
         }
@@ -454,18 +591,19 @@ const WebUtils = {
             return fs.trimmed(filePath);
         };
 
-        async function writeFile(sectionId: string, formvalue: string) {
+        async function writeFile(sectionId: string, formvalue?: string) {
             let currentHash = WebUtils.simpleHash(formvalue)
-            let oldHash = uci.get_first(LuciFlied.CONF_NAME, sectionId, fieldName)
-            if (currentHash == oldHash) {
+            let oldHash = uci.get(LuciFlied.CONF_NAME, sectionId, fieldName)
+            if (currentHash === oldHash) {
                 return
             }
-            uci.set(LuciFlied.CONF_NAME, sectionId, fieldName, WebUtils.simpleHash(formvalue))
+            uci.set(LuciFlied.CONF_NAME, sectionId, fieldName, currentHash)
             await fs.write(filePath, (formvalue || '').trim().replace(/\r\n/g, '\n') + '\n');
         }
 
         // 写入文件
         o.write = writeFile
+        o.remove = writeFile
         o.monospace = true;
 
         return o;
@@ -570,4 +708,4 @@ const WebUtils = {
     }
 }
 
-export {LuciUtils, WebUtils, ShuntUtils}
+export {LuciUtils, WebUtils, ShuntUtils, ProxyUtils}

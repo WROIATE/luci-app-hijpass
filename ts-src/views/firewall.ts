@@ -3,6 +3,8 @@ import uci from "uci";
 import {LuciFlied} from "../enum/hijpass";
 import form from "form";
 import {LuciUtils, WebUtils} from "../utils/common";
+import fs from "fs";
+import network from "network";
 
 
 const v = view.extend({
@@ -14,20 +16,20 @@ const v = view.extend({
 
     handleSaveApply: LuciUtils.genHandleSaveApply(),
 
-    render: function () {
+    render: async function () {
         let m = new form.Map(LuciFlied.CONF_NAME, _('防火墙配置'),
             _('配置nftables相关功能'));
 
         let s = m.section(form.TypedSection, LuciFlied.FIREWALL_SECTION_TYPE);
         s.anonymous = true;
         s.addremove = false;
-
         // 创建标签页
         createTabs(s);
 
         // 创建基础配置选项
         createGeneralOptions(s);
-
+        // 创建 ACL 配置选项
+        await createAclOptions(s);
         // 创建文本编辑选项
         createTextOptions(s);
 
@@ -123,10 +125,42 @@ function createTextOptions(s: LuCI.form.AbstractSection) {
 // 创建所有标签页
 function createTabs(s: LuCI.form.AbstractSection) {
     s.tab('basic', _('基本设置'));
+    s.tab('acl', _('访问控制列表'));
     s.tab('ip_direct', _('IP 直连列表'));
     s.tab('ip_proxy', _('IP 代理列表'));
     s.tab('nftables', _('防火墙规则'));
     s.tab('hook', _('自定义脚本'));
+}
+
+// 创建 ACL 访问控制列表配置选项
+async function createAclOptions(s: LuCI.form.AbstractSection) {
+    // 代理客户端 MAC 地址列表
+    let proxyMacOpt = s.taboption('acl', form.DynamicList, 'proxy_mac_list', _('代理客户端 MAC 地址'),
+        _('指定需要走代理的客户端 MAC 地址列表，如：AA:BB:CC:DD:EE:FF'));
+    proxyMacOpt.datatype = 'macaddr';
+    proxyMacOpt.rmempty = true;
+
+    await network.getHostHints().then(function (result: any) {
+        Object.keys(result?.hosts ?? {}).forEach((mac: any) => {
+
+            let name = result.hosts[mac].name;
+            let ip = result.hosts[mac].ipaddrs.length > 0 ? result.hosts[mac].ipaddrs[0] : undefined;
+            let fname = ((name ?? "") + " " + (ip ?? "")).trim()
+            proxyMacOpt.value(mac, mac + " " + (fname ? "(" + fname + ")" : ""));
+        })
+    })
+
+    // 代理客户端接口列表
+    let proxyIfaceOpt = s.taboption('acl', form.DynamicList, 'proxy_iface_list', _('代理客户端接口'),
+        _('指定需要走代理的网络接口名称列表，如：br-lan、eth0'));
+    proxyIfaceOpt.rmempty = true;
+
+    // 添加已知网络接口到数据列表
+    await network.getDevices().then(function (result: any) {
+        result.forEach(function (device: any) {
+            proxyIfaceOpt.value(device.device, device.device);
+        })
+    })
 }
 
 export default v;

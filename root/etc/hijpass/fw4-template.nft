@@ -8,6 +8,8 @@ table inet hijpass {
         # 过滤访问本地的请求
         fib daddr type local counter return
 
+        iif != @proxy_interface_list ether saddr != @proxy_mac_list counter return
+
         # 过滤回包
         ct direction reply counter return
 
@@ -211,6 +213,20 @@ table inet hijpass {
         auto-merge
         elements = {
             $IP6_PROXY_NFT_LIST
+        }
+    }
+
+    set proxy_mac_list {
+        type ether_addr
+        elements = {
+            $PROXY_MAC
+        }
+    }
+
+    set proxy_interface_list {
+        type iface_index
+        elements = {
+            $PROXY_INTERFACE
         }
     }
 }

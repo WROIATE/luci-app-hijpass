@@ -68,6 +68,9 @@
         ],
         "/usr/lib/hijpass/rm.sh proxy *": [
           "exec"
+        ],
+        "/bin/cat /proc/net/arp": [
+          "exec"
         ]
       }
     }

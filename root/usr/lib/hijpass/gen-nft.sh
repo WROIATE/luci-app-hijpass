@@ -23,7 +23,9 @@ CHN_ROUTE6_FILE=$(uci -q get hijpass.@hijpass[0].chn_route6 || :)
 ENABLE_CHN_ROUTE=$(uci -q get hijpass.@firewall[0].use_chnroute || :)
 ENABLE_GFW_LIST=$(uci -q get hijpass.@dns[0].use_gfw || :)
 ENABLE_CHN_LIST=$(uci -q get hijpass.@dns[0].use_chn || :)
-DNS_SERVICE=$(uci -q get hijpass.@dns[0].dns_service)
+DNS_SERVICE=$(uci -q get hijpass.@dns[0].dns_service || :)
+PROXY_MAC=$(uci -q get hijpass.@firewall[0].proxy_mac_list || :)
+PROXY_INTERFACE=$(uci -q get hijpass.@firewall[0].proxy_iface_list || :)
 
 LUA_SCRIPT="/usr/lib/hijpass/luci-utils.lua"
 CONF_PATH="/etc/hijpass"
@@ -118,6 +120,10 @@ $LOCAL_V6_CIDR
 IP4_PROXY_NFT_LIST=$(echo "$IP4_PROXY_LIST" | sort -u | awk 'NF {printf "%s,\n", $0}' | sed '$ s/,$//')
 IP6_PROXY_NFT_LIST=$(echo "$IP6_PROXY_LIST" | sort -u | awk 'NF {printf "%s,\n", $0}' | sed '$ s/,$//')
 
+[ -n "$PROXY_INTERFACE" ] && PROXY_INTERFACE="${PROXY_INTERFACE// /,}"
+[ -n "$PROXY_MAC" ] && PROXY_MAC="${PROXY_MAC// /,}"
+
+
 fw_rules="
 define HIJPASS_USER = $HIJPASS_USER
 define TPROXY_MARK = $TPROXY_MARK
@@ -132,6 +138,8 @@ define IP4_PROXY_NFT_LIST = { $IP4_PROXY_NFT_LIST }
 define IP6_PROXY_NFT_LIST = { $IP6_PROXY_NFT_LIST }
 define IP4_CHNROUTE_LIST = { $CHN_ROUTE }
 define IP6_CHNROUTE_LIST = { $CHN_ROUTE6 }
+define PROXY_INTERFACE = { $PROXY_INTERFACE }
+define PROXY_MAC = { $PROXY_MAC }
 
 $FW4_TEMPLATE
 "

@@ -320,6 +320,16 @@ declare namespace LuCI {
             extend(obj: any): any;
         }
     }
+
+    declare namespace network {
+        interface Network {
+            getNetworks(): Promise.<Array.<LuCI.network.Protocol>>
+
+            getDevices(): Promise.<Array.<LuCI.network.Device>>
+
+            getHostHints(): Promise.<LuCI.network.Hosts>
+        }
+    }
 }
 
 // 运行时存在的全局（由 luci 注入）
@@ -375,5 +385,10 @@ declare module 'baseclass' {
 
 declare module 'ui' {
     const u: LuCI.ui.UI;
+    export default u;
+}
+
+declare module 'network' {
+    const u: LuCI.network.Network;
     export default u;
 }

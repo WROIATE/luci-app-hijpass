@@ -21,7 +21,6 @@ SHUNT_CONF="$CONF_PATH/shunt.json"
 # Global
 ENABLED=$(uci -q get hijpass.@hijpass[0].enabled || :)
 DELAY_TIME=$(uci -q get hijpass.@hijpass[0].delay_time || :)
-LOG_DIR=$(uci -q get hijpass.@hijpass[0].log_dir || :)
 CLIENT_DIR=$(uci -q get hijpass.@hijpass[0].client_dir || :)
 
 # RuleDTO
@@ -38,7 +37,6 @@ CHINADNS_NG_CONF="$CONF_PATH/chinadns-ng.conf"
 
 start_service() {
   [ "$ENABLED" != "1" ] && return
-  [ -d "$LOG_DIR" ] || mkdir -p "$LOG_DIR"
   # 启动进程
   config_load $NAME
   log_info "===================== Starting service ======================="

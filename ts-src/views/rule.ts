@@ -81,7 +81,7 @@ const v = view.extend({
         updateSchedule.rmempty = true;
 
         let downloadTimeout = s.taboption('config', form.Value, 'download_timeout', _('下载超时时间'),
-            _('下载失败时的重试次数'));
+            _('单次下载的超时时间（秒）'));
         downloadTimeout.datatype = 'uinteger';
         downloadTimeout.default = '3';
         downloadTimeout.rmempty = false;

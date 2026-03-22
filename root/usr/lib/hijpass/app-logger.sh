@@ -2,7 +2,9 @@
 
 LOG_FILE=$(uci -q get hijpass.@hijpass[0].log_path || :)
 LOG_LEVEL=$(uci -q get hijpass.@hijpass[0].log_level || echo "INFO") # debug, info, warn, error
-
+LOG_DIR=$(uci -q get hijpass.@hijpass[0].log_dir || :)
+[ -z "$LOG_DIR" ] && exit 1
+[ -d "$LOG_DIR" ] || mkdir -p "$LOG_DIR"
 LOG_LEVELS="DEBUG:1 INFO:2 WARN:3 ERROR:4"
 
 get_log_level_num() {

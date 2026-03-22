@@ -11,10 +11,10 @@ if ! grep -q "^hijpass:" /etc/shadow; then
 fi
 
 uci -q batch <<-EOF >/dev/null
-	delete firewall.hijapss
-	set firewall.hijapss=include
-	set firewall.hijapss.type=script
-	set firewall.hijapss.path=/usr/lib/hijpass/fw4.sh
+	delete firewall.hijpass
+	set firewall.hijpass=include
+	set firewall.hijpass.type=script
+	set firewall.hijpass.path=/usr/lib/hijpass/fw4.sh
 	commit firewall
 EOF
 

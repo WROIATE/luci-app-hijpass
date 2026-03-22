@@ -16,7 +16,7 @@ fi
 
 if [ -f "$NFT_CONF" ]; then
     log_info "Loading nftables rules from: $NFT_CONF"
-    nft -f $NFT_CONF
+    nft -f "$NFT_CONF"
     if [ -n "$NFT_HOOK" ] && [ -f "$NFT_HOOK" ]; then
         log_info "Executing nft hook script: $NFT_HOOK"
         $NFT_HOOK || log_error "Execute nft hook failed"

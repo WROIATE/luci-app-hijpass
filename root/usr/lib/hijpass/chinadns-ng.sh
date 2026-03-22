@@ -10,13 +10,14 @@ DIRECT_DNS=$(uci -q get hijpass.@dns[0].direct_dns)
 PROXY_DNS=$(uci -q get hijpass.@dns[0].proxy_dns)
 ENABLE_GFW=$(uci -q get hijpass.@dns[0].use_gfw)
 ENABLE_CHN=$(uci -q get hijpass.@dns[0].use_chn)
+CDG_PORT=$(uci -q get hijpass.@dns[0].cdg_port)
 CHINADNS_NG_CONF="/etc/hijpass/chinadns-ng.conf"
 GEOVIEW_SCRIPT="/usr/lib/hijpass/geoview.sh"
 DOMAIN_PROXY_TEMP_FILE_PATH=/tmp/domain_proxy.tmp
 DOMAIN_DIRECT_TEMP_FILE_PATH=/tmp/domain_direct.tmp
 
-touch $DOMAIN_PROXY_TEMP_FILE_PATH
-touch $DOMAIN_DIRECT_TEMP_FILE_PATH
+touch "$DOMAIN_PROXY_TEMP_FILE_PATH"
+touch "$DOMAIN_DIRECT_TEMP_FILE_PATH"
 
 if [ "$DIRECT_DNS" = "custom" ]; then
     DIRECT_DNS="$(uci -q get hijpass.@dns[0].direct_dns_custom)"
@@ -29,7 +30,7 @@ fi
 if [ "$PROXY_DNS" = "custom" ]; then
     PROXY_DNS="$(uci -q get hijpass.@dns[0].proxy_dns_custom)"
 fi
-proxy_domain_list="$(cat "$DOMAIN_PROXY_FILE_PATH")"
+proxy_domain_list="$([ -f "$DOMAIN_PROXY_FILE_PATH" ] && cat "$DOMAIN_PROXY_FILE_PATH" || :)"
 geosite_proxy_lines=$(echo "$proxy_domain_list" | grep '^geosite:' | sed 's/^geosite://' | tr '\n' ',')
 if [ -n "$geosite_proxy_lines" ]; then
     geosite_proxy_domains=$($GEOVIEW_SCRIPT -e "geosite" "${geosite_proxy_lines%,}")
@@ -39,7 +40,7 @@ $geosite_proxy_domains"
 fi
 echo "$proxy_domain_list" > "$DOMAIN_PROXY_TEMP_FILE_PATH"
 
-direct_domain_list="$(cat "$DOMAIN_DIRECT_FILE_PATH")"
+direct_domain_list="$([ -f "$DOMAIN_DIRECT_FILE_PATH" ] && cat "$DOMAIN_DIRECT_FILE_PATH" || :)"
 geosite_direct_lines=$(echo "$direct_domain_list" | grep '^geosite:' | sed 's/^geosite://' | tr '\n' ',')
 if [ -n "$geosite_direct_lines" ]; then
     geosite_direct_domains=$($GEOVIEW_SCRIPT -e "geosite" "${geosite_direct_lines%,}")
@@ -52,7 +53,7 @@ echo "$direct_domain_list" > "$DOMAIN_DIRECT_TEMP_FILE_PATH"
 CONF="
 # 监听地址和端口
 bind-addr 0.0.0.0
-bind-port 53653
+bind-port $CDG_PORT
 
 # 国内上游、可信上游
 china-dns $DIRECT_DNS

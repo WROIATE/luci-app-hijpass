@@ -47,8 +47,8 @@ export class DNS {
         this.servers = []
         this.rules = []
         this.strategy = defaultStrategy || SingBoxEnum.DEFAULT_DNS_STRATEGY
-        this.disable_cache = cache
-        this.disable_expire = cache
+        this.disable_cache = !cache
+        this.disable_expire = !cache
         this.final = defaultTag
     }
 }

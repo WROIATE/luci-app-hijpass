@@ -86,7 +86,6 @@ export const HijpassValues = {
         {label: '无', value: ''},
         {label: 'HTTP', value: 'http'},
         {label: 'WebSocket', value: 'ws'},
-        {label: 'QUIC', value: 'quic'},
         {label: 'gRPC', value: 'grpc'},
         {label: 'HTTPUpgrade', value: 'httpupgrade'},
         {label: 'XHTTP', value: 'xhttp'}

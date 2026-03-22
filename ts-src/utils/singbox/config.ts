@@ -26,9 +26,9 @@ import {
     URLTest,
     VlessOutbound, WebSocketTransport
 } from "../../module/singbox";
-import {ShuntUtils} from "../common";
-import {LuciFlied, ShuntTag} from "../../enum/hijpass";
-import {SingBoxEnum} from "../../enum/singbox";
+import { ShuntUtils } from "../common";
+import { LuciFlied, ShuntTag } from "../../enum/hijpass";
+import { SingBoxEnum } from "../../enum/singbox";
 import {
     Hysteria2Config,
     ProxyNode,
@@ -93,12 +93,15 @@ function genConf() {
     }
 
     let inbounds = [
-        new TproxyInbound(parseInt(shuntSection.shuntListenPort, 10), SingBoxEnum.TPORXY_INBOUND_TAG),
+        new TproxyInbound(parseInt(shuntSection.shuntListenPort, 10), SingBoxEnum.TPROXY_INBOUND_TAG),
         new DnsInbound(parseInt(shuntSection.dnsListenPort, 10), SingBoxEnum.DNS_INBOUND_TAG)
     ]
 
     if (route.default_domain_resolver && route.final) {
         let dnsTmpl = dnsServerMap.get(route.default_domain_resolver)
+        if (!dnsTmpl) {
+            throw new Error("Default DNS template not found: " + route.default_domain_resolver);
+        }
         let server = genDnsFromTmpl(dnsTmpl.tag, route.final, dnsTmpl)
         dns.servers.push(server)
     }
@@ -273,8 +276,8 @@ function writeGeoRule() {
     }
     let geoSiteList = [...geoSiteSet];
     let geoIpList = [...geoIpSet];
-    let originalIps = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geoip_ruleset')
-    let originalSites = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geosite_ruleset')
+    let originalIps = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geoip_ruleset') ?? []
+    let originalSites = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geosite_ruleset') ?? []
 
     if (geoIpList.length > 0) {
         if (!isArrEqual(originalIps, geoIpList)) {
@@ -293,6 +296,7 @@ function writeGeoRule() {
 }
 
 function isArrEqual(arr1, arr2) {
+    if (!arr1 || !arr2) return false;
     return arr1.length === arr2.length && arr1.every((val, index) => val === arr2[index]);
 }
 

@@ -201,6 +201,7 @@ const LuciUtils = {
                 }
                 ui.changes.apply(true);
             } catch (e) {
+                console.log(e)
                 WebUtils.showErrorNotification("配置应用失败", _(e.message), 5000);
             }
         }

@@ -100,7 +100,7 @@ class RouteRule extends Rule {
 
     constructor(tag: string, outbound: string) {
         super(tag, undefined, outbound)
-        this.inboundTag = [XrayEnum.TPORXY_INBOUND_TAG]
+        this.inboundTag = [XrayEnum.TPROXY_INBOUND_TAG]
         this.domain = []
         this.network = []
         this.ip = []

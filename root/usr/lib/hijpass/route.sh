@@ -32,10 +32,6 @@ delete_route() {
         ip rule delete fwmark "$TPROXY_MARK" table "$TABLE_NAME"
         log_debug "IPv4 Rule with fwmark $TPROXY_MARK deleted from table ${TABLE_NAME}"
     done
-    while ip rule show | grep -q "fwmark $TPROXY_SHUNT_MARK lookup $TABLE_NAME"; do
-        ip rule delete fwmark "$TPROXY_SHUNT_MARK" table "$TABLE_NAME"
-        log_debug "IPv4 Rule with fwmark $TPROXY_SHUNT_MARK deleted from table ${TABLE_NAME}"
-    done
 
     while ip -6 rule show | grep -q "fwmark $TPROXY_MARK lookup $TABLE_NAME"; do
         ip -6 rule delete fwmark "$TPROXY_MARK" table "$TABLE_NAME"

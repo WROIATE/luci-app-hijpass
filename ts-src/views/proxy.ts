@@ -181,7 +181,7 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
     listenPortOpt.modalonly = true;
     listenPortOpt.validate = function (sectionId: string, value: string) {
         let socks_port = uci.get(LuciFlied.CONF_NAME, sectionId, "socks_port");
-        if (socks_port == value) {
+        if (socks_port === value) {
             return _("与socks端口冲突")
         }
         return WebUtils.validatePortConflict.call(this, sectionId, value);
@@ -203,7 +203,7 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
     socksPortOpt.modalonly = true;
     socksPortOpt.validate = function (sectionId: string, value: string) {
         let listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "listen_port");
-        if (listen_port == value) {
+        if (listen_port === value) {
             return _("与透明代理端口冲突")
         }
         return WebUtils.validatePortConflict.call(this, sectionId, value);

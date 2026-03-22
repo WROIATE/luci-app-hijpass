@@ -52,8 +52,8 @@ fi
 
 log_debug "Generating fw4 rules with mark:$TPROXY_MARK proxy port:$TPROXY_PORT shunt port:$TPROXY_SHUNT_PORT proto:$TPROXY_PROTO"
 
-IP_DIRECT_LIST=$(cat "$IP_DIRECT_CONF" | grep -v -e '^\s*$' -e '^\s*#')
-IP_PROXY_LIST=$(cat "$IP_PROXY_CONF" | grep -v -e '^\s*$' -e '^\s*#')
+IP_DIRECT_LIST=$([ -f "$IP_DIRECT_CONF" ] && cat "$IP_DIRECT_CONF" | grep -v -e '^\s*$' -e '^\s*#' || :)
+IP_PROXY_LIST=$([ -f "$IP_PROXY_CONF" ] && cat "$IP_PROXY_CONF" | grep -v -e '^\s*$' -e '^\s*#' || :)
 
 IP4_DIRECT_LIST=
 IP6_DIRECT_LIST=
@@ -103,8 +103,8 @@ CHN_ROUTE=
 CHN_ROUTE6=
 
 if [ "$ENABLE_CHN_ROUTE" = "1" ]; then
-    CHN_ROUTE=$(cat "$CHN_ROUTE_FILE" | grep -v -e '^\s*$' -e '^\s*#' | sort -u | awk 'NF {printf "%s,\n", $0}' | sed '$ s/,$//')
-    CHN_ROUTE6=$(cat "$CHN_ROUTE6_FILE" | grep -v -e '^\s*$' -e '^\s*#' | sort -u | awk 'NF {printf "%s,\n", $0}' | sed '$ s/,$//')
+    CHN_ROUTE=$([ -f "$CHN_ROUTE_FILE" ] && cat "$CHN_ROUTE_FILE" | grep -v -e '^\s*$' -e '^\s*#' | sort -u | awk 'NF {printf "%s,\n", $0}' | sed '$ s/,$//' || :)
+    CHN_ROUTE6=$([ -f "$CHN_ROUTE6_FILE" ] && cat "$CHN_ROUTE6_FILE" | grep -v -e '^\s*$' -e '^\s*#' | sort -u | awk 'NF {printf "%s,\n", $0}' | sed '$ s/,$//' || :)
 fi
 
 IP4_DIRECT_NFT_LIST=$(echo "$DNS_V4

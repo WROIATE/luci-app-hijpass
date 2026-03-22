@@ -4,8 +4,8 @@
 
 log_debug "$0"
 
-GEO_IP_URL=$(uci -q get hijpass.@shunt[0].geo_ip_url || :)
-GEO_SITE_URL=$(uci -q get hijpass.@shunt[0].geo_site_url || :)
+GEO_IP_URL=$(uci -q get hijpass.@rule[0].geoip || :)
+GEO_SITE_URL=$(uci -q get hijpass.@rule[0].geosite || :)
 DATA_DIR="/usr/share/v2ray"
 
 check_url() {

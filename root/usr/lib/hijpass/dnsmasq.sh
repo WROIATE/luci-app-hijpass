@@ -27,7 +27,7 @@ gen_proxy_rules() {
         local gfw_rules
         gfw_rules=$(grep -v '^\s*$\|^\s*#' "$GFW_FILE_PATH" |
             sed 's/^/nftset=\//' |
-            sed 's/$/\/4#inet#hijpass#gfwlist4list,6#inet#hijpass#gfwlist6list/')
+            sed 's/$/\/4#inet#hijpass#gfw4list,6#inet#hijpass#gfw6list/')
         rules="$rules
 $gfw_rules"
     fi

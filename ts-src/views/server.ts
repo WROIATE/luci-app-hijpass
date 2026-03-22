@@ -117,7 +117,7 @@ function createListenPortOption(s: LuCI.form.AbstractSection) {
 
 function createProcdEnvOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.DynamicList, 'procd_env', _('procd环境变量'),
-        _('指定procd服务的环境变量，例如：SOME_VARIABLE=funtimes"'));
+        _('指定procd服务的环境变量，例如：SOME_VARIABLE=funtimes'));
     o.modalonly = true; // 只在编辑表单中显示
     return o;
 }

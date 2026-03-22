@@ -62,7 +62,7 @@ function genConf() {
     outbounds.push(new DnsOutbound(XrayEnum.DNS_OUTBOUND_TAG))
 
     let inbounds = [
-        new Inbound("tproxy", parseInt(shuntSection.shuntListenPort, 10), XrayEnum.TPORXY_INBOUND_TAG),
+        new Inbound("tproxy", parseInt(shuntSection.shuntListenPort, 10), XrayEnum.TPROXY_INBOUND_TAG),
         new Inbound("direct", parseInt(shuntSection.dnsListenPort, 10), XrayEnum.DNS_INBOUND_TAG)
     ]
 
@@ -88,11 +88,11 @@ function genConf() {
 
         routeRule.network = luciRuleDTO.network
         routeRule.protocol = transRouteProtocol(luciRuleDTO.protocol)
-        routeRule.port = luciRuleDTO.port.join(',')
-        if (luciRuleDTO.portRange) {
-            luciRuleDTO.portRange.concat(routeRule.port)
+        let allPorts: string[] = luciRuleDTO.port.map(p => String(p))
+        if (luciRuleDTO.portRange && luciRuleDTO.portRange.length > 0) {
+            allPorts = allPorts.concat(luciRuleDTO.portRange)
         }
-        routeRule.port = luciRuleDTO.portRange.join(',')
+        routeRule.port = allPorts.join(',')
 
         const domainArrays: string[][] = [
             addPrefixToElements(luciRuleDTO.domain, 'full:'),
@@ -274,7 +274,7 @@ function genProxyConf(config: ProxyNode): {} {
                 outbounds: [createVlessOutbound(config)],
             }
         default:
-            throw new Error("为支持的");
+            throw new Error("不支持的代理类型: " + config.type);
     }
 }
 
@@ -287,7 +287,7 @@ function createVlessOutbound(config: ProxyNode): VlessOutbound {
 
     // 从 section 创建 VLESS 出站
     const vlessConfig = config as VlessConfig;
-    if (vlessConfig.transport_type != "xhttp") {
+    if (vlessConfig.transport_type !== "xhttp") {
         throw new Error("transport type must be a xhttp object")
     }
     const outbound = new VlessOutbound(

@@ -20,7 +20,7 @@ clean_log() {
 
 case "$1" in
 clean)
-    ehco "" >"$2"
+    echo "" >"$2"
     log_info "Manually trigger log cleanup, log file: $2"
     ;;
 hijpass)

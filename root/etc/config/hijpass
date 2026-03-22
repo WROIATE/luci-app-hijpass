@@ -14,6 +14,7 @@ config hijpass
 	option nft '/etc/hijpass/fw4-template.nft'
 	option nft_hook '/etc/hijpass/hook/nft-hook.sh'
 	option shunt_conf '/etc/hijpass/shunt.json'
+	option client_dir '/etc/hijpass/client'
 	option log_level 'INFO'
 	option log_path '/tmp/hijpass/log/hijpass.log'
 	option log_dir '/tmp/hijpass/log'
@@ -45,7 +46,7 @@ config dns
 	option proxy_dns '127.0.0.1#10153'
 	option cdg_port '53653'
 	option domain_proxy_hash ''
-	option doamin_direct_hash ''
+	option domain_direct_hash ''
 
 config rule
 	list chn_domain_list 'https://fastly.jsdelivr.net/gh/felixonmars/dnsmasq-china-list/accelerated-domains.china.conf'

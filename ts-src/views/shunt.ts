@@ -69,7 +69,7 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     shuntListenPort.rmempty = false;
     shuntListenPort.validate = function (sectionId: string, value: string) {
         let dns_listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "dns_listen_port");
-        if (dns_listen_port == value) {
+        if (dns_listen_port === value) {
             return _("与DNS端口冲突")
         }
         return WebUtils.validatePortConflict.call(this, sectionId, value);
@@ -83,7 +83,7 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     dnsListenPort.rmempty = false;
     dnsListenPort.validate = function (sectionId: string, value: string) {
         let shunt_listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "shunt_listen_port");
-        if (shunt_listen_port == value) {
+        if (shunt_listen_port === value) {
             return _("与分流端口冲突")
         }
         return WebUtils.validatePortConflict.call(this, sectionId, value);
@@ -193,7 +193,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
         if (!dnsProxyNode) {
             value = dnsNode
         } else {
-            dnsProxyNode = dnsProxyNode == 'hijpass-direct' ? '直连' : dnsProxyNode;
+            dnsProxyNode = dnsProxyNode === 'hijpass-direct' ? '直连' : dnsProxyNode;
             value = dnsNode + ' -> ' + dnsProxyNode;
         }
         return value;
@@ -472,11 +472,12 @@ function resetHash() {
 function preview() {
     try {
         let configJson = ShuntUtils.getShuntConfData()
+        let shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') || 'xray'
         // 创建模态对话框显示配置
-        ui.showModal(_('Sing-Box 配置预览'), [
+        ui.showModal(_('配置预览'), [
             E('div', {'class': 'cbi-section'}, [
                 E('div', {'class': 'cbi-section-descr'},
-                    _('以下是根据当前配置生成的Sing-Box JSON配置：')),
+                    _('以下是根据当前配置生成的 %s JSON配置：').format(shuntType)),
                 E('pre', {
                     'style': 'max-height: 500px; overflow: auto; padding: 10px; border-radius: 4px;',
                     'id': 'config-preview-content'

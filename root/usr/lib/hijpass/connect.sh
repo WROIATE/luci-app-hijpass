@@ -6,7 +6,7 @@
 . /usr/lib/hijpass/app-logger.sh
 
 URL="$1"
-TIMEOUT="${2:-5}"   # 默认总超时 10 秒
+TIMEOUT="${2:-5}"   # 默认总超时 5 秒
 
 if [ -z "$URL" ]; then
   echo "Usage: $0 <url> [timeout_seconds]" >&2

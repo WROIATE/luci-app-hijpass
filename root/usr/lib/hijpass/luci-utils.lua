@@ -75,10 +75,10 @@ end
 
 if not checkParams(arg[1]) then
     print("Invalid parameter")
-    os.exit(1, true)
+    os.exit(1)
 end
 
-if arg[1] == "iptype" then os.exit(ipType(arg[2]), true) end
+if arg[1] == "iptype" then os.exit(ipType(arg[2])) end
 
 if arg[1] == "ipmatch" then
     local ok, result_or_err
@@ -89,10 +89,10 @@ if arg[1] == "ipmatch" then
     end
     if ok and result_or_err then
         print("matched")
-        os.exit(0, true)
+        os.exit(0)
     else
         print("not matched")
-        os.exit(1, true)
+        os.exit(1)
     end
 end
 
@@ -101,9 +101,9 @@ if arg[1] == "domainmatch" then
 
     if ok and result_or_err then
         print("matched")
-        os.exit(0, true)
+        os.exit(0)
     else
         print("not matched")
-        os.exit(1, true)
+        os.exit(1)
     end
 end

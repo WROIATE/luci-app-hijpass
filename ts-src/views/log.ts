@@ -428,7 +428,7 @@ function clearLogs() {
 
     updateLogStatus(_('正在清空日志...'));
 
-    fs.write(logFile, null).then(function () {
+    fs.write(logFile, '').then(function () {
         updateLogStatus(_('日志已清空'));
         loadLogs(); // 重新加载显示空日志
     }).catch(function (error) {

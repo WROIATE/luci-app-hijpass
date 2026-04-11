@@ -38,14 +38,14 @@ delete_route() {
         log_debug "IPv6 rule with fwmark $TPROXY_MARK deleted from table ${TABLE_NAME}"
     done
 
-    if ip route del local default dev lo table "$TABLE_NUMBER" 2>/dev/null; then
-        log_debug "Removed $TABLE_NUMBER existing IPv4 default route Successfully"
+    if ip route del local default dev lo table "$TABLE_NAME" 2>/dev/null; then
+        log_debug "Removed ${TABLE_NAME} existing IPv4 default route Successfully"
     else
         log_debug "No existing IPv4 default route to remove"
     fi
 
-    if ip -6 route del local default dev lo table "$TABLE_NUMBER" 2>/dev/null; then
-        log_debug "Removed $TABLE_NUMBER existing IPv6 default route Successfully"
+    if ip -6 route del local default dev lo table "$TABLE_NAME" 2>/dev/null; then
+        log_debug "Removed ${TABLE_NAME} existing IPv6 default route Successfully"
     else
         log_debug "No existing IPv6 default route to remove"
     fi

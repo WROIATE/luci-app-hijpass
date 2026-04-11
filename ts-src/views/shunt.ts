@@ -210,7 +210,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     dnsProxyNode.value('', _('使用路由代理节点'));
     dnsProxyNode.value('hijpass-direct', _('直连'));
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section) {
-        if (section.name) {
+        if (section.name && section.enabled !== '0') {
             let displayName = section.name;
             if (section.socks_port) {
                 displayName += ' (' + section.socks_port + ')';
@@ -418,7 +418,7 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
         _('根据所选节点健康度自动调整出口路由，配置后可在代理节点处选择负载均衡节点'),
         LuciFlied.PROXY_NODE_TYPE,
         function (section: any) {
-            if (section.name) {
+            if (section.name && section.enabled !== '0') {
                 let displayName = section.name;
                 if (section.socks_port) {
                     displayName += ' (' + section.socks_port + ')';
@@ -533,7 +533,7 @@ function loadProxyNodeOptions(option: LuCI.form.AbstractValue, includeSLB: boole
         }
 
         uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
-            if (section.name) {
+            if (section.name && section.enabled !== '0') {
                 let displayName = section.name;
                 if (section.socks_port) {
                     displayName += ' (' + section.socks_port + ')';

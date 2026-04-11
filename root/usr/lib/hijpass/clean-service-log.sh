@@ -9,12 +9,16 @@ log_debug "$0"
 clean_log() {
     local log_file
     config_get log_file "$1" log_path
-    echo $log_file
     [ -z "$log_file" ] && return
     if [ -f "$log_file" ]; then
-        tail -n 30000 "$log_file" >"$log_file.tmp" && cat "$log_file.tmp" >"$log_file"
-        log_debug "Successfully cleaned log file: $log_file"
-        rm "$log_file.tmp"
+        if tail -n 30000 "$log_file" >"$log_file.tmp" 2>/dev/null && [ -s "$log_file.tmp" ]; then
+            cat "$log_file.tmp" >"$log_file"
+            rm -f "$log_file.tmp"
+            log_debug "Successfully cleaned log file: $log_file"
+        else
+            rm -f "$log_file.tmp"
+            log_warn "Failed to clean log file: $log_file"
+        fi
     fi
 }
 

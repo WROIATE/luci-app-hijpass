@@ -303,25 +303,25 @@ validate_file_format() {
         # 验证域名列表格式
         if head -n 5 "$file" | grep -q "server="; then
             return 0
-        elif head -n 5 "$file" | grep -E "^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"; then
+        elif head -n 5 "$file" | grep -qE "^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"; then
             return 0
         fi
         ;;
     *"gfw"*)
         # 验证GFW域名列表格式
-        if head -n 5 "$file" | grep -E "^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"; then
+        if head -n 5 "$file" | grep -qE "^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"; then
             log_debug "GFW file validated: plain domain format"
             return 0
         elif head -n 5 "$file" | grep -q "server="; then
             log_debug "GFW file validated: dnsmasq format"
             return 0
-        elif head -n 5 "$file" | grep -E "^\+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"; then
+        elif head -n 5 "$file" | grep -qE "^\+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"; then
             log_debug "GFW file validated: AdGuard Home format"
             return 0
-        elif head -n 5 "$file" | grep -E "^@@\|\|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\^$"; then
+        elif head -n 5 "$file" | grep -qE "^@@\|\|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\^$"; then
             log_debug "GFW file validated: AdBlock format"
             return 0
-        elif head -n 5 "$file" | grep -E "^(domain|full|regexp|keyword):"; then
+        elif head -n 5 "$file" | grep -qE "^(domain|full|regexp|keyword):"; then
             log_debug "GFW file validated: v2ray rules format"
             return 0
         fi
@@ -334,9 +334,9 @@ validate_file_format() {
         ;;
     *"route"* | *"ip"*)
         # 验证IP路由格式
-        if head -n 5 "$file" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(/[0-9]+)?$"; then
+        if head -n 5 "$file" | grep -qE "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(/[0-9]+)?$"; then
             return 0
-        elif head -n 5 "$file" | grep -E "^[0-9a-fA-F:]+(/[0-9]+)?$"; then
+        elif head -n 5 "$file" | grep -qE "^[0-9a-fA-F:]+(/[0-9]+)?$"; then
             return 0
         fi
         ;;

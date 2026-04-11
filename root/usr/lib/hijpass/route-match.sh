@@ -155,7 +155,7 @@ handle_rule() {
                 clean_line=$(echo "$line" | sed 's/#.*//' | sed 's/^[ \t]*//;s/[ \t]*$//')
                 [ -z "$clean_line" ] && continue
 
-                if echo "$clean_line" | grep -v "geoip:" >/dev/null; then
+                if echo "$clean_line" | grep -vq "geoip:"; then
                     # 调用 IP 检查函数
                     if check_ip_cidr_match "$INPUT" "$clean_line"; then
                         print_result "$name" "$clean_line" "$proxy_node" "$config"

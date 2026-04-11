@@ -157,14 +157,73 @@ const LuciUtils = {
     genHandleSaveApply: function () {
         return async function (ev: Event) {
             try {
+                // 检查分流配置引用的代理节点是否都已启用
+                const disabledNodes = new Set<string>();
+                uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
+                    if (section.enabled === '0' && section.name) {
+                        disabledNodes.add(section.name);
+                    }
+                });
+
+                if (disabledNodes.size > 0) {
+                    const warnings: string[] = [];
+
+                    // 检查默认全局出口
+                    const defaultNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'default_proxy_node');
+                    if (defaultNode && disabledNodes.has(defaultNode)) {
+                        warnings.push(_('默认全局出口 "%s" 未启用').format(defaultNode));
+                    }
+
+                    // 检查规则集出口
+                    const rulesetNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_out_node');
+                    if (rulesetNode && disabledNodes.has(rulesetNode)) {
+                        warnings.push(_('规则集出口 "%s" 未启用').format(rulesetNode));
+                    }
+
+                    // 检查路由规则中的代理节点
+                    uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
+                        if (section.proxy_node && disabledNodes.has(section.proxy_node)) {
+                            warnings.push(_('路由规则 "%s" 的代理节点 "%s" 未启用').format(section.name || section['.name'], section.proxy_node));
+                        }
+                        if (section.dns_proxy_node && disabledNodes.has(section.dns_proxy_node)) {
+                            warnings.push(_('路由规则 "%s" 的DNS出口节点 "%s" 未启用').format(section.name || section['.name'], section.dns_proxy_node));
+                        }
+                    });
+
+                    // 检查负载均衡节点列表
+                    const lbNodeList = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
+                    if (Array.isArray(lbNodeList)) {
+                        lbNodeList.forEach((node: string) => {
+                            if (disabledNodes.has(node)) {
+                                warnings.push(_('负载均衡节点 "%s" 未启用').format(node));
+                            }
+                        });
+                    }
+
+                        if (warnings.length > 0) {
+                        WebUtils.showWarningNotification(_('配置包含未启用的节点'), warnings.join('<br>'), 8000);
+                        return;
+                    }
+                }
+
+                // save 前：用当前 UCI 内存数据预校验配置（若生成失败则阻止保存）
+                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === FactoryType.SING_BOX) {
+                    SingBoxUtils.writeGeoRule()
+                }
+                ShuntUtils.getShuntConfData()
+
+                await this.handleSave(ev)
+
+                // handleSave 后重新生成，确保写入文件的是最新数据
                 if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === FactoryType.SING_BOX) {
                     SingBoxUtils.writeGeoRule()
                 }
                 let data = ShuntUtils.getShuntConfData()
-                await this.handleSave(ev)
                 if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
                     await fs.write(WebUtils.getFilePath('shunt_conf'), data);
                 }
+
+                // 清理已删除/重命名的代理节点文件
                 let changes = await uci.changes()
                 if (changes && changes.hijpass) {
                     for (let change of changes.hijpass) {
@@ -176,11 +235,12 @@ const LuciUtils = {
                         }
                     }
                 }
+
+                // 生成各代理节点客户端配置文件
                 let tasks = uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
-                    // 根据类型创建对应的配置类
                     const proxyConfig = ProxyUtils.createProxyConfigFromSection(section);
-                    let proxyConf: {};
                     if (proxyConfig) {
+                        let proxyConf: {};
                         if (proxyConfig.type === "vless" && (proxyConfig as VlessConfig).transport_type === "xhttp") {
                             proxyConf = LuciConverterFactory.genProxyConf(FactoryType.XRAY, proxyConfig);
                         } else {
@@ -199,6 +259,7 @@ const LuciUtils = {
                         }
                     });
                 }
+
                 ui.changes.apply(true);
             } catch (e) {
                 console.log(e)
@@ -453,7 +514,7 @@ const WebUtils = {
             }
         });
 
-        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (section) => {
+        uci.sections(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (section) => {
             if (section.listen_port) {
                 usedPorts.push(Number(section.listen_port));
             }
@@ -485,14 +546,14 @@ const WebUtils = {
     validatePortConflict: function (sectionId: string, value: string) {
         // 检查是否与shunt配置的端口冲突
         let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
-        if (shuntSection[".name"] !== sectionId && (shuntSection.dns_listen_port === value
+        if (shuntSection && shuntSection[".name"] !== sectionId && (shuntSection.dns_listen_port === value
             || shuntSection.shunt_listen_port === value)) {
             return _('端口 %s 已被分流配置占用').format(value);
         }
 
         // 检查是否与dns配置的端口冲突
         let dnsSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE)
-        if (dnsSection[".name"] !== sectionId && dnsSection.cdg_port === value) {
+        if (dnsSection && dnsSection[".name"] !== sectionId && dnsSection.cdg_port === value) {
             return _('端口 %s 已被DNS配置占用').format(value);
         }
 
@@ -509,7 +570,7 @@ const WebUtils = {
         }
 
         // 检查是否与其他server节点的端口冲突
-        let serverSections = uci.sections(LuciFlied.CONF_NAME, LuciFlied.SERVER_NODE_TYPE);
+        let serverSections = uci.sections(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE);
         for (let i = 0; i < serverSections.length; i++) {
             let section = serverSections[i]
             if (section[".name"] === sectionId) {
@@ -517,7 +578,7 @@ const WebUtils = {
             }
 
             if (section.listen_port === value) {
-                return _('端口 %s 已被代理节点 "%s" 使用').format(value, section.name);
+                return _('端口 %s 已被服务端节点 "%s" 使用').format(value, section.name);
             }
         }
         return true;

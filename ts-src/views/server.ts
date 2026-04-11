@@ -8,7 +8,8 @@ import fs from "fs";
 const v = view.extend({
     load: function () {
         return Promise.all([
-            uci.load(LuciFlied.SERVER_CONF_NAME)
+            uci.load(LuciFlied.SERVER_CONF_NAME),
+            uci.load(LuciFlied.CONF_NAME),
         ]);
     },
 
@@ -144,7 +145,7 @@ function createProxyOptions(s: LuCI.form.AbstractSection, data: { [key: string]:
 async function getPortStatus() {
     let portList = []
     uci.sections(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (section) => {
-        portList.push(section.listen_port)
+        if (section.listen_port) portList.push(section.listen_port);
     });
     try {
         return await L.resolveDefault(fs.exec_direct(`/usr/lib/hijpass/net.sh`, ['port'].concat(portList), "json"), {});

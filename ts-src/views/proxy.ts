@@ -28,8 +28,8 @@ const v = view.extend({
             let sectionId = WebUtils.generateUniqueSectionId();
             return L.bind(form.GridSection.prototype.handleAdd, this, ev, sectionId)();
         }
-        s.handleRemove = async function (ev: Event, name?: string) {
-            form.GridSection.prototype.handleRemove.call(this, ev, name)
+        s.handleRemove = function (ev: Event, name?: string) {
+            return form.GridSection.prototype.handleRemove.call(this, ev, name)
         }
         // 创建所有代理配置选项
         let data = await getPortStatus();

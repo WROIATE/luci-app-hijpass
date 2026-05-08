@@ -25,8 +25,28 @@ main() {
 		done
 		echo "$result"
 		;;
+	"ping")
+		# $1=socks_port, $2=target (optional, default www.google.com)
+		local socks_port="$1"
+		local target="${2:-www.google.com}"
+		local output
+		output=$(curl -I -o /dev/null -sSk \
+			-w '{"t_namelookup":%{time_namelookup},"t_starttransfer":%{time_starttransfer},"t_total":%{time_total}}' \
+			--max-time 5 \
+			--socks5 "127.0.0.1:${socks_port}" \
+			"https://${target}" 2>/dev/null)
+		local exit_code=$?
+		if [ $exit_code -eq 0 ] || [ $exit_code -eq 56 ]; then
+			echo "$output" | jq '{
+				ms: ((.t_starttransfer - .t_namelookup) * 1000 | floor),
+				total_ms: (.t_total * 1000 | floor)
+			}'
+		else
+			echo "{\"error\":\"timeout\"}"
+		fi
+		;;
 	*)
-		echo -e "Usage: \n    $0 [port] args"
+		echo -e "Usage: \n    $0 [port|ping] args"
 		exit 1
 		;;
 	esac

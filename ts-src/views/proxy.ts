@@ -4,11 +4,13 @@ import {LuciFlied, HijpassValues, PROXY_TYPE} from "../enum/hijpass";
 import form from "form";
 import {LuciUtils, ShuntUtils, WebUtils} from "../utils/common";
 import fs from "fs";
+import ui from "ui";
 
 const v = view.extend({
     load: function () {
         return Promise.all([
-            uci.load(LuciFlied.CONF_NAME)
+            uci.load(LuciFlied.CONF_NAME),
+            LuciUtils.getServiceInstances(LuciFlied.CONF_NAME)
         ]);
     },
 
@@ -16,7 +18,7 @@ const v = view.extend({
     handleSave: function (ev?: Event) {
         return view.prototype.handleSave.call(this, ev);
     },
-    render: async function () {
+    render: async function (data: any[]) {
         let m = new form.Map(LuciFlied.CONF_NAME, _('代理设置'),
             _('配置代理程序设置'));
         let s = m.section(form.GridSection, LuciFlied.PROXY_NODE_TYPE)
@@ -31,9 +33,8 @@ const v = view.extend({
         s.handleRemove = function (ev: Event, name?: string) {
             return form.GridSection.prototype.handleRemove.call(this, ev, name)
         }
-        // 创建所有代理配置选项
-        let data = await getPortStatus();
-        createProxyOptions(s, data);
+        const instances = data[1] ?? {};
+        createProxyOptions(s, instances);
 
         return m.render();
     },
@@ -81,7 +82,7 @@ function createProxyTypeOption(s: LuCI.form.AbstractSection) {
 /**
  * 创建Grid表格显示选项
  */
-function createGridDisplayOptions(s: LuCI.form.AbstractSection, data: { [key: string]: boolean }) {
+function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) {
     let typeOpt = s.option(form.TextValue, 'type', _('类型'), _('代理类型'));
     typeOpt.modalonly = false;
     typeOpt.textvalue = function (section_id: string) {
@@ -132,28 +133,126 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, data: { [key: st
         }
     };
 
-    // 显示监听端口和状态
-    let listenPortOpt = s.option(form.TextValue, 'listen_port', _('监听端口'), _(''));
-    listenPortOpt.modalonly = false;
-    listenPortOpt.textvalue = function (section_id: string) {
-        let port = uci.get(LuciFlied.CONF_NAME, section_id, 'listen_port');
-        let portStatus = data[port] ? 'green' : 'red';
-        return E('span', {style: 'color: ' + portStatus}, port || '-');
-    };
-
-    // 显示SOCKS端口和状态
-    let socksPortOpt = s.option(form.TextValue, 'socks_port', _('SOCKS端口'), _(''));
-    socksPortOpt.modalonly = false;
-    socksPortOpt.textvalue = function (section_id: string) {
-        let port = uci.get(LuciFlied.CONF_NAME, section_id, 'socks_port');
-        let portStatus = data[port] ? 'green' : 'red';
-        return E('span', {style: 'color: ' + portStatus}, port || '-');
+    // 运行状态列
+    let statusOpt = s.option(form.TextValue, 'run_status', _('状态'), _(''));
+    statusOpt.modalonly = false;
+    statusOpt.textvalue = function (section_id: string) {
+        const name = uci.get(LuciFlied.CONF_NAME, section_id, 'name');
+        const instanceName = section_id + (name ? '-' + name : '');
+        const running = instances?.[instanceName]?.running ?? false;
+        return E('span', {style: 'color:' + (running ? 'green' : 'red')}, running ? _('运行中') : _('未运行'));
     };
 
     // 启用状态（在表格中显示并可直接修改）
     let enabledOpt = createEnabledOption(s);
     enabledOpt.editable = true;
     enabledOpt.modalonly = false;
+
+    // 延迟测试列
+    let latencyOpt = s.option(form.TextValue, 'latency', _(''));
+    latencyOpt.modalonly = false;
+    latencyOpt.textvalue = function (section_id: string) {
+        let port = uci.get(LuciFlied.CONF_NAME, section_id, 'socks_port');
+        let enabled = uci.get(LuciFlied.CONF_NAME, section_id, 'enabled');
+        if (!port || enabled === '0') return E('span', {}, '-');
+        let btn = E('button', {
+            class: 'btn cbi-button',
+            'data-latency': port,
+            style: 'background-color:#1a6a8a;border-color:#1a6a8a',
+            click: function (ev: MouseEvent) {
+                let el = ev.currentTarget as HTMLElement;
+                el.setAttribute('disabled', 'true');
+                el.textContent = '...';
+                el.style.color = '';
+                el.style.backgroundColor = '#1a6a8a';
+                el.style.borderColor = '#1a6a8a';
+                fs.exec_direct('/usr/lib/hijpass/net.sh', ['ping', port], 'json')
+                    .then((res: any) => {
+                        if (res && res.ms != null) {
+                            el.textContent = res.ms + 'ms';
+                            if (res.ms < 300) {
+                                el.style.backgroundColor = '#1a7a3a';
+                                el.style.borderColor = '#1a7a3a';
+                                el.style.color = '';
+                            } else if (res.ms < 500) {
+                                el.style.backgroundColor = '#7a6a00';
+                                el.style.borderColor = '#7a6a00';
+                                el.style.color = '';
+                            } else {
+                                el.style.backgroundColor = '#7a2020';
+                                el.style.borderColor = '#7a2020';
+                                el.style.color = '';
+                            }
+                        } else {
+                            el.textContent = _('超时');
+                            el.style.backgroundColor = '#7a2020';
+                            el.style.borderColor = '#7a2020';
+                            el.style.color = '';
+                        }
+                    })
+                    .catch(() => {
+                        el.textContent = _('失败');
+                        el.style.backgroundColor = '#7a2020';
+                        el.style.borderColor = '#7a2020';
+                        el.style.color = '';
+                    })
+                    .finally(() => {
+                        el.removeAttribute('disabled');
+                    });
+            }
+        }, _('测速'));
+        return E('span', {}, [btn]);
+    };
+
+    // 日志查看按钮列（无标题，仅开启日志的节点显示）
+    let logViewOpt = s.option(form.TextValue, 'log_view', _(''));
+    logViewOpt.modalonly = false;
+    logViewOpt.textvalue = function (section_id: string) {
+        let logPath = uci.get(LuciFlied.CONF_NAME, section_id, 'log_path');
+        if (!logPath) return E('span', {}, '');
+        let name = uci.get(LuciFlied.CONF_NAME, section_id, 'name') || section_id;
+
+        function loadLog(contentEl: HTMLElement) {
+            contentEl.textContent = _('加载中...');
+            fs.exec('/usr/bin/tail', ['-n', '200', logPath])
+                .then((result: any) => {
+                    let text = (result && result.stdout) ? result.stdout.trim() : '';
+                    text = text.replace(/\x1b\[[0-9;]*m/g, '');
+                    contentEl.textContent = text || _('暂无日志');
+                    contentEl.scrollTop = contentEl.scrollHeight;
+                })
+                .catch(() => {
+                    contentEl.textContent = _('读取失败');
+                });
+        }
+
+        let btn = E('button', {
+            class: 'btn cbi-button',
+            style: 'background-color:#3d6b5e;border-color:#3d6b5e',
+            click: function () {
+                let contentEl = E('pre', {
+                    style: 'max-height:500px;overflow:auto;padding:10px;border-radius:4px;white-space:pre;font-size:0.8em'
+                }, '') as HTMLElement;
+
+                loadLog(contentEl);
+
+                ui.showModal(name + ' - ' + _('日志'), [
+                    E('div', {class: 'cbi-section'}, [contentEl]),
+                    E('div', {class: 'right', style: 'display:flex;justify-content:flex-end;gap:10px'}, [
+                        E('button', {
+                            class: 'btn cbi-button',
+                            click: ui.hideModal
+                        }, _('关闭')),
+                        E('button', {
+                            class: 'btn cbi-button-action',
+                            click: function () { loadLog(contentEl); }
+                        }, _('刷新'))
+                    ])
+                ]);
+            }
+        }, _('日志'));
+        return E('span', {}, [btn]);
+    };
 }
 
 /**
@@ -174,6 +273,29 @@ function createCustomProxyOptions(s: LuCI.form.AbstractSection) {
  * 创建代理监听端口选项（所有代理类型通用）
  */
 function createProxyPortOptions(s: LuCI.form.AbstractSection) {
+    // 两个 input 的直接引用，renderWidget 执行时赋值
+    let listenInp: HTMLInputElement | null = null;
+    let socksInp: HTMLInputElement | null = null;
+
+    // 获取除本节点外所有已占用端口
+    const getOtherUsedPorts = (section_id: string): number[] => {
+        let ports: number[] = [];
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
+            if (section['.name'] === section_id) return;
+            if (section.listen_port) ports.push(Number(section.listen_port));
+            if (section.socks_port) ports.push(Number(section.socks_port));
+        });
+        uci.sections(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (section) => {
+            if (section.listen_port) ports.push(Number(section.listen_port));
+        });
+        const shunt = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
+        if (shunt?.shunt_listen_port) ports.push(Number(shunt.shunt_listen_port));
+        if (shunt?.dns_listen_port) ports.push(Number(shunt.dns_listen_port));
+        const dns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE);
+        if (dns?.cdg_port) ports.push(Number(dns.cdg_port));
+        return ports;
+    };
+
     let listenPortOpt = s.option(form.Value, 'listen_port', _('本地监听端口'),
         _('指定本地透明代理监听端口号'));
     listenPortOpt.datatype = 'port';
@@ -194,6 +316,28 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
         let port = findAvailablePort(7890)
         form.Value.prototype.write.call(this, section_id, port);
         return port.toString();
+    };
+    (listenPortOpt as any).renderWidget = function (section_id: string, option_index: number, cfgvalue: any) {
+        let input = (form.Value.prototype as any).renderWidget.call(this, section_id, option_index, cfgvalue) as HTMLElement;
+        listenInp = input.querySelector('input') as HTMLInputElement;
+        let btn = E('button', {
+            class: 'btn cbi-button',
+            style: 'margin-left:6px',
+            type: 'button',
+            click: function () {
+                let current = Number(listenInp.value);
+                let usedPorts = getOtherUsedPorts(section_id);
+                let siblingPort = socksInp ? Number(socksInp.value) : 0;
+                if (siblingPort) usedPorts.push(siblingPort);
+                if (current && !usedPorts.includes(current)) return;
+                let port = siblingPort ? siblingPort + 1 : 7890;
+                while (usedPorts.includes(port)) port++;
+                listenInp.value = port.toString();
+                listenInp.dispatchEvent(new Event('input', {bubbles: true}));
+                listenInp.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+        }, _('自动生成'));
+        return E('div', {style: 'display:flex;align-items:center'}, [input, btn]);
     };
 
     let socksPortOpt = s.option(form.Value, 'socks_port', _('本地SOCKS监听端口'),
@@ -216,6 +360,28 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
         let port = findAvailablePort(7891)
         form.Value.prototype.write.call(this, section_id, port);
         return port.toString();
+    };
+    (socksPortOpt as any).renderWidget = function (section_id: string, option_index: number, cfgvalue: any) {
+        let input = (form.Value.prototype as any).renderWidget.call(this, section_id, option_index, cfgvalue) as HTMLElement;
+        socksInp = input.querySelector('input') as HTMLInputElement;
+        let btn = E('button', {
+            class: 'btn cbi-button',
+            style: 'margin-left:6px',
+            type: 'button',
+            click: function () {
+                let current = Number(socksInp.value);
+                let usedPorts = getOtherUsedPorts(section_id);
+                let siblingPort = listenInp ? Number(listenInp.value) : 0;
+                if (siblingPort) usedPorts.push(siblingPort);
+                if (current && !usedPorts.includes(current)) return;
+                let port = siblingPort ? siblingPort + 1 : 7891;
+                while (usedPorts.includes(port)) port++;
+                socksInp.value = port.toString();
+                socksInp.dispatchEvent(new Event('input', {bubbles: true}));
+                socksInp.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+        }, _('自动生成'));
+        return E('div', {style: 'display:flex;align-items:center'}, [input, btn]);
     };
 }
 
@@ -725,9 +891,9 @@ function createTransportXhttpOptions(s: LuCI.form.AbstractSection) {
 /**
  * 创建所有代理配置选项
  */
-function createProxyOptions(s: LuCI.form.AbstractSection, data: { [key: string]: boolean }) {
+function createProxyOptions(s: LuCI.form.AbstractSection, instances: any) {
     // Grid表格显示选项（所有类型都显示）
-    createGridDisplayOptions(s, data);
+    createGridDisplayOptions(s, instances);
 
     // 通用选项（所有类型都需要）
     createNodeNameOption(s);
@@ -784,18 +950,8 @@ function createProxyOptions(s: LuCI.form.AbstractSection, data: { [key: string]:
     createProxyEnvironmentOptions(s);
 }
 
-async function getPortStatus() {
-    let portList = []
-    uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
-        if (section.listen_port) portList.push(section.listen_port);
-        if (section.socks_port) portList.push(section.socks_port);
-    });
-    try {
-        return await L.resolveDefault(fs.exec_direct(`/usr/lib/hijpass/net.sh`, ['port'].concat(portList), "json"), {});
-    } catch (error) {
-        console.log('Error:', error);
-    }
-}
+
+
 
 /**
  * 查找第一个可用的端口（从起始端口开始）

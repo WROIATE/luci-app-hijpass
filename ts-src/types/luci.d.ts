@@ -279,6 +279,8 @@ declare namespace LuCI {
             set_first(config: string, sectionId: string, option: string, value: any): void;
 
             changes(): Promise.<Object.<string, Array.<string>>>
+
+            save(): Array.<string>;
         }
     }
 

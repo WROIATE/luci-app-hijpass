@@ -1,6 +1,6 @@
-import {LuciUtils, ShuntUtils, WebUtils} from "../utils/common";
+import { LuciUtils, ShuntUtils, WebUtils } from "../utils/common";
 
-import {HijpassValues, LuciFlied, ShuntTag} from "../enum/hijpass";
+import { HijpassValues, LuciFlied, ShuntTag } from "../enum/hijpass";
 import ui from 'ui';
 import form from "form";
 import view from 'view';
@@ -145,10 +145,90 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     let rulesetConvert = routeTypeSection.option(form.Flag, 'ruleset_convert',
         _('使用geosite规则集'), _('通过geoview将geo规则转换为规则集（sing-box配置）'));
     rulesetConvert.rmempty = false;
+    // 批量替换节点按钮
+    let replaceNodeBtn = s.taboption('route', form.Button, '_replace_node', _('批量替换节点'));
+    replaceNodeBtn.depends({ config_type: "tmpl" });
+    replaceNodeBtn.inputtitle = _('批量替换节点');
+    replaceNodeBtn.inputstyle = 'apply';
+    replaceNodeBtn.onclick = function () {
+        // 收集规则中实际被使用的节点值
+        const usedNodeValues = new Set<string>();
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
+            if (section.proxy_node) usedNodeValues.add(section.proxy_node);
+        });
+
+        // 构建全量节点选项列表（用于"替换为"）
+        const allNodeOptions: { value: string, label: string }[] = [
+            { value: ShuntTag.DIRECT_OUTBOUND_TAG, label: _('直连') },
+            { value: ShuntTag.BLOCK_OUTBOUND_TAG, label: _('阻止') },
+        ];
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
+            if (section.name && section.enabled !== '0') {
+                let label = section.name;
+                if (section.socks_port) label += ' (' + section.socks_port + ')';
+                allNodeOptions.push({ value: section.name, label });
+            }
+        });
+        const slbOutbounds = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
+        if (slbOutbounds && slbOutbounds.length > 0) {
+            allNodeOptions.push({ value: ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, label: _('负载均衡') });
+        }
+
+        // "从节点"只显示规则中实际使用的节点
+        const fromNodeOptions = allNodeOptions.filter(o => usedNodeValues.has(o.value));
+
+        const makeSelect = (id: string, options: { value: string, label: string }[]) => {
+            const sel = E('select', { id, class: 'cbi-input-select', style: 'width:100%' }) as HTMLSelectElement;
+            options.forEach(({ value, label }) => {
+                const opt = document.createElement('option');
+                opt.value = value;
+                opt.textContent = label;
+                sel.appendChild(opt);
+            });
+            return sel;
+        };
+
+        const fromSel = makeSelect('replace-from', fromNodeOptions);
+        const toSel = makeSelect('replace-to', allNodeOptions);
+
+        ui.showModal(_('批量替换节点'), [
+            E('div', { class: 'cbi-section' }, [
+                E('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center' }, [
+                    E('div', {}, [E('label', {}, _('从节点')), fromSel]),
+                    E('div', {}, [E('label', {}, _('替换为')), toSel]),
+                ])
+            ]),
+            E('div', { class: 'right', style: 'display:flex;justify-content:flex-end;gap:10px' }, [
+                E('button', { class: 'btn cbi-button', click: ui.hideModal }, _('取消')),
+                E('button', {
+                    class: 'btn cbi-button-action',
+                    click: function () {
+                        const fromVal = fromSel.value;
+                        const toVal = toSel.value;
+                        if (fromVal === toVal) {
+                            ui.hideModal();
+                            return;
+                        }
+                        let count = 0;
+                        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
+                            if (section.proxy_node === fromVal) {
+                                uci.set(LuciFlied.CONF_NAME, section['.name'], 'proxy_node', toVal);
+                                count++;
+                            }
+                        });
+                        uci.save();
+                        ui.hideModal();
+                        location.reload();
+                    }
+                }, _('确认替换'))
+            ])
+        ]);
+    };
+
     // 路由规则配置
     let routeGridSectionValue = s.taboption('route', form.SectionValue, '_route_rule',
         form.GridSection, LuciFlied.SHUNT_ROUTE_RULE_TYPE, _('路由规则配置'));
-    routeGridSectionValue.depends({config_type: "tmpl"})
+    routeGridSectionValue.depends({ config_type: "tmpl" })
 
     let routeGridSection = routeGridSectionValue.subsection;
     routeGridSection.rowcolors = true
@@ -359,7 +439,7 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
 
     let dnsGridSectionValue = s.taboption('dns', form.SectionValue, '_dns_servers',
         form.GridSection, LuciFlied.SHUNT_DNS_NODE_TYPE, _('DNS节点配置'));
-    dnsGridSectionValue.depends({config_type: "tmpl"})
+    dnsGridSectionValue.depends({ config_type: "tmpl" })
 
     let dnsGridSection = dnsGridSectionValue.subsection;
     dnsGridSection.rowcolors = true
@@ -433,15 +513,15 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
 
     let testUrl = ss.option(form.Value, 'url', _('测试URL'),
         _('输入一个测试的URL地址，默认使用 https://www.gstatic.com/generate_204'));
-    testUrl.depends({lb_node_list: /^\s*\S.*$/})
+    testUrl.depends({ lb_node_list: /^\s*\S.*$/ })
 
     let testInterval = ss.option(form.Value, 'interval', _('测试间隔'),
         _('设置测试的间隔时间，默认3m'));
-    testInterval.depends({lb_node_list: /^\s*\S.*$/})
+    testInterval.depends({ lb_node_list: /^\s*\S.*$/ })
 
     let testTimeout = ss.option(form.Value, 'timeout', _('测试超时'),
         _('设置测试的超时时间，默认2s'));
-    testTimeout.depends({lb_node_list: /^\s*\S.*$/})
+    testTimeout.depends({ lb_node_list: /^\s*\S.*$/ })
 }
 
 // 创建所有标签页
@@ -475,8 +555,8 @@ function preview() {
         let shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') || 'xray'
         // 创建模态对话框显示配置
         ui.showModal(_('配置预览'), [
-            E('div', {'class': 'cbi-section'}, [
-                E('div', {'class': 'cbi-section-descr'},
+            E('div', { 'class': 'cbi-section' }, [
+                E('div', { 'class': 'cbi-section-descr' },
                     _('以下是根据当前配置生成的 %s JSON配置：').format(shuntType)),
                 E('pre', {
                     'style': 'max-height: 500px; overflow: auto; padding: 10px; border-radius: 4px;',
@@ -581,16 +661,16 @@ function loadDNSServerOptions(option: LuCI.form.AbstractValue, includeDefault: b
 
 // 创建SectionValue容器
 function createSectionContainer<T extends LuCI.form.AbstractSection>(s: LuCI.form.AbstractSection, tab: string, id: string,
-                                                                     sectionType: T, sectionName: string, title: string) {
+    sectionType: T, sectionName: string, title: string) {
     let o = s.taboption(tab, form.SectionValue, id, sectionType, sectionName, title);
-    o.depends({config_type: "tmpl"});
+    o.depends({ config_type: "tmpl" });
     return o;
 }
 
 // 创建必填的ListValue
 function createRequiredListValue(section: LuCI.form.AbstractSection,
-                                 name: string, title: string, description: string,
-                                 validator?: Function) {
+    name: string, title: string, description: string,
+    validator?: Function) {
     let o = section.option(form.ListValue, name, title, description);
     o.rmempty = false;
     if (validator) {
@@ -602,8 +682,8 @@ function createRequiredListValue(section: LuCI.form.AbstractSection,
 
 // 创建DynamicList并添加校验
 function createValidatedDynamicList(section: LuCI.form.AbstractSection,
-                                    name: string, title: string, description: string,
-                                    sectionType: string, getItemName: (section: any) => any) {
+    name: string, title: string, description: string,
+    sectionType: string, getItemName: (section: any) => any) {
     let o = section.option(form.DynamicList, name, title, description);
 
     // 动态加载选项

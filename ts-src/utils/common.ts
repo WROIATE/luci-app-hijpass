@@ -133,6 +133,11 @@ const MiscUtils = {
 };
 
 const LuciUtils = {
+    getServiceInstances: async function (confName: string): Promise<any> {
+        const res = await callServiceList(confName);
+        return res?.[confName]?.['instances'] ?? {};
+    },
+
     refreshServiceStatus: function (type: string) {
         return async function () {
             const res = await L.resolveDefault(MiscUtils.getServiceInfo());
@@ -740,6 +745,7 @@ const WebUtils = {
 
         let o = tab ? s.taboption(tab, form.Flag, 'log_enabled', _('记录日志'))
             : s.option(form.Flag, 'log_enabled', _('记录日志'));
+        o.modalonly = true;
         o.write = function (section_id: string, value: string) {
             let log_file = 'shunt.log'
             let name = uci.get(conf_type, section_id, 'name');

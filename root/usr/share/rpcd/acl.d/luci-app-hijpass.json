@@ -54,6 +54,9 @@
         "/usr/lib/hijpass/net.sh port [0-9]*": [
           "exec"
         ],
+        "/usr/lib/hijpass/net.sh ping [0-9]*": [
+          "exec"
+        ],
         "/usr/lib/hijpass/geoview.sh -e *": [
           "exec"
         ],

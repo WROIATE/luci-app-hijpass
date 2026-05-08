@@ -2,18 +2,18 @@ import view from "view";
 import uci from "uci";
 import {LuciFlied} from "../enum/hijpass";
 import form from "form";
-import {WebUtils} from "../utils/common";
-import fs from "fs";
+import {LuciUtils, WebUtils} from "../utils/common";
 
 const v = view.extend({
     load: function () {
         return Promise.all([
             uci.load(LuciFlied.SERVER_CONF_NAME),
             uci.load(LuciFlied.CONF_NAME),
+            LuciUtils.getServiceInstances(LuciFlied.SERVER_CONF_NAME),
         ]);
     },
 
-    render: async function () {
+    render: async function (data: any[]) {
         let m = new form.Map(LuciFlied.SERVER_CONF_NAME, _('服务端设置'),
             _('配置服务端程序设置'));
 
@@ -29,9 +29,8 @@ const v = view.extend({
                 || sectionId;
         };
         s.cloneable = true;
-        // 创建所有代理配置选项
-        let data = await getPortStatus();
-        createProxyOptions(s, data);
+        const instances = data[2] ?? {};
+        createProxyOptions(s, instances);
 
         return m.render();
     },
@@ -54,7 +53,7 @@ function createFirewallEnabledOption(s: LuCI.form.AbstractSection) {
 }
 
 // 创建Grid表格显示选项
-function createGridDisplayOptions(s: LuCI.form.AbstractSection, data: { [key: string]: boolean }) {
+function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) {
 
     // 运行命令（在表格中显示，截取显示）
     let o = createCommandOption(s);
@@ -66,19 +65,22 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, data: { [key: st
         }
         return command || '';
     };
-    let getPortStatusElement = function (section_id: string, port_key: string) {
-        let value = uci.get(LuciFlied.SERVER_CONF_NAME, section_id, port_key);
-        return E('span', {
-            'id': 'port-' + value,
-            'style': 'color: ' + (data[value] ? 'green' : 'red')
-        }, value);
-    }
 
-    o = s.option(form.TextValue, 'listen_port', _('监听端口'),
+    let portOpt = s.option(form.TextValue, 'listen_port', _('监听端口'),
         _('指定服务端监听端口号'));
-    o.modalonly = false;
-    o.textvalue = function (section_id: string) {
-        return getPortStatusElement(section_id, 'listen_port');
+    portOpt.modalonly = false;
+    portOpt.textvalue = function (section_id: string) {
+        let value = uci.get(LuciFlied.SERVER_CONF_NAME, section_id, 'listen_port');
+        return E('span', {}, value || '-');
+    };
+
+    let statusOpt = s.option(form.TextValue, 'run_status', _('状态'), _(''));
+    statusOpt.modalonly = false;
+    statusOpt.textvalue = function (section_id: string) {
+        const name = uci.get(LuciFlied.SERVER_CONF_NAME, section_id, 'name');
+        const instanceName = section_id + (name ? '-' + name : '');
+        const running = instances?.[instanceName]?.running ?? false;
+        return E('span', {style: 'color:' + (running ? 'green' : 'red')}, running ? _('运行中') : _('未运行'));
     };
 
     o = createEnabledOption(s);
@@ -128,9 +130,9 @@ function createLogRedirectOption(s: LuCI.form.AbstractSection) {
 }
 
 // 创建所有代理配置选项
-function createProxyOptions(s: LuCI.form.AbstractSection, data: { [key: string]: boolean }) {
+function createProxyOptions(s: LuCI.form.AbstractSection, instances: any) {
     // 创建Grid表格显示选项
-    createGridDisplayOptions(s, data);
+    createGridDisplayOptions(s, instances);
     createNodeNameOption(s);
     // 启用状态（在表格中显示并可直接修改）
     createEnabledOption(s);
@@ -142,16 +144,5 @@ function createProxyOptions(s: LuCI.form.AbstractSection, data: { [key: string]:
     createLogRedirectOption(s);
 }
 
-async function getPortStatus() {
-    let portList = []
-    uci.sections(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (section) => {
-        if (section.listen_port) portList.push(section.listen_port);
-    });
-    try {
-        return await L.resolveDefault(fs.exec_direct(`/usr/lib/hijpass/net.sh`, ['port'].concat(portList), "json"), {});
-    } catch (error) {
-        console.log('Error:', error);
-    }
-}
 
 export default v;

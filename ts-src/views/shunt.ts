@@ -1,6 +1,6 @@
 import { LuciUtils, ShuntUtils, WebUtils } from "../utils/common";
 
-import { HijpassValues, LuciFlied, ShuntTag } from "../enum/hijpass";
+import { HijpassValues, LuciFlied } from "../enum/hijpass";
 import ui from 'ui';
 import form from "form";
 import view from 'view';
@@ -17,6 +17,7 @@ const v = view.extend({
         try {
             await view.prototype.handleSave(ev)
         } catch (e) {
+            console.log(e);
             WebUtils.showErrorNotification(_('配置保存失败'), _(e.message), 5000);
         }
     },
@@ -46,6 +47,11 @@ const v = view.extend({
 
 // 创建基础配置选项
 function createBasicOptions(s: LuCI.form.AbstractSection) {
+    // 总开关
+    let enabled = s.taboption('basic', form.Flag, 'enabled', _('启用分流'), _(''));
+    enabled.default = '1';
+    enabled.rmempty = false;
+
     // 分流类型
     let serviceType = s.taboption('basic', form.ListValue, 'type', _('分流类型'),
         _('选择分流程序类型'));
@@ -158,21 +164,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
         });
 
         // 构建全量节点选项列表（用于"替换为"）
-        const allNodeOptions: { value: string, label: string }[] = [
-            { value: ShuntTag.DIRECT_OUTBOUND_TAG, label: _('直连') },
-            { value: ShuntTag.BLOCK_OUTBOUND_TAG, label: _('阻止') },
-        ];
-        uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
-            if (section.name && section.enabled !== '0') {
-                let label = section.name;
-                if (section.socks_port) label += ' (' + section.socks_port + ')';
-                allNodeOptions.push({ value: section.name, label });
-            }
-        });
-        const slbOutbounds = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
-        if (slbOutbounds && slbOutbounds.length > 0) {
-            allNodeOptions.push({ value: ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, label: _('负载均衡') });
-        }
+        const allNodeOptions = WebUtils.getEnabledProxyNodeOptions(true);
 
         // "从节点"只显示规则中实际使用的节点
         const fromNodeOptions = allNodeOptions.filter(o => usedNodeValues.has(o.value));
@@ -488,40 +480,132 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
 
 // 创建负载均衡选项
 function createSLBOptions(s: LuCI.form.AbstractSection) {
-    let o = createSectionContainer(s, 'slb', '_slb_global',
-        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _(''))
-    let ss = o.subsection;
-    ss.anonymous = true;
-    ss.addremove = false;
+    const lbNodeLoader = function (section: any) {
+        if (section.name && section.enabled !== '0') {
+            let displayName = section.name;
+            if (section.socks_port) displayName += ' (' + section.socks_port + ')';
+            return { value: section.name, display: displayName };
+        }
+        return null;
+    };
 
-    createValidatedDynamicList(ss, 'lb_node_list', _('负载均衡'),
-        _('根据所选节点健康度自动调整出口路由，配置后可在代理节点处选择负载均衡节点'),
-        LuciFlied.PROXY_NODE_TYPE,
-        function (section: any) {
-            if (section.name && section.enabled !== '0') {
-                let displayName = section.name;
-                if (section.socks_port) {
-                    displayName += ' (' + section.socks_port + ')';
-                }
-                return {
-                    value: section.name,
-                    display: displayName
-                };
-            }
-            return null;
-        });
+    // ── global：节点列表（xray 和 sing-box 都显示）──────────────────────
+    let oGlobal = s.taboption('slb', form.SectionValue, '_slb_global',
+        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _(''));
+    oGlobal.depends({ config_type: 'tmpl', type: 'xray' });
+    oGlobal.depends({ config_type: 'tmpl', type: 'sing-box' });
+    let gSs = oGlobal.subsection;
+    gSs.anonymous = true;
+    gSs.addremove = false;
 
-    let testUrl = ss.option(form.Value, 'url', _('测试URL'),
-        _('输入一个测试的URL地址，默认使用 https://www.gstatic.com/generate_204'));
-    testUrl.depends({ lb_node_list: /^\s*\S.*$/ })
+    createValidatedDynamicList(gSs, 'lb_node_list', _('负载均衡节点'),
+        _('根据所选节点健康度自动调整出口路由，配置后可在路由规则处选择负载均衡节点'),
+        LuciFlied.PROXY_NODE_TYPE, lbNodeLoader);
 
-    let testInterval = ss.option(form.Value, 'interval', _('测试间隔'),
-        _('设置测试的间隔时间，默认3m'));
-    testInterval.depends({ lb_node_list: /^\s*\S.*$/ })
+    // ── sing-box：URLTest 参数 ────────────────────────────────────────
+    let oSingBox = s.taboption('slb', form.SectionValue, '_slb_singbox',
+        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('sing-box URLTest'));
+    oSingBox.depends({ config_type: 'tmpl', type: 'sing-box' });
+    let sbSs = oSingBox.subsection;
+    sbSs.anonymous = true;
+    sbSs.addremove = false;
 
-    let testTimeout = ss.option(form.Value, 'timeout', _('测试超时'),
-        _('设置测试的超时时间，默认2s'));
-    testTimeout.depends({ lb_node_list: /^\s*\S.*$/ })
+    let sbUrl = sbSs.option(form.Value, 'url', _('测试 URL'),
+        _('健康检查请求的目标 URL，默认 https://www.gstatic.com/generate_204'));
+    sbUrl.placeholder = 'https://www.gstatic.com/generate_204';
+
+    let sbInterval = sbSs.option(form.Value, 'interval', _('测试间隔'),
+        _('健康检查间隔，如 3m、30s，默认 3m'));
+    sbInterval.placeholder = '3m';
+
+    let sbTolerance = sbSs.option(form.Value, 'tolerance', _('容错值 (ms)'),
+        _('最优节点与当前节点的延迟差容忍值（毫秒），默认 50'));
+    sbTolerance.placeholder = '50';
+    sbTolerance.datatype = 'uinteger';
+
+    let sbIdleTimeout = sbSs.option(form.Value, 'idle_timeout', _('空闲超时'),
+        _('节点空闲超时时间，如 30m，默认 30m'));
+    sbIdleTimeout.placeholder = '30m';
+
+    sbSs.option(form.Flag, 'interrupt_exist_connections', _('切换时中断现有连接'),
+        _('当选中出站变更时是否中断现有连接'));
+
+    // ── xray：Balancer + BurstObservatory 参数 ────────────────────────
+    let oXray = s.taboption('slb', form.SectionValue, '_slb_xray',
+        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('Xray Balancer'));
+    oXray.depends({ config_type: 'tmpl', type: 'xray' });
+    let xSs = oXray.subsection;
+    xSs.anonymous = true;
+    xSs.addremove = false;
+
+    let xrayStrategy = xSs.option(form.ListValue, 'strategy', _('负载策略'),
+        _('负载均衡选择策略'));
+    xrayStrategy.value('random', _('随机'));
+    xrayStrategy.value('roundRobin', _('轮询'));
+    xrayStrategy.value('leastPing', _('最低 Ping'));
+    xrayStrategy.value('leastLoad', _('最低负载'));
+    xrayStrategy.default = 'leastLoad';
+
+    let xrayExpected = xSs.option(form.Value, 'strategy_expected', _('最优节点数'),
+        _('选出的最优节点个数，流量在这几个节点中随机分配'));
+    xrayExpected.placeholder = '1';
+    xrayExpected.datatype = 'uinteger';
+    xrayExpected.depends('strategy', 'leastLoad');
+
+    let xrayMaxRtt = xSs.option(form.Value, 'strategy_max_rtt', _('最高可接受 RTT'),
+        _('最高可接受的 RTT 时长，如 1s、500ms'));
+    xrayMaxRtt.placeholder = '1s';
+    xrayMaxRtt.depends('strategy', 'leastLoad');
+
+    let xrayTolerance = xSs.option(form.Value, 'strategy_tolerance', _('失败率容忍'),
+        _('最多可接受的测速失败比例，如 0.05 表示 5%'));
+    xrayTolerance.placeholder = '0.05';
+    xrayTolerance.depends('strategy', 'leastLoad');
+
+    let xrayFallback = xSs.option(form.ListValue, 'fallback_tag', _('备用节点'),
+        _('所有节点不可用时的备用出站'));
+    xrayFallback.value('', _('无'));
+    uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
+        if (section.name && section.enabled !== '0') xrayFallback.value(section.name, section.name);
+    });
+
+    let xrayProbeUrl = xSs.option(form.Value, 'probe_url', _('探测 URL'),
+        _('健康检查探测目标 URL，应返回 HTTP 204'));
+    xrayProbeUrl.placeholder = 'https://connectivitycheck.gstatic.com/generate_204';
+    xrayProbeUrl.depends('strategy', 'leastPing');
+    xrayProbeUrl.depends('strategy', 'leastLoad');
+
+    let xrayProbeConnectivity = xSs.option(form.Value, 'probe_connectivity', _('本地连通性检测 URL'),
+        _('本地网络连通性检测 URL，为空则不检测'));
+    xrayProbeConnectivity.depends('strategy', 'leastPing');
+    xrayProbeConnectivity.depends('strategy', 'leastLoad');
+
+    let xrayProbeInterval = xSs.option(form.Value, 'probe_interval', _('探测间隔'),
+        _('平均探测间隔，最小 10s，默认 1m'));
+    xrayProbeInterval.placeholder = '1m';
+    xrayProbeInterval.depends('strategy', 'leastPing');
+    xrayProbeInterval.depends('strategy', 'leastLoad');
+
+    let xrayProbeTimeout = xSs.option(form.Value, 'probe_timeout', _('探测超时'),
+        _('探测超时时间，默认 5s'));
+    xrayProbeTimeout.placeholder = '5s';
+    xrayProbeTimeout.depends('strategy', 'leastPing');
+    xrayProbeTimeout.depends('strategy', 'leastLoad');
+
+    let xrayProbeSampling = xSs.option(form.Value, 'probe_sampling', _('保留结果数'),
+        _('保留最近探测结果的数量，默认 10'));
+    xrayProbeSampling.placeholder = '10';
+    xrayProbeSampling.datatype = 'uinteger';
+    xrayProbeSampling.depends('strategy', 'leastPing');
+    xrayProbeSampling.depends('strategy', 'leastLoad');
+
+    let xrayProbeHttpMethod = xSs.option(form.ListValue, 'probe_http_method', _('探测 HTTP 方法'),
+        _('探测使用的 HTTP 方法，默认 HEAD'));
+    xrayProbeHttpMethod.value('', _('默认 (HEAD)'));
+    xrayProbeHttpMethod.value('HEAD', 'HEAD');
+    xrayProbeHttpMethod.value('GET', 'GET');
+    xrayProbeHttpMethod.depends('strategy', 'leastPing');
+    xrayProbeHttpMethod.depends('strategy', 'leastLoad');
 }
 
 // 创建所有标签页
@@ -586,6 +670,7 @@ function preview() {
             ])
         ]);
     } catch (err) {
+        console.log(err);
         WebUtils.showErrorNotification("配置生成失败", _(err.message), 5000);
     }
 }
@@ -601,37 +686,9 @@ function shuntConfWrite(func: Function) {
     }
 }
 
-// 封装：动态加载代理节点选项
+// 封装：动态加载代理节点选项（委托给 WebUtils）
 function loadProxyNodeOptions(option: LuCI.form.AbstractValue, includeSLB: boolean) {
-    option.load = function (section_id) {
-        delete this.keylist;
-        delete this.vallist;
-
-        this.value(ShuntTag.DIRECT_OUTBOUND_TAG, _('直连'));
-        if (includeSLB !== false) {
-            this.value(ShuntTag.BLOCK_OUTBOUND_TAG, _('阻止'));
-        }
-
-        uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
-            if (section.name && section.enabled !== '0') {
-                let displayName = section.name;
-                if (section.socks_port) {
-                    displayName += ' (' + section.socks_port + ')';
-                }
-                this.value(section.name, displayName);
-            }
-        }.bind(this));
-
-        if (includeSLB !== false) {
-            let slbOutbounds = uci.get_first(
-                LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
-            if (slbOutbounds && slbOutbounds.length > 0) {
-                this.value(ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, _('负载均衡'));
-            }
-        }
-
-        return form.ListValue.prototype.load.apply(this, [section_id]);
-    };
+    WebUtils.loadProxyNodeOptions(option, includeSLB);
 }
 
 

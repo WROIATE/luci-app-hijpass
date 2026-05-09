@@ -64,6 +64,11 @@ run_server() {
   config_get listen_port "$1" listen_port
   config_get allow_firewall "$1" allow_firewall
 
+  local server_dir
+  server_dir=$(uci -q get hijserver.@hijserver[0].server_dir || echo '/etc/hijpass/server')
+  local conf_path="$server_dir/$name-$1.json"
+  command=$(echo "$command" | sed "s|{conf_path}|$conf_path|g")
+
   if [ -n "$log_path" ]; then
     : > "$log_path"
     command="$command >> $log_path 2>&1"

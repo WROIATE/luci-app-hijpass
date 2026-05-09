@@ -2,7 +2,7 @@ import view from "view";
 import uci from "uci";
 import {LuciFlied, HijpassValues, PROXY_TYPE} from "../enum/hijpass";
 import form from "form";
-import {LuciUtils, ShuntUtils, WebUtils} from "../utils/common";
+import {LuciUtils, WebUtils} from "../utils/common";
 import fs from "fs";
 import ui from "ui";
 
@@ -259,14 +259,20 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
  * 创建自定义代理的特定选项
  */
 function createCustomProxyOptions(s: LuCI.form.AbstractSection) {
-    // 运行命令
-    let o = s.option(form.Value, 'command', _('运行命令'),
-        _('指定代理程序运行命令'));
-    o.default = '/usr/bin/xray -c /etc/hijpass/proxy.json';
-    o.rmempty = false;
-    o.modalonly = true;
-    o.depends('type', PROXY_TYPE.CUSTOM);
-    return o;
+    // 运行命令，{conf_path} 为配置文件路径占位符
+    let cmdOpt = s.option(form.Value, 'command', _('运行命令'),
+        _('指定代理程序运行命令，使用 {conf_path} 引用自动生成的配置文件路径'));
+    cmdOpt.default = '/usr/bin/xray -c {conf_path}';
+    cmdOpt.rmempty = false;
+    cmdOpt.modalonly = true;
+    cmdOpt.depends('type', PROXY_TYPE.CUSTOM);
+
+    // 配置文件内容编辑器，路径自动生成为 $client_dir/$name-$section_id.json
+    let confOpt = s.option(form.TextValue, 'custom_conf', _('配置文件内容'),
+        _('编辑配置文件内容，保存时自动写入对应路径'));
+    confOpt.modalonly = true;
+    confOpt.depends('type', PROXY_TYPE.CUSTOM);
+    WebUtils.setConfContentOptionMembers(confOpt, LuciFlied.CONF_NAME, WebUtils.getFilePath('client_dir'));
 }
 
 /**
@@ -277,24 +283,6 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
     let listenInp: HTMLInputElement | null = null;
     let socksInp: HTMLInputElement | null = null;
 
-    // 获取除本节点外所有已占用端口
-    const getOtherUsedPorts = (section_id: string): number[] => {
-        let ports: number[] = [];
-        uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
-            if (section['.name'] === section_id) return;
-            if (section.listen_port) ports.push(Number(section.listen_port));
-            if (section.socks_port) ports.push(Number(section.socks_port));
-        });
-        uci.sections(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (section) => {
-            if (section.listen_port) ports.push(Number(section.listen_port));
-        });
-        const shunt = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
-        if (shunt?.shunt_listen_port) ports.push(Number(shunt.shunt_listen_port));
-        if (shunt?.dns_listen_port) ports.push(Number(shunt.dns_listen_port));
-        const dns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE);
-        if (dns?.cdg_port) ports.push(Number(dns.cdg_port));
-        return ports;
-    };
 
     let listenPortOpt = s.option(form.Value, 'listen_port', _('本地监听端口'),
         _('指定本地透明代理监听端口号'));
@@ -313,7 +301,7 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
         if (value) {
             return value;
         }
-        let port = findAvailablePort(7890)
+        let port = WebUtils.findAvailablePort(7890)
         form.Value.prototype.write.call(this, section_id, port);
         return port.toString();
     };
@@ -326,7 +314,7 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
             type: 'button',
             click: function () {
                 let current = Number(listenInp.value);
-                let usedPorts = getOtherUsedPorts(section_id);
+                let usedPorts = WebUtils.getUsedPortsExcluding(section_id);
                 let siblingPort = socksInp ? Number(socksInp.value) : 0;
                 if (siblingPort) usedPorts.push(siblingPort);
                 if (current && !usedPorts.includes(current)) return;
@@ -357,7 +345,7 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
         if (value) {
             return value;
         }
-        let port = findAvailablePort(7891)
+        let port = WebUtils.findAvailablePort(7891)
         form.Value.prototype.write.call(this, section_id, port);
         return port.toString();
     };
@@ -370,7 +358,7 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
             type: 'button',
             click: function () {
                 let current = Number(socksInp.value);
-                let usedPorts = getOtherUsedPorts(section_id);
+                let usedPorts = WebUtils.getUsedPortsExcluding(section_id);
                 let siblingPort = listenInp ? Number(listenInp.value) : 0;
                 if (siblingPort) usedPorts.push(siblingPort);
                 if (current && !usedPorts.includes(current)) return;
@@ -953,23 +941,5 @@ function createProxyOptions(s: LuCI.form.AbstractSection, instances: any) {
 
 
 
-/**
- * 查找第一个可用的端口（从起始端口开始）
- */
-function findAvailablePort(startPort: number): number {
-    let usedPorts = WebUtils.getUsedPorts();
-    let port = startPort;
-
-    // 最多尝试 1000 个端口，防止无限循环
-    for (let i = 0; i < 1000; i++) {
-        if (!usedPorts.includes(port)) {
-            return port;
-        }
-        port++;
-    }
-
-    // 如果找不到可用端口，返回起始端口
-    return startPort;
-}
 
 export default v;

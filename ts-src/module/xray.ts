@@ -325,18 +325,22 @@ class BurstObservatory {
     subjectSelector: string[];
     pingConfig: {
         destination: string;
+        connectivity: string;
         interval: string;
         timeout: string;
         sampling: number;
+        httpMethod: string;
     };
 
-    constructor(url: string, interval: string, timeout: string, sampling: number) {
+    constructor(destination: string, connectivity: string, interval: string, timeout: string, sampling: number, httpMethod: string) {
         this.subjectSelector = []
         this.pingConfig = {
-            destination: url ? url : "https://connectivitycheck.gstatic.com/generate_204",
-            interval: interval ? interval : "60s",
-            timeout: timeout ? timeout : "2s",
-            sampling: sampling ? sampling : 3
+            destination: destination || "https://connectivitycheck.gstatic.com/generate_204",
+            connectivity: connectivity || undefined,
+            interval: interval || "60s",
+            timeout: timeout || "2s",
+            sampling: sampling || 3,
+            httpMethod: httpMethod || undefined,
         }
     }
 }

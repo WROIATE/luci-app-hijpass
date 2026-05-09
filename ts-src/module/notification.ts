@@ -169,7 +169,7 @@ class NotificationManager {
                 line-height: 1.4;
                 opacity: 0.9;
             `;
-            contentEl.textContent = notificationContent;
+            contentEl.innerHTML = notificationContent;
             contentContainer.appendChild(contentEl);
         }
 

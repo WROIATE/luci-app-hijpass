@@ -1,4 +1,4 @@
-import {HijpassValues, LuciFlied, PROXY_TYPE} from "../enum/hijpass";
+import { LuciFlied, PROXY_TYPE, ShuntTag } from "../enum/hijpass";
 import {
     RuleDTO,
     DnsNode,
@@ -20,8 +20,8 @@ import uci from "uci";
 import fs from "fs";
 import form from "form";
 import ui from "ui";
-import {LuciConverterFactory, ShuntConfFactory, FactoryType} from "./factory";
-import {SingBoxUtils} from "./singbox/config";
+import { LuciConverterFactory, ShuntConfFactory, FactoryType } from "./factory";
+import { SingBoxUtils } from "./singbox/config";
 import notificationManager from "../module/notification";
 
 
@@ -29,7 +29,7 @@ const callServiceList = rpc.declare({
     object: 'service',
     method: 'list',
     params: ['name'],
-    expect: {'': {}}
+    expect: { '': {} }
 })
 
 const MiscUtils = {
@@ -113,7 +113,7 @@ const MiscUtils = {
         let filename = pathOrUrl.split('/').pop();
         let tag = filename.substring(0, filename.lastIndexOf('.')) || filename;
         let format = (type === 'remote' ? pathOrUrl : filename).endsWith('srs') ? 'binary' : 'source';
-        return {tag: tag, type: type, format: format, pathOrUrl: pathOrUrl}
+        return { tag: tag, type: type, format: format, pathOrUrl: pathOrUrl }
     },
 
     camelToSnake: function (str: string) {
@@ -150,9 +150,9 @@ const LuciUtils = {
         return function () {
             poll.add(LuciUtils.refreshServiceStatus(type));
 
-            return E('div', {class: 'cbi-map'},
-                E('fieldset', {class: 'cbi-section'}, [
-                    E('p', {id: 'service_status', style: 'display: flex; gap: 1rem;'},
+            return E('div', { class: 'cbi-map' },
+                E('fieldset', { class: 'cbi-section' }, [
+                    E('p', { id: 'service_status', style: 'display: flex; gap: 1rem;' },
                         _('正在获取状态...'))
                 ])
             );
@@ -162,6 +162,10 @@ const LuciUtils = {
     genHandleSaveApply: function () {
         return async function (ev: Event) {
             try {
+                await this.handleSave(ev)
+
+                // ── 以下预检均在 save 后执行，读取的是用户最新提交的配置 ──
+
                 // 检查分流配置引用的代理节点是否都已启用
                 const disabledNodes = new Set<string>();
                 uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
@@ -173,19 +177,16 @@ const LuciUtils = {
                 if (disabledNodes.size > 0) {
                     const warnings: string[] = [];
 
-                    // 检查默认全局出口
                     const defaultNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'default_proxy_node');
                     if (defaultNode && disabledNodes.has(defaultNode)) {
                         warnings.push(_('默认全局出口 "%s" 未启用').format(defaultNode));
                     }
 
-                    // 检查规则集出口
                     const rulesetNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_out_node');
                     if (rulesetNode && disabledNodes.has(rulesetNode)) {
                         warnings.push(_('规则集出口 "%s" 未启用').format(rulesetNode));
                     }
 
-                    // 检查路由规则中的代理节点
                     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
                         if (section.proxy_node && disabledNodes.has(section.proxy_node)) {
                             warnings.push(_('路由规则 "%s" 的代理节点 "%s" 未启用').format(section.name || section['.name'], section.proxy_node));
@@ -195,7 +196,6 @@ const LuciUtils = {
                         }
                     });
 
-                    // 检查负载均衡节点列表
                     const lbNodeList = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
                     if (Array.isArray(lbNodeList)) {
                         lbNodeList.forEach((node: string) => {
@@ -205,21 +205,24 @@ const LuciUtils = {
                         });
                     }
 
-                        if (warnings.length > 0) {
+                    if (warnings.length > 0) {
                         WebUtils.showWarningNotification(_('配置包含未启用的节点'), warnings.join('<br>'), 8000);
                         return;
                     }
                 }
 
-                // save 前：用当前 UCI 内存数据预校验配置（若生成失败则阻止保存）
-                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === FactoryType.SING_BOX) {
-                    SingBoxUtils.writeGeoRule()
+                // 当 shunt 未启用时，若防火墙分流端口指向 shunt 监听端口，阻止后续操作
+                const shuntEnabled = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled');
+                if (shuntEnabled === '0') {
+                    const shuntListenPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_listen_port');
+                    const fwShuntPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.FIREWALL_SECTION_TYPE, 'shunt_port');
+                    if (shuntListenPort && fwShuntPort === shuntListenPort) {
+                        WebUtils.showWarningNotification(_('配置冲突'), _('分流已禁用，请先将防火墙默认分流端口切换为不使用'), 8000);
+                        return;
+                    }
                 }
-                ShuntUtils.getShuntConfData()
 
-                await this.handleSave(ev)
-
-                // handleSave 后重新生成，确保写入文件的是最新数据
+                // 生成分流配置并写入文件
                 if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === FactoryType.SING_BOX) {
                     SingBoxUtils.writeGeoRule()
                 }
@@ -237,6 +240,16 @@ const LuciUtils = {
                         }
                         if (change.length === 4 && change[0] === "set" && change[2] === "name") {
                             await fs.exec("/usr/lib/hijpass/rm.sh", ['proxy', change[1]]);
+                        }
+                    }
+                }
+                if (changes && changes.hijserver) {
+                    for (let change of changes.hijserver) {
+                        if (change.length === 2 && change[0] === "remove") {
+                            await fs.exec("/usr/lib/hijpass/rm.sh", ['server', change[1]]);
+                        }
+                        if (change.length === 4 && change[0] === "set" && change[2] === "name") {
+                            await fs.exec("/usr/lib/hijpass/rm.sh", ['server', change[1]]);
                         }
                     }
                 }
@@ -409,7 +422,25 @@ const ShuntUtils = {
 
     getShuntConfData: function () {
         let data = "";
+        const shuntEnabled = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled');
+        if (shuntEnabled === '0') return data;
         if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
+            // 检查负载均衡节点列表是否为空但仍被使用
+            const lbNodeList = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
+            const lbEmpty = !lbNodeList || (Array.isArray(lbNodeList) && lbNodeList.filter((v: string) => v).length === 0);
+            if (lbEmpty) {
+                let inUse = false;
+                uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
+                    if (section.proxy_node === ShuntTag.LOAD_BALANCE_OUTBOUND_TAG) inUse = true;
+                });
+                if (!inUse) {
+                    const defaultNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'default_proxy_node');
+                    if (defaultNode === ShuntTag.LOAD_BALANCE_OUTBOUND_TAG) inUse = true;
+                }
+                if (inUse) {
+                    throw new Error(_('负载均衡节点列表为空，但仍有规则使用负载均衡出口，请先移除相关规则或添加节点'));
+                }
+            }
             let type = uci.get_first(LuciFlied.CONF_NAME,
                 LuciFlied.SHUNT_SECTION_TYPE, 'type')
             data = JSON.stringify(ShuntConfFactory.getShuntUtils(type).genShuntConf(), ShuntUtils.omitEmptyReplacer, 2)
@@ -507,44 +538,53 @@ const WebUtils = {
      * 获取所有已占用的端口
      */
     getUsedPorts: function (): number[] {
-        let usedPorts: number[] = [];
-
-        // 收集所有 proxy 节点的端口
+        let ports: number[] = [];
         uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
-            if (section.listen_port) {
-                usedPorts.push(Number(section.listen_port));
-            }
-            if (section.socks_port) {
-                usedPorts.push(Number(section.socks_port));
-            }
+            if (section.listen_port) ports.push(Number(section.listen_port));
+            if (section.socks_port) ports.push(Number(section.socks_port));
         });
-
         uci.sections(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (section) => {
-            if (section.listen_port) {
-                usedPorts.push(Number(section.listen_port));
-            }
+            if (section.listen_port) ports.push(Number(section.listen_port));
         });
+        const shunt = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
+        if (shunt?.shunt_listen_port) ports.push(Number(shunt.shunt_listen_port));
+        if (shunt?.dns_listen_port) ports.push(Number(shunt.dns_listen_port));
+        const dns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE);
+        if (dns?.cdg_port) ports.push(Number(dns.cdg_port));
+        return ports;
+    },
 
-        // 收集 shunt 配置占用的端口
-        let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
-        if (shuntSection) {
-            if (shuntSection.shunt_listen_port) {
-                usedPorts.push(Number(shuntSection.shunt_listen_port));
-            }
-            if (shuntSection.dns_listen_port) {
-                usedPorts.push(Number(shuntSection.dns_listen_port));
-            }
+    /**
+     * 获取除指定 section 自身外的所有已占用端口（用于复制节点场景）
+     */
+    getUsedPortsExcluding: function (excludeSectionId: string): number[] {
+        let ports: number[] = [];
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
+            if (section['.name'] === excludeSectionId) return;
+            if (section.listen_port) ports.push(Number(section.listen_port));
+            if (section.socks_port) ports.push(Number(section.socks_port));
+        });
+        uci.sections(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, (section) => {
+            if (section.listen_port) ports.push(Number(section.listen_port));
+        });
+        const shunt = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
+        if (shunt?.shunt_listen_port) ports.push(Number(shunt.shunt_listen_port));
+        if (shunt?.dns_listen_port) ports.push(Number(shunt.dns_listen_port));
+        const dns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE);
+        if (dns?.cdg_port) ports.push(Number(dns.cdg_port));
+        return ports;
+    },
+
+    /**
+     * 从起始端口开始查找第一个可用端口
+     */
+    findAvailablePort: function (startPort: number, extraExclude: number[] = []): number {
+        const used = [...WebUtils.getUsedPorts(), ...extraExclude];
+        let port = startPort;
+        for (let i = 0; i < 1000; i++, port++) {
+            if (!used.includes(port)) return port;
         }
-
-        // 收集 shunt 配置占用的端口
-        let dnsSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE);
-        if (dnsSection) {
-            if (dnsSection.cdg_port) {
-                usedPorts.push(Number(dnsSection.cdg_port));
-            }
-        }
-
-        return usedPorts;
+        return startPort;
     },
 
     // 端口冲突检查函数
@@ -676,8 +716,39 @@ const WebUtils = {
         return o;
     },
 
+    /**
+     * 为节点配置文件内容编辑器设置 load/write/remove，
+     * 路径自动生成为 {dirPath}/{name}-{section_id}.json
+     * @param o         TextValue 选项
+     * @param confName  UCI 配置名（读取 name 字段用）
+     * @param dirPath   配置文件目录路径
+     */
+    setConfContentOptionMembers: function (
+        o: LuCI.form.AbstractValue,
+        confName: string,
+        dirPath: string
+    ) {
+        (o as any).monospace = true;
+        (o as any).rows = 20;
+
+        const getFilePath = (section_id: string) => {
+            const name = uci.get(confName, section_id, 'name') || section_id;
+            return dirPath + '/' + name + '-' + section_id + '.json';
+        };
+
+        o.load = function (section_id: string) {
+            return L.resolveDefault(fs.read(getFilePath(section_id)), '');
+        };
+        o.write = async function (section_id: string, value: string) {
+            await fs.write(getFilePath(section_id), (value || '').trim() + '\n');
+        };
+        o.remove = function (section_id: string) {
+            fs.write(getFilePath(section_id), '');
+        };
+    },
+
     createTextOption: function (s: LuCI.form.AbstractSection, tabName: string,
-                                fieldName: string, title: string, description: string, filePath: string) {
+        fieldName: string, title: string, description: string, filePath: string) {
         let o = s.taboption(tabName, form.TextValue, fieldName, title, description);
         WebUtils.setEditorOptionMembers(o, filePath, fieldName);
         return o;
@@ -709,28 +780,28 @@ const WebUtils = {
      * 显示成功通知（支持 title 和 content）
      */
     showSuccessNotification: function (title: string, content?: string, duration?: number) {
-        return notificationManager.show({title, content, type: 'success', duration});
+        return notificationManager.show({ title, content, type: 'success', duration });
     },
 
     /**
      * 显示错误通知（支持 title 和 content）
      */
     showErrorNotification: function (title: string, content?: string, duration?: number) {
-        return notificationManager.show({title, content, type: 'error', duration});
+        return notificationManager.show({ title, content, type: 'error', duration });
     },
 
     /**
      * 显示警告通知（支持 title 和 content）
      */
     showWarningNotification: function (title: string, content?: string, duration?: number) {
-        return notificationManager.show({title, content, type: 'warning', duration});
+        return notificationManager.show({ title, content, type: 'warning', duration });
     },
 
     /**
      * 显示信息通知（支持 title 和 content）
      */
     showInfoNotification: function (title: string, content?: string, duration?: number) {
-        return notificationManager.show({title, content, type: 'info', duration});
+        return notificationManager.show({ title, content, type: 'info', duration });
     },
 
     /**
@@ -773,7 +844,83 @@ const WebUtils = {
         s.anonymous = true;
         s.render = LuciUtils.renderServiceStatus(type);
         return s;
-    }
+    },
+
+    /**
+     * 将所有启用节点的 listen_port 追加为下拉选项（用于防火墙端口选择场景）。
+     */
+    appendEnabledNodeListenPorts: function (option: LuCI.form.ListValue) {
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
+            if (section.listen_port && section.enabled !== '0') {
+                let displayName = _('代理节点 %s: %s').format(section.name, section.listen_port);
+                option.value(section.listen_port, displayName);
+            }
+        });
+    },
+
+    /**
+     * 为 ListValue/DynamicList 动态加载启用的代理节点选项。
+     * @param option      目标选项
+     * @param includeSlb  是否追加阻止和负载均衡条目（默认 true）
+     */
+    loadProxyNodeOptions: function (option: LuCI.form.AbstractValue, includeSlb: boolean = true) {
+        option.load = function (section_id: string) {
+            delete this.keylist;
+            delete this.vallist;
+
+            this.value(ShuntTag.DIRECT_OUTBOUND_TAG, _('直连'));
+            if (includeSlb) {
+                this.value(ShuntTag.BLOCK_OUTBOUND_TAG, _('阻止'));
+            }
+
+            uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
+                if (section.name && section.enabled !== '0') {
+                    let displayName = section.name;
+                    if (section.socks_port) displayName += ' (' + section.socks_port + ')';
+                    this.value(section.name, displayName);
+                }
+            }.bind(this));
+
+            if (includeSlb) {
+                const lbList = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
+                if (lbList && lbList.length > 0) {
+                    this.value(ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, _('负载均衡'));
+                }
+            }
+
+            return form.ListValue.prototype.load.apply(this, [section_id]);
+        };
+    },
+
+    /**
+     * 获取所有启用代理节点的列表（用于构建 modal 里的原生 select 等场景）。
+     * @param includeSpecial 是否包含直连/阻止/负载均衡条目（默认 true）
+     */
+    getEnabledProxyNodeOptions: function (includeSpecial: boolean = true): { value: string, label: string }[] {
+        const options: { value: string, label: string }[] = [];
+
+        if (includeSpecial) {
+            options.push({ value: ShuntTag.DIRECT_OUTBOUND_TAG, label: _('直连') });
+            options.push({ value: ShuntTag.BLOCK_OUTBOUND_TAG, label: _('阻止') });
+        }
+
+        uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
+            if (section.name && section.enabled !== '0') {
+                let label = section.name;
+                if (section.socks_port) label += ' (' + section.socks_port + ')';
+                options.push({ value: section.name, label });
+            }
+        });
+
+        if (includeSpecial) {
+            const lbList = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
+            if (lbList && lbList.length > 0) {
+                options.push({ value: ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, label: _('负载均衡') });
+            }
+        }
+
+        return options;
+    },
 }
 
-export {LuciUtils, WebUtils, ShuntUtils, ProxyUtils}
+export { LuciUtils, WebUtils, ShuntUtils, ProxyUtils }

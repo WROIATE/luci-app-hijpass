@@ -10,7 +10,6 @@ case "$1" in
   rm -f "${CLIENT_DIR}/"*-"$2".json
   ;;
 "server")
-  # 暂时没有实际使用
   rm -f "${SERVER_DIR}/"*-"$2".json
   ;;
 esac

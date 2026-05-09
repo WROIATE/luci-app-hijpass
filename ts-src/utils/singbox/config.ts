@@ -83,11 +83,14 @@ function genConf() {
 
     if (shuntSection.loadBalance.lbNodeList.length > 0) {
         let lbConf = shuntSection.loadBalance
-        let testNode = new URLTest(SingBoxEnum.LOAD_BALANCE_OUTBOUND_TAG, lbConf.url,
-            parseInt(lbConf.interval, 10),
-            parseInt(lbConf.timeout, 10),
-            undefined, undefined)
-
+        let testNode = new URLTest(
+            SingBoxEnum.LOAD_BALANCE_OUTBOUND_TAG,
+            lbConf.url || undefined,
+            lbConf.interval || undefined,
+            lbConf.tolerance ? parseInt(lbConf.tolerance, 10) : undefined,
+            lbConf.idleTimeout || undefined,
+            lbConf.interruptExistConnections === '1' ? true : undefined
+        )
         testNode.outbounds = lbConf.lbNodeList
         outbounds.push(testNode)
     }

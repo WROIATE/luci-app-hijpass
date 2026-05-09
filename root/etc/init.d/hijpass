@@ -31,8 +31,7 @@ REDIRECT_LOG=
 
 # DNS
 DNS_SERVICE=$(uci -q get hijpass.@dns[0].dns_service || :)
-DNS_START_HOOK=$(uci -q get hijpass.@dns[0].start_hook || :)
-DNS_STOP_HOOK=$(uci -q get hijpass.@dns[0].stop_hook || :)
+DNS_HOOK=$(uci -q get hijpass.@hijpass[0].dns_hook || :)
 CHINADNS_NG_CONF="$CONF_PATH/chinadns-ng.conf"
 
 start_service() {
@@ -91,8 +90,11 @@ run_proxy() {
   config_get nest_proxy "$1" nest_proxy
   config_get type "$1" type
 
+  local conf_path="$CLIENT_DIR/$name-$1.json"
+  # 替换 command 中的 {conf_path} 占位符
+  command=$(echo "$command" | sed "s|{conf_path}|$conf_path|g")
+
   if [ -n "$type" ] && [ "$type" != "custom" ]; then
-    local conf_path="$CLIENT_DIR/$name-$1.json"
     local transport_type
     config_get transport_type "$1" transport_type
     if [ "$transport_type" = "xhttp" ]; then
@@ -114,7 +116,9 @@ run_proxy() {
 }
 
 run_shunt() {
-  local type log_path
+  local type log_path enabled
+  config_get enabled "$1" enabled
+  [ "$enabled" = "0" ] && log_info "Shunt disabled, skipping" && return
   config_get type "$1" type
   [ -z "$type" ] && log_error "Shunt type not set" && return
   config_get log_path "$1" log_path
@@ -144,6 +148,7 @@ open_instance() {
   if [ "$2" = "shunt" ]; then
     procd_set_param limits core="unlimited"
     procd_set_param limits nofile="1000000 1000000"
+    procd_set_param env "XRAY_LOCATION_ASSET=/usr/share/v2ray"
   fi
   config_list_foreach "$1" procd_env procd_set_env "$instance_name"
   if [ "$enable_std_log" = "1" ]; then
@@ -187,10 +192,10 @@ start_dns_service() {
     cid="$(uci show hijpass.@dns[0] | grep 'dns$' | awk -F '[.=]' '{print $2}')"
     open_instance "$cid" "chinadns-ng" "$DNS_SERVICE -C $CHINADNS_NG_CONF"
   fi
-  if [ -n "$DNS_START_HOOK" ]; then
-    [ ! -f "$DNS_START_HOOK" ] && log_warn "Custom DNS start hook script $DNS_START_HOOK not found" && return 1
-    log_info "Executing custom DNS start hook script"
-    $DNS_START_HOOK || log_error "Custom DNS start hook script execute failed"
+  if [ -n "$DNS_HOOK" ]; then
+    [ ! -f "$DNS_HOOK" ] && log_warn "Custom DNS hook script $DNS_HOOK not found" && return 1
+    log_info "Executing custom DNS hook script (start)"
+    $DNS_HOOK start || log_error "Custom DNS hook script execute failed"
   fi
 }
 
@@ -198,10 +203,10 @@ stop_dns_service() {
   if [ "$DNS_SERVICE" = "chinadns-ng" ]; then
     rm -f "$CHINADNS_NG_CONF" && log_info "Deleted chinadns-ng conf"
   fi
-  if [ -n "$DNS_STOP_HOOK" ]; then
-    [ ! -f "$DNS_STOP_HOOK" ] && log_warn "Custom DNS stop hook script $DNS_STOP_HOOK not found" && return 1
-    log_info "Executing custom DNS stop hook script"
-    $DNS_STOP_HOOK || log_warn "Custom DNS stop hook script execute failed"
+  if [ -n "$DNS_HOOK" ]; then
+    [ ! -f "$DNS_HOOK" ] && log_warn "Custom DNS hook script $DNS_HOOK not found" && return 1
+    log_info "Executing custom DNS hook script (stop)"
+    $DNS_HOOK stop || log_warn "Custom DNS hook script execute failed"
   fi
 }
 

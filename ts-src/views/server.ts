@@ -100,10 +100,20 @@ function createNodeNameOption(s: LuCI.form.AbstractSection) {
 // 修改运行命令选项为编辑表单专用
 function createCommandOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.Value, 'command', _('运行命令'),
-        _('指定服务端程序运行命令'));
-    o.default = '/usr/bin/xray -c /etc/hijpass/proxy.json';
+        _('指定服务端程序运行命令，使用 {conf_path} 引用自动生成的配置文件路径'));
+    o.default = '/usr/bin/xray -c {conf_path}';
     o.rmempty = false;
-    o.modalonly = true; // 只在编辑表单中显示
+    o.modalonly = true;
+    return o;
+}
+
+// 配置文件内容编辑器
+function createConfContentOption(s: LuCI.form.AbstractSection) {
+    let o = s.option(form.TextValue, 'custom_conf', _('配置文件内容'),
+        _('编辑配置文件内容，保存时自动写入对应路径'));
+    o.modalonly = true;
+    const serverDir = uci.get_first(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_CONF_NAME, 'server_dir') || '/etc/hijpass/server';
+    WebUtils.setConfContentOptionMembers(o, LuciFlied.SERVER_CONF_NAME, serverDir);
     return o;
 }
 
@@ -138,6 +148,7 @@ function createProxyOptions(s: LuCI.form.AbstractSection, instances: any) {
     createEnabledOption(s);
     // 创建编辑表单选项
     createCommandOption(s);
+    createConfContentOption(s);
     createListenPortOption(s);
     createFirewallEnabledOption(s);
     createProcdEnvOption(s);

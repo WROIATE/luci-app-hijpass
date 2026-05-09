@@ -57,40 +57,22 @@ function createGeneralOptions(s: LuCI.form.AbstractSection) {
 
 // 创建端口选择选项
 function createPortOptions(s: LuCI.form.AbstractSection) {
-
     let proxyPort = s.taboption('basic', form.ListValue, 'proxy_port', _('代理端口'),
         _('选择代理应用端口号，可从代理节点端口中选择'));
-
-
-    // 动态添加代理节点端口选项
-    uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
-        if (section.listen_port) {
-            let displayName = _('代理节点 %s: %s').format(section.name, section.listen_port);
-            proxyPort.value(section.listen_port, displayName);
-        }
-    });
-    proxyPort.value('', _('不使用'))
-    proxyPort.default = ''
+    WebUtils.appendEnabledNodeListenPorts(proxyPort);
+    proxyPort.value('', _('不使用'));
+    proxyPort.default = '';
     proxyPort.rmempty = true;
 
     let shuntPort = s.taboption('basic', form.ListValue, 'shunt_port', _('默认分流端口'),
         _('选择分流应用端口号，可从分流端口或代理节点端口中选择'));
-
-    // 动态添加分流端口选项
-    let shuntListenPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_listen_port');
+    const shuntListenPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_listen_port');
     if (shuntListenPort) {
         shuntPort.value(shuntListenPort, _('分流端口: %s').format(shuntListenPort));
     }
-
-    // 动态添加代理节点端口选项
-    uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section) => {
-        if (section.listen_port) {
-            let displayName = _('代理节点 %s: %s').format(section.name, section.listen_port);
-            shuntPort.value(section.listen_port, displayName);
-        }
-    });
-    shuntPort.value('', _('不使用'))
-    shuntPort.default = ''
+    WebUtils.appendEnabledNodeListenPorts(shuntPort);
+    shuntPort.value('', _('不使用'));
+    shuntPort.default = '';
     shuntPort.rmempty = true;
 }
 

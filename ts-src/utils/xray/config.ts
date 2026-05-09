@@ -171,9 +171,26 @@ function genConf() {
         let lbConf = shuntSection.loadBalance
         let balancer = new Balancer(XrayEnum.LOAD_BALANCE_OUTBOUND_TAG)
         balancer.selector = lbConf.lbNodeList
-        balancer.fallbackTag = lbConf.lbNodeList[0]
+        balancer.fallbackTag = lbConf.fallbackTag || lbConf.lbNodeList[0]
+
+        const strategy = lbConf.strategy || 'leastLoad'
+        balancer.strategy.type = strategy
+        if (strategy === 'leastLoad') {
+            if (lbConf.strategyExpected) balancer.strategy.settings.expected = parseInt(lbConf.strategyExpected, 10)
+            if (lbConf.strategyMaxRtt) balancer.strategy.settings.maxRTT = lbConf.strategyMaxRtt
+            if (lbConf.strategyTolerance) balancer.strategy.settings.tolerance = parseFloat(lbConf.strategyTolerance)
+        }
+
         route.balancers.push(balancer)
-        burstObservatory = new BurstObservatory(undefined, undefined, undefined, undefined)
+
+        burstObservatory = new BurstObservatory(
+            lbConf.probeUrl || undefined,
+            lbConf.probeConnectivity || undefined,
+            lbConf.probeInterval || undefined,
+            lbConf.probeTimeout || undefined,
+            lbConf.probeSampling ? parseInt(lbConf.probeSampling, 10) : undefined,
+            lbConf.probeHttpMethod || undefined
+        )
         burstObservatory.subjectSelector = lbConf.lbNodeList
     }
 

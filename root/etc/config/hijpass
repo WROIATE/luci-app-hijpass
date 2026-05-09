@@ -13,6 +13,7 @@ config hijpass
 	option chn_list '/etc/hijpass/rules/chn-list.txt'
 	option nft '/etc/hijpass/fw4-template.nft'
 	option nft_hook '/etc/hijpass/hook/nft-hook.sh'
+	option dns_hook '/etc/hijpass/hook/dns-hook.sh'
 	option shunt_conf '/etc/hijpass/shunt.json'
 	option client_dir '/etc/hijpass/client'
 	option log_level 'INFO'

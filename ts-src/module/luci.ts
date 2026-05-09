@@ -55,9 +55,28 @@ export class RouteSection {
 export class LoadBalanceNode {
     tag: string;
     lbNodeList: string[];
+
+    // sing-box urltest 参数
     url: string;
     interval: string;
-    timeout: string
+    tolerance: string;
+    idleTimeout: string;
+    interruptExistConnections: string;
+
+    // xray balancer 策略参数
+    strategy: string;
+    strategyExpected: string;
+    strategyMaxRtt: string;
+    strategyTolerance: string;
+    fallbackTag: string;
+
+    // xray burstObservatory 参数
+    probeUrl: string;
+    probeConnectivity: string;
+    probeInterval: string;
+    probeTimeout: string;
+    probeSampling: string;
+    probeHttpMethod: string;
 
     constructor() {
         this.lbNodeList = [];

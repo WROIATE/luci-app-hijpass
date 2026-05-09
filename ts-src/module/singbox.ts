@@ -287,13 +287,13 @@ export class URLTest implements Outbound {
     type: 'urltest' = 'urltest';
     tag: string;
     url: string;
-    interval: number;
+    interval: string;
     tolerance: number;
-    idle_timeout: number;
+    idle_timeout: string;
     interrupt_exist_connections: boolean;
     outbounds: string[];
 
-    constructor(tag: string, url: string, interval: number, tolerance: number, idle_timeout: number, interrupt_exist_connections: boolean) {
+    constructor(tag: string, url: string, interval: string, tolerance: number, idle_timeout: string, interrupt_exist_connections: boolean) {
         this.tag = tag
         this.outbounds = []
         this.url = url

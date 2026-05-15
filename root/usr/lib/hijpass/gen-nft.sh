@@ -25,7 +25,10 @@ ENABLE_GFW_LIST=$(uci -q get hijpass.@dns[0].use_gfw || :)
 ENABLE_CHN_LIST=$(uci -q get hijpass.@dns[0].use_chn || :)
 DNS_SERVICE=$(uci -q get hijpass.@dns[0].dns_service || :)
 PROXY_MAC=$(uci -q get hijpass.@firewall[0].proxy_mac_list || :)
+PROXY_MAC_EXCLUDE=$(uci -q get hijpass.@firewall[0].proxy_mac_exclude_list || :)
 PROXY_INTERFACE=$(uci -q get hijpass.@firewall[0].proxy_iface_list || :)
+PROXY_INTERFACE_EXCLUDE=$(uci -q get hijpass.@firewall[0].proxy_iface_exclude_list || :)
+ACL_DEFAULT_ALLOW=$(uci -q get hijpass.@firewall[0].acl_default_allow || :)
 
 LUA_SCRIPT="/usr/lib/hijpass/luci-utils.lua"
 CONF_PATH="/etc/hijpass"
@@ -121,7 +124,9 @@ IP4_PROXY_NFT_LIST=$(echo "$IP4_PROXY_LIST" | sort -u | awk 'NF {printf "%s,\n",
 IP6_PROXY_NFT_LIST=$(echo "$IP6_PROXY_LIST" | sort -u | awk 'NF {printf "%s,\n", $0}' | sed '$ s/,$//')
 
 [ -n "$PROXY_INTERFACE" ] && PROXY_INTERFACE="${PROXY_INTERFACE// /,}"
+[ -n "$PROXY_INTERFACE_EXCLUDE" ] && PROXY_INTERFACE_EXCLUDE="${PROXY_INTERFACE_EXCLUDE// /,}"
 [ -n "$PROXY_MAC" ] && PROXY_MAC="${PROXY_MAC// /,}"
+[ -n "$PROXY_MAC_EXCLUDE" ] && PROXY_MAC_EXCLUDE="${PROXY_MAC_EXCLUDE// /,}"
 
 
 fw_rules="
@@ -139,7 +144,9 @@ define IP6_PROXY_NFT_LIST = { $IP6_PROXY_NFT_LIST }
 define IP4_CHNROUTE_LIST = { $CHN_ROUTE }
 define IP6_CHNROUTE_LIST = { $CHN_ROUTE6 }
 define PROXY_INTERFACE = { $PROXY_INTERFACE }
+define PROXY_INTERFACE_EXCLUDE = { $PROXY_INTERFACE_EXCLUDE }
 define PROXY_MAC = { $PROXY_MAC }
+define PROXY_MAC_EXCLUDE = { $PROXY_MAC_EXCLUDE }
 
 $FW4_TEMPLATE
 "
@@ -173,6 +180,33 @@ fi
 if [ "$DNS_SERVICE" = "custom" ]; then
     fw_rules=$(echo "$fw_rules" | grep -Ev "@dns.*\dlist")
     fw_rules=$(echo "$fw_rules" | sed '/set dns.*\dlist {/,/^    }/d')
+fi
+
+if [ "$ACL_DEFAULT_ALLOW" = "1" ]; then
+    # 默认全代理模式：移除 deny 模式规则和 proxy 集合
+    fw_rules=$(echo "$fw_rules" | grep -v "iif != @proxy_interface_list ether saddr != @proxy_mac_list")
+    fw_rules=$(echo "$fw_rules" | sed '/set proxy_mac_list {/,/^    }/d')
+    fw_rules=$(echo "$fw_rules" | sed '/set proxy_interface_list {/,/^    }/d')
+    fw_rules=$(echo "$fw_rules" | grep -v "define PROXY_INTERFACE =")
+    fw_rules=$(echo "$fw_rules" | grep -v "define PROXY_MAC =")
+    if [ -z "$PROXY_MAC_EXCLUDE" ]; then
+        fw_rules=$(echo "$fw_rules" | grep -v "ether saddr @proxy_mac_exclude_list")
+        fw_rules=$(echo "$fw_rules" | sed '/set proxy_mac_exclude_list {/,/^    }/d')
+        fw_rules=$(echo "$fw_rules" | grep -v "define PROXY_MAC_EXCLUDE =")
+    fi
+    if [ -z "$PROXY_INTERFACE_EXCLUDE" ]; then
+        fw_rules=$(echo "$fw_rules" | grep -v "iif @proxy_interface_exclude_list")
+        fw_rules=$(echo "$fw_rules" | sed '/set proxy_interface_exclude_list {/,/^    }/d')
+        fw_rules=$(echo "$fw_rules" | grep -v "define PROXY_INTERFACE_EXCLUDE =")
+    fi
+else
+    # 默认不代理模式：移除 allow 模式规则和 exclude 集合
+    fw_rules=$(echo "$fw_rules" | grep -v "iif @proxy_interface_exclude_list")
+    fw_rules=$(echo "$fw_rules" | grep -v "ether saddr @proxy_mac_exclude_list")
+    fw_rules=$(echo "$fw_rules" | sed '/set proxy_mac_exclude_list {/,/^    }/d')
+    fw_rules=$(echo "$fw_rules" | sed '/set proxy_interface_exclude_list {/,/^    }/d')
+    fw_rules=$(echo "$fw_rules" | grep -v "define PROXY_MAC_EXCLUDE =")
+    fw_rules=$(echo "$fw_rules" | grep -v "define PROXY_INTERFACE_EXCLUDE =")
 fi
 
 echo "$fw_rules"

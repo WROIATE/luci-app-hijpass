@@ -5,6 +5,13 @@
 NFT_GEN_SCRIPT="/usr/lib/hijpass/gen-nft.sh"
 NFT_CONF="/etc/hijpass/fw4-rules.nft"
 
+case "$1" in
+show)
+    nft list table inet hijpass 2>/dev/null || echo ""
+    exit 0
+    ;;
+esac
+
 NFT_RULES=$($NFT_GEN_SCRIPT)
 
 case "$1" in

@@ -9,6 +9,8 @@ table inet hijpass {
         fib daddr type local counter return
 
         iif != @proxy_interface_list ether saddr != @proxy_mac_list counter return
+        iif @proxy_interface_exclude_list counter return
+        ether saddr @proxy_mac_exclude_list counter return
 
         # 过滤回包
         ct direction reply counter return
@@ -223,10 +225,24 @@ table inet hijpass {
         }
     }
 
+    set proxy_mac_exclude_list {
+        type ether_addr
+        elements = {
+            $PROXY_MAC_EXCLUDE
+        }
+    }
+
     set proxy_interface_list {
         type iface_index
         elements = {
             $PROXY_INTERFACE
+        }
+    }
+
+    set proxy_interface_exclude_list {
+        type iface_index
+        elements = {
+            $PROXY_INTERFACE_EXCLUDE
         }
     }
 }

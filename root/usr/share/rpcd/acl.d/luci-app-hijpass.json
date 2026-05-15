@@ -36,6 +36,9 @@
         "/usr/lib/hijpass/nft.sh reset": [
           "exec"
         ],
+        "/usr/lib/hijpass/nft.sh show": [
+          "exec"
+        ],
         "/usr/bin/tail -n [0-9]* /tmp/hijpass/log/*.log": [
           "exec"
         ],
@@ -70,6 +73,9 @@
           "exec"
         ],
         "/usr/lib/hijpass/rm.sh proxy *": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/rm.sh server *": [
           "exec"
         ],
         "/bin/cat /proc/net/arp": [

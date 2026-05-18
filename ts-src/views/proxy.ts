@@ -19,8 +19,8 @@ const v = view.extend({
         return view.prototype.handleSave.call(this, ev);
     },
     render: async function (data: any[]) {
-        let m = new form.Map(LuciFlied.CONF_NAME, _('代理设置'),
-            _('配置代理程序设置'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('Proxy Settings'),
+            _('Configure Proxy Settings'));
         let s = m.section(form.GridSection, LuciFlied.PROXY_NODE_TYPE)
         WebUtils.setAnonymousGridSectionMembers(s);
         s.cloneable = true
@@ -44,7 +44,7 @@ const v = view.extend({
  * 创建启用状态选项
  */
 function createEnabledOption(s: LuCI.form.AbstractSection) {
-    let o = s.option(form.Flag, 'enabled', _('启用'), _(''));
+    let o = s.option(form.Flag, 'enabled', _('Enable'), _(''));
     o.modalonly = true;
     o.default = '1';
     o.rmempty = false;
@@ -55,8 +55,8 @@ function createEnabledOption(s: LuCI.form.AbstractSection) {
  * 创建节点名称编辑选项
  */
 function createNodeNameOption(s: LuCI.form.AbstractSection) {
-    let o = s.option(form.Value, 'name', _('节点名称'),
-        _('修改节点的名称，用于标识不同的代理节点'));
+    let o = s.option(form.Value, 'name', _('Node Name'),
+        _('Modify Proxy Node Name'));
     o.modalonly = true;
     o.validate = WebUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, 'name')
     return o;
@@ -66,8 +66,8 @@ function createNodeNameOption(s: LuCI.form.AbstractSection) {
  * 创建代理类型选择选项
  */
 function createProxyTypeOption(s: LuCI.form.AbstractSection) {
-    let o = s.option(form.ListValue, 'type', _('代理类型'),
-        _('选择代理程序类型'));
+    let o = s.option(form.ListValue, 'type', _('Proxy Type'),
+        _('Select Proxy Type'));
     o.modalonly = true;
     o.default = PROXY_TYPE.SHADOWSOCKS;
     o.rmempty = false;
@@ -83,7 +83,7 @@ function createProxyTypeOption(s: LuCI.form.AbstractSection) {
  * 创建Grid表格显示选项
  */
 function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) {
-    let typeOpt = s.option(form.TextValue, 'type', _('类型'), _('代理类型'));
+    let typeOpt = s.option(form.TextValue, 'type', _('Type'), _('Proxy Type'));
     typeOpt.modalonly = false;
     typeOpt.textvalue = function (section_id: string) {
         let type = uci.get(LuciFlied.CONF_NAME, section_id, 'type') || PROXY_TYPE.CUSTOM;
@@ -92,7 +92,7 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
     };
 
     // 显示服务器信息（不同类型显示不同内容）
-    let serverInfoOpt = s.option(form.TextValue, 'server_info', _('配置信息'), _(''));
+    let serverInfoOpt = s.option(form.TextValue, 'server_info', _('Configuration Info'), _(''));
     serverInfoOpt.modalonly = false;
     serverInfoOpt.textvalue = function (section_id: string) {
         let type = uci.get(LuciFlied.CONF_NAME, section_id, 'type') || PROXY_TYPE.CUSTOM;
@@ -111,22 +111,22 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
                 return command || '';
             }
             case PROXY_TYPE.HYSTERIA2:
-                return E('span', {}, server_name ? server_name + ':' + (server_port || '443') : _('未配置'));
+                return E('span', {}, server_name ? server_name + ':' + (server_port || '443') : _('Not Configured'));
             case PROXY_TYPE.SHADOWSOCKS: {
                 let method = uci.get(LuciFlied.CONF_NAME, section_id, 'method');
-                return E('span', {}, server_name ? server_name + ':' + (server_port || '-') + ' (' + (method || '-') + ')' : _('未配置'));
+                return E('span', {}, server_name ? server_name + ':' + (server_port || '-') + ' (' + (method || '-') + ')' : _('Not Configured'));
             }
             case PROXY_TYPE.TUIC: {
                 let congestion = uci.get(LuciFlied.CONF_NAME, section_id, 'congestion_control');
-                return E('span', {}, server_name ? server_name + ':' + (server_port || '-') + ' (' + (congestion || 'cubic') + ')' : _('未配置'));
+                return E('span', {}, server_name ? server_name + ':' + (server_port || '-') + ' (' + (congestion || 'cubic') + ')' : _('Not Configured'));
             }
             case PROXY_TYPE.SHADOWTLS: {
                 let version = uci.get(LuciFlied.CONF_NAME, section_id, 'version');
-                return E('span', {}, server_name ? server_name + ':' + (server_port || '-') + ' (v' + (version || '1') + ')' : _('未配置'));
+                return E('span', {}, server_name ? server_name + ':' + (server_port || '-') + ' (v' + (version || '1') + ')' : _('Not Configured'));
             }
             case PROXY_TYPE.VLESS: {
                 let flow = uci.get(LuciFlied.CONF_NAME, section_id, 'flow');
-                return E('span', {}, server_name ? server_name + ':' + (server_port || '-') + (flow ? ' (' + flow + ')' : '') : _('未配置'));
+                return E('span', {}, server_name ? server_name + ':' + (server_port || '-') + (flow ? ' (' + flow + ')' : '') : _('Not Configured'));
             }
             default:
                 return '';
@@ -134,13 +134,13 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
     };
 
     // 运行状态列
-    let statusOpt = s.option(form.TextValue, 'run_status', _('状态'), _(''));
+    let statusOpt = s.option(form.TextValue, 'run_status', _('Status'), _(''));
     statusOpt.modalonly = false;
     statusOpt.textvalue = function (section_id: string) {
         const name = uci.get(LuciFlied.CONF_NAME, section_id, 'name');
         const instanceName = section_id + (name ? '-' + name : '');
         const running = instances?.[instanceName]?.running ?? false;
-        return E('span', {style: 'color:' + (running ? 'green' : 'red')}, running ? _('运行中') : _('未运行'));
+        return E('span', {style: 'color:' + (running ? 'green' : 'red')}, running ? _('Running') : _('Not Running'));
     };
 
     // 启用状态（在表格中显示并可直接修改）
@@ -184,14 +184,14 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
                                 el.style.color = '';
                             }
                         } else {
-                            el.textContent = _('超时');
+                            el.textContent = _('Timeout');
                             el.style.backgroundColor = '#7a2020';
                             el.style.borderColor = '#7a2020';
                             el.style.color = '';
                         }
                     })
                     .catch(() => {
-                        el.textContent = _('失败');
+                        el.textContent = _('Failed');
                         el.style.backgroundColor = '#7a2020';
                         el.style.borderColor = '#7a2020';
                         el.style.color = '';
@@ -200,7 +200,7 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
                         el.removeAttribute('disabled');
                     });
             }
-        }, _('测速'));
+        }, _('Speed Test'));
         return E('span', {}, [btn]);
     };
 
@@ -213,16 +213,16 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
         let name = uci.get(LuciFlied.CONF_NAME, section_id, 'name') || section_id;
 
         function loadLog(contentEl: HTMLElement) {
-            contentEl.textContent = _('加载中...');
+            contentEl.textContent = _('Loading...');
             fs.exec('/usr/bin/tail', ['-n', '200', logPath])
                 .then((result: any) => {
                     let text = (result && result.stdout) ? result.stdout.trim() : '';
                     text = text.replace(/\x1b\[[0-9;]*m/g, '');
-                    contentEl.textContent = text || _('暂无日志');
+                    contentEl.textContent = text || _('No Logs');
                     contentEl.scrollTop = contentEl.scrollHeight;
                 })
                 .catch(() => {
-                    contentEl.textContent = _('读取失败');
+                    contentEl.textContent = _('Read Failed');
                 });
         }
 
@@ -236,7 +236,7 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
 
                 loadLog(contentEl);
 
-                ui.showModal(name + ' - ' + _('日志'), [
+                ui.showModal(name + ' - ' + _('Log'), [
                     E('div', {class: 'cbi-section'}, [contentEl]),
                     E('div', {class: 'right', style: 'display:flex;justify-content:flex-end;gap:10px'}, [
                         E('button', {
@@ -250,7 +250,7 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
                     ])
                 ]);
             }
-        }, _('日志'));
+        }, _('Log'));
         return E('span', {}, [btn]);
     };
 }
@@ -260,16 +260,16 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
  */
 function createCustomProxyOptions(s: LuCI.form.AbstractSection) {
     // 运行命令，{conf_path} 为配置文件路径占位符
-    let cmdOpt = s.option(form.Value, 'command', _('运行命令'),
-        _('指定代理程序运行命令，使用 {conf_path} 引用自动生成的配置文件路径'));
+    let cmdOpt = s.option(form.Value, 'command', _('Run Command'),
+        _('Proxy Run Command'));
     cmdOpt.default = '/usr/bin/xray -c {conf_path}';
     cmdOpt.rmempty = false;
     cmdOpt.modalonly = true;
     cmdOpt.depends('type', PROXY_TYPE.CUSTOM);
 
     // 配置文件内容编辑器，路径自动生成为 $client_dir/$name-$section_id.json
-    let confOpt = s.option(form.TextValue, 'custom_conf', _('配置文件内容'),
-        _('编辑配置文件内容，保存时自动写入对应路径'));
+    let confOpt = s.option(form.TextValue, 'custom_conf', _('Configuration File Content'),
+        _('Edit Configuration File'));
     confOpt.modalonly = true;
     confOpt.depends('type', PROXY_TYPE.CUSTOM);
     WebUtils.setConfContentOptionMembers(confOpt, LuciFlied.CONF_NAME, WebUtils.getFilePath('client_dir'));
@@ -284,15 +284,15 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
     let socksInp: HTMLInputElement | null = null;
 
 
-    let listenPortOpt = s.option(form.Value, 'listen_port', _('本地监听端口'),
-        _('指定本地透明代理监听端口号'));
+    let listenPortOpt = s.option(form.Value, 'listen_port', _('Local Listen Port'),
+        _('Local Transparent Proxy Listen Port'));
     listenPortOpt.datatype = 'port';
     listenPortOpt.rmempty = false;
     listenPortOpt.modalonly = true;
     listenPortOpt.validate = function (sectionId: string, value: string) {
         let socks_port = uci.get(LuciFlied.CONF_NAME, sectionId, "socks_port");
         if (socks_port === value) {
-            return _("与socks端口冲突")
+            return _("Conflicts with SOCKS Port")
         }
         return WebUtils.validatePortConflict.call(this, sectionId, value);
     }
@@ -324,19 +324,19 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
                 listenInp.dispatchEvent(new Event('input', {bubbles: true}));
                 listenInp.dispatchEvent(new Event('change', {bubbles: true}));
             }
-        }, _('自动生成'));
+        }, _('Auto Generate'));
         return E('div', {style: 'display:flex;align-items:center'}, [input, btn]);
     };
 
-    let socksPortOpt = s.option(form.Value, 'socks_port', _('本地SOCKS监听端口'),
-        _('指定本地SOCKS监听端口号'));
+    let socksPortOpt = s.option(form.Value, 'socks_port', _('Local SOCKS Port'),
+        _('Local SOCKS Listen Port'));
     socksPortOpt.datatype = 'port';
     socksPortOpt.rmempty = false;
     socksPortOpt.modalonly = true;
     socksPortOpt.validate = function (sectionId: string, value: string) {
         let listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "listen_port");
         if (listen_port === value) {
-            return _("与透明代理端口冲突")
+            return _("Conflicts with Transparent Proxy Port")
         }
         return WebUtils.validatePortConflict.call(this, sectionId, value);
     }
@@ -368,7 +368,7 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
                 socksInp.dispatchEvent(new Event('input', {bubbles: true}));
                 socksInp.dispatchEvent(new Event('change', {bubbles: true}));
             }
-        }, _('自动生成'));
+        }, _('Auto Generate'));
         return E('div', {style: 'display:flex;align-items:center'}, [input, btn]);
     };
 }
@@ -377,8 +377,8 @@ function createProxyPortOptions(s: LuCI.form.AbstractSection) {
  * 创建自定义代理的环境变量和日志选项
  */
 function createProxyEnvironmentOptions(s: LuCI.form.AbstractSection) {
-    let procdEnvOpt = s.option(form.DynamicList, 'procd_env', _('procd环境变量'),
-        _('指定procd服务的环境变量，例如：SOME_VARIABLE=funtimes'));
+    let procdEnvOpt = s.option(form.DynamicList, 'procd_env', _('Procd Environment Variables'),
+        _('Procd Environment Variables'));
     procdEnvOpt.modalonly = true;
 
     WebUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, undefined)
@@ -389,8 +389,8 @@ function createProxyEnvironmentOptions(s: LuCI.form.AbstractSection) {
  * 创建通用的服务器地址和端口选项（用于所有需要server/server_port的协议）
  */
 function createCommonServerOptions(s: LuCI.form.AbstractSection) {
-    let serverAddrOpt = s.option(form.Value, 'server', _('服务器地址'),
-        _('代理服务器地址'));
+    let serverAddrOpt = s.option(form.Value, 'server', _('Server Address'),
+        _('Proxy Server Address'));
     serverAddrOpt.modalonly = true;
     serverAddrOpt.rmempty = false;
     serverAddrOpt.depends('type', PROXY_TYPE.HYSTERIA2);
@@ -399,8 +399,8 @@ function createCommonServerOptions(s: LuCI.form.AbstractSection) {
     serverAddrOpt.depends('type', PROXY_TYPE.SHADOWTLS);
     serverAddrOpt.depends('type', PROXY_TYPE.VLESS);
 
-    let serverPortOpt = s.option(form.Value, 'server_port', _('服务器端口'),
-        _('代理服务器端口'));
+    let serverPortOpt = s.option(form.Value, 'server_port', _('Server Port'),
+        _('Proxy Server Port'));
     serverPortOpt.datatype = 'port';
     serverPortOpt.modalonly = true;
     serverPortOpt.rmempty = false;
@@ -415,26 +415,26 @@ function createCommonServerOptions(s: LuCI.form.AbstractSection) {
  * 创建Hysteria2代理的高级选项
  */
 function createHysteria2AdvancedOptions(s: LuCI.form.AbstractSection) {
-    let serverPortsOpt = s.option(form.DynamicList, 'server_ports', _('端口跳跃'),
-        _('端口跳跃范围列表，如 2080-3000'));
+    let serverPortsOpt = s.option(form.DynamicList, 'server_ports', _('Port Hopping'),
+        _('Port Hopping Range'));
     serverPortsOpt.modalonly = true;
     serverPortsOpt.datatype = 'portrange';
     serverPortsOpt.depends('type', PROXY_TYPE.HYSTERIA2);
 
-    let hopIntervalOpt = s.option(form.Value, 'hop_interval', _('端口跳跃间隔'),
-        _('端口跳跃间隔，如90s'));
+    let hopIntervalOpt = s.option(form.Value, 'hop_interval', _('Port Hop Interval'),
+        _('Port Hop Interval'));
     hopIntervalOpt.modalonly = true;
     // hop_interval 依赖于类型是 Hysteria2 且 server_ports 有值
     hopIntervalOpt.depends({type: PROXY_TYPE.HYSTERIA2, server_ports: /./});
 
-    let upMbpsOpt = s.option(form.Value, 'up_mbps', _('上行速率'),
-        _('上行最大带宽（Mbps）'));
+    let upMbpsOpt = s.option(form.Value, 'up_mbps', _('Uplink Speed'),
+        _('Maximum Uplink Bandwidth'));
     upMbpsOpt.datatype = 'uinteger';
     upMbpsOpt.modalonly = true;
     upMbpsOpt.depends('type', PROXY_TYPE.HYSTERIA2);
 
-    let downMbpsOpt = s.option(form.Value, 'down_mbps', _('下行速率'),
-        _('下行最大带宽（Mbps）'));
+    let downMbpsOpt = s.option(form.Value, 'down_mbps', _('Downlink Speed'),
+        _('Maximum Downlink Bandwidth'));
     downMbpsOpt.datatype = 'uinteger';
     downMbpsOpt.modalonly = true;
     downMbpsOpt.depends('type', PROXY_TYPE.HYSTERIA2);
@@ -444,8 +444,8 @@ function createHysteria2AdvancedOptions(s: LuCI.form.AbstractSection) {
  * 创建Hysteria2代理的OBFS选项
  */
 function createHysteria2ObfsOptions(s: LuCI.form.AbstractSection) {
-    let obfsTypeOpt = s.option(form.ListValue, 'obfs_type', _('OBFS类型'),
-        _('QUIC流量混淆器类型，仅支持 salamander'));
+    let obfsTypeOpt = s.option(form.ListValue, 'obfs_type', _('OBFS Type'),
+        _('QUIC Obfuscation Type'));
     obfsTypeOpt.modalonly = true;
     obfsTypeOpt.depends('type', PROXY_TYPE.HYSTERIA2);
 
@@ -453,8 +453,8 @@ function createHysteria2ObfsOptions(s: LuCI.form.AbstractSection) {
         obfsTypeOpt.value(item.value, _(item.label));
     });
 
-    let obfsPasswordOpt = s.option(form.Value, 'obfs_password', _('OBFS密码'),
-        _('QUIC流量混淆器密码（obfs_type设置为salamander时需要）'));
+    let obfsPasswordOpt = s.option(form.Value, 'obfs_password', _('OBFS Password'),
+        _('QUIC Obfuscation Password'));
     obfsPasswordOpt.modalonly = true;
     obfsPasswordOpt.depends('obfs_type', 'salamander');
 }
@@ -463,8 +463,8 @@ function createHysteria2ObfsOptions(s: LuCI.form.AbstractSection) {
  * 创建VLESS代理的网络和packet_encoding选项
  */
 function createVlessNetworkOptions(s: LuCI.form.AbstractSection) {
-    let packetEncodingOpt = s.option(form.ListValue, 'packet_encoding', _('UDP包编码'),
-        _('UDP包编码方式'));
+    let packetEncodingOpt = s.option(form.ListValue, 'packet_encoding', _('UDP Packet Encoding'),
+        _('UDP Packet Encoding Method'));
     packetEncodingOpt.modalonly = true;
     packetEncodingOpt.depends('type', PROXY_TYPE.VLESS);
 
@@ -477,8 +477,8 @@ function createVlessNetworkOptions(s: LuCI.form.AbstractSection) {
  * 创建通用传输层类型选择（用于支持Transport的协议：VLESS等）
  */
 function createTransportTypeOption(s: LuCI.form.AbstractSection) {
-    let transportOpt = s.option(form.ListValue, 'transport_type', _('传输协议'),
-        _('V2Ray传输层协议'));
+    let transportOpt = s.option(form.ListValue, 'transport_type', _('Transport Protocol'),
+        _('V2Ray Transport Protocol'));
     transportOpt.modalonly = true;
     transportOpt.depends('type', PROXY_TYPE.VLESS);
 
@@ -491,29 +491,29 @@ function createTransportTypeOption(s: LuCI.form.AbstractSection) {
  * 创建通用的HTTP传输选项（用于支持Transport的协议：VLESS等）
  */
 function createTransportHttpOptions(s: LuCI.form.AbstractSection) {
-    let hostOpt = s.option(form.Value, 'transport_http_host', _('HTTP主机'),
-        _('HTTP请求的主机域名列表'));
+    let hostOpt = s.option(form.Value, 'transport_http_host', _('HTTP Host'),
+        _('HTTP Host List'));
     hostOpt.modalonly = true;
     hostOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'http'});
 
-    let pathOpt = s.option(form.Value, 'transport_http_path', _('HTTP路径'),
-        _('HTTP请求路径'));
+    let pathOpt = s.option(form.Value, 'transport_http_path', _('HTTP Path'),
+        _('HTTP Request Path'));
     pathOpt.modalonly = true;
     pathOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'http'});
 
-    let methodOpt = s.option(form.Value, 'transport_http_method', _('HTTP方法'),
-        _('HTTP请求方法'));
+    let methodOpt = s.option(form.Value, 'transport_http_method', _('HTTP Method'),
+        _('HTTP Request Method'));
     methodOpt.modalonly = true;
     methodOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'http'});
 
-    let idleOpt = s.option(form.Value, 'transport_http_idle_timeout', _('空闲超时'),
-        _('闲置连接超时（如15s）'));
+    let idleOpt = s.option(form.Value, 'transport_http_idle_timeout', _('Idle Timeout'),
+        _('Idle Timeout'));
     idleOpt.modalonly = true;
     idleOpt.default = '15s';
     idleOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'http'});
 
-    let pingOpt = s.option(form.Value, 'transport_http_ping_timeout', _('PING超时'),
-        _('PING响应超时（如15s）'));
+    let pingOpt = s.option(form.Value, 'transport_http_ping_timeout', _('PING Timeout'),
+        _('PING Response Timeout'));
     pingOpt.modalonly = true;
     pingOpt.default = '15s';
     pingOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'http'});
@@ -523,19 +523,19 @@ function createTransportHttpOptions(s: LuCI.form.AbstractSection) {
  * 创建通用的WebSocket传输选项（用于支持Transport的协议：VLESS等）
  */
 function createTransportWsOptions(s: LuCI.form.AbstractSection) {
-    let pathOpt = s.option(form.Value, 'transport_ws_path', _('WebSocket路径'),
-        _('HTTP请求路径'));
+    let pathOpt = s.option(form.Value, 'transport_ws_path', _('WebSocket Path'),
+        _('HTTP Request Path'));
     pathOpt.modalonly = true;
     pathOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'ws'});
 
-    let earlyDataOpt = s.option(form.Value, 'transport_ws_max_early_data', _('最大早期数据'),
+    let earlyDataOpt = s.option(form.Value, 'transport_ws_max_early_data', _('Max Early Data'),
         _('请求中允许的最大有效负载大小'));
     earlyDataOpt.datatype = 'uinteger';
     earlyDataOpt.modalonly = true;
     earlyDataOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'ws'});
 
-    let headerNameOpt = s.option(form.Value, 'transport_ws_early_data_header_name', _('早期数据头名'),
-        _('早期数据头名称（如Sec-WebSocket-Protocol）'));
+    let headerNameOpt = s.option(form.Value, 'transport_ws_early_data_header_name', _('Early Data Header Name'),
+        _('Early Data Header Name'));
     headerNameOpt.modalonly = true;
     headerNameOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'ws'});
 }
@@ -544,26 +544,26 @@ function createTransportWsOptions(s: LuCI.form.AbstractSection) {
  * 创建通用的gRPC传输选项（用于支持Transport的协议：VLESS等）
  */
 function createTransportGrpcOptions(s: LuCI.form.AbstractSection) {
-    let serviceOpt = s.option(form.Value, 'transport_grpc_service_name', _('gRPC服务名'),
-        _('gRPC服务名称'));
+    let serviceOpt = s.option(form.Value, 'transport_grpc_service_name', _('gRPC Service Name'),
+        _('gRPC Service Name'));
     serviceOpt.modalonly = true;
     serviceOpt.default = 'TunService';
     serviceOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'grpc'});
 
-    let idleOpt = s.option(form.Value, 'transport_grpc_idle_timeout', _('空闲超时'),
-        _('空闲超时时间（如15s）'));
+    let idleOpt = s.option(form.Value, 'transport_grpc_idle_timeout', _('Idle Timeout'),
+        _('Idle Timeout'));
     idleOpt.modalonly = true;
     idleOpt.default = '15s';
     idleOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'grpc'});
 
-    let pingOpt = s.option(form.Value, 'transport_grpc_ping_timeout', _('PING超时'),
-        _('PING响应超时（如15s）'));
+    let pingOpt = s.option(form.Value, 'transport_grpc_ping_timeout', _('PING Timeout'),
+        _('PING Response Timeout'));
     pingOpt.modalonly = true;
     pingOpt.default = '15s';
     pingOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'grpc'});
 
-    let permitOpt = s.option(form.Flag, 'transport_grpc_permit_without_stream', _('无流允许'),
-        _('在没有活动连接时是否发送keepalive ping'));
+    let permitOpt = s.option(form.Flag, 'transport_grpc_permit_without_stream', _('Permit Without Stream'),
+        _('Send Keepalive Ping'));
     permitOpt.modalonly = true;
     permitOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'grpc'});
 }
@@ -572,13 +572,13 @@ function createTransportGrpcOptions(s: LuCI.form.AbstractSection) {
  * 创建通用的HTTPUpgrade传输选项（用于支持Transport的协议：VLESS等）
  */
 function createTransportHttpupgradeOptions(s: LuCI.form.AbstractSection) {
-    let hostOpt = s.option(form.Value, 'transport_httpupgrade_host', _('HTTPUpgrade主机'),
-        _('主机域名'));
+    let hostOpt = s.option(form.Value, 'transport_httpupgrade_host', _('HTTPUpgrade Host'),
+        _('Host Domain'));
     hostOpt.modalonly = true;
     hostOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'httpupgrade'});
 
-    let pathOpt = s.option(form.Value, 'transport_httpupgrade_path', _('HTTPUpgrade路径'),
-        _('HTTP请求路径'));
+    let pathOpt = s.option(form.Value, 'transport_httpupgrade_path', _('HTTPUpgrade Path'),
+        _('HTTP Request Path'));
     pathOpt.modalonly = true;
     pathOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'httpupgrade'});
 }
@@ -587,8 +587,8 @@ function createTransportHttpupgradeOptions(s: LuCI.form.AbstractSection) {
  * 创建通用TLS配置选项（用于支持TLS的协议：Hysteria2、TUIC、ShadowTLS、VLESS）
  */
 function createCommonTlsOptions(s: LuCI.form.AbstractSection) {
-    let serverNameOpt = s.option(form.Value, 'tls_server_name', _('TLS服务器名称'),
-        _('TLS握手时使用的服务器名称'));
+    let serverNameOpt = s.option(form.Value, 'tls_server_name', _('TLS Server Name'),
+        _('TLS Server Name'));
     serverNameOpt.modalonly = true;
     serverNameOpt.rmempty = false;
     serverNameOpt.depends('type', PROXY_TYPE.HYSTERIA2);
@@ -596,8 +596,8 @@ function createCommonTlsOptions(s: LuCI.form.AbstractSection) {
     serverNameOpt.depends('type', PROXY_TYPE.SHADOWTLS);
     serverNameOpt.depends('type', PROXY_TYPE.VLESS);
 
-    let insecureOpt = s.option(form.Flag, 'tls_insecure', _('忽略证书验证'),
-        _('接受任何服务器证书（不安全）'));
+    let insecureOpt = s.option(form.Flag, 'tls_insecure', _('Ignore Certificate Verification'),
+        _('Accept Any Certificate'));
     insecureOpt.modalonly = true;
     insecureOpt.depends('type', PROXY_TYPE.HYSTERIA2);
     insecureOpt.depends('type', PROXY_TYPE.TUIC);
@@ -609,18 +609,18 @@ function createCommonTlsOptions(s: LuCI.form.AbstractSection) {
  * 创建TLS Reality配置选项（用于支持Reality的协议：VLESS等）
  */
 function createTlsRealityOptions(s: LuCI.form.AbstractSection) {
-    let realityEnabledOpt = s.option(form.Flag, 'tls_reality_enabled', _('启用TLS Reality'),
-        _('启用TLS Reality分流伪装'));
+    let realityEnabledOpt = s.option(form.Flag, 'tls_reality_enabled', _('Enable TLS Reality'),
+        _('Enable TLS Reality Obfuscation'));
     realityEnabledOpt.modalonly = true;
     realityEnabledOpt.depends('type', PROXY_TYPE.VLESS);
 
-    let publicKeyOpt = s.option(form.Value, 'tls_reality_public_key', _('Reality公钥'),
-        _('服务器的Reality公钥'));
+    let publicKeyOpt = s.option(form.Value, 'tls_reality_public_key', _('Reality Public Key'),
+        _('Server Reality Public Key'));
     publicKeyOpt.modalonly = true;
     publicKeyOpt.depends({type: PROXY_TYPE.VLESS, tls_reality_enabled: '1'});
 
-    let shortIdOpt = s.option(form.Value, 'tls_reality_short_id', _('Reality短ID'),
-        _('服务器的Reality短ID'));
+    let shortIdOpt = s.option(form.Value, 'tls_reality_short_id', _('Reality Short ID'),
+        _('Server Reality Short ID'));
     shortIdOpt.modalonly = true;
     shortIdOpt.depends({type: PROXY_TYPE.VLESS, tls_reality_enabled: '1'});
 }
@@ -629,15 +629,15 @@ function createTlsRealityOptions(s: LuCI.form.AbstractSection) {
  * 创建Hysteria2代理的调试选项
  */
 function createHysteria2DebugOptions(s: LuCI.form.AbstractSection) {
-    let o = s.option(form.Flag, 'brutal_debug', _('启用Brutal CC调试'),
-        _('启用Hysteria Brutal CC的调试日志'));
+    let o = s.option(form.Flag, 'brutal_debug', _('Enable Brutal CC Debug'),
+        _('Enable Hysteria Brutal CC Debug'));
     o.modalonly = true;
     o.depends('type', PROXY_TYPE.HYSTERIA2);
 }
 
 function createNetworkOption(s: LuCI.form.AbstractSection) {
-    let networkOpt = s.option(form.ListValue, 'network', _('网络协议'),
-        _('启用的网络协议，默认所有'));
+    let networkOpt = s.option(form.ListValue, 'network', _('Network Protocol'),
+        _('Enabled Network Protocols'));
     networkOpt.modalonly = true;
     networkOpt.default = '';
     networkOpt.value('', '默认');
@@ -651,8 +651,8 @@ function createNetworkOption(s: LuCI.form.AbstractSection) {
 }
 
 function createPasswordOption(s: LuCI.form.AbstractSection) {
-    let passwordOpt = s.option(form.Value, 'password', _('密码'),
-        _('认证密码'));
+    let passwordOpt = s.option(form.Value, 'password', _('Password'),
+        _('Authentication Password'));
     passwordOpt.modalonly = true;
     passwordOpt.password = true;
     passwordOpt.rmempty = false;
@@ -665,7 +665,7 @@ function createPasswordOption(s: LuCI.form.AbstractSection) {
 }
 
 function createUuidOption(s: LuCI.form.AbstractSection) {
-    let uuidOpt = s.option(form.Value, 'uuid', _('UUID'), _('用户 UUID'));
+    let uuidOpt = s.option(form.Value, 'uuid', _('UUID'), _('User UUID'));
     uuidOpt.modalonly = true;
     uuidOpt.rmempty = false;
     uuidOpt.depends('type', PROXY_TYPE.VLESS);
@@ -673,14 +673,14 @@ function createUuidOption(s: LuCI.form.AbstractSection) {
 }
 
 function createMultiplexOptions(s: LuCI.form.AbstractSection) {
-    let enabledOpt = s.option(form.Flag, 'multiplex_enabled', _('启用多路复用'),
-        _('启用多路复用以提高连接效率'));
+    let enabledOpt = s.option(form.Flag, 'multiplex_enabled', _('Enable Multiplexing'),
+        _('Enable Multiplexing for Better Efficiency'));
     enabledOpt.modalonly = true;
     enabledOpt.depends('type', PROXY_TYPE.SHADOWSOCKS);
     enabledOpt.depends('type', PROXY_TYPE.VLESS);
 
-    let protocolOpt = s.option(form.ListValue, 'multiplex_protocol', _('多路复用协议'),
-        _('多路复用协议'));
+    let protocolOpt = s.option(form.ListValue, 'multiplex_protocol', _('Multiplexing Protocol'),
+        _('Multiplexing Protocol'));
     protocolOpt.modalonly = true;
     protocolOpt.default = 'h2mux';
     protocolOpt.depends({type: PROXY_TYPE.SHADOWSOCKS, multiplex_enabled: '1'});
@@ -690,43 +690,43 @@ function createMultiplexOptions(s: LuCI.form.AbstractSection) {
         protocolOpt.value(item.value, item.label);
     });
 
-    let maxConnOpt = s.option(form.Value, 'multiplex_max_connections', _('最大连接数'),
-        _('最大连接数量'));
+    let maxConnOpt = s.option(form.Value, 'multiplex_max_connections', _('Max Connections'),
+        _('Max Connections'));
     maxConnOpt.datatype = 'uinteger';
     maxConnOpt.modalonly = true;
     maxConnOpt.depends({type: PROXY_TYPE.SHADOWSOCKS, multiplex_enabled: '1'});
     maxConnOpt.depends({type: PROXY_TYPE.VLESS, multiplex_enabled: '1'});
 
-    let minStreamsOpt = s.option(form.Value, 'multiplex_min_streams', _('最小流数'),
-        _('在打开新连接前的最小流数量'));
+    let minStreamsOpt = s.option(form.Value, 'multiplex_min_streams', _('Min Streams'),
+        _('Min Concurrent Streams'));
     minStreamsOpt.datatype = 'uinteger';
     minStreamsOpt.modalonly = true;
     minStreamsOpt.depends({type: PROXY_TYPE.SHADOWSOCKS, multiplex_enabled: '1'});
     minStreamsOpt.depends({type: PROXY_TYPE.VLESS, multiplex_enabled: '1'});
 
-    let maxStreamsOpt = s.option(form.Value, 'multiplex_max_streams', _('最大流数'),
-        _('在打开新连接前的最大流数量'));
+    let maxStreamsOpt = s.option(form.Value, 'multiplex_max_streams', _('Max Streams'),
+        _('Max Concurrent Streams'));
     maxStreamsOpt.datatype = 'uinteger';
     maxStreamsOpt.modalonly = true;
     maxStreamsOpt.depends({type: PROXY_TYPE.SHADOWSOCKS, multiplex_enabled: '1'});
     maxStreamsOpt.depends({type: PROXY_TYPE.VLESS, multiplex_enabled: '1'});
 
     // TCP Brutal 拥塞控制算法
-    let brutalEnabledOpt = s.option(form.Flag, 'multiplex_brutal_enabled', _('启用TCP Brutal'),
-        _('启用TCP Brutal拥塞控制算法'));
+    let brutalEnabledOpt = s.option(form.Flag, 'multiplex_brutal_enabled', _('Enable TCP Brutal'),
+        _('Enable TCP Brutal Congestion Control'));
     brutalEnabledOpt.modalonly = true;
     brutalEnabledOpt.depends({type: PROXY_TYPE.SHADOWSOCKS, multiplex_enabled: '1'});
     brutalEnabledOpt.depends({type: PROXY_TYPE.VLESS, multiplex_enabled: '1'});
 
-    let brutalUpOpt = s.option(form.Value, 'multiplex_brutal_up_mbps', _('上行带宽'),
-        _('上行带宽（Mbps）'));
+    let brutalUpOpt = s.option(form.Value, 'multiplex_brutal_up_mbps', _('Uplink Bandwidth'),
+        _('Uplink Bandwidth'));
     brutalUpOpt.datatype = 'uinteger';
     brutalUpOpt.modalonly = true;
     brutalUpOpt.depends({type: PROXY_TYPE.SHADOWSOCKS, multiplex_enabled: '1', multiplex_brutal_enabled: '1'});
     brutalUpOpt.depends({type: PROXY_TYPE.VLESS, multiplex_enabled: '1', multiplex_brutal_enabled: '1'});
 
-    let brutalDownOpt = s.option(form.Value, 'multiplex_brutal_down_mbps', _('下行带宽'),
-        _('下行带宽（Mbps）'));
+    let brutalDownOpt = s.option(form.Value, 'multiplex_brutal_down_mbps', _('Downlink Bandwidth'),
+        _('Downlink Bandwidth'));
     brutalDownOpt.datatype = 'uinteger';
     brutalDownOpt.modalonly = true;
     brutalDownOpt.depends({type: PROXY_TYPE.SHADOWSOCKS, multiplex_enabled: '1', multiplex_brutal_enabled: '1'});
@@ -737,8 +737,8 @@ function createMultiplexOptions(s: LuCI.form.AbstractSection) {
  * 创建Shadowsocks代理的加密和密码选项
  */
 function createShadowsocksEncryptionOptions(s: LuCI.form.AbstractSection) {
-    let methodOpt = s.option(form.ListValue, 'method', _('加密方法'),
-        _('Shadowsocks加密方法'));
+    let methodOpt = s.option(form.ListValue, 'method', _('Encryption Method'),
+        _('Shadowsocks Encryption Method'));
     methodOpt.modalonly = true;
     methodOpt.rmempty = false;
     methodOpt.default = '2022-blake3-aes-256-gcm';
@@ -753,16 +753,16 @@ function createShadowsocksEncryptionOptions(s: LuCI.form.AbstractSection) {
  * 创建Shadowsocks代理的插件选项
  */
 function createShadowsocksPluginOptions(s: LuCI.form.AbstractSection) {
-    let pluginOpt = s.option(form.ListValue, 'plugin', _('插件'),
-        _('Shadowsocks SIP003插件'));
+    let pluginOpt = s.option(form.ListValue, 'plugin', _('Plugin'),
+        _('Shadowsocks SIP003 Plugin'));
     pluginOpt.modalonly = true;
     pluginOpt.value('', _('无'));
     pluginOpt.value('obfs-local', 'obfs-local');
     pluginOpt.value('v2ray-plugin', 'v2ray-plugin');
     pluginOpt.depends('type', PROXY_TYPE.SHADOWSOCKS);
 
-    let pluginOptsOpt = s.option(form.Value, 'plugin_opts', _('插件选项'),
-        _('Shadowsocks SIP003插件参数'));
+    let pluginOptsOpt = s.option(form.Value, 'plugin_opts', _('Plugin Options'),
+        _('Shadowsocks SIP003 Plugin Options'));
     pluginOptsOpt.modalonly = true;
     // plugin_opts 依赖于类型是 Shadowsocks 且 plugin 有值
     pluginOptsOpt.depends({type: PROXY_TYPE.SHADOWSOCKS, plugin: /./});
@@ -773,7 +773,7 @@ function createShadowsocksPluginOptions(s: LuCI.form.AbstractSection) {
  */
 function createShadowsocksNetworkOptions(s: LuCI.form.AbstractSection) {
     let udpOverTcpOpt = s.option(form.Flag, 'udp_over_tcp', _('UDP over TCP'),
-        _('启用UDP over TCP'));
+        _('Enable UDP over TCP'));
     udpOverTcpOpt.modalonly = true;
     udpOverTcpOpt.depends('type', PROXY_TYPE.SHADOWSOCKS);
 }
@@ -782,8 +782,8 @@ function createShadowsocksNetworkOptions(s: LuCI.form.AbstractSection) {
  * 创建TUIC代理的高级选项
  */
 function createTuicAdvancedOptions(s: LuCI.form.AbstractSection) {
-    let congestionOpt = s.option(form.ListValue, 'congestion_control', _('拥塞控制'),
-        _('QUIC拥塞控制算法'));
+    let congestionOpt = s.option(form.ListValue, 'congestion_control', _('Congestion Control'),
+        _('QUIC Congestion Control'));
     congestionOpt.modalonly = true;
     congestionOpt.default = 'cubic';
     congestionOpt.depends('type', PROXY_TYPE.TUIC);
@@ -792,8 +792,8 @@ function createTuicAdvancedOptions(s: LuCI.form.AbstractSection) {
         congestionOpt.value(item.value, item.label);
     });
 
-    let udpRelayOpt = s.option(form.ListValue, 'udp_relay_mode', _('UDP中继模式'),
-        _('UDP包中继模式'));
+    let udpRelayOpt = s.option(form.ListValue, 'udp_relay_mode', _('UDP Relay Mode'),
+        _('UDP Packet Relay Mode'));
     udpRelayOpt.modalonly = true;
     udpRelayOpt.default = '';
     // udp_relay_mode 依赖于 udp_over_stream 未启用
@@ -805,17 +805,17 @@ function createTuicAdvancedOptions(s: LuCI.form.AbstractSection) {
     });
 
     let udpOverStreamOpt = s.option(form.Flag, 'udp_over_stream', _('UDP over Stream'),
-        _('使用流式UDP中继'));
+        _('Use UDP Stream Relay'));
     udpOverStreamOpt.modalonly = true;
     udpOverStreamOpt.depends('type', PROXY_TYPE.TUIC);
 
-    let zero_rttOpt = s.option(form.Flag, 'zero_rtt_handshake', _('0-RTT握手'),
-        _('启用0-RTT QUIC连接握手（不推荐，容易受到重放攻击）'));
+    let zero_rttOpt = s.option(form.Flag, 'zero_rtt_handshake', _('0-RTT Handshake'),
+        _('Enable 0-RTT QUIC Handshake'));
     zero_rttOpt.modalonly = true;
     zero_rttOpt.depends('type', PROXY_TYPE.TUIC);
 
-    let heartbeatOpt = s.option(form.Value, 'heartbeat', _('心跳间隔'),
-        _('心跳包间隔，如10s'));
+    let heartbeatOpt = s.option(form.Value, 'heartbeat', _('Heartbeat Interval'),
+        _('Heartbeat Interval'));
     heartbeatOpt.modalonly = true;
     heartbeatOpt.default = '10s';
     heartbeatOpt.depends('type', PROXY_TYPE.TUIC);
@@ -825,8 +825,8 @@ function createTuicAdvancedOptions(s: LuCI.form.AbstractSection) {
  * 创建ShadowTLS代理的版本和密码选项
  */
 function createShadowTLSAuthOptions(s: LuCI.form.AbstractSection) {
-    let versionOpt = s.option(form.ListValue, 'version', _('协议版本'),
-        _('ShadowTLS协议版本'));
+    let versionOpt = s.option(form.ListValue, 'version', _('Protocol Version'),
+        _('ShadowTLS Protocol Version'));
     versionOpt.modalonly = true;
     versionOpt.default = '1';
     versionOpt.depends('type', PROXY_TYPE.SHADOWTLS);
@@ -840,8 +840,8 @@ function createShadowTLSAuthOptions(s: LuCI.form.AbstractSection) {
  * 创建VLESS代理的认证选项
  */
 function createVlessAuthOptions(s: LuCI.form.AbstractSection) {
-    let flowOpt = s.option(form.ListValue, 'flow', _('VLESS流控'),
-        _('VLESS流量控制协议'));
+    let flowOpt = s.option(form.ListValue, 'flow', _('VLESS Flow Control'),
+        _('VLESS Flow Control Protocol'));
     flowOpt.modalonly = true;
     flowOpt.depends('type', PROXY_TYPE.VLESS);
 
@@ -854,19 +854,19 @@ function createVlessAuthOptions(s: LuCI.form.AbstractSection) {
  * 创建通用的XHTTP传输选项（用于支持Transport的协议：VLESS等）
  */
 function createTransportXhttpOptions(s: LuCI.form.AbstractSection) {
-    let hostOpt = s.option(form.Value, 'transport_xhttp_host', _('XHTTP主机'),
-        _('XHTTP请求的主机域名'));
+    let hostOpt = s.option(form.Value, 'transport_xhttp_host', _('XHTTP Host'),
+        _('XHTTP Host Domain'));
     hostOpt.modalonly = true;
     hostOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'xhttp'});
 
-    let pathOpt = s.option(form.Value, 'transport_xhttp_path', _('XHTTP路径'),
-        _('XHTTP请求路径'));
+    let pathOpt = s.option(form.Value, 'transport_xhttp_path', _('XHTTP Path'),
+        _('XHTTP Request Path'));
     pathOpt.modalonly = true;
     pathOpt.default = '/';
     pathOpt.depends({type: PROXY_TYPE.VLESS, transport_type: 'xhttp'});
 
-    let modeOpt = s.option(form.ListValue, 'transport_xhttp_mode', _('XHTTP模式'),
-        _('XHTTP传输模式'));
+    let modeOpt = s.option(form.ListValue, 'transport_xhttp_mode', _('XHTTP Mode'),
+        _('XHTTP Transport Mode'));
     modeOpt.modalonly = true;
     modeOpt.default = 'auto';
     modeOpt.value('auto', _('自动'));

@@ -1,0 +1,1157 @@
+msgid "-"
+msgstr ""
+
+msgid "0-RTT Handshake"
+msgstr "0-RTT握手"
+
+msgid "1st Day of Month 5 AM"
+msgstr "每月1日凌晨5点"
+
+msgid "Accept Any Certificate"
+msgstr "接受任何服务器证书（不安全）"
+
+msgid "Access Control List"
+msgstr "访问控制列表"
+
+msgid "All"
+msgstr "全部"
+
+msgid "Authentication Password"
+msgstr "认证密码"
+
+msgid "Auto Generate"
+msgstr "自动生成"
+
+msgid "Auto Refresh"
+msgstr "自动刷新"
+
+msgid "Auto Refresh Disabled"
+msgstr "自动刷新已停用"
+
+msgid "Auto Refresh Enabled"
+msgstr "自动刷新已启用"
+
+msgid "Auto Update Time"
+msgstr "自动更新时间"
+
+msgid "Basic Configuration"
+msgstr "基础配置"
+
+msgid "Basic Settings"
+msgstr "基本设置"
+
+msgid "Best Nodes"
+msgstr "最优节点数"
+
+msgid "Best Nodes Count"
+msgstr "选出的最优节点个数，流量在这几个节点中随机分配"
+
+msgid "Bulk Replace Nodes"
+msgstr "批量替换节点"
+
+msgid "CHN Domain List Download URL"
+msgstr "CHN Domain List 下载地址"
+
+msgid "CHN Domain List URL"
+msgstr "配置中国域名列表的下载地址"
+
+msgid "CHN IPv4 Route Download URL"
+msgstr "CHN IPv4 Route 下载地址"
+
+msgid "CHN IPv4 Route URL"
+msgstr "配置中国IPv4路由的下载地址"
+
+msgid "CHN IPv6 Route Download URL"
+msgstr "CHN IPv6 Route 下载地址"
+
+msgid "CHN IPv6 Route URL"
+msgstr "配置中国IPv6路由的下载地址"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "ChinaDNS-NG Listen Port"
+msgstr "指定ChinaDNS-NG的监听端口"
+
+msgid "Clear"
+msgstr "清空"
+
+msgid "Clear Failed"
+msgstr "清空失败: "
+
+msgid "Clear Log Confirmation"
+msgstr "确定要清空日志文件吗？此操作不可恢复。"
+
+msgid "Clearing Logs"
+msgstr "正在清空日志..."
+
+msgid "Click to Preview"
+msgstr "点击预览配置"
+
+msgid "Click to Test"
+msgstr "点击测试"
+
+msgid "Click to View Firewall Rules"
+msgstr "点击查看按钮获取当前hijpass的防火墙信息"
+
+msgid "Configuration File Content"
+msgstr "配置文件内容"
+
+msgid "Configuration Info"
+msgstr "配置信息"
+
+msgid "Configuration Save Failed"
+msgstr "配置保存失败"
+
+msgid "Configuration Type"
+msgstr "配置类型"
+
+msgid "Configure DNS Routing"
+msgstr "配置DNS分流相关设置"
+
+msgid "Configure Firewall"
+msgstr "配置nftables相关功能"
+
+msgid "Configure Global Exit First"
+msgstr "请先配置全局出口"
+
+msgid "Configure Proxy Settings"
+msgstr "配置代理程序设置"
+
+msgid "Configure Shunt Rules"
+msgstr "配置分流规则和设置"
+
+msgid "Confirm Replace"
+msgstr "确认替换"
+
+msgid "Conflicts with DNS Port"
+msgstr "与DNS端口冲突"
+
+msgid "Conflicts with SOCKS Port"
+msgstr "与socks端口冲突"
+
+msgid "Conflicts with Shunt Port"
+msgstr "与分流端口冲突"
+
+msgid "Conflicts with Transparent Proxy Port"
+msgstr "与透明代理端口冲突"
+
+msgid "Congestion Control"
+msgstr "拥塞控制"
+
+msgid "Connection Abnormal"
+msgstr "连接异常，code "
+
+msgid "Convert Geo Rules"
+msgstr "通过geoview将geo规则转换为规则集（sing-box配置）"
+
+msgid "Copy Configuration"
+msgstr "复制配置"
+
+msgid "Custom"
+msgstr "自定义"
+
+msgid "Custom DNS"
+msgstr "自定义DNS"
+
+msgid "Custom Direct DNS"
+msgstr "自定义直连DNS"
+
+msgid "Custom Edit"
+msgstr "自定义编辑"
+
+msgid "Custom Hook Script"
+msgstr "用户自定义脚本"
+
+msgid "Custom Proxy DNS"
+msgstr "自定义代理DNS"
+
+msgid "Custom Script"
+msgstr "自定义脚本"
+
+msgid "DNS"
+msgstr "DNS"
+
+msgid "DNS Cache"
+msgstr "DNS缓存"
+
+msgid "DNS Configuration"
+msgstr "DNS配置"
+
+msgid "DNS Exit Node"
+msgstr "DNS出口节点"
+
+msgid "DNS Listen Port"
+msgstr "DNS监听端口"
+
+msgid "DNS Node Configuration"
+msgstr "DNS节点配置"
+
+msgid "DNS Resolution Strategy"
+msgstr "DNS解析策略"
+
+msgid "DNS Routing Configuration"
+msgstr "DNS分流设置"
+
+msgid "DNS Server"
+msgstr "DNS服务器"
+
+msgid "DNS Server Address"
+msgstr "DNS服务器地址"
+
+msgid "DNS Server Configuration"
+msgstr "DNS服务器配置"
+
+msgid "DNS Server Port"
+msgstr "DNS服务器端口"
+
+msgid "DNS Server Tag"
+msgstr "DNS服务器的唯一标识"
+
+msgid "DNS Server Type"
+msgstr "DNS服务器类型"
+
+msgid "Debug"
+msgstr "调试"
+
+msgid "Default (HEAD)"
+msgstr "默认 (HEAD)"
+
+msgid "Default Proxy All"
+msgstr "默认全走代理"
+
+msgid "Default Shunt Port"
+msgstr "默认分流端口"
+
+msgid "Delay Time"
+msgstr "延迟时间"
+
+msgid "Direct"
+msgstr "直连"
+
+msgid "Direct Domain DNS"
+msgstr "直连域名DNS"
+
+msgid "Direct Domain DNS Server"
+msgstr "指定直连域名使用的DNS服务器"
+
+msgid "Disable Auto Update"
+msgstr "禁用自动更新"
+
+msgid "Disabled"
+msgstr "不使用"
+
+msgid "Display Lines"
+msgstr "显示行数"
+
+msgid "Domain Direct List"
+msgstr "域名直连列表"
+
+msgid "Domain Proxy List"
+msgstr "域名代理列表"
+
+msgid "Domain Query"
+msgstr "域名查询"
+
+msgid "Domain Rule List"
+msgstr "域名规则列表"
+
+msgid "Downlink Bandwidth"
+msgstr "下行带宽（Mbps）"
+
+msgid "Downlink Speed"
+msgstr "下行速率"
+
+msgid "Download"
+msgstr "下载"
+
+msgid "Download All Rules Now"
+msgstr "立即下载更新所有规则文件和数据库文件"
+
+msgid "Download Failed"
+msgstr "下载失败: "
+
+msgid "Download Timeout"
+msgstr "下载超时时间"
+
+msgid "Early Data Header Name"
+msgstr "早期数据头名称"
+
+msgid "Edit Configuration File"
+msgstr "编辑配置文件内容，保存时自动写入对应路径"
+
+msgid "Edit DNS Hook Script"
+msgstr "编辑 DNS Hook 脚本"
+
+msgid "Edit DNS Server"
+msgstr "编辑DNS服务器"
+
+msgid "Edit Domain Direct List"
+msgstr "编辑域名直连列表配置，配合chinadns-ng使用"
+
+msgid "Edit Domain Proxy List"
+msgstr "编辑域名代理列表配置，配合chinadns-ng使用"
+
+msgid "Edit Firewall Rules"
+msgstr "编辑防火墙 nftables 规则"
+
+msgid "Edit IP Direct List"
+msgstr "编辑 IP CIDR 直连列表配置（支持 IPv4 和 IPv6）"
+
+msgid "Edit IP Proxy List"
+msgstr "编辑 IP CIDR 代理列表配置（支持 IPv4 和 IPv6）"
+
+msgid "Edit Routing Rule"
+msgstr "编辑路由规则"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "Enable 0-RTT QUIC Handshake"
+msgstr "启用0-RTT QUIC连接握手"
+
+msgid "Enable Brutal CC Debug"
+msgstr "启用Brutal CC调试"
+
+msgid "Enable CHN Domain List"
+msgstr "启用中国域名列表进行分流"
+
+msgid "Enable CHN IP Route"
+msgstr "启用中国 IP 路由列表进行分流"
+
+msgid "Enable GFW Domain List"
+msgstr "启用 GFW 域名列表进行分流"
+
+msgid "Enable Hysteria Brutal CC Debug"
+msgstr "启用Hysteria Brutal CC的调试日志"
+
+msgid "Enable Multiplexing"
+msgstr "启用多路复用"
+
+msgid "Enable Multiplexing for Better Efficiency"
+msgstr "启用多路复用以提高连接效率"
+
+msgid "Enable Shunt"
+msgstr "启用分流"
+
+msgid "Enable TCP Brutal"
+msgstr "启用TCP Brutal"
+
+msgid "Enable TCP Brutal Congestion Control"
+msgstr "启用TCP Brutal拥塞控制算法"
+
+msgid "Enable TLS Reality"
+msgstr "启用TLS Reality"
+
+msgid "Enable TLS Reality Obfuscation"
+msgstr "启用TLS Reality分流伪装"
+
+msgid "Enable UDP over TCP"
+msgstr "启用UDP over TCP"
+
+msgid "Enable or Disable HiJpass"
+msgstr "启用或禁用 HiJpass"
+
+msgid "Enabled Network Protocols"
+msgstr "启用的网络协议，默认所有"
+
+msgid "Encryption Method"
+msgstr "加密方法"
+
+msgid "Enter Domain or GeoSite Tag"
+msgstr "输入域名或GeoSite标签"
+
+msgid "Enter Query Keyword"
+msgstr "请输入查询关键字"
+
+msgid "Error"
+msgstr "错误"
+
+msgid "Every Day 5 AM"
+msgstr "每天凌晨5点"
+
+msgid "Every Day Midnight"
+msgstr "每天午夜12点"
+
+msgid "Every Monday 5 AM"
+msgstr "每周一凌晨5点"
+
+msgid "Every Sunday 5 AM"
+msgstr "每周日凌晨5点"
+
+msgid "Failed"
+msgstr "失败"
+
+msgid "Failed to Load Log"
+msgstr "加载日志失败: "
+
+msgid "Failed to Load Log File"
+msgstr "无法加载日志文件: "
+
+msgid "Failure Rate Tolerance"
+msgstr "失败率容忍"
+
+msgid "Fallback Node"
+msgstr "备用节点"
+
+msgid "Fallback Outbound"
+msgstr "所有节点不可用时的备用出站"
+
+msgid "Firewall Configuration"
+msgstr "防火墙配置"
+
+msgid "Firewall Refresh Failed"
+msgstr "防火墙刷新失败: "
+
+msgid "Firewall Refreshed"
+msgstr "防火墙刷新成功"
+
+msgid "Firewall Rules"
+msgstr "防火墙规则"
+
+msgid "From Node"
+msgstr "从节点"
+
+msgid "GFW List Download URL"
+msgstr "GFW List 下载地址"
+
+msgid "GFW List URL"
+msgstr "配置GFW域名列表的下载地址"
+
+msgid "Generated %s JSON Configuration"
+msgstr ""
+
+msgid "GeoIP Database Download URL"
+msgstr "Geo IP 下载地址"
+
+msgid "GeoIP Database URL"
+msgstr "配置 GeoIP 数据库文件的下载地址"
+
+msgid "GeoSite"
+msgstr ""
+
+msgid "GeoSite Database Download URL"
+msgstr "Geo Site 下载地址"
+
+msgid "GeoSite Database URL"
+msgstr "配置 GeoSite 数据库文件的下载地址"
+
+msgid "HTTP Host"
+msgstr "HTTP主机"
+
+msgid "HTTP Host List"
+msgstr "HTTP请求的主机域名列表"
+
+msgid "HTTP Method"
+msgstr ""
+
+msgid "HTTP Path"
+msgstr "HTTP路径"
+
+msgid "HTTP Request Method"
+msgstr "HTTP请求方法"
+
+msgid "HTTP Request Path"
+msgstr "HTTP请求路径"
+
+msgid "HTTPUpgrade Host"
+msgstr "HTTPUpgrade主机"
+
+msgid "HTTPUpgrade Path"
+msgstr "HTTPUpgrade路径"
+
+msgid "Health Check Interval"
+msgstr "健康检查间隔，如 3m、30s，默认 3m"
+
+msgid "Health Check Probe URL"
+msgstr "健康检查探测目标 URL，应返回 HTTP 204"
+
+msgid "Health Check URL"
+msgstr "健康检查请求的目标 URL"
+
+msgid "Heartbeat Interval"
+msgstr "心跳间隔"
+
+msgid "HiJpass"
+msgstr "HiJpass"
+
+msgid "Hook Script"
+msgstr "Hook 脚本"
+
+msgid "Host Domain"
+msgstr "主机域名"
+
+msgid "IP Direct List"
+msgstr "IP 直连列表"
+
+msgid "IP Proxy List"
+msgstr "IP 代理列表"
+
+msgid "IP Rule List"
+msgstr "IP规则列表"
+
+msgid "Idle Timeout"
+msgstr "空闲超时"
+
+msgid "Ignore Certificate Verification"
+msgstr "忽略证书验证"
+
+msgid "Info"
+msgstr "信息"
+
+msgid "Interface \"%s\" Not Found"
+msgstr "接口 \"%s\" 不存在"
+
+msgid "Internal DNS Resolution Strategy"
+msgstr "内部DNS解析策略"
+
+msgid "Interrupt Existing Connections"
+msgstr "切换时中断现有连接"
+
+msgid "Interrupt on Outbound Change"
+msgstr "当选中出站变更时是否中断现有连接"
+
+msgid "Item Not Found"
+msgstr "%s \"%s\" 不存在，请从下拉列表中选择或先在配置中添加"
+
+msgid "Listen Port"
+msgstr "监听端口"
+
+msgid "Load Balancing"
+msgstr "负载均衡"
+
+msgid "Load Balancing Nodes"
+msgstr "负载均衡节点"
+
+msgid "Load Balancing Strategy"
+msgstr "负载均衡选择策略"
+
+msgid "Load Strategy"
+msgstr "负载策略"
+
+msgid "Loading"
+msgstr "加载中..."
+
+msgid "Loading Logs"
+msgstr "正在加载日志..."
+
+msgid "Loading..."
+msgstr ""
+
+msgid "Local Connectivity Check URL"
+msgstr "本地连通性检测 URL"
+
+msgid "Local Listen Port"
+msgstr "本地监听端口"
+
+msgid "Local SOCKS Listen Port"
+msgstr "指定本地SOCKS监听端口号"
+
+msgid "Local SOCKS Port"
+msgstr "本地SOCKS监听端口"
+
+msgid "Local Transparent Proxy Listen Port"
+msgstr "指定本地透明代理监听端口号"
+
+msgid "Log"
+msgstr "日志"
+
+msgid "Log Cleared"
+msgstr "日志已清空"
+
+msgid "Log Content"
+msgstr "日志内容将在这里显示..."
+
+msgid "Log Downloaded"
+msgstr "日志下载完成"
+
+msgid "Log File"
+msgstr "日志文件"
+
+msgid "Log Level"
+msgstr "日志等级"
+
+msgid "Log Level Filter"
+msgstr "日志级别过滤"
+
+msgid "Log Updated"
+msgstr "日志已更新"
+
+msgid "Logging Level"
+msgstr "日志记录等级"
+
+msgid "Lowest Load"
+msgstr "最低负载"
+
+msgid "Lowest Ping"
+msgstr "最低 Ping"
+
+msgid "Main Log"
+msgstr "主日志"
+
+msgid "Max Acceptable RTT"
+msgstr "最高可接受 RTT"
+
+msgid "Max Concurrent Streams"
+msgstr "在打开新连接前的最大流数量"
+
+msgid "Max Connections"
+msgstr "最大连接数"
+
+msgid "Max Early Data"
+msgstr "最大早期数据"
+
+msgid "Max Streams"
+msgstr "最大流数"
+
+msgid "Maximum Downlink Bandwidth"
+msgstr "下行最大带宽（Mbps）"
+
+msgid "Maximum Uplink Bandwidth"
+msgstr "上行最大带宽（Mbps）"
+
+msgid "Min Concurrent Streams"
+msgstr "在打开新连接前的最小流数量"
+
+msgid "Min Streams"
+msgstr "最小流数"
+
+msgid "Modify Proxy Node Name"
+msgstr "修改节点的名称，用于标识不同的代理节点"
+
+msgid "Modify Server Node Name"
+msgstr "修改节点的名称，用于标识不同服务节点"
+
+msgid "Multiplexing Protocol"
+msgstr "多路复用协议"
+
+msgid "Network Protocol"
+msgstr "网络协议"
+
+msgid "No Logs"
+msgstr "暂无日志"
+
+msgid "No Rules"
+msgstr "暂无规则（服务未运行）"
+
+msgid "Node Idle Timeout"
+msgstr "节点空闲超时时间，如 30m，默认 30m"
+
+msgid "Node Name"
+msgstr "节点名称"
+
+msgid "Non-Proxy Device"
+msgstr "不走代理设备（MAC）"
+
+msgid "Non-Proxy Interface"
+msgstr "不走代理接口"
+
+msgid "Not Configured"
+msgstr "未配置"
+
+msgid "Not Running"
+msgstr "未运行"
+
+msgid "OBFS Password"
+msgstr "OBFS密码"
+
+msgid "OBFS Type"
+msgstr "OBFS类型"
+
+msgid "Off: Default no proxy; On: Default proxy all"
+msgstr "关闭：默认不代理；开启：默认全代理"
+
+msgid "Only Effective with Domain/GeoSite/Rule-set"
+msgstr "仅在规则中存在域名、geosite、rule_set时生效"
+
+msgid "PING Response Timeout"
+msgstr "PING响应超时"
+
+msgid "PING Timeout"
+msgstr "PING超时"
+
+msgid "Password"
+msgstr "密码"
+
+msgid "Permit Without Stream"
+msgstr "无流允许"
+
+msgid "Plugin"
+msgstr "插件"
+
+msgid "Plugin Options"
+msgstr "插件选项"
+
+msgid "Port"
+msgstr "端口"
+
+msgid "Port Hop Interval"
+msgstr "端口跳跃间隔"
+
+msgid "Port Hopping"
+msgstr "端口跳跃"
+
+msgid "Port Hopping Range"
+msgstr "端口跳跃范围列表，如 2080-3000"
+
+msgid "Port Range"
+msgstr "端口范围"
+
+msgid "Preparing Download"
+msgstr "正在准备下载..."
+
+msgid "Preview Configuration"
+msgstr "预览配置"
+
+msgid "Probe HTTP Method"
+msgstr "探测 HTTP 方法"
+
+msgid "Probe Interval"
+msgstr "探测间隔"
+
+msgid "Probe Timeout"
+msgstr "探测超时"
+
+msgid "Probe URL"
+msgstr "探测 URL"
+
+msgid "Procd Environment Variables"
+msgstr "procd环境变量"
+
+msgid "Protocol Version"
+msgstr "协议版本"
+
+msgid "Proxy Device"
+msgstr "走代理设备（MAC）"
+
+msgid "Proxy Domain DNS"
+msgstr "代理域名DNS"
+
+msgid "Proxy Domain DNS Server"
+msgstr "指定代理域名使用的DNS服务器"
+
+msgid "Proxy Interface"
+msgstr "走代理接口"
+
+msgid "Proxy Log"
+msgstr "代理日志"
+
+msgid "Proxy Node"
+msgstr "代理节点"
+
+msgid "Proxy Port"
+msgstr "代理端口"
+
+msgid "Proxy Run Command"
+msgstr "指定代理程序运行命令"
+
+msgid "Proxy Server Address"
+msgstr "代理服务器地址"
+
+msgid "Proxy Server Port"
+msgstr "代理服务器端口"
+
+msgid "Proxy Settings"
+msgstr "代理设置"
+
+msgid "Proxy Type"
+msgstr "代理类型"
+
+msgid "QUIC Congestion Control"
+msgstr "QUIC拥塞控制算法"
+
+msgid "QUIC Obfuscation Password"
+msgstr "QUIC流量混淆器密码"
+
+msgid "QUIC Obfuscation Type"
+msgstr "QUIC流量混淆器类型"
+
+msgid "Query"
+msgstr "查询"
+
+msgid "Query Complete"
+msgstr "查询完成"
+
+msgid "Query Failed"
+msgstr "查询失败"
+
+msgid "Query Keyword"
+msgstr "查询关键词"
+
+msgid "Query Results"
+msgstr "查询结果"
+
+msgid "Query Type"
+msgstr "查询类型"
+
+msgid "Querying"
+msgstr "正在查询..."
+
+msgid "Random"
+msgstr "随机"
+
+msgid "Read Failed"
+msgstr "读取失败"
+
+msgid "Reality Public Key"
+msgstr "Reality公钥"
+
+msgid "Reality Short ID"
+msgstr "Reality短ID"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "Refresh Firewall"
+msgstr "刷新防火墙"
+
+msgid "Refreshing Firewall"
+msgstr "正在刷新防火墙..."
+
+msgid "Replace With"
+msgstr "替换为"
+
+msgid "Restart Service"
+msgstr "重启服务"
+
+msgid "Restarting Service"
+msgstr "正在重启服务..."
+
+msgid "Results to Retain"
+msgstr "保留结果数"
+
+msgid "Retain Recent Probe Results"
+msgstr "保留最近探测结果的数量，默认 10"
+
+msgid "Round Robin"
+msgstr "轮询"
+
+msgid "Route Rule Configuration"
+msgstr "路由相关文件规则配置"
+
+msgid "Routing Configuration"
+msgstr "路由配置"
+
+msgid "Routing Rule Configuration"
+msgstr "路由规则配置"
+
+msgid "Rule Configuration"
+msgstr "规则配置"
+
+msgid "Rule Name"
+msgstr "规则名称"
+
+msgid "Rule Update"
+msgstr "规则更新"
+
+msgid "Rule-set"
+msgstr ""
+
+msgid "Rule-set DNS"
+msgstr "规则集DNS"
+
+msgid "Rule-set Download Exit"
+msgstr "rule-set下载使用出口（sing-box配置）"
+
+msgid "Rule-set Exit"
+msgstr "规则集出口"
+
+msgid "Run Command"
+msgstr "运行命令"
+
+msgid "Run as Server"
+msgstr "以本机作为服务端，允许程序在本机监听端口并对外提供服务"
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Select Configuration Type"
+msgstr "选择配置类型"
+
+msgid "Select DNS Resolution Strategy"
+msgstr "选择 sing-box or xray 的域名解析策略"
+
+msgid "Select DNS Service Type"
+msgstr "选择DNS分流服务类型"
+
+msgid "Select Default DNS"
+msgstr "选择默认使用的DNS服务器，未命中路由将使用此DNS"
+
+msgid "Select Default Exit Node"
+msgstr "选择默认使用的出口节点，未命中的路由会使用该出口"
+
+msgid "Select Direct Domain DNS"
+msgstr "选择直连域名使用的DNS服务器"
+
+msgid "Select Proxy Domain DNS"
+msgstr "选择代理域名使用的DNS服务器"
+
+msgid "Select Proxy Port"
+msgstr "选择代理应用端口号，可从代理节点端口中选择"
+
+msgid "Select Proxy Type"
+msgstr "选择代理程序类型"
+
+msgid "Select Rule-set DNS"
+msgstr "选择用于解析rule-set链接域名的DNS服务器（sing-box配置）"
+
+msgid "Select Shunt Port"
+msgstr "选择分流应用端口号，可从分流端口或代理节点端口中选择"
+
+msgid "Select Shunt Type"
+msgstr "选择分流程序类型"
+
+msgid "Send Keepalive Ping"
+msgstr "在没有活动连接时是否发送keepalive ping"
+
+msgid "Server Address"
+msgstr "服务器地址"
+
+msgid "Server Listen Port"
+msgstr "指定服务端监听端口号"
+
+msgid "Server Log"
+msgstr "服务器日志"
+
+msgid "Server Port"
+msgstr "服务器端口"
+
+msgid "Server Reality Public Key"
+msgstr "服务器的Reality公钥"
+
+msgid "Server Reality Short ID"
+msgstr "服务器的Reality短ID"
+
+msgid "Server Run Command"
+msgstr "指定服务端程序运行命令"
+
+msgid "Server Settings"
+msgstr "服务端设置"
+
+msgid "Service Control"
+msgstr "服务控制"
+
+msgid "Service Log Level"
+msgstr "服务日志等级"
+
+msgid "Service Restart Failed"
+msgstr "服务重启失败: "
+
+msgid "Service Restarted"
+msgstr "服务重启成功"
+
+msgid "Set Auto Update Time"
+msgstr "设置规则文件的自动更新时间"
+
+msgid "ShadowTLS Protocol Version"
+msgstr "ShadowTLS协议版本"
+
+msgid "Shadowsocks Encryption Method"
+msgstr "Shadowsocks加密方法"
+
+msgid "Shadowsocks SIP003 Plugin"
+msgstr "Shadowsocks SIP003插件"
+
+msgid "Shadowsocks SIP003 Plugin Options"
+msgstr "Shadowsocks SIP003插件参数"
+
+msgid "Shunt Configuration"
+msgstr "分流设置"
+
+msgid "Shunt Configuration Editor"
+msgstr ""
+
+msgid "Shunt DNS Port: %s"
+msgstr "分流DNS端口: %s"
+
+msgid "Shunt Listen Port"
+msgstr "分流监听端口"
+
+msgid "Shunt Log"
+msgstr "分流日志"
+
+msgid "Shunt Port: %s"
+msgstr "分流端口: %s"
+
+msgid "Shunt Query"
+msgstr "分流查询"
+
+msgid "Shunt Service"
+msgstr "分流服务"
+
+msgid "Single Download Timeout"
+msgstr "单次下载的超时时间（秒）"
+
+msgid "Speed Test"
+msgstr "测速"
+
+msgid "Startup Delay"
+msgstr "服务启动前的延迟时间（秒）"
+
+msgid "Status"
+msgstr "状态"
+
+msgid "Stop Auto Refresh"
+msgstr "停止自动刷新"
+
+msgid "TLS Server Name"
+msgstr "TLS服务器名称"
+
+msgid "TPROXY Protocol"
+msgstr "TPROXY 协议"
+
+msgid "TPROXY Protocol Type"
+msgstr "指定 TPROXY 协议类型"
+
+msgid "Tag"
+msgstr "标签"
+
+msgid "Template Configuration"
+msgstr "模板配置"
+
+msgid "Test Failed"
+msgstr "测试失败，请结合日志排查"
+
+msgid "Test Interval"
+msgstr "测试间隔"
+
+msgid "Test URL"
+msgstr "测试 URL"
+
+msgid "Testing"
+msgstr "测试中..."
+
+msgid "Timeout"
+msgstr "超时"
+
+msgid "Tolerance"
+msgstr ""
+
+msgid "Tolerance (ms)"
+msgstr "容错值 (ms)"
+
+msgid "Transport Protocol"
+msgstr "传输协议"
+
+msgid "Type"
+msgstr "类型"
+
+msgid "UDP Packet Encoding"
+msgstr "UDP包编码"
+
+msgid "UDP Packet Encoding Method"
+msgstr "UDP包编码方式"
+
+msgid "UDP Packet Relay Mode"
+msgstr "UDP包中继模式"
+
+msgid "UDP Relay Mode"
+msgstr "UDP中继模式"
+
+msgid "UDP over Stream"
+msgstr ""
+
+msgid "UDP over TCP"
+msgstr ""
+
+msgid "UUID"
+msgstr ""
+
+msgid "Unknown Query Type"
+msgstr "未知的查询类型"
+
+msgid "Unnamed Rule"
+msgstr "未命名规则"
+
+msgid "Update All Rules"
+msgstr "更新所有规则"
+
+msgid "Update Rule Files"
+msgstr "更新规则文件"
+
+msgid "Uplink Bandwidth"
+msgstr "上行带宽（Mbps）"
+
+msgid "Uplink Speed"
+msgstr "上行速率"
+
+msgid "Use CHN List"
+msgstr "使用 CHN 列表"
+
+msgid "Use CHN Route"
+msgstr "使用 CHN 路由"
+
+msgid "Use GFW List"
+msgstr "使用 GFW 列表"
+
+msgid "Use GeoSite Rule-set"
+msgstr "使用geosite规则集"
+
+msgid "Use Global Default DNS"
+msgstr "使用全局默认DNS"
+
+msgid "Use Global Default Resolution Strategy"
+msgstr "使用全局默认解析策略"
+
+msgid "Use Routing Proxy Node"
+msgstr "使用路由代理节点"
+
+msgid "Use System DNS"
+msgstr "使用系统DNS"
+
+msgid "Use UDP Stream Relay"
+msgstr "使用流式UDP中继"
+
+msgid "User UUID"
+msgstr "用户 UUID"
+
+msgid "V2Ray Transport Protocol"
+msgstr "V2Ray传输层协议"
+
+msgid "VLESS Flow Control"
+msgstr "VLESS流控"
+
+msgid "VLESS Flow Control Protocol"
+msgstr "VLESS流量控制协议"
+
+msgid "View Logs"
+msgstr "日志查看"
+
+msgid "View and Manage Logs"
+msgstr "查看和管理 HiJpass 相关日志"
+
+msgid "Warning"
+msgstr "警告"
+
+msgid "WebSocket Path"
+msgstr "WebSocket路径"
+
+msgid "Website Connectivity Test"
+msgstr "网站连通性测试"
+
+msgid "XHTTP Host"
+msgstr "XHTTP主机"
+
+msgid "XHTTP Host Domain"
+msgstr "XHTTP请求的主机域名"
+
+msgid "XHTTP Mode"
+msgstr "XHTTP模式"
+
+msgid "XHTTP Path"
+msgstr "XHTTP路径"
+
+msgid "XHTTP Request Path"
+msgstr "XHTTP请求路径"
+
+msgid "XHTTP Transport Mode"
+msgstr "XHTTP传输模式"
+
+msgid "Xray Balancer"
+msgstr ""
+
+msgid "gRPC Service Name"
+msgstr "gRPC服务名称"
+
+msgid "sing-box URLTest"
+msgstr ""

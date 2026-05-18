@@ -18,15 +18,15 @@ const v = view.extend({
             await view.prototype.handleSave(ev)
         } catch (e) {
             console.log(e);
-            WebUtils.showErrorNotification(_('配置保存失败'), _(e.message), 5000);
+            WebUtils.showErrorNotification(_('Configuration Save Failed'), _(e.message), 5000);
         }
     },
 
     handleSaveApply: LuciUtils.genHandleSaveApply(),
 
     render: function () {
-        let m = new form.Map(LuciFlied.CONF_NAME, _('分流设置'),
-            _('配置分流规则和设置'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('Shunt Configuration'),
+            _('Configure Shunt Rules'));
         WebUtils.createServiceStatusSection(m, 'shunt');
 
         let s = m.section(form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE);
@@ -48,49 +48,49 @@ const v = view.extend({
 // 创建基础配置选项
 function createBasicOptions(s: LuCI.form.AbstractSection) {
     // 总开关
-    let enabled = s.taboption('basic', form.Flag, 'enabled', _('启用分流'), _(''));
+    let enabled = s.taboption('basic', form.Flag, 'enabled', _('Enable Shunt'), _(''));
     enabled.default = '1';
     enabled.rmempty = false;
 
     // 分流类型
-    let serviceType = s.taboption('basic', form.ListValue, 'type', _('分流类型'),
-        _('选择分流程序类型'));
+    let serviceType = s.taboption('basic', form.ListValue, 'type', _('Shunt Type'),
+        _('Select Shunt Type'));
     HijpassValues.SHUNT_CONF_TYPE.forEach(function (type) {
         serviceType.value(type);
     })
     serviceType.default = 'xray';
     serviceType.rmempty = false;
 
-    let configType = s.taboption('basic', form.ListValue, 'config_type', _('配置类型'),
-        _('选择配置类型'));
-    configType.value('tmpl', _('模板配置'));
-    configType.value('custom', _('自定义编辑'));
+    let configType = s.taboption('basic', form.ListValue, 'config_type', _('Configuration Type'),
+        _('Select Configuration Type'));
+    configType.value('tmpl', _('Template Configuration'));
+    configType.value('custom', _('Custom Edit'));
     configType.rmempty = true;
 
     // 分流监听端口
-    let shuntListenPort = s.taboption('basic', form.Value, 'shunt_listen_port', _('分流监听端口'),
-        _('指定分流监听端口号'));
+    let shuntListenPort = s.taboption('basic', form.Value, 'shunt_listen_port', _('Shunt Listen Port'),
+        _('Shunt Listen Port'));
     shuntListenPort.default = '1041';
     shuntListenPort.datatype = 'port';
     shuntListenPort.rmempty = false;
     shuntListenPort.validate = function (sectionId: string, value: string) {
         let dns_listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "dns_listen_port");
         if (dns_listen_port === value) {
-            return _("与DNS端口冲突")
+            return _("Conflicts with DNS Port")
         }
         return WebUtils.validatePortConflict.call(this, sectionId, value);
     }
 
     // DNS监听端口
-    let dnsListenPort = s.taboption('basic', form.Value, 'dns_listen_port', _('DNS监听端口'),
-        _('指定DNS监听端口号'));
+    let dnsListenPort = s.taboption('basic', form.Value, 'dns_listen_port', _('DNS Listen Port'),
+        _('DNS Listen Port'));
     dnsListenPort.default = '10153';
     dnsListenPort.datatype = 'port';
     dnsListenPort.rmempty = false;
     dnsListenPort.validate = function (sectionId: string, value: string) {
         let shunt_listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "shunt_listen_port");
         if (shunt_listen_port === value) {
-            return _("与分流端口冲突")
+            return _("Conflicts with Shunt Port")
         }
         return WebUtils.validatePortConflict.call(this, sectionId, value);
     }
@@ -99,17 +99,17 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     WebUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, 'basic');
 
     // 日志路径
-    let logLevel = s.taboption('basic', form.ListValue, 'log_level', _('日志等级'), _('日志记录等级'));
+    let logLevel = s.taboption('basic', form.ListValue, 'log_level', _('Log Level'), _('Logging Level'));
     HijpassValues.SHUNT_LOG_LEVELS.forEach(function (level) {
         logLevel.value(level);
     })
     logLevel.depends('log_enabled', '1');
 
     // 预览配置按钮
-    let previewConfigButton = s.taboption('basic', form.Button, '_preview_config', _('预览配置'),
-        _('点击预览配置'));
+    let previewConfigButton = s.taboption('basic', form.Button, '_preview_config', _('Preview Configuration'),
+        _('Click to Preview'));
     previewConfigButton.depends('config_type', 'tmpl');
-    previewConfigButton.inputtitle = _('预览配置');
+    previewConfigButton.inputtitle = _('Preview Configuration');
     previewConfigButton.inputstyle = 'apply';
     previewConfigButton.onclick = preview
 }
@@ -134,27 +134,27 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     let routeTypeSection = routeTypeSectionValue.subsection;
     WebUtils.setAnonymousSection(routeTypeSection);
 
-    let defaultProxyNode = createRequiredListValue(routeTypeSection, 'default_proxy_node', _('默认全局出口'),
-        _('选择默认使用的出口节点，未命中的路由会使用该出口'),
+    let defaultProxyNode = createRequiredListValue(routeTypeSection, 'default_proxy_node', _('Default Global Exit'),
+        _('Select Default Exit Node'),
         function (section_id: any, value: any) {
             if (!value) {
-                return _('请先配置全局出口');
+                return _('Configure Global Exit First');
             }
             return true;
         });
     loadProxyNodeOptions(defaultProxyNode, true);
 
-    let rulesetOutNode = routeTypeSection.option(form.ListValue, 'ruleset_out_node', _('规则集出口'),
-        _('rule-set下载使用出口（sing-box配置）'));
+    let rulesetOutNode = routeTypeSection.option(form.ListValue, 'ruleset_out_node', _('Rule-set Exit'),
+        _('Rule-set Download Exit'));
     loadProxyNodeOptions(rulesetOutNode, false);
 
     let rulesetConvert = routeTypeSection.option(form.Flag, 'ruleset_convert',
-        _('使用geosite规则集'), _('通过geoview将geo规则转换为规则集（sing-box配置）'));
+        _('Use GeoSite Rule-set'), _('Convert Geo Rules'));
     rulesetConvert.rmempty = false;
     // 批量替换节点按钮
-    let replaceNodeBtn = s.taboption('route', form.Button, '_replace_node', _('批量替换节点'));
+    let replaceNodeBtn = s.taboption('route', form.Button, '_replace_node', _('Bulk Replace Nodes'));
     replaceNodeBtn.depends({ config_type: "tmpl" });
-    replaceNodeBtn.inputtitle = _('批量替换节点');
+    replaceNodeBtn.inputtitle = _('Bulk Replace Nodes');
     replaceNodeBtn.inputstyle = 'apply';
     replaceNodeBtn.onclick = function () {
         // 收集规则中实际被使用的节点值
@@ -183,15 +183,15 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
         const fromSel = makeSelect('replace-from', fromNodeOptions);
         const toSel = makeSelect('replace-to', allNodeOptions);
 
-        ui.showModal(_('批量替换节点'), [
+        ui.showModal(_('Bulk Replace Nodes'), [
             E('div', { class: 'cbi-section' }, [
                 E('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center' }, [
-                    E('div', {}, [E('label', {}, _('从节点')), fromSel]),
-                    E('div', {}, [E('label', {}, _('替换为')), toSel]),
+                    E('div', {}, [E('label', {}, _('From Node')), fromSel]),
+                    E('div', {}, [E('label', {}, _('Replace With')), toSel]),
                 ])
             ]),
             E('div', { class: 'right', style: 'display:flex;justify-content:flex-end;gap:10px' }, [
-                E('button', { class: 'btn cbi-button', click: ui.hideModal }, _('取消')),
+                E('button', { class: 'btn cbi-button', click: ui.hideModal }, _('Cancel')),
                 E('button', {
                     class: 'btn cbi-button-action',
                     click: function () {
@@ -212,47 +212,47 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
                         ui.hideModal();
                         location.reload();
                     }
-                }, _('确认替换'))
+                }, _('Confirm Replace'))
             ])
         ]);
     };
 
     // 路由规则配置
     let routeGridSectionValue = s.taboption('route', form.SectionValue, '_route_rule',
-        form.GridSection, LuciFlied.SHUNT_ROUTE_RULE_TYPE, _('路由规则配置'));
+        form.GridSection, LuciFlied.SHUNT_ROUTE_RULE_TYPE, _('Routing Rule Configuration'));
     routeGridSectionValue.depends({ config_type: "tmpl" })
 
     let routeGridSection = routeGridSectionValue.subsection;
     routeGridSection.rowcolors = true
     WebUtils.setAnonymousGridSectionMembers(routeGridSection)
-    routeGridSection.modaltitle = _('编辑路由规则');
+    routeGridSection.modaltitle = _('Edit Routing Rule');
     routeGridSection.sectiontitle = function (section_id: any) {
-        return uci.get(LuciFlied.CONF_NAME, section_id, 'name') || _('未命名规则');
+        return uci.get(LuciFlied.CONF_NAME, section_id, 'name') || _('Unnamed Rule');
     };
     routeGridSection.rowcolors = true
     routeGridSection.tab('_rule', _('规则'));
-    routeGridSection.tab('_dns', _('DNS配置'));
+    routeGridSection.tab('_dns', _('DNS Configuration'));
 
     // 规则名称
-    let name = routeGridSection.taboption('_rule', form.Value, 'name', _('规则名称'));
+    let name = routeGridSection.taboption('_rule', form.Value, 'name', _('Rule Name'));
     name.validate = WebUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, 'name')
     name.rmempty = false;
     name.modalonly = true;
 
     // 启用开关（从路由配置移过来）
-    let enabled = routeGridSection.taboption('_rule', form.Flag, 'enabled', _('启用'));
+    let enabled = routeGridSection.taboption('_rule', form.Flag, 'enabled', _('Enable'));
     enabled.default = '1';
     enabled.rmempty = false;
     enabled.editable = true;
 
     // 代理节点（动态生成选项）
-    let proxyNode = routeGridSection.taboption('_rule', form.ListValue, 'proxy_node', _('代理节点'));
+    let proxyNode = routeGridSection.taboption('_rule', form.ListValue, 'proxy_node', _('Proxy Node'));
     proxyNode.rmempty = false;
     proxyNode.editable = true;
     loadProxyNodeOptions(proxyNode, true);  // 包含阻止和负载均衡
 
     // DNS服务器（动态生成选项）
-    let dnsNode = routeGridSection.taboption('_dns', form.ListValue, 'dns_node', _('DNS服务器'), _('仅在规则中存在域名、geosite、rule_set时生效'));
+    let dnsNode = routeGridSection.taboption('_dns', form.ListValue, 'dns_node', _('DNS Server'), _('Only Effective with Domain/GeoSite/Rule-set'));
     // dnsNode.modalonly = true;
     loadDNSServerOptions(dnsNode, true);  // 包含默认选项
     dnsNode.textvalue = function (sectionId) {
@@ -265,22 +265,22 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
         if (!dnsProxyNode) {
             value = dnsNode
         } else {
-            dnsProxyNode = dnsProxyNode === 'hijpass-direct' ? '直连' : dnsProxyNode;
+            dnsProxyNode = dnsProxyNode === 'hijpass-direct' ? _('Direct') : dnsProxyNode;
             value = dnsNode + ' -> ' + dnsProxyNode;
         }
         return value;
     }
 
-    let dnsStrategy = routeGridSection.taboption('_dns', form.ListValue, 'dns_strategy', _('DNS解析策略'));
-    dnsStrategy.value('', _('使用全局默认解析策略'))
+    let dnsStrategy = routeGridSection.taboption('_dns', form.ListValue, 'dns_strategy', _('DNS Resolution Strategy'));
+    dnsStrategy.value('', _('Use Global Default Resolution Strategy'))
     HijpassValues.DNS_STRATEGY_VALUES.forEach(function (strategy) {
         dnsStrategy.value(strategy.value, strategy.label);
     });
     dnsStrategy.modalonly = true;
 
-    let dnsProxyNode = routeGridSection.taboption('_dns', form.ListValue, 'dns_proxy_node', _('DNS出口节点'));
-    dnsProxyNode.value('', _('使用路由代理节点'));
-    dnsProxyNode.value('hijpass-direct', _('直连'));
+    let dnsProxyNode = routeGridSection.taboption('_dns', form.ListValue, 'dns_proxy_node', _('DNS Exit Node'));
+    dnsProxyNode.value('', _('Use Routing Proxy Node'));
+    dnsProxyNode.value('hijpass-direct', _('Direct'));
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section) {
         if (section.name && section.enabled !== '0') {
             let displayName = section.name;
@@ -327,18 +327,18 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     }
 
     // 端口
-    let port = routeGridSection.taboption('_rule', form.DynamicList, 'port', _('端口'));
+    let port = routeGridSection.taboption('_rule', form.DynamicList, 'port', _('Port'));
     port.datatype = 'port';
     port.placeholder = '80';
     port.modalonly = true
 
     // 端口范围
-    let portRange = routeGridSection.taboption('_rule', form.DynamicList, 'port_range', _('端口范围'));
+    let portRange = routeGridSection.taboption('_rule', form.DynamicList, 'port_range', _('Port Range'));
     portRange.datatype = 'portrange';
     portRange.placeholder = '1000-2000';
     portRange.modalonly = true
 
-    let portView = routeGridSection.option(form.TextValue, '_port_view', _('端口范围'))
+    let portView = routeGridSection.option(form.TextValue, '_port_view', _('Port Range'))
     portView.textvalue = function (sectionId) {
         let port = uci.get(LuciFlied.CONF_NAME, sectionId, 'port');
         let portRange = uci.get(LuciFlied.CONF_NAME, sectionId, 'port_range');
@@ -354,7 +354,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     portView.modalonly = false
 
     // 域名规则列表
-    let domainList = routeGridSection.taboption('_rule', form.TextValue, 'domain_list', _('域名规则列表'), _('纯字符串: 当此字符串匹配目标域名中任意部分，该规则生效。<br>' +
+    let domainList = routeGridSection.taboption('_rule', form.TextValue, 'domain_list', _('Domain Rule List'), _('纯字符串: 当此字符串匹配目标域名中任意部分，该规则生效。<br>' +
         '正则表达式: 由\'regexp:\'开始，余下部分是一个正则表达式。<br>' +
         '子域名 (推荐): 由\'domain:\'开始，余下部分是一个域名。当此域名是目标域名或其子域名时，该规则生效。<br>' +
         '完整匹配: 由\'full:\'开始，余下部分是一个域名。当此域名完整匹配目标域名时，该规则生效。<br>' +
@@ -375,7 +375,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     }
 
     // IP规则列表
-    let ipList = routeGridSection.taboption('_rule', form.TextValue, 'ip_list', _('IP规则列表'), _('IP: 形如\'127.0.0.1\'。<br>' +
+    let ipList = routeGridSection.taboption('_rule', form.TextValue, 'ip_list', _('IP Rule List'), _('IP: 形如\'127.0.0.1\'。<br>' +
         'CIDR: 形如\'10.0.0.0/8\'.<br>' +
         'geoip: 形如\'geoip:cn\'。<br>' +
         'rule-set: 形如\'rule-set:local:/path/rulefile\'或\'rule-set:remote:https://file\'。<br>' +
@@ -405,8 +405,8 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
     WebUtils.setAnonymousSection(dnsTypeSection);
 
     // 默认全局DNS配置
-    let defaultDNSNode = createRequiredListValue(dnsTypeSection, 'default_dns_node', _('默认全局DNS'),
-        _('选择默认使用的DNS服务器，未命中路由将使用此DNS'),
+    let defaultDNSNode = createRequiredListValue(dnsTypeSection, 'default_dns_node', _('Default Global DNS'),
+        _('Select Default DNS'),
         function (section_id: string, value: any) {
             if (!value) {
                 return _('请先配置全局DNS服务器');
@@ -416,21 +416,21 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
     loadDNSServerOptions(defaultDNSNode, false);
 
     let rulesetDNSNode = dnsTypeSection.option(form.ListValue, 'ruleset_dns_node',
-        _('规则集DNS'), _('选择用于解析rule-set链接域名的DNS服务器（sing-box配置）'));
+        _('Rule-set DNS'), _('Select Rule-set DNS'));
     loadDNSServerOptions(rulesetDNSNode, false);
 
-    let defaultStrategy = dnsTypeSection.option(form.ListValue, 'default_strategy', _('内部DNS解析策略'),
-        _('选择 sing-box or xray 的域名解析策略'));
+    let defaultStrategy = dnsTypeSection.option(form.ListValue, 'default_strategy', _('Internal DNS Resolution Strategy'),
+        _('Select DNS Resolution Strategy'));
     HijpassValues.DNS_STRATEGY_VALUES.forEach(function (strategy) {
         defaultStrategy.value(strategy.value, strategy.label);
     });
     defaultStrategy.rmempty = false;
 
-    let useCache = dnsTypeSection.option(form.Flag, 'use_cache', _('DNS缓存'));
+    let useCache = dnsTypeSection.option(form.Flag, 'use_cache', _('DNS Cache'));
     useCache.rmempty = false;
 
     let dnsGridSectionValue = s.taboption('dns', form.SectionValue, '_dns_servers',
-        form.GridSection, LuciFlied.SHUNT_DNS_NODE_TYPE, _('DNS节点配置'));
+        form.GridSection, LuciFlied.SHUNT_DNS_NODE_TYPE, _('DNS Node Configuration'));
     dnsGridSectionValue.depends({ config_type: "tmpl" })
 
     let dnsGridSection = dnsGridSectionValue.subsection;
@@ -439,14 +439,14 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
     dnsGridSection.addremove = true;
     dnsGridSection.sortable = true;
     dnsGridSection.nodescriptions = true;
-    dnsGridSection.modaltitle = _('编辑DNS服务器');
+    dnsGridSection.modaltitle = _('Edit DNS Server');
     dnsGridSection.sectiontitle = function (section_id) {
         return uci.get(LuciFlied.CONF_NAME, section_id, 'tag') || _('未命名');
     };
 
     // DNS类型
     let type = dnsGridSection.option(form.ListValue, 'type', _('类型'),
-        _('DNS服务器类型'));
+        _('DNS Server Type'));
     type.value('tcp', 'TCP');
     type.value('udp', 'UDP');
     type.value('tls', 'TLS（仅sing-box支持）');
@@ -456,8 +456,8 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
     type.rmempty = false;
 
     // DNS标签
-    let tag = dnsGridSection.option(form.Value, 'tag', _('标签'),
-        _('DNS服务器的唯一标识'));
+    let tag = dnsGridSection.option(form.Value, 'tag', _('Tag'),
+        _('DNS Server Tag'));
     tag.placeholder = 'dns-local';
     tag.rmempty = false;
     tag.validate = WebUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, 'tag')
@@ -465,14 +465,14 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
 
     // DNS服务器地址
     let server = dnsGridSection.option(form.Value, 'server', _('服务器'),
-        _('DNS服务器地址'));
+        _('DNS Server Address'));
     server.placeholder = '8.8.8.8';
     server.datatype = 'ipaddr';
     server.rmempty = false;
 
     // DNS服务器端口
-    let port = dnsGridSection.option(form.Value, 'port', _('端口'),
-        _('DNS服务器端口'));
+    let port = dnsGridSection.option(form.Value, 'port', _('Port'),
+        _('DNS Server Port'));
     port.placeholder = '53';
     port.datatype = 'port';
     port.rmempty = true;
@@ -498,8 +498,8 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
     gSs.anonymous = true;
     gSs.addremove = false;
 
-    createValidatedDynamicList(gSs, 'lb_node_list', _('负载均衡节点'),
-        _('根据所选节点健康度自动调整出口路由，配置后可在路由规则处选择负载均衡节点'),
+    createValidatedDynamicList(gSs, 'lb_node_list', _('Load Balancing Nodes'),
+        _('Load Balancing Nodes'),
         LuciFlied.PROXY_NODE_TYPE, lbNodeLoader);
 
     // ── sing-box：URLTest 参数 ────────────────────────────────────────
@@ -510,25 +510,25 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
     sbSs.anonymous = true;
     sbSs.addremove = false;
 
-    let sbUrl = sbSs.option(form.Value, 'url', _('测试 URL'),
-        _('健康检查请求的目标 URL，默认 https://www.gstatic.com/generate_204'));
+    let sbUrl = sbSs.option(form.Value, 'url', _('Test URL'),
+        _('Health Check URL'));
     sbUrl.placeholder = 'https://www.gstatic.com/generate_204';
 
-    let sbInterval = sbSs.option(form.Value, 'interval', _('测试间隔'),
-        _('健康检查间隔，如 3m、30s，默认 3m'));
+    let sbInterval = sbSs.option(form.Value, 'interval', _('Test Interval'),
+        _('Health Check Interval'));
     sbInterval.placeholder = '3m';
 
-    let sbTolerance = sbSs.option(form.Value, 'tolerance', _('容错值 (ms)'),
-        _('最优节点与当前节点的延迟差容忍值（毫秒），默认 50'));
+    let sbTolerance = sbSs.option(form.Value, 'tolerance', _('Tolerance (ms)'),
+        _('Tolerance'));
     sbTolerance.placeholder = '50';
     sbTolerance.datatype = 'uinteger';
 
-    let sbIdleTimeout = sbSs.option(form.Value, 'idle_timeout', _('空闲超时'),
-        _('节点空闲超时时间，如 30m，默认 30m'));
+    let sbIdleTimeout = sbSs.option(form.Value, 'idle_timeout', _('Idle Timeout'),
+        _('Node Idle Timeout'));
     sbIdleTimeout.placeholder = '30m';
 
-    sbSs.option(form.Flag, 'interrupt_exist_connections', _('切换时中断现有连接'),
-        _('当选中出站变更时是否中断现有连接'));
+    sbSs.option(form.Flag, 'interrupt_exist_connections', _('Interrupt Existing Connections'),
+        _('Interrupt on Outbound Change'));
 
     // ── xray：Balancer + BurstObservatory 参数 ────────────────────────
     let oXray = s.taboption('slb', form.SectionValue, '_slb_xray',
@@ -538,70 +538,70 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
     xSs.anonymous = true;
     xSs.addremove = false;
 
-    let xrayStrategy = xSs.option(form.ListValue, 'strategy', _('负载策略'),
-        _('负载均衡选择策略'));
-    xrayStrategy.value('random', _('随机'));
-    xrayStrategy.value('roundRobin', _('轮询'));
-    xrayStrategy.value('leastPing', _('最低 Ping'));
-    xrayStrategy.value('leastLoad', _('最低负载'));
+    let xrayStrategy = xSs.option(form.ListValue, 'strategy', _('Load Strategy'),
+        _('Load Balancing Strategy'));
+    xrayStrategy.value('random', _('Random'));
+    xrayStrategy.value('roundRobin', _('Round Robin'));
+    xrayStrategy.value('leastPing', _('Lowest Ping'));
+    xrayStrategy.value('leastLoad', _('Lowest Load'));
     xrayStrategy.default = 'leastLoad';
 
-    let xrayExpected = xSs.option(form.Value, 'strategy_expected', _('最优节点数'),
-        _('选出的最优节点个数，流量在这几个节点中随机分配'));
+    let xrayExpected = xSs.option(form.Value, 'strategy_expected', _('Best Nodes'),
+        _('Best Nodes Count'));
     xrayExpected.placeholder = '1';
     xrayExpected.datatype = 'uinteger';
     xrayExpected.depends('strategy', 'leastLoad');
 
-    let xrayMaxRtt = xSs.option(form.Value, 'strategy_max_rtt', _('最高可接受 RTT'),
-        _('最高可接受的 RTT 时长，如 1s、500ms'));
+    let xrayMaxRtt = xSs.option(form.Value, 'strategy_max_rtt', _('Max Acceptable RTT'),
+        _('Max Acceptable RTT'));
     xrayMaxRtt.placeholder = '1s';
     xrayMaxRtt.depends('strategy', 'leastLoad');
 
-    let xrayTolerance = xSs.option(form.Value, 'strategy_tolerance', _('失败率容忍'),
-        _('最多可接受的测速失败比例，如 0.05 表示 5%'));
+    let xrayTolerance = xSs.option(form.Value, 'strategy_tolerance', _('Failure Rate Tolerance'),
+        _('Failure Rate Tolerance'));
     xrayTolerance.placeholder = '0.05';
     xrayTolerance.depends('strategy', 'leastLoad');
 
-    let xrayFallback = xSs.option(form.ListValue, 'fallback_tag', _('备用节点'),
-        _('所有节点不可用时的备用出站'));
+    let xrayFallback = xSs.option(form.ListValue, 'fallback_tag', _('Fallback Node'),
+        _('Fallback Outbound'));
     xrayFallback.value('', _('无'));
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
         if (section.name && section.enabled !== '0') xrayFallback.value(section.name, section.name);
     });
 
-    let xrayProbeUrl = xSs.option(form.Value, 'probe_url', _('探测 URL'),
-        _('健康检查探测目标 URL，应返回 HTTP 204'));
+    let xrayProbeUrl = xSs.option(form.Value, 'probe_url', _('Probe URL'),
+        _('Health Check Probe URL'));
     xrayProbeUrl.placeholder = 'https://connectivitycheck.gstatic.com/generate_204';
     xrayProbeUrl.depends('strategy', 'leastPing');
     xrayProbeUrl.depends('strategy', 'leastLoad');
 
-    let xrayProbeConnectivity = xSs.option(form.Value, 'probe_connectivity', _('本地连通性检测 URL'),
-        _('本地网络连通性检测 URL，为空则不检测'));
+    let xrayProbeConnectivity = xSs.option(form.Value, 'probe_connectivity', _('Local Connectivity Check URL'),
+        _('Local Connectivity Check URL'));
     xrayProbeConnectivity.depends('strategy', 'leastPing');
     xrayProbeConnectivity.depends('strategy', 'leastLoad');
 
-    let xrayProbeInterval = xSs.option(form.Value, 'probe_interval', _('探测间隔'),
-        _('平均探测间隔，最小 10s，默认 1m'));
+    let xrayProbeInterval = xSs.option(form.Value, 'probe_interval', _('Probe Interval'),
+        _('Probe Interval'));
     xrayProbeInterval.placeholder = '1m';
     xrayProbeInterval.depends('strategy', 'leastPing');
     xrayProbeInterval.depends('strategy', 'leastLoad');
 
-    let xrayProbeTimeout = xSs.option(form.Value, 'probe_timeout', _('探测超时'),
-        _('探测超时时间，默认 5s'));
+    let xrayProbeTimeout = xSs.option(form.Value, 'probe_timeout', _('Probe Timeout'),
+        _('Probe Timeout'));
     xrayProbeTimeout.placeholder = '5s';
     xrayProbeTimeout.depends('strategy', 'leastPing');
     xrayProbeTimeout.depends('strategy', 'leastLoad');
 
-    let xrayProbeSampling = xSs.option(form.Value, 'probe_sampling', _('保留结果数'),
-        _('保留最近探测结果的数量，默认 10'));
+    let xrayProbeSampling = xSs.option(form.Value, 'probe_sampling', _('Results to Retain'),
+        _('Retain Recent Probe Results'));
     xrayProbeSampling.placeholder = '10';
     xrayProbeSampling.datatype = 'uinteger';
     xrayProbeSampling.depends('strategy', 'leastPing');
     xrayProbeSampling.depends('strategy', 'leastLoad');
 
-    let xrayProbeHttpMethod = xSs.option(form.ListValue, 'probe_http_method', _('探测 HTTP 方法'),
-        _('探测使用的 HTTP 方法，默认 HEAD'));
-    xrayProbeHttpMethod.value('', _('默认 (HEAD)'));
+    let xrayProbeHttpMethod = xSs.option(form.ListValue, 'probe_http_method', _('Probe HTTP Method'),
+        _('Probe HTTP Method'));
+    xrayProbeHttpMethod.value('', _('Default (HEAD)'));
     xrayProbeHttpMethod.value('HEAD', 'HEAD');
     xrayProbeHttpMethod.value('GET', 'GET');
     xrayProbeHttpMethod.depends('strategy', 'leastPing');
@@ -610,12 +610,12 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
 
 // 创建所有标签页
 function createTabs(s: LuCI.form.AbstractSection) {
-    s.tab('basic', _('基础配置'));
-    s.tab('config', _('分流配置编辑'));
-    s.tab('route', _('路由配置'));
-    s.tab('dns', _('DNS服务器配置'));
-    s.tab('slb', _('负载均衡'));
-    s.tab('ruleset', _('规则集'));
+    s.tab('basic', _('Basic Configuration'));
+    s.tab('config', _('Shunt Configuration Editor'));
+    s.tab('route', _('Routing Configuration'));
+    s.tab('dns', _('DNS Server Configuration'));
+    s.tab('slb', _('Load Balancing'));
+    s.tab('ruleset', _('Rule-set'));
 }
 
 function resetHash() {
@@ -638,10 +638,10 @@ function preview() {
         let configJson = ShuntUtils.getShuntConfData()
         let shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') || 'xray'
         // 创建模态对话框显示配置
-        ui.showModal(_('配置预览'), [
+        ui.showModal(_('Preview Configuration'), [
             E('div', { 'class': 'cbi-section' }, [
                 E('div', { 'class': 'cbi-section-descr' },
-                    _('以下是根据当前配置生成的 %s JSON配置：').format(shuntType)),
+                    _('Generated %s JSON Configuration').format(shuntType)),
                 E('pre', {
                     'style': 'max-height: 500px; overflow: auto; padding: 10px; border-radius: 4px;',
                     'id': 'config-preview-content'
@@ -666,7 +666,7 @@ function preview() {
                             WebUtils.showSuccessNotification("成功", "配置已复制到剪贴板", 3000);
                         })
                     }
-                }, _('复制配置'))
+                }, _('Copy Configuration'))
             ])
         ]);
     } catch (err) {
@@ -699,7 +699,7 @@ function loadDNSServerOptions(option: LuCI.form.AbstractValue, includeDefault: b
         delete this.vallist;
 
         if (includeDefault) {
-            this.value('', _('使用全局默认DNS'));
+            this.value('', _('Use Global Default DNS'));
         }
 
         uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, function (section: any) {
@@ -773,7 +773,7 @@ function createValidatedDynamicList(section: LuCI.form.AbstractSection,
         });
 
         if (availableItems.indexOf(value) === -1) {
-            return _('%s "%s" 不存在，请从下拉列表中选择或先在配置中添加').format(title, value);
+            return _('Item Not Found').format(title, value);
         }
 
         return true;

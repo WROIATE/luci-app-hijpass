@@ -17,8 +17,8 @@ const v = view.extend({
     handleSave: null,
     render: function () {
 
-        let m = new form.Map(LuciFlied.CONF_NAME, _('日志查看'),
-            _('查看和管理 HiJpass 相关日志'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('View Logs'),
+            _('View and Manage Logs'));
 
         let s = m.section(form.TypedSection, 'logs_display');
         s.anonymous = true;
@@ -37,12 +37,12 @@ function createLogFileOptions() {
 
     let hijpassLog = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.CONF_NAME, 'log_path');
     // 添加系统日志
-    options.push(E('option', {'value': hijpassLog}, _('主日志')));
+    options.push(E('option', {'value': hijpassLog}, _('Main Log')));
 
     // 添加分流日志
     let shuntLog = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'log_path');
     if (shuntLog) {
-        options.push(E('option', {'value': shuntLog}, _('分流日志')));
+        options.push(E('option', {'value': shuntLog}, _('Shunt Log')));
     }
 
     // 动态添加代理节点日志
@@ -52,7 +52,7 @@ function createLogFileOptions() {
         let log_path = proxySection.log_path;
 
         if (log_path) {
-            let optionText = _('代理日志') + ' - ' + displayName;
+            let optionText = _('Proxy Log') + ' - ' + displayName;
             options.push(E('option', {'value': log_path}, optionText));
         }
     });
@@ -63,7 +63,7 @@ function createLogFileOptions() {
         let log_path = serverSection.log_path;
 
         if (log_path) {
-            let optionText = _('服务器日志') + ' - ' + displayName;
+            let optionText = _('Server Log') + ' - ' + displayName;
             options.push(E('option', {'value': log_path}, optionText));
         }
     });
@@ -81,7 +81,7 @@ function createLogControlPanel() {
     return E('div', {'class': 'cbi-section', 'style': 'display: flex;flex-direction: column;gap: 20px;'}, [
         E('div', {'class': 'cbi-section-node'}, [
             E('div', {'class': 'cbi-value'}, [
-                E('label', {'class': 'cbi-value-title'}, _('日志文件')),
+                E('label', {'class': 'cbi-value-title'}, _('Log File')),
                 E('div', {'class': 'cbi-value-field'}, [
                     E('select', {
                         'id': 'log-file-select',
@@ -91,23 +91,23 @@ function createLogControlPanel() {
                 ])
             ]),
             E('div', {'class': 'cbi-value'}, [
-                E('label', {'class': 'cbi-value-title'}, _('日志级别过滤')),
+                E('label', {'class': 'cbi-value-title'}, _('Log Level Filter')),
                 E('div', {'class': 'cbi-value-field'}, [
                     E('select', {
                         'id': 'log-level-filter',
                         'class': 'cbi-input-select',
                         'style': 'margin-right: 10px;'
                     }, [
-                        E('option', {'value': ''}, _('全部')),
-                        E('option', {'value': 'DEBUG'}, _('调试')),
-                        E('option', {'value': 'INFO'}, _('信息')),
-                        E('option', {'value': 'WARN'}, _('警告')),
-                        E('option', {'value': 'ERROR'}, _('错误'))
+                        E('option', {'value': ''}, _('All')),
+                        E('option', {'value': 'DEBUG'}, _('Debug')),
+                        E('option', {'value': 'INFO'}, _('Info')),
+                        E('option', {'value': 'WARN'}, _('Warning')),
+                        E('option', {'value': 'ERROR'}, _('Error'))
                     ])
                 ])
             ]),
             E('div', {'class': 'cbi-value'}, [
-                E('label', {'class': 'cbi-value-title'}, _('显示行数')),
+                E('label', {'class': 'cbi-value-title'}, _('Display Lines')),
                 E('div', {'class': 'cbi-value-field'}, [
                     E('select', {
                         'id': 'log-lines-count',
@@ -129,21 +129,21 @@ function createLogControlPanel() {
                         'class': 'cbi-button cbi-button-action',
                         'id': 'refresh-logs',
                         'style': 'margin-right: 5px;'
-                    }, _('刷新')),
+                    }, _('Refresh')),
                     E('button', {
                         'class': 'cbi-button cbi-button-neutral',
                         'id': 'auto-refresh-toggle',
                         'style': 'margin-right: 5px;'
-                    }, _('自动刷新')),
+                    }, _('Auto Refresh')),
                     E('button', {
                         'class': 'cbi-button cbi-button-positive',
                         'id': 'download-logs',
                         'style': 'margin-right: 5px;'
-                    }, _('下载')),
+                    }, _('Download')),
                     E('button', {
                         'class': 'cbi-button cbi-button-negative',
                         'id': 'clear-logs'
-                    }, _('清空'))
+                    }, _('Clear'))
                 ])
             ]),
             E('div', {'class': 'cbi-value'}, [
@@ -155,7 +155,7 @@ function createLogControlPanel() {
                     'id': 'log-content',
                     'class': 'log-display',
                     'style': 'width: 100%; height: 500px; font-family: monospace; font-size: 12px; background: #101010; color: #eee; border: 1px solid #ccc; padding: 10px; overflow: auto; white-space: pre; line-height: 1.4;'
-                }, _('日志内容将在这里显示...'))
+                }, _('Log Content'))
             ])
         ])
     ]);
@@ -177,18 +177,18 @@ function setupLogEventListeners() {
         let button = this;
 
         if (isAutoRefresh) {
-            button.textContent = _('停止自动刷新');
+            button.textContent = _('Stop Auto Refresh');
             button.className = 'cbi-button cbi-button-negative';
             autoRefreshInterval = setInterval(loadLogs, 3000); // 每3秒刷新
-            updateLogStatus(_('自动刷新已启用'));
+            updateLogStatus(_('Auto Refresh Enabled'));
         } else {
-            button.textContent = _('自动刷新');
+            button.textContent = _('Auto Refresh');
             button.className = 'cbi-button cbi-button-neutral';
             if (autoRefreshInterval) {
                 clearInterval(autoRefreshInterval);
                 autoRefreshInterval = null;
             }
-            updateLogStatus(_('自动刷新已停用'));
+            updateLogStatus(_('Auto Refresh Disabled'));
         }
     });
 
@@ -199,7 +199,7 @@ function setupLogEventListeners() {
 
     // 清空日志
     document.getElementById('clear-logs').addEventListener('click', function () {
-        if (confirm(_('确定要清空日志文件吗？此操作不可恢复。'))) {
+        if (confirm(_('Clear Log Confirmation'))) {
             clearLogs();
         }
     });
@@ -226,7 +226,7 @@ function loadLogs() {
     let levelFilter = (document.getElementById('log-level-filter') as HTMLInputElement).value;
     let linesCount = (document.getElementById('log-lines-count') as HTMLInputElement).value;
 
-    updateLogStatus(_('正在加载日志...'));
+    updateLogStatus(_('Loading Logs'));
 
     fs.exec('/usr/bin/tail', ['-n', linesCount, logFile]).then(function (result) {
         let logContent = result.stdout || '';
@@ -257,10 +257,10 @@ function loadLogs() {
         // 滚动到底部
         textarea.scrollTop = textarea.scrollHeight;
 
-        updateLogStatus(_('日志已更新') + ' - ' + new Date().toLocaleTimeString());
+        updateLogStatus(_('Log Updated') + ' - ' + new Date().toLocaleTimeString());
     }).catch(function (error) {
-        updateLogStatus(_('加载日志失败: ') + error.message);
-        document.getElementById('log-content').textContent = _('无法加载日志文件: ') + logFile;
+        updateLogStatus(_('Failed to Load Log') + error.message);
+        document.getElementById('log-content').textContent = _('Failed to Load Log File') + logFile;
     });
 }
 
@@ -401,7 +401,7 @@ function convertAnsiToHtml(text) {
 function downloadLogs() {
     let logFile = (document.getElementById('log-file-select') as HTMLInputElement).value;
 
-    updateLogStatus(_('正在准备下载...'));
+    updateLogStatus(_('Preparing Download'));
 
     fs.read(logFile).then(function (content) {
 
@@ -416,9 +416,9 @@ function downloadLogs() {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
 
-        updateLogStatus(_('日志下载完成'));
+        updateLogStatus(_('Log Downloaded'));
     }).catch(function (error) {
-        updateLogStatus(_('下载失败: ') + error.message);
+        updateLogStatus(_('Download Failed') + error.message);
     });
 }
 
@@ -426,13 +426,13 @@ function downloadLogs() {
 function clearLogs() {
     let logFile = (document.getElementById('log-file-select') as HTMLInputElement).value;
 
-    updateLogStatus(_('正在清空日志...'));
+    updateLogStatus(_('Clearing Logs'));
 
     fs.write(logFile, '').then(function () {
-        updateLogStatus(_('日志已清空'));
+        updateLogStatus(_('Log Cleared'));
         loadLogs(); // 重新加载显示空日志
     }).catch(function (error) {
-        updateLogStatus(_('清空失败: ') + error.message);
+        updateLogStatus(_('Clear Failed') + error.message);
     });
 }
 

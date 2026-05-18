@@ -25,18 +25,18 @@ const v = view.extend({
         s.addremove = false;
 
         let enabled = s.option(form.Flag, 'enabled', _('启用'),
-            _('启用或禁用 HiJpass'));
+            _('Enable or Disable HiJpass'));
         enabled.default = '0';
         enabled.rmempty = false;
 
-        let delayTime = s.option(form.Value, 'delay_time', _('延迟时间'),
-            _('服务启动前的延迟时间（秒）'));
+        let delayTime = s.option(form.Value, 'delay_time', _('Delay Time'),
+            _('Startup Delay'));
         delayTime.datatype = 'uinteger';
         delayTime.default = '60';
         delayTime.rmempty = false;
 
         let logLevel = s.option(form.ListValue, 'log_level', _('日志等级'),
-            _('服务日志等级'));
+            _('Service Log Level'));
         logLevel.modalonly = true;
         logLevel.value('DEBUG', _('调试'));
         logLevel.value('INFO', _('信息'));
@@ -68,18 +68,18 @@ function createActionButtons() {
     });
 
     return E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 2rem;'}, [
-        E('label', {'class': 'cbi-value-title', 'style': 'visibility: hidden'}, _('服务控制')),
+        E('label', {'class': 'cbi-value-title', 'style': 'visibility: hidden'}, _('Service Control')),
         E('div', {'class': 'cbi-value-field'}, [
             E('button', {
                 'class': 'cbi-button cbi-button-action',
                 'id': 'restart-service',
                 'style': 'margin-right: 10px;'
-            }, _('重启服务')),
+            }, _('Restart Service')),
             E('button', {
                 'class': 'cbi-button cbi-button-action',
                 'id': 'reload-firewall',
                 'style': 'margin-right: 10px;'
-            }, _('刷新防火墙')),
+            }, _('Refresh Firewall')),
             E('span', {
                 'id': 'action-status',
                 'style': 'margin-left: 10px; font-size: 12px; color: #666;'
@@ -109,35 +109,35 @@ function setupActionListeners() {
 
 // 重启服务
 function restartService() {
-    updateActionStatus(_('正在重启服务...'));
+    updateActionStatus(_('Restarting Service'));
 
     fs.exec('/etc/init.d/hijpass', ['restart']).then(function (result) {
         if (result.code === 0) {
-            updateActionStatus(_('服务重启成功'));
+            updateActionStatus(_('Service Restarted'));
             // 延迟刷新页面状态
             setTimeout(function () {
                 location.reload();
             }, 2000);
         } else {
-            updateActionStatus(_('服务重启失败: ') + (result.stderr || result.stdout));
+            updateActionStatus(_('Service Restart Failed') + (result.stderr || result.stdout));
         }
     }).catch(function (error) {
-        updateActionStatus(_('服务重启失败: ') + error.message);
+        updateActionStatus(_('Service Restart Failed') + error.message);
     });
 }
 
 // 刷新防火墙
 function reloadFirewall() {
-    updateActionStatus(_('正在刷新防火墙...'));
+    updateActionStatus(_('Refreshing Firewall'));
 
     fs.exec('/usr/lib/hijpass/nft.sh', ['reset']).then(function (result) {
         if (result.code === 0) {
-            updateActionStatus(_('防火墙刷新成功'));
+            updateActionStatus(_('Firewall Refreshed'));
         } else {
-            updateActionStatus(_('防火墙刷新失败: ') + (result.stderr || result.stdout));
+            updateActionStatus(_('Firewall Refresh Failed') + (result.stderr || result.stdout));
         }
     }).catch(function (error) {
-        updateActionStatus(_('防火墙刷新失败: ') + error.message);
+        updateActionStatus(_('Firewall Refresh Failed') + error.message);
     });
 }
 
@@ -184,7 +184,7 @@ function createConnectivityTest() {
         'id': 'custom-connectivity-test',
         'class': 'cbi-map'
     }, [
-        E('h2', {}, _('网站连通性测试')),
+        E('h2', {}, _('Website Connectivity Test')),
         E('div', {
             'class': 'cbi-section',
             'style': 'display: flex; gap: 18px; padding: 18px; justify-content: center;'
@@ -225,7 +225,7 @@ function createTestButton(info: {
             E('div', {
                 'id': 'test-result-' + info.id,
                 'style': 'font-size: 13px; color: #f44336;'
-            }, _('点击测试'))
+            }, _('Click to Test'))
         ])
     ])
 }
@@ -255,7 +255,7 @@ function testConnectivity(id: string, url: string) {
     const buttonElement = document.getElementById('test-' + id) as HTMLButtonElement;
 
     if (resultElement && buttonElement) {
-        resultElement.textContent = _('测试中...');
+        resultElement.textContent = _('Testing');
         resultElement.style.color = '#666';
         buttonElement.disabled = true;
         buttonElement.style.opacity = '0.7';
@@ -284,14 +284,14 @@ function updateTestResult(id: string, success: boolean, response: any) {
 
         if (success) {
             if (/^([45])\d{2}$/.test(response.http_code)) {
-                resultElement.textContent = _('连接异常，code ') + response.http_code;
+                resultElement.textContent = _('Connection Abnormal') + response.http_code;
                 resultElement.style.color = '#f44336';
             } else {
                 resultElement.textContent = response.tls_handshake_time_ms + ' ms'
                 resultElement.style.color = '#4caf50';
             }
         } else {
-            resultElement.textContent = _('测试失败，请结合日志排查');
+            resultElement.textContent = _('Test Failed');
             resultElement.style.color = '#f44336';
         }
     }

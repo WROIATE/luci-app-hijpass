@@ -15,7 +15,7 @@ const v = view.extend({
     handleSaveApply: LuciUtils.genHandleSaveApply(),
 
     render: function () {
-        let m = new form.Map(LuciFlied.CONF_NAME, _('规则配置'), _('路由相关文件规则配置'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('Rule Configuration'), _('Route Rule Configuration'));
 
         let s = m.section(form.TypedSection, LuciFlied.RULE_SECTION_TYPE);
         s.anonymous = true;
@@ -25,63 +25,63 @@ const v = view.extend({
         s.tab("query", _("查询"))
 
         // 下载所有文件按钮
-        let downloadButton = s.taboption('config', form.Button, '_download_all', _('更新所有规则'),
-            _('立即下载更新所有规则文件和数据库文件'));
+        let downloadButton = s.taboption('config', form.Button, '_download_all', _('Update All Rules'),
+            _('Download All Rules Now'));
         downloadButton.inputtitle = _('更新');
         downloadButton.render = function () {
             return createUpdateButtons();
         }
 
         // CHN List 下载地址列表
-        let chnDomainList = s.taboption('config', form.DynamicList, 'chn_domain_list', _('CHN Domain List 下载地址'),
-            _('配置中国域名列表的下载地址'));
+        let chnDomainList = s.taboption('config', form.DynamicList, 'chn_domain_list', _('CHN Domain List Download URL'),
+            _('CHN Domain List URL'));
         chnDomainList.default = 'https://fastly.jsdelivr.net/gh/felixonmars/dnsmasq-china-list/accelerated-domains.china.conf';
         chnDomainList.rmempty = true;
 
         // CHN Route IPv4 下载地址列表
-        let chnV4Route = s.taboption('config', form.DynamicList, 'chn_v4_route', _('CHN IPv4 Route 下载地址'),
-            _('配置中国IPv4路由的下载地址'));
+        let chnV4Route = s.taboption('config', form.DynamicList, 'chn_v4_route', _('CHN IPv4 Route Download URL'),
+            _('CHN IPv4 Route URL'));
         chnV4Route.default = 'https://fastly.jsdelivr.net/gh/gaoyifan/china-operator-ip@ip-lists/china.txt';
         chnV4Route.rmempty = true;
 
         // CHN Route IPv6 下载地址列表
-        let chnV6Route = s.taboption('config', form.DynamicList, 'chn_v6_route', _('CHN IPv6 Route 下载地址'),
-            _('配置中国IPv6路由的下载地址'));
+        let chnV6Route = s.taboption('config', form.DynamicList, 'chn_v6_route', _('CHN IPv6 Route Download URL'),
+            _('CHN IPv6 Route URL'));
         chnV6Route.default = 'https://fastly.jsdelivr.net/gh/gaoyifan/china-operator-ip@ip-lists/china6.txt';
         chnV6Route.rmempty = true;
 
         // GFW List 下载地址列表
-        let gfwList = s.taboption('config', form.Value, 'gfw_list', _('GFW List 下载地址'),
-            _('配置GFW域名列表的下载地址'));
+        let gfwList = s.taboption('config', form.Value, 'gfw_list', _('GFW List Download URL'),
+            _('GFW List URL'));
         gfwList.default = 'https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/gfw.txt';
         gfwList.rmempty = true;
 
         // Geo Site 下载地址
-        let geosite = s.taboption('config', form.Value, 'geosite', _('Geo Site 下载地址'),
-            _('配置 GeoSite 数据库文件的下载地址'));
+        let geosite = s.taboption('config', form.Value, 'geosite', _('GeoSite Database Download URL'),
+            _('GeoSite Database URL'));
         geosite.default = 'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat';
         geosite.rmempty = false;
 
         // Geo IP 下载地址
-        let geoip = s.taboption('config', form.Value, 'geoip', _('Geo IP 下载地址'),
-            _('配置 GeoIP 数据库文件的下载地址'));
+        let geoip = s.taboption('config', form.Value, 'geoip', _('GeoIP Database Download URL'),
+            _('GeoIP Database URL'));
         geoip.default = 'https://github.com/Loyalsoldier/geoip/releases/latest/download/geoip.dat';
         geoip.rmempty = false;
 
         // 自动更新时间
-        let updateSchedule = s.taboption('config', form.ListValue, 'update_schedule', _('自动更新时间'),
-            _('设置规则文件的自动更新时间'));
-        updateSchedule.value('', _('禁用自动更新'));
-        updateSchedule.value('0 5 * * *', _('每天凌晨5点'));
-        updateSchedule.value('0 0 * * *', _('每天午夜12点'));
-        updateSchedule.value('0 5 * * 0', _('每周日凌晨5点'));
-        updateSchedule.value('0 5 * * 1', _('每周一凌晨5点'));
-        updateSchedule.value('0 5 1 * *', _('每月1日凌晨5点'));
+        let updateSchedule = s.taboption('config', form.ListValue, 'update_schedule', _('Auto Update Time'),
+            _('Set Auto Update Time'));
+        updateSchedule.value('', _('Disable Auto Update'));
+        updateSchedule.value('0 5 * * *', _('Every Day 5 AM'));
+        updateSchedule.value('0 0 * * *', _('Every Day Midnight'));
+        updateSchedule.value('0 5 * * 0', _('Every Sunday 5 AM'));
+        updateSchedule.value('0 5 * * 1', _('Every Monday 5 AM'));
+        updateSchedule.value('0 5 1 * *', _('1st Day of Month 5 AM'));
         updateSchedule.default = '0 5 * * 1';
         updateSchedule.rmempty = true;
 
-        let downloadTimeout = s.taboption('config', form.Value, 'download_timeout', _('下载超时时间'),
-            _('单次下载的超时时间（秒）'));
+        let downloadTimeout = s.taboption('config', form.Value, 'download_timeout', _('Download Timeout'),
+            _('Single Download Timeout'));
         downloadTimeout.datatype = 'uinteger';
         downloadTimeout.default = '3';
         downloadTimeout.rmempty = false;
@@ -116,13 +116,13 @@ function createUpdateButtons() {
     let view = E('div', {'class': 'cbi-section'}, [
         E('div', {'class': 'cbi-section-node'}, [
             E('div', {'class': 'cbi-value'}, [
-                E('label', {'class': 'cbi-value-title'}, _('规则更新')),
+                E('label', {'class': 'cbi-value-title'}, _('Rule Update')),
                 E('div', {'class': 'cbi-value-field'}, [
                     E('button', {
                         'class': 'cbi-button cbi-button-neutral',
                         'id': 'update-rule',
                         'style': 'margin-right: 10px;'
-                    }, _('更新规则文件')),
+                    }, _('Update Rule Files')),
                     E('span', {
                         'id': 'update-status',
                         'style': 'margin-left: 10px; font-size: 12px; color: #666;'
@@ -163,35 +163,35 @@ function createQueryPanel() {
         E('div', {'class': 'cbi-section-node'}, [
             // 查询类型选择
             E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 20px;'}, [
-                E('label', {'class': 'cbi-value-title'}, _('查询类型')),
+                E('label', {'class': 'cbi-value-title'}, _('Query Type')),
                 E('div', {'class': 'cbi-value-field'}, [
                     E('select', {
                         'id': 'query-type',
                         'class': 'cbi-input-select',
                         'style': 'width: 200px; margin-right: 10px;'
                     }, [
-                        E('option', {'value': 'domain'}, _('域名查询')),
+                        E('option', {'value': 'domain'}, _('Domain Query')),
                         E('option', {'value': 'geosite'}, _('GeoSite')),
-                        E('option', {'value': 'shunt'}, _('分流查询')),
+                        E('option', {'value': 'shunt'}, _('Shunt Query')),
                     ])
                 ])
             ]),
             // 查询输入区域
             E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 20px;'}, [
-                E('label', {'class': 'cbi-value-title'}, _('查询关键词')),
+                E('label', {'class': 'cbi-value-title'}, _('Query Keyword')),
                 E('div', {'class': 'cbi-value-field'}, [
                     E('input', {
                         'type': 'text',
                         'id': 'query-keyword',
                         'class': 'cbi-input-text',
-                        'placeholder': _('输入域名或GeoSite标签'),
+                        'placeholder': _('Enter Domain or GeoSite Tag'),
                         'style': 'margin-right: 10px;'
                     }),
                     E('button', {
                         'class': 'cbi-button cbi-button-action',
                         'id': 'query-btn',
                         'style': 'margin-right: 10px;'
-                    }, _('查询')),
+                    }, _('Query')),
                     E('span', {
                         'id': 'query-status',
                         'style': 'margin-left: 10px; font-size: 12px; color: #666;'
@@ -201,7 +201,7 @@ function createQueryPanel() {
 
             // 输出区域
             E('div', {'class': 'cbi-value'}, [
-                E('label', {'class': 'cbi-value-title', 'style': 'visibility: hidden'}, _('查询结果')),
+                E('label', {'class': 'cbi-value-title', 'style': 'visibility: hidden'}, _('Query Results')),
                 E('div', {'class': 'cbi-value-field'}, [
                     E('textarea', {
                         'id': 'query-output',
@@ -251,14 +251,14 @@ function performQuery() {
 
     if (!keyword) {
         if (statusElement) {
-            statusElement.textContent = _('请输入查询关键字');
+            statusElement.textContent = _('Enter Query Keyword');
             statusElement.style.color = '#f44336';
         }
         return;
     }
 
     if (statusElement) {
-        statusElement.textContent = _('正在查询...');
+        statusElement.textContent = _('Querying');
         statusElement.style.color = '#666';
     }
 
@@ -275,7 +275,7 @@ function performQuery() {
             break;
         default:
             if (statusElement) {
-                statusElement.textContent = _('未知的查询类型');
+                statusElement.textContent = _('Unknown Query Type');
                 statusElement.style.color = '#f44336';
             }
     }
@@ -314,7 +314,7 @@ function queryGeoTag(keyword, geoType, outputElement, statusElement) {
                     outputElement.value += result;
                 }
                 if (statusElement) {
-                    statusElement.textContent = _('查询完成');
+                    statusElement.textContent = _('Query Complete');
                     statusElement.style.color = '#4caf50';
                 }
             } else {
@@ -340,7 +340,7 @@ function setOutput(outputElement: HTMLTextAreaElement, statusElement, comment: s
                 outputElement.value += result.stdout;
             }
             if (statusElement) {
-                statusElement.textContent = _('查询完成');
+                statusElement.textContent = _('Query Complete');
                 statusElement.style.color = '#4caf50';
             }
         } else {
@@ -352,7 +352,7 @@ function setOutput(outputElement: HTMLTextAreaElement, statusElement, comment: s
 function setError(statusElement) {
     return function (error) {
         console.log(error)
-        statusElement.textContent = _('查询失败');
+        statusElement.textContent = _('Query Failed');
         statusElement.style.color = '#f44336';
     }
 }

@@ -5,6 +5,7 @@ import ui from 'ui';
 import form from "form";
 import view from 'view';
 import uci from 'uci';
+import fs from 'fs';
 
 const v = view.extend({
     load: function () {
@@ -104,6 +105,88 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
         logLevel.value(level);
     })
     logLevel.depends('log_enabled', '1');
+
+    // ── Core 版本显示 & 更新 ──────────────────────────────────────────
+
+    // sing-box 版本 + 更新按钮
+    let sbVersionOpt = s.taboption('basic', form.DummyValue, '_singbox_version', _('sing-box Version'));
+    sbVersionOpt.renderWidget = function () {
+        const versionEl = E('span', { style: 'margin-right:12px;color:#666' }, _('Loading...'));
+        const updateBtn = E('button', {
+            class: 'btn cbi-button',
+            style: 'background-color:#1a6a8a;border-color:#1a6a8a',
+            click: function (ev: MouseEvent) {
+                const btn = ev.currentTarget as HTMLButtonElement;
+                btn.disabled = true;
+                btn.textContent = _('Updating...');
+                fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['update', 'sing-box'], 'json')
+                    .then((res: any) => {
+                        if (res && res.success) {
+                            versionEl.textContent = res.version || _('Updated');
+                            WebUtils.showSuccessNotification('sing-box', _('Updated to %s').format(res.version), 4000);
+                        } else {
+                            WebUtils.showErrorNotification('sing-box', _('Update failed: %s').format((res && res.error) || 'unknown'), 5000);
+                        }
+                    })
+                    .catch((e: any) => {
+                        WebUtils.showErrorNotification('sing-box', _(e.message || 'Update failed'), 5000);
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.textContent = _('Update');
+                    });
+            }
+        }, _('Update'));
+
+        // 初始加载版本
+        fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['version', 'sing-box'], 'json')
+            .then((res: any) => {
+                versionEl.textContent = (res && res.version) ? res.version : _('Unknown');
+            })
+            .catch(() => { versionEl.textContent = _('Unknown'); });
+
+        return E('div', { style: 'display:flex;align-items:center;gap:8px' }, [versionEl, updateBtn]);
+    };
+
+    // xray 版本 + 更新按钮
+    let xrayVersionOpt = s.taboption('basic', form.DummyValue, '_xray_version', _('Xray Version'));
+    xrayVersionOpt.renderWidget = function () {
+        const versionEl = E('span', { style: 'margin-right:12px;color:#666' }, _('Loading...'));
+        const updateBtn = E('button', {
+            class: 'btn cbi-button',
+            style: 'background-color:#1a6a8a;border-color:#1a6a8a',
+            click: function (ev: MouseEvent) {
+                const btn = ev.currentTarget as HTMLButtonElement;
+                btn.disabled = true;
+                btn.textContent = _('Updating...');
+                fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['update', 'xray'], 'json')
+                    .then((res: any) => {
+                        if (res && res.success) {
+                            versionEl.textContent = res.version || _('Updated');
+                            WebUtils.showSuccessNotification('Xray', _('Updated to %s').format(res.version), 4000);
+                        } else {
+                            WebUtils.showErrorNotification('Xray', _('Update failed: %s').format((res && res.error) || 'unknown'), 5000);
+                        }
+                    })
+                    .catch((e: any) => {
+                        WebUtils.showErrorNotification('Xray', _(e.message || 'Update failed'), 5000);
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.textContent = _('Update');
+                    });
+            }
+        }, _('Update'));
+
+        // 初始加载版本
+        fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['version', 'xray'], 'json')
+            .then((res: any) => {
+                versionEl.textContent = (res && res.version) ? res.version : _('Unknown');
+            })
+            .catch(() => { versionEl.textContent = _('Unknown'); });
+
+        return E('div', { style: 'display:flex;align-items:center;gap:8px' }, [versionEl, updateBtn]);
+    };
 
     // 预览配置按钮
     let previewConfigButton = s.taboption('basic', form.Button, '_preview_config', _('Preview Configuration'),

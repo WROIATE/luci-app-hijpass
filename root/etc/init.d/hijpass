@@ -80,7 +80,7 @@ boot() {
 }
 
 run_proxy() {
-  local command log_path name enabled nest_proxy type
+  local command log_path name enabled nest_proxy core
   local enable_std_log="1"
   config_get enabled "$1" enabled
   [ "$enabled" != "1" ] && return
@@ -88,21 +88,16 @@ run_proxy() {
   config_get log_path "$1" log_path
   config_get name "$1" name
   config_get nest_proxy "$1" nest_proxy
-  config_get type "$1" type
+  config_get core "$1" core
 
   local conf_path="$CLIENT_DIR/$name-$1.json"
-  # 替换 command 中的 {conf_path} 占位符
-  command=$(echo "$command" | sed "s|{conf_path}|$conf_path|g")
 
-  if [ -n "$type" ] && [ "$type" != "custom" ]; then
-    local transport_type
-    config_get transport_type "$1" transport_type
-    if [ "$transport_type" = "xhttp" ]; then
-      command="xray -c $conf_path"
-    else
-      command="sing-box -c $conf_path run"
-    fi
-  fi
+  case "$core" in
+    xray)    command="xray -c $conf_path" ;;
+    singbox) command="sing-box -c $conf_path run" ;;
+    custom)  command=$(echo "$command" | sed "s|{conf_path}|$conf_path|g") ;;
+    *)       log_warn "Node '$name' has unknown core='$core', skipping"; return ;;
+  esac
 
   if [ -n "$log_path" ]; then
     : > "$log_path"

@@ -34,6 +34,9 @@ msgstr "自动刷新已启用"
 msgid "Auto Update Time"
 msgstr "自动更新时间"
 
+msgid "Backend Core"
+msgstr "后端核心"
+
 msgid "Basic Configuration"
 msgstr "基础配置"
 
@@ -865,6 +868,9 @@ msgstr "以本机作为服务端，允许程序在本机监听端口并对外提
 msgid "Running"
 msgstr "运行中"
 
+msgid "Select backend core for this protocol"
+msgstr "选择该协议使用的后端核心程序"
+
 msgid "Select Configuration Type"
 msgstr "选择配置类型"
 
@@ -1105,14 +1111,14 @@ msgstr "使用流式UDP中继"
 msgid "User UUID"
 msgstr "用户 UUID"
 
-msgid "V2Ray Transport Protocol"
-msgstr "V2Ray传输层协议"
+msgid "Proxy Transport Protocol"
+msgstr "代理传输层协议"
 
 msgid "VLESS Flow Control"
 msgstr "VLESS流控"
 
-msgid "VLESS Flow Control Protocol"
-msgstr "VLESS流量控制协议"
+msgid "VLESS Flow Control (required for XTLS Vision+REALITY)"
+msgstr "VLESS流控（XTLS Vision+REALITY 必填）"
 
 msgid "View Logs"
 msgstr "日志查看"
@@ -1146,6 +1152,9 @@ msgstr "XHTTP请求路径"
 
 msgid "XHTTP Transport Mode"
 msgstr "XHTTP传输模式"
+
+msgid "XHTTP transport is only supported by Xray core"
+msgstr "XHTTP 传输协议仅 Xray 核心支持"
 
 msgid "Xray Balancer"
 msgstr ""

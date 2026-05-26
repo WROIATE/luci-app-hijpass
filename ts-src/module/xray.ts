@@ -190,6 +190,96 @@ class Freedom implements Outbound {
     }
 }
 
+// Hysteria2 传输配置
+// 参考文档: https://xtls.github.io/config/transports/hysteria.html
+interface HysteriaSettings {
+    version: 2;
+    auth: string;
+    udpIdleTimeout?: number;
+}
+
+// Hysteria2 streamSettings
+interface Hysteria2StreamSettings {
+    network: 'hysteria';
+    security: 'tls';
+    tlsSettings: TlsObject;
+    hysteriaSettings: HysteriaSettings;
+}
+
+// Hysteria2 出站类
+// 参考文档: https://xtls.github.io/config/outbounds/hysteria.html
+// 参考文档: https://xtls.github.io/config/transports/hysteria.html
+class Hysteria2Outbound implements Outbound {
+    settings: {
+        version: 2;
+        address: string;
+        port: number;
+    };
+    protocol: string;
+    tag: string;
+    streamSettings: Hysteria2StreamSettings;
+
+    constructor(
+        address: string,
+        port: number,
+        tag: string,
+        password: string,
+        serverName: string,
+        allowInsecure: boolean = false,
+        udpIdleTimeout?: number,
+    ) {
+        this.protocol = 'hysteria';
+        this.tag = tag;
+        this.settings = {
+            version: 2,
+            address: address,
+            port: port,
+        };
+        this.streamSettings = {
+            network: 'hysteria',
+            security: 'tls',
+            tlsSettings: {
+                serverName: serverName,
+                allowInsecure: allowInsecure,
+                alpn: ['h3'],   // Hysteria2 over QUIC 必须协商 h3，否则 CRYPTO_ERROR 0x178
+            },
+            hysteriaSettings: {
+                version: 2,
+                auth: password,
+                ...(udpIdleTimeout !== undefined ? { udpIdleTimeout } : {}),
+            },
+        };
+    }
+}
+
+// Shadowsocks 出站类
+// 参考文档: https://xtls.github.io/config/outbounds/shadowsocks.html
+class ShadowsocksXrayOutbound implements Outbound {
+    settings: {
+        address: string;
+        port: number;
+        method: string;
+        password: string;
+        uot?: boolean;
+        level: number;
+    };
+    protocol: string;
+    tag: string;
+
+    constructor(address: string, port: number, tag: string, method: string, password: string, uot?: boolean) {
+        this.protocol = 'shadowsocks';
+        this.tag = tag;
+        this.settings = {
+            address,
+            port,
+            method,
+            password,
+            uot: uot || undefined,
+            level: 0,
+        };
+    }
+}
+
 // VLESS 出站类
 // 参考文档: https://xtls.github.io/config/outbounds/vless.html
 class VlessOutbound implements Outbound {
@@ -227,17 +317,45 @@ class VlessOutbound implements Outbound {
 // Xray StreamSettings 配置对象
 // 参考: https://xtls.github.io/config/transport.html#streamsettingsobject
 interface VlessStreamSettings {
-    // 网络类型：raw(tcp) | xhttp
     network?: string;
-    security: string
-    // XHTTP 配置
+    security: string;
     xhttpSettings?: XHTTPObject;
-
-    // Reality 配置
+    wsSettings?: WsObject;
+    grpcSettings?: GrpcObject;
+    httpSettings?: HttpObject;
+    httpupgradeSettings?: HttpUpgradeObject;
     realitySettings?: RealityObject;
     tlsSettings?: TlsObject;
-    // Socket 层选项
     sockopt?: SockoptObject;
+}
+
+interface WsObject {
+    path?: string;
+    headers?: Record<string, string>;
+    heartbeatPeriod?: number;
+}
+
+interface GrpcObject {
+    serviceName?: string;
+    multiMode?: boolean;
+    authority?: string;
+    user_agent?: string;
+    idle_timeout?: number;
+    health_check_timeout?: number;
+    permit_without_stream?: boolean;
+    initial_windows_size?: number;
+}
+
+interface HttpObject {
+    host?: string[];
+    path?: string;
+    method?: string;
+}
+
+interface HttpUpgradeObject {
+    host?: string;
+    path?: string;
+    headers?: Record<string, string>;
 }
 
 // XHTTP 配置
@@ -398,4 +516,8 @@ export {
     Balancer,
     BlockOutbound,
     BurstObservatory,
+    Hysteria2Outbound,
+    HysteriaSettings,
+    Hysteria2StreamSettings,
+    ShadowsocksXrayOutbound,
 }

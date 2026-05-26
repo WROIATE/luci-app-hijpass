@@ -177,6 +177,7 @@ export interface LuciConvertUtils {
 export interface ProxyNode {
     name: string;
     type: string;
+    core?: string;
     enabled: string;
     listen_port: string;
     socks_port: string;
@@ -212,19 +213,25 @@ export class Hysteria2Config implements ProxyNode {
     name: string;
     type: 'hysteria2' = 'hysteria2';
     enabled: string = '1';
+    /** 核心选择：'' 或 'singbox' 使用 sing-box，'xray' 使用 xray */
+    core: string;
     server: string;
     server_port: string;
+    // sing-box 独有
     server_ports: string[];
     hop_interval: string;
     up_mbps: string;
     down_mbps: string;
     obfs_type: string;
     obfs_password: string;
+    brutal_debug: string;
+    // xray 独有
+    udp_idle_timeout: string;
+    // 共有
     password: string;
     network: string;
     tls_server_name: string;
     tls_insecure: string;
-    brutal_debug: string;
     listen_port: string;
     socks_port: string;
 
@@ -234,6 +241,7 @@ export class Hysteria2Config implements ProxyNode {
     constructor() {
         this.type = 'hysteria2';
         this.enabled = '1';
+        this.core = 'singbox';
         this.server_ports = [];
         this.network = '';
         this.brutal_debug = '0';
@@ -249,6 +257,8 @@ export class ShadowsocksConfig implements ProxyNode {
     name: string;
     type: 'shadowsocks' = 'shadowsocks';
     enabled: string = '1';
+    /** 核心选择：'singbox'（默认）或 'xray' */
+    core: string;
     server: string;
     server_port: string;
     method: string;
@@ -274,6 +284,7 @@ export class ShadowsocksConfig implements ProxyNode {
     constructor() {
         this.type = 'shadowsocks';
         this.enabled = '1';
+        this.core = 'singbox';
         this.network = '';
         this.udp_over_tcp = '0';
         this.multiplex_enabled = '0';
@@ -289,6 +300,7 @@ export class TuicConfig implements ProxyNode {
     name: string;
     type: 'tuic' = 'tuic';
     enabled: string = '1';
+    core: string;
     server: string;
     server_port: string;
     uuid: string;
@@ -310,6 +322,7 @@ export class TuicConfig implements ProxyNode {
     constructor() {
         this.type = 'tuic';
         this.enabled = '1';
+        this.core = 'singbox';
         this.congestion_control = 'cubic';
         this.udp_relay_mode = '';
         this.udp_over_stream = '0';
@@ -327,6 +340,7 @@ export class ShadowTLSConfig implements ProxyNode {
     name: string;
     type: 'shadowtls' = 'shadowtls';
     enabled: string = '1';
+    core: string;
     server: string;
     server_port: string;
     version: string;
@@ -341,6 +355,7 @@ export class ShadowTLSConfig implements ProxyNode {
     constructor() {
         this.type = 'shadowtls';
         this.enabled = '1';
+        this.core = 'singbox';
         this.version = '1';
         this.tls_insecure = '0';
     }
@@ -353,6 +368,8 @@ export class VlessConfig implements ProxyNode {
     name: string;
     type: 'vless' = 'vless';
     enabled: string = '1';
+    /** 核心选择：'singbox' 使用 sing-box，'xray'（默认）使用 xray */
+    core: string;
     server: string;
     server_port: string;
     uuid: string;
@@ -401,6 +418,7 @@ export class VlessConfig implements ProxyNode {
     constructor() {
         this.type = 'vless';
         this.enabled = '1';
+        this.core = 'xray';   // VLESS 默认用 xray（支持 Vision/XHTTP+REALITY）
         this.network = 'tcp';
         this.packet_encoding = '';
         this.tls_insecure = '0';

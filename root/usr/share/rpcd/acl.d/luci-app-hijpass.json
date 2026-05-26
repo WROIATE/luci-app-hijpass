@@ -80,6 +80,12 @@
         ],
         "/bin/cat /proc/net/arp": [
           "exec"
+        ],
+        "/usr/lib/hijpass/core-update.sh version *": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/core-update.sh update *": [
+          "exec"
         ]
       }
     }

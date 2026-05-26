@@ -9,6 +9,7 @@ import {
     DnsRule,
     DnsServer,
     Freedom,
+    Hysteria2Outbound,
     Inbound,
     Log,
     Outbound,
@@ -16,10 +17,11 @@ import {
     RouteRule,
     Socks,
     VlessOutbound,
-    BlockOutbound, VlessStreamSettings
+    BlockOutbound, VlessStreamSettings,
+    ShadowsocksXrayOutbound
 } from "../../module/xray";
 import {LuciFlied, ShuntTag} from "../../enum/hijpass";
-import {ProxyNode, ShuntConfigUtils, VlessConfig} from "../../module/luci";
+import {Hysteria2Config, ProxyNode, ShadowsocksConfig, ShuntConfigUtils, VlessConfig} from "../../module/luci";
 
 export const XrayUtils: ShuntConfigUtils = {
     genShuntConf: genConf,
@@ -265,34 +267,73 @@ function addPrefixToElements(arr: string[], prefix: string) {
     return arr.map(item => prefix + item);
 }
 
+function buildBaseProxyConf(config: ProxyNode, outbound: Outbound): {} {
+    return {
+        log: {
+            loglevel: "info",
+            dnsLog: false
+        },
+        inbounds: [
+            function () {
+                let inbound = new Inbound("tproxy", Number(config.listen_port), "tproxy-in")
+                inbound.sniffing = undefined;
+                return inbound;
+            }(),
+            function () {
+                let inbound = new Inbound("socks", Number(config.socks_port), "socks-in");
+                inbound.settings = { udp: true }
+                inbound.protocol = "socks"
+                return inbound;
+            }()
+        ],
+        outbounds: [outbound],
+    }
+}
+
 function genProxyConf(config: ProxyNode): {} {
     switch (config.type) {
         case "vless":
-            return {
-                log: {
-                    loglevel: "info",
-                    dnsLog: false
-                },
-                inbounds: [
-                    function () {
-                        let inbound = new Inbound("tproxy", Number(config.listen_port), "tproxy-in")
-                        inbound.sniffing = undefined;
-                        return inbound;
-                    }(),
-                    function () {
-                        let inbound = new Inbound("socks", Number(config.socks_port), "socks-in");
-                        inbound.settings = {
-                            udp: true
-                        }
-                        inbound.protocol = "socks"
-                        return inbound;
-                    }()
-                ],
-                outbounds: [createVlessOutbound(config)],
-            }
+            return buildBaseProxyConf(config, createVlessOutbound(config));
+        case "hysteria2":
+            return buildBaseProxyConf(config, createHysteria2Outbound(config as Hysteria2Config));
+        case "shadowsocks":
+            return buildBaseProxyConf(config, createShadowsocksXrayOutbound(config as ShadowsocksConfig));
         default:
-            throw new Error("不支持的代理类型: " + config.type);
+            throw new Error("不支持的代理类型 (xray): " + config.type);
     }
+}
+
+/**
+ * 创建 Shadowsocks 出站配置（Xray 核心）
+ * 参考: https://xtls.github.io/config/outbounds/shadowsocks.html
+ */
+function createShadowsocksXrayOutbound(config: ShadowsocksConfig): ShadowsocksXrayOutbound {
+    return new ShadowsocksXrayOutbound(
+        config.server,
+        Number(config.server_port),
+        transOutTag(config.name),
+        config.method,
+        config.password,
+        config.udp_over_tcp === '1' ? true : undefined
+    );
+}
+
+/**
+ * 创建 Hysteria2 出站配置
+ * 参考: https://xtls.github.io/config/outbounds/hysteria.html
+ * 参考: https://xtls.github.io/config/transports/hysteria.html
+ */
+function createHysteria2Outbound(config: Hysteria2Config): Hysteria2Outbound {
+    const udpIdleTimeout = config.udp_idle_timeout ? Number(config.udp_idle_timeout) : undefined;
+    return new Hysteria2Outbound(
+        config.server,
+        Number(config.server_port),
+        transOutTag(config.name),
+        config.password || '',
+        config.tls_server_name || config.server,
+        config.tls_insecure === '1',
+        udpIdleTimeout,
+    );
 }
 
 /**
@@ -301,58 +342,88 @@ function genProxyConf(config: ProxyNode): {} {
  * 参考: https://xtls.github.io/config/transport.html#streamsettingsobject
  */
 function createVlessOutbound(config: ProxyNode): VlessOutbound {
-
-    // 从 section 创建 VLESS 出站
     const vlessConfig = config as VlessConfig;
-    if (vlessConfig.transport_type !== "xhttp") {
-        throw new Error("transport type must be a xhttp object")
-    }
+
     const outbound = new VlessOutbound(
         vlessConfig.server,
         Number(vlessConfig.server_port),
         vlessConfig.uuid,
         transOutTag(vlessConfig.name),
-        'none', // 加密方式，xray 中默认使用 none
-        vlessConfig.flow || undefined, // XTLS 流控模式
-        0 // 用户等级
+        'none',
+        vlessConfig.flow || undefined,
+        0
     );
 
-    // 设置 streamSettings（流传输层配置）
-    const streamSettings: VlessStreamSettings = {
-        network: 'xhttp',
-        security: "none"
-    };
+    // ── TLS / Reality 公共配置 ────────────────────────────────────────
+    const useReality = vlessConfig.tls_reality_enabled === '1';
+    const realitySettings = useReality ? {
+        fingerprint: 'chrome',
+        serverName: vlessConfig.tls_server_name || vlessConfig.server,
+        password: vlessConfig.tls_reality_public_key || '',
+        shortId: vlessConfig.tls_reality_short_id || ''
+    } : null;
 
-    streamSettings.xhttpSettings = {
-        host: vlessConfig.transport_xhttp_host || "",
-        path: vlessConfig.transport_xhttp_path || '/',
-        mode: vlessConfig.transport_xhttp_mode || 'auto'
-    };
+    const tlsSettings = !useReality ? {
+        allowInsecure: vlessConfig.tls_insecure === '1',
+        alpn: ["h2", "http/1.1"],
+        serverName: vlessConfig.tls_server_name || vlessConfig.server,
+    } : null;
 
-    // Reality 配置
-    if (vlessConfig.tls_reality_enabled === '1') {
-        streamSettings.security = "reality"
-        streamSettings.realitySettings = {
-            fingerprint: 'chrome',
-            serverName: vlessConfig.tls_server_name || vlessConfig.server,
-            password: vlessConfig.tls_reality_public_key || '',
-            shortId: vlessConfig.tls_reality_short_id || ''
-        };
-    } else {
-        streamSettings.security = "tls"
-        streamSettings.tlsSettings = {
-            allowInsecure: false,
-            alpn: ["h2", "http/1.1"],
-            serverName: vlessConfig.tls_server_name || vlessConfig.server,
-        }
+    const security = useReality ? 'reality' : (vlessConfig.tls_server_name || vlessConfig.tls_insecure ? 'tls' : 'none');
+
+    const streamSettings: VlessStreamSettings = { network: 'raw', security };
+    if (realitySettings) streamSettings.realitySettings = realitySettings;
+    if (tlsSettings && security === 'tls') streamSettings.tlsSettings = tlsSettings;
+
+    const transport = vlessConfig.transport_type || '';
+
+    switch (transport) {
+        case 'xhttp':
+            streamSettings.network = 'xhttp';
+            streamSettings.xhttpSettings = {
+                host: vlessConfig.transport_xhttp_host || undefined,
+                path: vlessConfig.transport_xhttp_path || '/',
+                mode: vlessConfig.transport_xhttp_mode || 'auto'
+            };
+            break;
+        case 'ws':
+            streamSettings.network = 'websocket';
+            streamSettings.wsSettings = {
+                path: vlessConfig.transport_ws_path || '/',
+                ...(vlessConfig.transport_ws_max_early_data ? {
+                    headers: { 'Sec-WebSocket-Protocol': vlessConfig.transport_ws_early_data_header_name || '' }
+                } : {})
+            };
+            break;
+        case 'grpc':
+            streamSettings.network = 'grpc';
+            streamSettings.grpcSettings = {
+                serviceName: vlessConfig.transport_grpc_service_name || 'TunService',
+                ...(vlessConfig.transport_grpc_idle_timeout ? { idle_timeout: Number(vlessConfig.transport_grpc_idle_timeout) } : {}),
+                ...(vlessConfig.transport_grpc_permit_without_stream === '1' ? { permit_without_stream: true } : {})
+            };
+            break;
+        case 'http':
+            streamSettings.network = 'h2';
+            streamSettings.httpSettings = {
+                ...(vlessConfig.transport_http_host ? { host: [vlessConfig.transport_http_host] } : {}),
+                path: vlessConfig.transport_http_path || '/',
+                ...(vlessConfig.transport_http_method ? { method: vlessConfig.transport_http_method } : {})
+            };
+            break;
+        case 'httpupgrade':
+            streamSettings.network = 'httpupgrade';
+            streamSettings.httpupgradeSettings = {
+                host: vlessConfig.transport_httpupgrade_host || undefined,
+                path: vlessConfig.transport_httpupgrade_path || '/'
+            };
+            break;
+        default:
+            // 无传输层（raw/tcp），Vision 流控使用此路径
+            break;
     }
 
-
-    // 设置 streamSettings 到 outbound
-    if (Object.keys(streamSettings).length > 0) {
-        outbound['streamSettings'] = streamSettings;
-    }
-
+    outbound['streamSettings'] = streamSettings;
     return outbound;
 }
 

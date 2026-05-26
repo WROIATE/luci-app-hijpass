@@ -259,10 +259,16 @@ const LuciUtils = {
                     const proxyConfig = ProxyUtils.createProxyConfigFromSection(section);
                     if (proxyConfig) {
                         let proxyConf: {};
-                        if (proxyConfig.type === "vless" && (proxyConfig as VlessConfig).transport_type === "xhttp") {
-                            proxyConf = LuciConverterFactory.genProxyConf(FactoryType.XRAY, proxyConfig);
-                        } else {
-                            proxyConf = LuciConverterFactory.genProxyConf(FactoryType.SING_BOX, proxyConfig);
+                        const nodeCore = proxyConfig.core;
+                        switch (nodeCore) {
+                            case 'xray':
+                                proxyConf = LuciConverterFactory.genProxyConf(FactoryType.XRAY, proxyConfig);
+                                break;
+                            case 'singbox':
+                                proxyConf = LuciConverterFactory.genProxyConf(FactoryType.SING_BOX, proxyConfig);
+                                break;
+                            default:
+                                throw new Error('Unsupported core: ' + nodeCore);
                         }
                         let outData = JSON.stringify(proxyConf, ShuntUtils.omitEmptyReplacer, 2)
                         return fs.write(WebUtils.getFilePath('client_dir')
@@ -724,12 +730,12 @@ const WebUtils = {
      * @param dirPath   配置文件目录路径
      */
     setConfContentOptionMembers: function (
-        o: LuCI.form.AbstractValue,
+        o: LuCI.form.TextValue,
         confName: string,
         dirPath: string
     ) {
-        (o as any).monospace = true;
-        (o as any).rows = 20;
+        o.monospace = true;
+        o.rows = 20;
 
         const getFilePath = (section_id: string) => {
             const name = uci.get(confName, section_id, 'name') || section_id;
@@ -739,8 +745,15 @@ const WebUtils = {
         o.load = function (section_id: string) {
             return L.resolveDefault(fs.read(getFilePath(section_id)), '');
         };
+        // write 写文件同时更新 UCI hash，产生 diff 以激活应用按钮
         o.write = async function (section_id: string, value: string) {
-            await fs.write(getFilePath(section_id), (value || '').trim() + '\n');
+            const content = (value || '').trim() + '\n';
+            const currentHash = String(WebUtils.simpleHash(content));
+            const oldHash = uci.get(confName, section_id, 'custom_conf_hash');
+            if (currentHash !== oldHash) {
+                uci.set(confName, section_id, 'custom_conf_hash', currentHash);
+            }
+            await fs.write(getFilePath(section_id), content);
         };
         o.remove = function (section_id: string) {
             fs.write(getFilePath(section_id), '');

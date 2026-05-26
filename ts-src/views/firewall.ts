@@ -105,8 +105,8 @@ function createTextOptions(s: LuCI.form.AbstractSection) {
     nftViewOpt.monospace = true;
     nftViewOpt.load = function () { return ''; };
     nftViewOpt.write = function () { };
-    (nftViewOpt as any).renderWidget = function (section_id: string, option_index: number, cfgvalue: any) {
-        let widget = (form.TextValue.prototype as any).renderWidget.call(this, section_id, option_index, cfgvalue) as HTMLElement;
+    nftViewOpt.renderWidget = function (section_id: string, option_index: number, cfgvalue: any) {
+        let widget = form.TextValue.prototype.renderWidget.call(this, section_id, option_index, cfgvalue) as HTMLElement;
         let textarea = widget.querySelector('textarea') as HTMLTextAreaElement;
         textarea.placeholder = _('Click to View Firewall Rules');
         let btn = E('button', {

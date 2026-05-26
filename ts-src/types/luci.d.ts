@@ -99,7 +99,7 @@ declare namespace LuCI {
 
             write(section_id: string, formvalue: string | Array<string>): void
 
-            remove(section_id: string): void
+            renderWidget(section_id: string, option_index: number, cfgvalue: string): Node;
 
         }
 

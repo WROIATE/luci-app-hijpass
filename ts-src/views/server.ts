@@ -29,6 +29,13 @@ const v = view.extend({
                 || sectionId;
         };
         s.cloneable = true;
+        s.handleAdd = function (ev: Event, name?: string) {
+            let sectionId = WebUtils.generateUniqueSectionId();
+            return L.bind(form.GridSection.prototype.handleAdd, this, ev, sectionId)();
+        };
+        s.handleRemove = function (ev: Event, name?: string) {
+            return form.GridSection.prototype.handleRemove.call(this, ev, name);
+        };
         const instances = data[2] ?? {};
         createProxyOptions(s, instances);
 

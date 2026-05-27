@@ -28,7 +28,7 @@ const v = view.extend({
             return uci.get(LuciFlied.SERVER_CONF_NAME, sectionId, 'name')
                 || sectionId;
         };
-        s.cloneable = true;
+
         s.handleAdd = function (ev: Event, name?: string) {
             let sectionId = WebUtils.generateUniqueSectionId();
             return L.bind(form.GridSection.prototype.handleAdd, this, ev, sectionId)();

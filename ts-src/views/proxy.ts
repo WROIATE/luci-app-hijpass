@@ -24,7 +24,6 @@ const v = view.extend({
             _('Configure Proxy Settings'));
         let s = m.section(form.GridSection, LuciFlied.PROXY_NODE_TYPE)
         WebUtils.setAnonymousGridSectionMembers(s);
-        s.cloneable = true
 
         // 重写 handleAdd 方法，使用自定义的唯一 ID 生成器
         s.handleAdd = function (ev: Event, name?: string) {

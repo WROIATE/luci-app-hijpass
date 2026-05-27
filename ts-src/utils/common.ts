@@ -211,6 +211,25 @@ const LuciUtils = {
                     }
                 }
 
+                // 检查路由规则引用的 DNS 出口节点是否存在
+                const existingNodeNames = new Set<string>();
+                uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
+                    if (section.name) existingNodeNames.add(section.name);
+                });
+
+                const missingDnsExits: string[] = [];
+                uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
+                    const dnsExit = section.dns_proxy_node;
+                    if (dnsExit && dnsExit !== ShuntTag.DIRECT_OUTBOUND_TAG && !existingNodeNames.has(dnsExit)) {
+                        missingDnsExits.push(_('路由规则 "%s" 的DNS出口节点 "%s" 不存在').format(section.name || section['.name'], dnsExit));
+                    }
+                });
+
+                if (missingDnsExits.length > 0) {
+                    WebUtils.showWarningNotification(_('配置包含无效的DNS出口节点'), missingDnsExits.join('<br>'), 8000);
+                    return;
+                }
+
                 // 当 shunt 未启用时，若防火墙分流端口指向 shunt 监听端口，阻止后续操作
                 const shuntEnabled = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled');
                 if (shuntEnabled === '0') {
@@ -223,7 +242,8 @@ const LuciUtils = {
                 }
 
                 // 生成分流配置并写入文件
-                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === FactoryType.SING_BOX) {
+                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === FactoryType.SING_BOX
+                    && uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_convert') === '1') {
                     SingBoxUtils.writeGeoRule()
                 }
                 let data = ShuntUtils.getShuntConfData()

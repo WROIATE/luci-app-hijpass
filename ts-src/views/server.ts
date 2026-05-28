@@ -119,7 +119,8 @@ function createConfContentOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.TextValue, 'custom_conf', _('Configuration File Content'),
         _('Edit Configuration File'));
     o.modalonly = true;
-    WebUtils.setConfContentOptionMembers(o, LuciFlied.SERVER_CONF_NAME);
+    const serverDir = WebUtils.getFilePath('server_dir');
+    WebUtils.setConfContentOptionMembers(o, LuciFlied.SERVER_CONF_NAME, serverDir);
     return o;
 }
 

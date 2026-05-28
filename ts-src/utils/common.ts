@@ -757,21 +757,28 @@ const WebUtils = {
     },
 
     /**
-     * 为节点配置文件内容编辑器设置 load/write/remove，
-     * 路径自动生成为 {dirPath}/{name}-{section_id}.json
+     * 为节点配置文件内容编辑器设置 load/write/remove。
+     * load 从 {dirPath}/{name}-{section_id}.json 读取展示；
+     * write 只写 UCI custom_conf 字段，由 saveapply 统一写文件。
      * @param o         TextValue 选项
      * @param confName  UCI 配置名（读取 name 字段用）
-     * @param dirPath   配置文件目录路径
+     * @param dirPath   配置文件目录路径（仅用于 load）
      */
     setConfContentOptionMembers: function (
         o: LuCI.form.TextValue,
         confName: string,
+        dirPath: string,
     ) {
         o.monospace = true;
         o.rows = 20;
 
+        const getFilePath = (section_id: string) => {
+            const name = uci.get(confName, section_id, 'name') || section_id;
+            return dirPath + '/' + name + '-' + section_id + '.json';
+        };
+
         o.load = function (section_id: string) {
-            return uci.get(confName, section_id, 'custom_conf') || '';
+            return L.resolveDefault(fs.read(getFilePath(section_id)), '');
         };
         o.write = function (section_id: string, value: string) {
             uci.set(confName, section_id, 'custom_conf', (value || '').trim());

@@ -276,7 +276,7 @@ function createCustomProxyOptions(s: LuCI.form.AbstractSection) {
         _('Edit Configuration File'));
     confOpt.modalonly = true;
     confOpt.depends('core', 'custom');
-    WebUtils.setConfContentOptionMembers(confOpt, LuciFlied.CONF_NAME);
+    WebUtils.setConfContentOptionMembers(confOpt, LuciFlied.CONF_NAME, WebUtils.getFilePath('client_dir'));
 }
 
 /**

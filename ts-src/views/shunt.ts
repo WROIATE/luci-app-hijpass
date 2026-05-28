@@ -203,8 +203,8 @@ function createConfigEditor(s: LuCI.form.AbstractSection) {
     o.depends('config_type', 'custom')
     o.rows = 30;
     o.monospace = true;
-    o.load = function (sectionId: string) {
-        return uci.get(LuciFlied.CONF_NAME, sectionId, 'shunt_conf_data') || '';
+    o.load = function (_: string) {
+        return L.resolveDefault(fs.trimmed(WebUtils.getFilePath('shunt_conf')), '');
     };
     o.write = function (sectionId: string, value: string) {
         uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_conf_data', (value || '').trim());

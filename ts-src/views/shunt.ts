@@ -1,5 +1,5 @@
 import { LuciUtils, ShuntUtils, WebUtils } from "../utils/common";
-
+import { cacheConf } from "../core/custom/cache";
 import { HijpassValues, LuciFlied } from "../enum/hijpass";
 import ui from 'ui';
 import form from "form";
@@ -203,14 +203,16 @@ function createConfigEditor(s: LuCI.form.AbstractSection) {
     o.depends('config_type', 'custom')
     o.rows = 30;
     o.monospace = true;
-    o.load = function (_: string) {
-        return L.resolveDefault(fs.trimmed(WebUtils.getFilePath('shunt_conf')), '');
+    o.load = async function (_: string) {
+        const content = await L.resolveDefault(fs.trimmed(WebUtils.getFilePath('shunt_conf')), '');
+        cacheConf('shunt_conf', content);
+        return content;
     };
-    o.write = function (sectionId: string, value: string) {
-        uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_conf_data', (value || '').trim());
+    o.write = function (_: string, value: string) {
+        cacheConf('shunt_conf', (value || '').trim());
     };
-    o.remove = function (sectionId: string) {
-        uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_conf_data', '');
+    o.remove = function (_: string) {
+        cacheConf('shunt_conf', '');
     };
     o.rmempty = false;
 }

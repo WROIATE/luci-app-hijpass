@@ -23,6 +23,7 @@ import form from "form";
 import ui from "ui";
 import { LuciConverterFactory, ShuntConfFactory, FactoryType } from "./factory";
 import { SingBoxUtils } from "../core/singbox/builder";
+import { cacheConf } from "../core/custom/cache";
 import notificationManager from "../module/notification";
 
 
@@ -759,7 +760,7 @@ const WebUtils = {
     /**
      * 为节点配置文件内容编辑器设置 load/write/remove。
      * load 从 {dirPath}/{name}-{section_id}.json 读取展示；
-     * write 只写 UCI custom_conf 字段，由 saveapply 统一写文件。
+     * write 写入浏览器 sessionStorage 缓存，由 saveapply 统一写文件。
      * @param o         TextValue 选项
      * @param confName  UCI 配置名（读取 name 字段用）
      * @param dirPath   配置文件目录路径（仅用于 load）
@@ -777,14 +778,19 @@ const WebUtils = {
             return dirPath + '/' + name + '-' + section_id + '.json';
         };
 
-        o.load = function (section_id: string) {
-            return L.resolveDefault(fs.read(getFilePath(section_id)), '');
+        const getNodeName = (section_id: string) =>
+            uci.get(confName, section_id, 'name') || section_id;
+
+        o.load = async function (section_id: string) {
+            const content = await L.resolveDefault(fs.read(getFilePath(section_id)), '');
+            cacheConf(getNodeName(section_id), content);
+            return content;
         };
         o.write = function (section_id: string, value: string) {
-            uci.set(confName, section_id, 'custom_conf', (value || '').trim());
+            cacheConf(getNodeName(section_id), (value || '').trim());
         };
         o.remove = function (section_id: string) {
-            uci.set(confName, section_id, 'custom_conf', '');
+            cacheConf(getNodeName(section_id), '');
         };
     },
 

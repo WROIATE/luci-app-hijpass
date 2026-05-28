@@ -193,7 +193,6 @@ export class CustomProxyNode implements ProxyNode {
     type: 'custom' = 'custom';
     enabled: string = '1';
     command: string;
-    custom_conf: string;
     listen_port: string;
     socks_port: string;
     procd_env: string[];

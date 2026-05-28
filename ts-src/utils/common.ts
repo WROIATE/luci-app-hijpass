@@ -779,16 +779,18 @@ const WebUtils = {
             return dirPath + '/' + name + '-' + section_id + '.json';
         };
 
+        const cacheKey = (section_id: string) => confName + ':' + section_id;
+
         o.load = async function (section_id: string) {
             const content = await L.resolveDefault(fs.read(getFilePath(section_id)), '');
-            cacheConf(section_id, content);
+            cacheConf(cacheKey(section_id), content);
             return content;
         };
         o.write = function (section_id: string, value: string) {
-            cacheConf(section_id, (value || '').trim());
+            cacheConf(cacheKey(section_id), (value || '').trim());
         };
         o.remove = function (section_id: string) {
-            cacheConf(section_id, '');
+            cacheConf(cacheKey(section_id), '');
         };
     },
 

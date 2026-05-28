@@ -1,4 +1,5 @@
 import { CoreAdapter, ProxyNode } from '../../module/luci'
+import { LuciFlied } from '../../enum/hijpass'
 import { getCachedConf } from './cache'
 
 export const CommandUtils: CoreAdapter = {
@@ -11,5 +12,5 @@ function genShuntConf() {
 }
 
 function genProxyConf(proxyNode: ProxyNode) {
-    return getCachedConf(proxyNode.cfgid)
+    return getCachedConf(LuciFlied.CONF_NAME + ':' + proxyNode.cfgid)
 }

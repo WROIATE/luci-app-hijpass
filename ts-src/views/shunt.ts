@@ -199,12 +199,19 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
 
 
 function createConfigEditor(s: LuCI.form.AbstractSection) {
-    let o = s.taboption('config', form.TextValue, 'shunt_hash', null, '修改分流配置文件');
+    let o = s.taboption('config', form.TextValue, 'shunt_conf_data', null, '修改分流配置文件');
     o.depends('config_type', 'custom')
-    WebUtils.setEditorOptionMembers(o, WebUtils.getFilePath('shunt_conf'), 'shunt_hash');
-    let defaultWrite = o.write
-    o.write = shuntConfWrite(defaultWrite)
-    o.remove = shuntConfWrite(defaultWrite)
+    o.rows = 30;
+    o.monospace = true;
+    o.load = function (sectionId: string) {
+        return uci.get(LuciFlied.CONF_NAME, sectionId, 'shunt_conf_data') || '';
+    };
+    o.write = function (sectionId: string, value: string) {
+        uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_conf_data', (value || '').trim());
+    };
+    o.remove = function (sectionId: string) {
+        uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_conf_data', '');
+    };
     o.rmempty = false;
 }
 

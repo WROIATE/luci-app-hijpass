@@ -1,5 +1,6 @@
+import uci from 'uci'
 import { CoreAdapter, CustomProxyNode, ProxyNode } from '../../module/luci'
-import { ShuntUtils } from '../../utils/common'
+import { LuciFlied } from '../../enum/hijpass'
 
 export const CommandUtils: CoreAdapter = {
     genShuntConf,
@@ -7,17 +8,9 @@ export const CommandUtils: CoreAdapter = {
 }
 
 function genShuntConf() {
-    return ShuntUtils.getShuntSection()
+    return uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_conf_data') || ''
 }
 
 function genProxyConf(proxyNode: ProxyNode) {
-    const node = proxyNode as CustomProxyNode
-    return {
-        command: node.command,
-        listen_port: node.listen_port,
-        socks_port: node.socks_port,
-        log_enabled: node.log_enabled,
-        log_path: node.log_path,
-        procd_env: node.procd_env,
-    }
+    return (proxyNode as CustomProxyNode).custom_conf || ''
 }

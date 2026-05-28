@@ -119,8 +119,7 @@ function createConfContentOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.TextValue, 'custom_conf', _('Configuration File Content'),
         _('Edit Configuration File'));
     o.modalonly = true;
-    const serverDir = uci.get_first(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_CONF_NAME, 'server_dir') || '/etc/hijpass/server';
-    WebUtils.setConfContentOptionMembers(o, LuciFlied.SERVER_CONF_NAME, serverDir);
+    WebUtils.setConfContentOptionMembers(o, LuciFlied.SERVER_CONF_NAME);
     return o;
 }
 

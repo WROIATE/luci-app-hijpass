@@ -6,7 +6,7 @@ import { CommandUtils } from '../core/custom/builder'
 export const FactoryType = {
     SING_BOX: 'sing-box',
     XRAY: 'xray',
-    COMMAND: 'command',
+    COMMAND: 'custom',
 } as const
 
 export const ShuntConfFactory = {

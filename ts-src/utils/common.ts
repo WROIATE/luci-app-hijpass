@@ -8,6 +8,7 @@ import {
     ShuntSection,
     LoadBalanceNode, RuleSetDTO,
     ProxyNode,
+    CustomProxyNode,
     Hysteria2Config,
     ShadowsocksConfig,
     TuicConfig,
@@ -242,13 +243,19 @@ const LuciUtils = {
                 }
 
                 // 生成分流配置并写入文件
-                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') === FactoryType.SING_BOX
+                const shuntCoreType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type')
+                if (shuntCoreType === FactoryType.SING_BOX
                     && uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_convert') === '1') {
                     SingBoxUtils.writeGeoRule()
                 }
-                let data = ShuntUtils.getShuntConfData()
-                if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
-                    await fs.write(WebUtils.getFilePath('shunt_conf'), data);
+                if (shuntCoreType === FactoryType.COMMAND) {
+                    const shuntConf = ShuntConfFactory.getShuntUtils(FactoryType.COMMAND).genShuntConf()
+                    await fs.write(WebUtils.getFilePath('shunt_conf'), shuntConf as string);
+                } else {
+                    let data = ShuntUtils.getShuntConfData()
+                    if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
+                        await fs.write(WebUtils.getFilePath('shunt_conf'), data);
+                    }
                 }
 
                 // 清理已删除/重命名的代理节点文件
@@ -287,10 +294,15 @@ const LuciUtils = {
                             case 'singbox':
                                 proxyConf = LuciConverterFactory.genProxyConf(FactoryType.SING_BOX, proxyConfig);
                                 break;
+                            case FactoryType.COMMAND:
+                                proxyConf = LuciConverterFactory.genProxyConf(FactoryType.COMMAND, proxyConfig);
+                                break;
                             default:
                                 throw new Error('Unsupported core: ' + nodeCore);
                         }
-                        let outData = JSON.stringify(proxyConf, ShuntUtils.omitEmptyReplacer, 2)
+                        let outData = typeof proxyConf === 'string'
+                            ? proxyConf
+                            : JSON.stringify(proxyConf, ShuntUtils.omitEmptyReplacer, 2)
                         return fs.write(WebUtils.getFilePath('client_dir')
                             + "/" + section.name + "-" + section[".name"] + ".json", outData);
                     }
@@ -518,6 +530,8 @@ const ProxyUtils = {
                 config = new VlessConfig();
                 break;
             case PROXY_TYPE.CUSTOM:
+                config = new CustomProxyNode();
+                break;
             default:
                 return null;
         }
@@ -752,31 +766,18 @@ const WebUtils = {
     setConfContentOptionMembers: function (
         o: LuCI.form.TextValue,
         confName: string,
-        dirPath: string
     ) {
         o.monospace = true;
         o.rows = 20;
 
-        const getFilePath = (section_id: string) => {
-            const name = uci.get(confName, section_id, 'name') || section_id;
-            return dirPath + '/' + name + '-' + section_id + '.json';
-        };
-
         o.load = function (section_id: string) {
-            return L.resolveDefault(fs.read(getFilePath(section_id)), '');
+            return uci.get(confName, section_id, 'custom_conf') || '';
         };
-        // write 写文件同时更新 UCI hash，产生 diff 以激活应用按钮
-        o.write = async function (section_id: string, value: string) {
-            const content = (value || '').trim() + '\n';
-            const currentHash = String(WebUtils.simpleHash(content));
-            const oldHash = uci.get(confName, section_id, 'custom_conf_hash');
-            if (currentHash !== oldHash) {
-                uci.set(confName, section_id, 'custom_conf_hash', currentHash);
-            }
-            await fs.write(getFilePath(section_id), content);
+        o.write = function (section_id: string, value: string) {
+            uci.set(confName, section_id, 'custom_conf', (value || '').trim());
         };
         o.remove = function (section_id: string) {
-            fs.write(getFilePath(section_id), '');
+            uci.set(confName, section_id, 'custom_conf', '');
         };
     },
 

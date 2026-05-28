@@ -1,5 +1,5 @@
 import { LuciUtils, ShuntUtils, WebUtils } from "../utils/common";
-import { cacheConf } from "../core/custom/cache";
+import { cacheConf } from "../core/command/cache";
 import { HijpassValues, LuciFlied } from "../enum/hijpass";
 import ui from 'ui';
 import form from "form";
@@ -67,6 +67,9 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     configType.value('tmpl', _('Template Configuration'));
     configType.value('custom', _('Custom Edit'));
     configType.rmempty = true;
+    // command 核心无模板，隐藏配置类型选项
+    configType.depends('type', 'xray');
+    configType.depends('type', 'singbox');
 
     // 分流监听端口
     let shuntListenPort = s.taboption('basic', form.Value, 'shunt_listen_port', _('Shunt Listen Port'),
@@ -201,6 +204,7 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
 function createConfigEditor(s: LuCI.form.AbstractSection) {
     let o = s.taboption('config', form.TextValue, 'shunt_conf_data', null, '修改分流配置文件');
     o.depends('config_type', 'custom')
+    o.depends('type', 'custom')
     o.rows = 30;
     o.monospace = true;
     o.load = async function (_: string) {
@@ -585,7 +589,7 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
     let oGlobal = s.taboption('slb', form.SectionValue, '_slb_global',
         form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _(''));
     oGlobal.depends({ config_type: 'tmpl', type: 'xray' });
-    oGlobal.depends({ config_type: 'tmpl', type: 'sing-box' });
+    oGlobal.depends({ config_type: 'tmpl', type: 'singbox' });
     let gSs = oGlobal.subsection;
     gSs.anonymous = true;
     gSs.addremove = false;
@@ -597,7 +601,7 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
     // ── sing-box：URLTest 参数 ────────────────────────────────────────
     let oSingBox = s.taboption('slb', form.SectionValue, '_slb_singbox',
         form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('sing-box URLTest'));
-    oSingBox.depends({ config_type: 'tmpl', type: 'sing-box' });
+    oSingBox.depends({ config_type: 'tmpl', type: 'singbox' });
     let sbSs = oSingBox.subsection;
     sbSs.anonymous = true;
     sbSs.addremove = false;

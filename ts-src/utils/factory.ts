@@ -1,16 +1,16 @@
 import { CoreAdapter, ProxyNode } from '../module/luci'
 import { SingBoxUtils } from '../core/singbox/builder'
 import { XrayUtils } from '../core/xray/builder'
-import { CommandUtils } from '../core/custom/builder'
+import { CommandUtils } from '../core/command/builder'
 
 export const FactoryType = {
-    SING_BOX: 'sing-box',
+    SING_BOX: 'singbox',
     XRAY: 'xray',
     COMMAND: 'custom',
 } as const
 
-export const ShuntConfFactory = {
-    getShuntUtils: function (type: string): CoreAdapter {
+export const CoreAdapterFactory = {
+    getCoreAdapter: function (type: string): CoreAdapter {
         switch (type) {
             case FactoryType.SING_BOX: return SingBoxUtils
             case FactoryType.XRAY: return XrayUtils

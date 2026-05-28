@@ -21,9 +21,9 @@ import uci from "uci";
 import fs from "fs";
 import form from "form";
 import ui from "ui";
-import { LuciConverterFactory, ShuntConfFactory, FactoryType } from "./factory";
+import { LuciConverterFactory, CoreAdapterFactory, FactoryType } from "./factory";
 import { SingBoxUtils } from "../core/singbox/builder";
-import { cacheConf } from "../core/custom/cache";
+import { cacheConf } from "../core/command/cache";
 import notificationManager from "../module/notification";
 
 
@@ -250,7 +250,7 @@ const LuciUtils = {
                     SingBoxUtils.writeGeoRule()
                 }
                 if (shuntCoreType === FactoryType.COMMAND) {
-                    const shuntConf = ShuntConfFactory.getShuntUtils(FactoryType.COMMAND).genShuntConf()
+                    const shuntConf = CoreAdapterFactory.getCoreAdapter(FactoryType.COMMAND).genShuntConf()
                     await fs.write(WebUtils.getFilePath('shunt_conf'), shuntConf as string);
                 } else {
                     let data = ShuntUtils.getShuntConfData()
@@ -482,7 +482,7 @@ const ShuntUtils = {
             }
             let type = uci.get_first(LuciFlied.CONF_NAME,
                 LuciFlied.SHUNT_SECTION_TYPE, 'type')
-            data = JSON.stringify(ShuntConfFactory.getShuntUtils(type).genShuntConf(), ShuntUtils.omitEmptyReplacer, 2)
+            data = JSON.stringify(CoreAdapterFactory.getCoreAdapter(type).genShuntConf(), ShuntUtils.omitEmptyReplacer, 2)
         }
         return data;
     },

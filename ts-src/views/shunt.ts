@@ -208,11 +208,14 @@ function createConfigEditor(s: LuCI.form.AbstractSection) {
         cacheConf('shunt_conf', content);
         return content;
     };
-    o.write = function (_: string, value: string) {
-        cacheConf('shunt_conf', (value || '').trim());
+    o.write = function (sectionId: string, value: string) {
+        const content = (value || '').trim();
+        cacheConf('shunt_conf', content);
+        uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_hash', String(WebUtils.simpleHash(content)));
     };
-    o.remove = function (_: string) {
+    o.remove = function (sectionId: string) {
         cacheConf('shunt_conf', '');
+        uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_hash', '');
     };
     o.rmempty = false;
 }

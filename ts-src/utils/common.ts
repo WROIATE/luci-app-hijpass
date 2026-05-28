@@ -786,10 +786,13 @@ const WebUtils = {
             return content;
         };
         o.write = function (section_id: string, value: string) {
-            cacheConf(cacheKey(section_id), (value || '').trim());
+            const content = (value || '').trim();
+            cacheConf(cacheKey(section_id), content);
+            uci.set(confName, section_id, 'custom_conf_hash', String(WebUtils.simpleHash(content)));
         };
         o.remove = function (section_id: string) {
             cacheConf(cacheKey(section_id), '');
+            uci.set(confName, section_id, 'custom_conf_hash', '');
         };
     },
 

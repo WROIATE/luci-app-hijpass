@@ -1,35 +1,26 @@
-import {ShuntConfigUtils, ProxyNode} from "../module/luci";
-import {SingBoxUtils} from "./singbox/config";
-import {XrayUtils} from "./xray/config";
-import proxy from "../views/proxy";
+import { ShuntConfigUtils, ProxyNode } from '../module/luci'
+import { SingBoxUtils } from '../core/singbox/builder'
+import { XrayUtils } from '../core/xray/builder'
 
 export const FactoryType = {
     SING_BOX: 'sing-box',
     XRAY: 'xray',
-} as const;
-
+} as const
 
 export const ShuntConfFactory = {
     getShuntUtils: function (type: string): ShuntConfigUtils {
         switch (type) {
-            case FactoryType.SING_BOX:
-                return SingBoxUtils
-            case FactoryType.XRAY:
-                return XrayUtils
+            case FactoryType.SING_BOX: return SingBoxUtils
+            case FactoryType.XRAY: return XrayUtils
         }
     }
 }
 
-/**
- * Luci 配置转换工厂
- */
 export const LuciConverterFactory = {
     genProxyConf: function (type: string, proxyNode: ProxyNode): {} {
         switch (type) {
-            case FactoryType.SING_BOX:
-                return SingBoxUtils.genProxyConf(proxyNode)
-            case FactoryType.XRAY:
-                return XrayUtils.genProxyConf(proxyNode)
+            case FactoryType.SING_BOX: return SingBoxUtils.genProxyConf(proxyNode)
+            case FactoryType.XRAY: return XrayUtils.genProxyConf(proxyNode)
         }
     }
 }

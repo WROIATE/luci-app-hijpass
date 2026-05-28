@@ -21,7 +21,7 @@ import fs from "fs";
 import form from "form";
 import ui from "ui";
 import { LuciConverterFactory, ShuntConfFactory, FactoryType } from "./factory";
-import { SingBoxUtils } from "./singbox/config";
+import { SingBoxUtils } from "../core/singbox/builder";
 import notificationManager from "../module/notification";
 
 

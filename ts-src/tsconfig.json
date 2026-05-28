@@ -16,5 +16,6 @@
     "enum/**/*.ts",
     "module/**/*.ts",
     "utils/**/*.ts",
+    "core/**/*.ts"
   ],
 }

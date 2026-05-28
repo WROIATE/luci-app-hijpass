@@ -1,0 +1,223 @@
+import './protocols/registry'
+import uci from 'uci'
+import {
+    BlockOutbound, DirectOutbound, DNS, DnsInbound, DnsRule, DnsServer,
+    Log, Outbound, RemoteRuleSet, LocalRuleSet, Route, RouteRule, RuleSet,
+    SocksInbound, SocksOutbound, TproxyInbound, URLTest
+} from './models'
+import { ShuntUtils } from '../../utils/common'
+import { LuciFlied, ShuntTag } from '../../enum/hijpass'
+import { SingBoxEnum } from '../../enum/singbox'
+import { ProxyNode, RuleDTO, RuleSetDTO, ShuntConfigUtils } from '../../module/luci'
+import { singboxRegistry } from './protocols/protocol'
+
+export const SingBoxUtils: ShuntConfigUtils & { writeGeoRule: () => void } = {
+    genShuntConf: genConf,
+    genProxyConf,
+    writeGeoRule
+}
+
+function genConf() {
+    const shuntSection = ShuntUtils.getShuntSection()
+    if (!shuntSection) return
+
+    const dnsServerMap = new Map<string, DnsServer>()
+    const ruleSetMap = new Map<string, RuleSet>()
+    const dnsConf = shuntSection.dns
+    const routeConf = shuntSection.route
+    const route = new Route(transOutTag(routeConf.defaultProxyNode), dnsConf.defaultDnsNode)
+    const dns = new DNS(
+        dnsConf.defaultDnsNode,
+        transDnsStrategy(dnsConf.defaultStrategy),
+        dnsConf.useCache === '1'
+    )
+
+    dnsConf.nodes.forEach(function (dnsNode) {
+        const server = new DnsServer(dnsNode.type, dnsNode.tag, dnsNode.server, parseInt(dnsNode.port, 10), undefined)
+        dnsServerMap.set(dnsNode.tag, server)
+    })
+
+    let outbounds: any[] = [
+        new DirectOutbound(SingBoxEnum.DIRECT_OUTBOUND_TAG),
+        new BlockOutbound(SingBoxEnum.BLOCK_OUTBOUND_TAG)
+    ]
+
+    uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section) {
+        if (section.enabled === '1') {
+            outbounds.push(new SocksOutbound('127.0.0.1', Number(section.socks_port), section.name))
+        }
+    })
+
+    if (shuntSection.loadBalance.lbNodeList.length > 0) {
+        const lbConf = shuntSection.loadBalance
+        const testNode = new URLTest(
+            SingBoxEnum.LOAD_BALANCE_OUTBOUND_TAG,
+            lbConf.url || undefined,
+            lbConf.interval || undefined,
+            lbConf.tolerance ? parseInt(lbConf.tolerance, 10) : undefined,
+            lbConf.idleTimeout || undefined,
+            lbConf.interruptExistConnections === '1' ? true : undefined
+        )
+        testNode.outbounds = lbConf.lbNodeList
+        outbounds.push(testNode)
+    }
+
+    const inbounds = [
+        new TproxyInbound(parseInt(shuntSection.shuntListenPort, 10), SingBoxEnum.TPROXY_INBOUND_TAG),
+        new DnsInbound(parseInt(shuntSection.dnsListenPort, 10), SingBoxEnum.DNS_INBOUND_TAG)
+    ]
+
+    if (route.default_domain_resolver && route.final) {
+        const dnsTmpl = dnsServerMap.get(route.default_domain_resolver)
+        if (!dnsTmpl) throw new Error('Default DNS template not found: ' + route.default_domain_resolver)
+        dns.servers.push(genDnsFromTmpl(dnsTmpl.tag, route.final, dnsTmpl))
+    }
+
+    if (routeConf.rulesetOutNode) {
+        const outTag = transOutTag(routeConf.rulesetOutNode)
+        const node = outbounds.find(o => o.tag === outTag)
+        if (node) {
+            const rulesetOutNode = structuredClone(node)
+            rulesetOutNode.tag = SingBoxEnum.RULESET_OUTBOUND_TAG
+            if (dnsConf.rulesetDnsNode) {
+                rulesetOutNode.domain_resolver = SingBoxEnum.RULESET_DNS_NAME
+                const dnsTmpl = dnsServerMap.get(dnsConf.rulesetDnsNode)
+                dns.servers.push(genDnsFromTmpl(SingBoxEnum.RULESET_DNS_NAME, SingBoxEnum.RULESET_OUTBOUND_TAG, dnsTmpl))
+            }
+            outbounds.push(rulesetOutNode)
+        }
+    }
+
+    routeConf.rules.forEach(function (routeRule) {
+        if (routeRule.enabled !== '1') return
+        const luciRuleDTO = ShuntUtils.parseRuleList(routeRule)
+
+        if (routeConf.rulesetConvert === '1') convertGeoRule(luciRuleDTO)
+
+        if (luciRuleDTO.isEmpty('set')) throw new Error('Empty rule: ' + routeRule.name)
+
+        for (const rs of luciRuleDTO.ruleSet) {
+            ruleSetMap.set(rs.tag, genRuleSet(rs, routeConf.rulesetOutNode ? SingBoxEnum.RULESET_OUTBOUND_TAG : undefined))
+        }
+
+        let action = 'route'
+        let outbound = transOutTag(routeRule.proxyNode)
+        if (routeRule.proxyNode === ShuntTag.BLOCK_OUTBOUND_TAG) {
+            action = 'reject'
+            outbound = undefined
+        }
+        route.rules.push(new RouteRule(action, outbound).initRule(luciRuleDTO))
+
+        if (action === 'reject') return
+
+        if (luciRuleDTO.containDomain() || luciRuleDTO.containIp() || luciRuleDTO.containRuleSet()) {
+            const dnsTag = routeRule.dnsNode
+            const detour = transOutTag(routeRule.dnsProxyNode) || outbound
+            const dnsTmpl = dnsTag
+                ? dnsServerMap.get(dnsTag)
+                : dnsServerMap.get(route.default_domain_resolver)
+            dns.servers.push(genDnsFromTmpl(transDnsTag(routeRule.name), detour, dnsTmpl))
+            dns.rules.push(
+                new DnsRule(action, transDnsTag(routeRule.name), transDnsStrategy(routeRule.dnsStrategy))
+                    .initRule(luciRuleDTO)
+            )
+        }
+    })
+
+    ruleSetMap.forEach(value => route.rule_set.push(value))
+
+    return {
+        log: new Log(shuntSection.logLevel),
+        inbounds,
+        outbounds,
+        dns,
+        route
+    }
+}
+
+function genProxyConf(proxyNode: ProxyNode): {} {
+    return {
+        log: { disabled: false, level: 'info', timestamp: true },
+        dns: { servers: [{ type: 'local', tag: 'local' }] },
+        inbounds: [
+            new TproxyInbound(Number(proxyNode.listen_port), 'tproxy-in', '127.0.0.1'),
+            new SocksInbound(Number(proxyNode.socks_port), 'socks-in', '127.0.0.1')
+        ],
+        outbounds: [singboxRegistry.build(proxyNode.type, proxyNode)]
+    }
+}
+
+function writeGeoRule() {
+    const routeConf = ShuntUtils.getRouteSection()
+    const geoSiteSet = new Set<string>()
+    const geoIpSet = new Set<string>()
+    for (const rule of routeConf.rules) {
+        const luciRuleDTO = ShuntUtils.parseRuleList(rule)
+        for (const geo of luciRuleDTO.geoSite) geoSiteSet.add(geo.replace('geosite:', ''))
+        for (const geo of luciRuleDTO.geoIp) geoIpSet.add(geo.replace('geoip:', ''))
+    }
+    const geoSiteList = [...geoSiteSet]
+    const geoIpList = [...geoIpSet]
+    const originalIps = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geoip_ruleset') ?? []
+    const originalSites = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geosite_ruleset') ?? []
+
+    if (geoIpList.length > 0) {
+        if (!isArrEqual(originalIps, geoIpList)) {
+            uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geoip_ruleset', geoIpList)
+        }
+    } else {
+        uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geoip_ruleset', undefined)
+    }
+    if (geoSiteList.length > 0) {
+        if (!isArrEqual(originalSites, geoSiteList)) {
+            uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geosite_ruleset', geoSiteList)
+        }
+    } else {
+        uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'geosite_ruleset', undefined)
+    }
+}
+
+function genDnsFromTmpl(tag: string, detour: string, tmpl: DnsServer): DnsServer {
+    return new DnsServer(tmpl.type, tag, tmpl.server, tmpl.port, detour)
+}
+
+function genRuleSet(rs: RuleSetDTO, detour: string): RuleSet {
+    if (rs.type === 'remote') return new RemoteRuleSet(rs.tag, rs.format, rs.pathOrUrl, detour, undefined)
+    return new LocalRuleSet(rs.tag, rs.format, rs.pathOrUrl)
+}
+
+function transDnsStrategy(strategy: string) {
+    switch (strategy) {
+        case '4': return 'ipv4_only'
+        case '6': return 'ipv6_only'
+        case '64': return 'prefer_ipv6'
+        case '46': return 'prefer_ipv4'
+        default: return undefined
+    }
+}
+
+function transOutTag(tag: string) {
+    if (tag === ShuntTag.BLOCK_OUTBOUND_TAG) return SingBoxEnum.BLOCK_OUTBOUND_TAG
+    if (tag === ShuntTag.DIRECT_OUTBOUND_TAG) return SingBoxEnum.DIRECT_OUTBOUND_TAG
+    if (tag === ShuntTag.LOAD_BALANCE_OUTBOUND_TAG) return SingBoxEnum.LOAD_BALANCE_OUTBOUND_TAG
+    return tag
+}
+
+function transDnsTag(name: string) { return name + '-dns' }
+
+function convertGeoRule(luciRuleDTO: RuleDTO) {
+    luciRuleDTO.ruleSet = []
+    for (const geo of luciRuleDTO.geoSite) {
+        const tag = geo.replace('geosite:', 'geosite-')
+        luciRuleDTO.ruleSet.push({ tag, type: 'local', format: 'binary', pathOrUrl: '/etc/hijpass/ruleset/' + tag + '.srs' })
+    }
+    for (const geo of luciRuleDTO.geoIp) {
+        const tag = geo.replace('geoip:', 'geoip-')
+        luciRuleDTO.ruleSet.push({ tag, type: 'local', format: 'binary', pathOrUrl: '/etc/hijpass/ruleset/' + tag + '.srs' })
+    }
+}
+
+function isArrEqual(arr1: any[], arr2: any[]) {
+    if (!arr1 || !arr2) return false
+    return arr1.length === arr2.length && arr1.every((val, i) => val === arr2[i])
+}

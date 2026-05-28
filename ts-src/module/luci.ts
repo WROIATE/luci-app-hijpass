@@ -162,9 +162,9 @@ export interface RuleSetDTO {
     pathOrUrl: string;
 }
 
-export interface ShuntConfigUtils {
+export interface CoreAdapter {
     genShuntConf: () => {}
-    genProxyConf: (ProxyNode: ProxyNode) => {}
+    genProxyConf: (proxyNode: ProxyNode) => {}
 }
 
 export interface LuciConvertUtils {

@@ -1,18 +1,18 @@
 import './protocols/registry'
 import uci from 'uci'
-import { XrayEnum } from '../../enum/xray'
-import { ShuntUtils } from '../../utils/common'
+import {XrayEnum} from '../../enum/xray'
+import {ShuntUtils} from '../../utils/common'
 import {
     Balancer, BurstObservatory,
     DNS, DnsOutbound, DnsRule, DnsServer,
     Freedom, Inbound, Log, Outbound, Route,
     RouteRule, Socks, BlockOutbound
 } from './models'
-import { LuciFlied, ShuntTag } from '../../enum/hijpass'
-import { ShuntConfigUtils, ProxyNode } from '../../module/luci'
-import { xrayRegistry } from './protocols/protocol'
+import {LuciFlied, ShuntTag} from '../../enum/hijpass'
+import { CoreAdapter, ProxyNode } from '../../module/luci'
+import {xrayRegistry} from './protocols/protocol'
 
-export const XrayUtils: ShuntConfigUtils = {
+export const XrayUtils: CoreAdapter = {
     genShuntConf: genConf,
     genProxyConf
 }
@@ -178,17 +178,19 @@ function buildBaseProxyConf(config: ProxyNode, outbound: Outbound): {} {
     tproxyInbound.sniffing = undefined
 
     const socksInbound = new Inbound('direct', Number(config.socks_port), 'socks-in')
-    socksInbound.settings = { udp: true }
+    socksInbound.settings = {udp: true}
     socksInbound.protocol = 'socks'
 
     return {
-        log: { loglevel: 'info', dnsLog: false },
+        log: {loglevel: 'info', dnsLog: false},
         inbounds: [tproxyInbound, socksInbound],
         outbounds: [outbound]
     }
 }
 
-function transDnsTag(name: string) { return name + '-dns' }
+function transDnsTag(name: string) {
+    return name + '-dns'
+}
 
 function transOutTag(tag: string) {
     if (tag === ShuntTag.BLOCK_OUTBOUND_TAG) return XrayEnum.BLOCK_OUTBOUND_TAG
@@ -199,10 +201,15 @@ function transOutTag(tag: string) {
 
 function transDnsStrategy(strategy: string) {
     switch (strategy) {
-        case '4': return 'UseIPv4'
-        case '6': return 'UseIPv6'
-        case '64': case '46': return 'UseIP'
-        default: return undefined
+        case '4':
+            return 'UseIPv4'
+        case '6':
+            return 'UseIPv6'
+        case '64':
+        case '46':
+            return 'UseIP'
+        default:
+            return undefined
     }
 }
 
@@ -210,8 +217,13 @@ function transRouteProtocol(protocol: string[]) {
     if (!protocol) return undefined
     const res = protocol.map((pro: string) => {
         switch (pro) {
-            case 'http': case 'tls': case 'quic': case 'bittorrent': return pro
-            default: throw new Error('Unsupported xray rule protocol: ' + pro)
+            case 'http':
+            case 'tls':
+            case 'quic':
+            case 'bittorrent':
+                return pro
+            default:
+                throw new Error('Unsupported xray rule protocol: ' + pro)
         }
     }).filter(p => p !== undefined)
     return res.length === 0 ? undefined : res

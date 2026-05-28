@@ -8,10 +8,10 @@ import {
 import { ShuntUtils } from '../../utils/common'
 import { LuciFlied, ShuntTag } from '../../enum/hijpass'
 import { SingBoxEnum } from '../../enum/singbox'
-import { ProxyNode, RuleDTO, RuleSetDTO, ShuntConfigUtils } from '../../module/luci'
+import { CoreAdapter, ProxyNode, RuleDTO, RuleSetDTO } from '../../module/luci'
 import { singboxRegistry } from './protocols/protocol'
 
-export const SingBoxUtils: ShuntConfigUtils & { writeGeoRule: () => void } = {
+export const SingBoxUtils: CoreAdapter & { writeGeoRule: () => void } = {
     genShuntConf: genConf,
     genProxyConf,
     writeGeoRule

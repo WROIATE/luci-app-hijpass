@@ -249,14 +249,13 @@ const LuciUtils = {
                     && uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_convert') === '1') {
                     SingBoxUtils.writeGeoRule()
                 }
-                if (shuntCoreType === FactoryType.COMMAND) {
+                const shuntConfigType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type')
+                if (shuntConfigType === FactoryType.COMMAND) {
                     const shuntConf = CoreAdapterFactory.getCoreAdapter(FactoryType.COMMAND).genShuntConf()
                     await fs.write(WebUtils.getFilePath('shunt_conf'), shuntConf as string);
-                } else {
+                } else if (shuntConfigType === 'tmpl') {
                     let data = ShuntUtils.getShuntConfData()
-                    if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
-                        await fs.write(WebUtils.getFilePath('shunt_conf'), data);
-                    }
+                    await fs.write(WebUtils.getFilePath('shunt_conf'), data);
                 }
 
                 // 清理已删除/重命名的代理节点文件

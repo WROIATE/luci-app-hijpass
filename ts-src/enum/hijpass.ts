@@ -46,7 +46,7 @@ export const HijpassValues = {
         {label: '只使用v4', value: '4'}
     ],
     SHUNT_LOG_LEVELS: ['info', 'warn', 'error', 'debug'] as const,
-    SHUNT_CONF_TYPE: ['xray', 'singbox', 'custom'] as const,
+    SHUNT_CONF_TYPE: ['xray', 'singbox'] as const,
     PROXY_TYPES: [
         {label: 'Shadowsocks', value: 'shadowsocks'},
         {label: 'Hysteria2',   value: 'hysteria2'},

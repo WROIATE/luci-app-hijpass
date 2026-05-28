@@ -67,9 +67,6 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     configType.value('tmpl', _('Template Configuration'));
     configType.value('custom', _('Custom Edit'));
     configType.rmempty = true;
-    // command 核心无模板，隐藏配置类型选项
-    configType.depends('type', 'xray');
-    configType.depends('type', 'singbox');
 
     // 分流监听端口
     let shuntListenPort = s.taboption('basic', form.Value, 'shunt_listen_port', _('Shunt Listen Port'),
@@ -204,7 +201,6 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
 function createConfigEditor(s: LuCI.form.AbstractSection) {
     let o = s.taboption('config', form.TextValue, 'shunt_conf_data', null, '修改分流配置文件');
     o.depends('config_type', 'custom')
-    o.depends('type', 'custom')
     o.rows = 30;
     o.monospace = true;
     o.load = async function (_: string) {

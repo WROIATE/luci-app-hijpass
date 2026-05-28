@@ -107,18 +107,18 @@ const vlessProtocol: XrayProtocol = {
         )
 
         const useReality = c.tls_reality_enabled === '1'
-        const realitySettings: RealityObject = useReality ? {
+        const realitySettings: RealityObject | undefined = useReality ? {
             fingerprint: 'chrome',
             serverName: c.tls_server_name || c.server,
             password: c.tls_reality_public_key || '',
             shortId: c.tls_reality_short_id || ''
-        } : null
+        } : undefined
 
-        const tlsSettings: TlsObject = !useReality ? {
+        const tlsSettings: TlsObject | undefined = !useReality ? {
             allowInsecure: c.tls_insecure === '1',
             alpn: ['h2', 'http/1.1'],
             serverName: c.tls_server_name || c.server,
-        } : null
+        } : undefined
 
         const security = useReality
             ? 'reality'

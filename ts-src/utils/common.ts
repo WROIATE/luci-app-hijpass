@@ -543,6 +543,7 @@ const ProxyUtils = {
                 (config as any)[key] = section[key];
             }
         });
+        config.cfgid = section['.name'];
 
         return config;
     }
@@ -778,19 +779,16 @@ const WebUtils = {
             return dirPath + '/' + name + '-' + section_id + '.json';
         };
 
-        const getNodeName = (section_id: string) =>
-            uci.get(confName, section_id, 'name') || section_id;
-
         o.load = async function (section_id: string) {
             const content = await L.resolveDefault(fs.read(getFilePath(section_id)), '');
-            cacheConf(getNodeName(section_id), content);
+            cacheConf(section_id, content);
             return content;
         };
         o.write = function (section_id: string, value: string) {
-            cacheConf(getNodeName(section_id), (value || '').trim());
+            cacheConf(section_id, (value || '').trim());
         };
         o.remove = function (section_id: string) {
-            cacheConf(getNodeName(section_id), '');
+            cacheConf(section_id, '');
         };
     },
 

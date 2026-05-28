@@ -11,5 +11,5 @@ function genShuntConf() {
 }
 
 function genProxyConf(proxyNode: ProxyNode) {
-    return getCachedConf(proxyNode.name)
+    return getCachedConf(proxyNode.cfgid)
 }

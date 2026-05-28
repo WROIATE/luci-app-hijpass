@@ -176,6 +176,7 @@ export interface LuciConvertUtils {
  */
 export interface ProxyNode {
     name: string;
+    cfgid?: string;
     type: string;
     core?: string;
     enabled: string;

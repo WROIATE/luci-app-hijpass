@@ -1,11 +1,13 @@
-import { LuciUtils, ShuntUtils, WebUtils } from "../utils/common";
-import { cacheConf } from "../core/command/cache";
-import { HijpassValues, LuciFlied } from "../enum/hijpass";
-import ui from 'ui';
+import {SaveApplyUtils} from "../utils/actions/save-apply/index";
+import {ServiceUtils} from "../utils/base/luci/service";
+import {FormUtils} from "../utils/base/luci/form";
+import {ValidationUtils} from "../utils/base/luci/validation";
+import {NotificationUtils} from "../utils/base/luci/notification";
+import {ShuntFormUtils} from "../utils/feature/shunt/form";
+import {HijpassValues, LuciFlied} from "../enum/hijpass";
 import form from "form";
 import view from 'view';
 import uci from 'uci';
-import fs from 'fs';
 
 const v = view.extend({
     load: function () {
@@ -19,16 +21,16 @@ const v = view.extend({
             await view.prototype.handleSave(ev)
         } catch (e) {
             console.log(e);
-            WebUtils.showErrorNotification(_('Configuration Save Failed'), _(e.message), 5000);
+            NotificationUtils.error(_('Configuration Save Failed'), _(e.message), 5000);
         }
     },
 
-    handleSaveApply: LuciUtils.genHandleSaveApply(),
+    handleSaveApply: SaveApplyUtils.genHandleSaveApply(),
 
     render: function () {
         let m = new form.Map(LuciFlied.CONF_NAME, _('Shunt Configuration'),
             _('Configure Shunt Rules'));
-        WebUtils.createServiceStatusSection(m, 'shunt');
+        ServiceUtils.createStatusSection(m, 'shunt');
 
         let s = m.section(form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE);
         s.anonymous = true;
@@ -79,7 +81,7 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
         if (dns_listen_port === value) {
             return _("Conflicts with DNS Port")
         }
-        return WebUtils.validatePortConflict.call(this, sectionId, value);
+        return ValidationUtils.validatePortConflict.call(this, sectionId, value);
     }
 
     // DNS监听端口
@@ -93,11 +95,11 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
         if (shunt_listen_port === value) {
             return _("Conflicts with Shunt Port")
         }
-        return WebUtils.validatePortConflict.call(this, sectionId, value);
+        return ValidationUtils.validatePortConflict.call(this, sectionId, value);
     }
 
     // 日志开关
-    WebUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, 'basic');
+    FormUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, 'basic');
 
     // 日志路径
     let logLevel = s.taboption('basic', form.ListValue, 'log_level', _('Log Level'), _('Logging Level'));
@@ -111,81 +113,13 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     // sing-box 版本 + 更新按钮
     let sbVersionOpt = s.taboption('basic', form.DummyValue, '_singbox_version', _('sing-box Version'));
     sbVersionOpt.renderWidget = function () {
-        const versionEl = E('span', { style: 'margin-right:12px;color:#666' }, _('Loading...'));
-        const updateBtn = E('button', {
-            class: 'btn cbi-button',
-            style: 'background-color:#1a6a8a;border-color:#1a6a8a',
-            click: function (ev: MouseEvent) {
-                const btn = ev.currentTarget as HTMLButtonElement;
-                btn.disabled = true;
-                btn.textContent = _('Updating...');
-                fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['update', 'sing-box'], 'json')
-                    .then((res: any) => {
-                        if (res && res.success) {
-                            versionEl.textContent = res.version || _('Updated');
-                            WebUtils.showSuccessNotification('sing-box', _('Updated to %s').format(res.version), 4000);
-                        } else {
-                            WebUtils.showErrorNotification('sing-box', _('Update failed: %s').format((res && res.error) || 'unknown'), 5000);
-                        }
-                    })
-                    .catch((e: any) => {
-                        WebUtils.showErrorNotification('sing-box', _(e.message || 'Update failed'), 5000);
-                    })
-                    .finally(() => {
-                        btn.disabled = false;
-                        btn.textContent = _('Update');
-                    });
-            }
-        }, _('Update'));
-
-        // 初始加载版本
-        fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['version', 'sing-box'], 'json')
-            .then((res: any) => {
-                versionEl.textContent = (res && res.version) ? res.version : _('Unknown');
-            })
-            .catch(() => { versionEl.textContent = _('Unknown'); });
-
-        return E('div', { style: 'display:flex;align-items:center;gap:8px' }, [versionEl, updateBtn]);
+        return ShuntFormUtils.renderCoreVersionWidget('sing-box', 'sing-box');
     };
 
     // xray 版本 + 更新按钮
     let xrayVersionOpt = s.taboption('basic', form.DummyValue, '_xray_version', _('Xray Version'));
     xrayVersionOpt.renderWidget = function () {
-        const versionEl = E('span', { style: 'margin-right:12px;color:#666' }, _('Loading...'));
-        const updateBtn = E('button', {
-            class: 'btn cbi-button',
-            style: 'background-color:#1a6a8a;border-color:#1a6a8a',
-            click: function (ev: MouseEvent) {
-                const btn = ev.currentTarget as HTMLButtonElement;
-                btn.disabled = true;
-                btn.textContent = _('Updating...');
-                fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['update', 'xray'], 'json')
-                    .then((res: any) => {
-                        if (res && res.success) {
-                            versionEl.textContent = res.version || _('Updated');
-                            WebUtils.showSuccessNotification('Xray', _('Updated to %s').format(res.version), 4000);
-                        } else {
-                            WebUtils.showErrorNotification('Xray', _('Update failed: %s').format((res && res.error) || 'unknown'), 5000);
-                        }
-                    })
-                    .catch((e: any) => {
-                        WebUtils.showErrorNotification('Xray', _(e.message || 'Update failed'), 5000);
-                    })
-                    .finally(() => {
-                        btn.disabled = false;
-                        btn.textContent = _('Update');
-                    });
-            }
-        }, _('Update'));
-
-        // 初始加载版本
-        fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['version', 'xray'], 'json')
-            .then((res: any) => {
-                versionEl.textContent = (res && res.version) ? res.version : _('Unknown');
-            })
-            .catch(() => { versionEl.textContent = _('Unknown'); });
-
-        return E('div', { style: 'display:flex;align-items:center;gap:8px' }, [versionEl, updateBtn]);
+        return ShuntFormUtils.renderCoreVersionWidget('xray', 'Xray');
     };
 
     // 预览配置按钮
@@ -194,42 +128,26 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     previewConfigButton.depends('config_type', 'tmpl');
     previewConfigButton.inputtitle = _('Preview Configuration');
     previewConfigButton.inputstyle = 'apply';
-    previewConfigButton.onclick = preview
+    previewConfigButton.onclick = ShuntFormUtils.showPreview
 }
 
 
 function createConfigEditor(s: LuCI.form.AbstractSection) {
     let o = s.taboption('config', form.TextValue, 'shunt_conf_data', null, '修改分流配置文件');
     o.depends('config_type', 'custom')
-    o.rows = 30;
-    o.monospace = true;
-    o.load = async function (_: string) {
-        const content = await L.resolveDefault(fs.trimmed(WebUtils.getFilePath('shunt_conf')), '');
-        cacheConf('shunt_conf', content);
-        return content;
-    };
-    o.write = function (sectionId: string, value: string) {
-        const content = (value || '').trim();
-        cacheConf('shunt_conf', content);
-        uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_hash', String(WebUtils.simpleHash(content)));
-    };
-    o.remove = function (sectionId: string) {
-        cacheConf('shunt_conf', '');
-        uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_hash', '');
-    };
-    o.rmempty = false;
+    ShuntFormUtils.configureConfigEditor(o);
 }
 
 // 创建路由配置选项
 function createRouteOptions(s: LuCI.form.AbstractSection) {
     // 默认全局路由出口配置
-    let routeTypeSectionValue = createSectionContainer(s, 'route', '_route_global',
+    let routeTypeSectionValue = ShuntFormUtils.createSectionContainer(s, 'route', '_route_global',
         form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _(''));
 
     let routeTypeSection = routeTypeSectionValue.subsection;
-    WebUtils.setAnonymousSection(routeTypeSection);
+    FormUtils.setAnonymousSection(routeTypeSection);
 
-    let defaultProxyNode = createRequiredListValue(routeTypeSection, 'default_proxy_node', _('Default Global Exit'),
+    let defaultProxyNode = ShuntFormUtils.createRequiredListValue(routeTypeSection, 'default_proxy_node', _('Default Global Exit'),
         _('Select Default Exit Node'),
         function (section_id: any, value: any) {
             if (!value) {
@@ -237,89 +155,30 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
             }
             return true;
         });
-    loadProxyNodeOptions(defaultProxyNode, true);
+    ShuntFormUtils.loadProxyNodeOptions(defaultProxyNode, true);
 
     let rulesetOutNode = routeTypeSection.option(form.ListValue, 'ruleset_out_node', _('Rule-set Exit'),
         _('Rule-set Download Exit'));
-    loadProxyNodeOptions(rulesetOutNode, false);
+    ShuntFormUtils.loadProxyNodeOptions(rulesetOutNode, false);
 
     let rulesetConvert = routeTypeSection.option(form.Flag, 'ruleset_convert',
         _('Use GeoSite Rule-set'), _('Convert Geo Rules'));
     rulesetConvert.rmempty = false;
     // 批量替换节点按钮
     let replaceNodeBtn = s.taboption('route', form.Button, '_replace_node', _('Bulk Replace Nodes'));
-    replaceNodeBtn.depends({ config_type: "tmpl" });
+    replaceNodeBtn.depends({config_type: "tmpl"});
     replaceNodeBtn.inputtitle = _('Bulk Replace Nodes');
     replaceNodeBtn.inputstyle = 'apply';
-    replaceNodeBtn.onclick = function () {
-        // 收集规则中实际被使用的节点值
-        const usedNodeValues = new Set<string>();
-        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-            if (section.proxy_node) usedNodeValues.add(section.proxy_node);
-        });
-
-        // 构建全量节点选项列表（用于"替换为"）
-        const allNodeOptions = WebUtils.getEnabledProxyNodeOptions(true);
-
-        // "从节点"只显示规则中实际使用的节点
-        const fromNodeOptions = allNodeOptions.filter(o => usedNodeValues.has(o.value));
-
-        const makeSelect = (id: string, options: { value: string, label: string }[]) => {
-            const sel = E('select', { id, class: 'cbi-input-select', style: 'width:100%' }) as HTMLSelectElement;
-            options.forEach(({ value, label }) => {
-                const opt = document.createElement('option');
-                opt.value = value;
-                opt.textContent = label;
-                sel.appendChild(opt);
-            });
-            return sel;
-        };
-
-        const fromSel = makeSelect('replace-from', fromNodeOptions);
-        const toSel = makeSelect('replace-to', allNodeOptions);
-
-        ui.showModal(_('Bulk Replace Nodes'), [
-            E('div', { class: 'cbi-section' }, [
-                E('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center' }, [
-                    E('div', {}, [E('label', {}, _('From Node')), fromSel]),
-                    E('div', {}, [E('label', {}, _('Replace With')), toSel]),
-                ])
-            ]),
-            E('div', { class: 'right', style: 'display:flex;justify-content:flex-end;gap:10px' }, [
-                E('button', { class: 'btn cbi-button', click: ui.hideModal }, _('Cancel')),
-                E('button', {
-                    class: 'btn cbi-button-action',
-                    click: function () {
-                        const fromVal = fromSel.value;
-                        const toVal = toSel.value;
-                        if (fromVal === toVal) {
-                            ui.hideModal();
-                            return;
-                        }
-                        let count = 0;
-                        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-                            if (section.proxy_node === fromVal) {
-                                uci.set(LuciFlied.CONF_NAME, section['.name'], 'proxy_node', toVal);
-                                count++;
-                            }
-                        });
-                        uci.save();
-                        ui.hideModal();
-                        location.reload();
-                    }
-                }, _('Confirm Replace'))
-            ])
-        ]);
-    };
+    replaceNodeBtn.onclick = ShuntFormUtils.showBulkReplaceModal;
 
     // 路由规则配置
     let routeGridSectionValue = s.taboption('route', form.SectionValue, '_route_rule',
         form.GridSection, LuciFlied.SHUNT_ROUTE_RULE_TYPE, _('Routing Rule Configuration'));
-    routeGridSectionValue.depends({ config_type: "tmpl" })
+    routeGridSectionValue.depends({config_type: "tmpl"})
 
     let routeGridSection = routeGridSectionValue.subsection;
     routeGridSection.rowcolors = true
-    WebUtils.setAnonymousGridSectionMembers(routeGridSection)
+    FormUtils.setAnonymousGridSectionMembers(routeGridSection)
     routeGridSection.modaltitle = _('Edit Routing Rule');
     routeGridSection.sectiontitle = function (section_id: any) {
         return uci.get(LuciFlied.CONF_NAME, section_id, 'name') || _('Unnamed Rule');
@@ -330,7 +189,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
 
     // 规则名称
     let name = routeGridSection.taboption('_rule', form.Value, 'name', _('Rule Name'));
-    name.validate = WebUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, 'name')
+    name.validate = ValidationUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, 'name')
     name.rmempty = false;
     name.modalonly = true;
 
@@ -344,12 +203,12 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     let proxyNode = routeGridSection.taboption('_rule', form.ListValue, 'proxy_node', _('Proxy Node'));
     proxyNode.rmempty = false;
     proxyNode.editable = true;
-    loadProxyNodeOptions(proxyNode, true);  // 包含阻止和负载均衡
+    ShuntFormUtils.loadProxyNodeOptions(proxyNode, true);  // 包含阻止和负载均衡
 
     // DNS服务器（动态生成选项）
     let dnsNode = routeGridSection.taboption('_dns', form.ListValue, 'dns_node', _('DNS Server'), _('Only Effective with Domain/GeoSite/Rule-set'));
     // dnsNode.modalonly = true;
-    loadDNSServerOptions(dnsNode, true);  // 包含默认选项
+    ShuntFormUtils.loadDNSServerOptions(dnsNode, true);  // 包含默认选项
     dnsNode.textvalue = function (sectionId) {
         let dnsNode = uci.get(LuciFlied.CONF_NAME, sectionId, 'dns_node');
         if (!dnsNode) {
@@ -493,14 +352,14 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
 // 创建DNS服务器配置选项
 function createDNSOptions(s: LuCI.form.AbstractSection) {
 
-    let dnsTypeSectionValue = createSectionContainer(s, 'dns', '_dns_global',
+    let dnsTypeSectionValue = ShuntFormUtils.createSectionContainer(s, 'dns', '_dns_global',
         form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _(''));
 
     let dnsTypeSection = dnsTypeSectionValue.subsection;
-    WebUtils.setAnonymousSection(dnsTypeSection);
+    FormUtils.setAnonymousSection(dnsTypeSection);
 
     // 默认全局DNS配置
-    let defaultDNSNode = createRequiredListValue(dnsTypeSection, 'default_dns_node', _('Default Global DNS'),
+    let defaultDNSNode = ShuntFormUtils.createRequiredListValue(dnsTypeSection, 'default_dns_node', _('Default Global DNS'),
         _('Select Default DNS'),
         function (section_id: string, value: any) {
             if (!value) {
@@ -508,11 +367,11 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
             }
             return true;
         });
-    loadDNSServerOptions(defaultDNSNode, false);
+    ShuntFormUtils.loadDNSServerOptions(defaultDNSNode, false);
 
     let rulesetDNSNode = dnsTypeSection.option(form.ListValue, 'ruleset_dns_node',
         _('Rule-set DNS'), _('Select Rule-set DNS'));
-    loadDNSServerOptions(rulesetDNSNode, false);
+    ShuntFormUtils.loadDNSServerOptions(rulesetDNSNode, false);
 
     let defaultStrategy = dnsTypeSection.option(form.ListValue, 'default_strategy', _('Internal DNS Resolution Strategy'),
         _('Select DNS Resolution Strategy'));
@@ -526,7 +385,7 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
 
     let dnsGridSectionValue = s.taboption('dns', form.SectionValue, '_dns_servers',
         form.GridSection, LuciFlied.SHUNT_DNS_NODE_TYPE, _('DNS Node Configuration'));
-    dnsGridSectionValue.depends({ config_type: "tmpl" })
+    dnsGridSectionValue.depends({config_type: "tmpl"})
 
     let dnsGridSection = dnsGridSectionValue.subsection;
     dnsGridSection.rowcolors = true
@@ -555,7 +414,7 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
         _('DNS Server Tag'));
     tag.placeholder = 'dns-local';
     tag.rmempty = false;
-    tag.validate = WebUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, 'tag')
+    tag.validate = ValidationUtils.createTagValidator(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, 'tag')
     tag.modalonly = true
 
     // DNS服务器地址
@@ -579,7 +438,7 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
         if (section.name && section.enabled !== '0') {
             let displayName = section.name;
             if (section.socks_port) displayName += ' (' + section.socks_port + ')';
-            return { value: section.name, display: displayName };
+            return {value: section.name, display: displayName};
         }
         return null;
     };
@@ -587,20 +446,20 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
     // ── global：节点列表（xray 和 sing-box 都显示）──────────────────────
     let oGlobal = s.taboption('slb', form.SectionValue, '_slb_global',
         form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _(''));
-    oGlobal.depends({ config_type: 'tmpl', type: 'xray' });
-    oGlobal.depends({ config_type: 'tmpl', type: 'singbox' });
+    oGlobal.depends({config_type: 'tmpl', type: 'xray'});
+    oGlobal.depends({config_type: 'tmpl', type: 'sing-box'});
     let gSs = oGlobal.subsection;
     gSs.anonymous = true;
     gSs.addremove = false;
 
-    createValidatedDynamicList(gSs, 'lb_node_list', _('Load Balancing Nodes'),
+    ShuntFormUtils.createValidatedDynamicList(gSs, 'lb_node_list', _('Load Balancing Nodes'),
         _('Load Balancing Nodes'),
         LuciFlied.PROXY_NODE_TYPE, lbNodeLoader);
 
     // ── sing-box：URLTest 参数 ────────────────────────────────────────
     let oSingBox = s.taboption('slb', form.SectionValue, '_slb_singbox',
         form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('sing-box URLTest'));
-    oSingBox.depends({ config_type: 'tmpl', type: 'singbox' });
+    oSingBox.depends({config_type: 'tmpl', type: 'sing-box'});
     let sbSs = oSingBox.subsection;
     sbSs.anonymous = true;
     sbSs.addremove = false;
@@ -628,7 +487,7 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
     // ── xray：Balancer + BurstObservatory 参数 ────────────────────────
     let oXray = s.taboption('slb', form.SectionValue, '_slb_xray',
         form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('Xray Balancer'));
-    oXray.depends({ config_type: 'tmpl', type: 'xray' });
+    oXray.depends({config_type: 'tmpl', type: 'xray'});
     let xSs = oXray.subsection;
     xSs.anonymous = true;
     xSs.addremove = false;
@@ -711,170 +570,6 @@ function createTabs(s: LuCI.form.AbstractSection) {
     s.tab('dns', _('DNS Server Configuration'));
     s.tab('slb', _('Load Balancing'));
     s.tab('ruleset', _('Rule-set'));
-}
-
-function resetHash() {
-    let data = ShuntUtils.getShuntConfData()
-    if (data === "") {
-        uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_hash', -1)
-        return false;
-    }
-    let currentHash = WebUtils.simpleHash(data)
-    let oldHash = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_hash')
-    if (currentHash !== oldHash) {
-        uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_hash', currentHash)
-        return true;
-    }
-    return false;
-}
-
-function preview() {
-    try {
-        let configJson = ShuntUtils.getShuntConfData()
-        let shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') || 'xray'
-        // 创建模态对话框显示配置
-        ui.showModal(_('Preview Configuration'), [
-            E('div', { 'class': 'cbi-section' }, [
-                E('div', { 'class': 'cbi-section-descr' },
-                    _('Generated %s JSON Configuration').format(shuntType)),
-                E('pre', {
-                    'style': 'max-height: 500px; overflow: auto; padding: 10px; border-radius: 4px;',
-                    'id': 'config-preview-content'
-                }, configJson)
-            ]),
-            E('div', {
-                'class': 'right',
-                'style': 'display: flex; justify-content: flex-end; align-items: center; gap: 10px;'
-            }, [
-                E('button', {
-                    'class': 'btn cbi-button',
-                    'click': ui.hideModal
-                }, _('关闭')),
-                E('button', {
-                    'class': 'btn cbi-button-action',
-                    'click': function (ev) {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        // 复制配置到剪贴板
-                        let content = document.getElementById('config-preview-content').textContent;
-                        navigator.clipboard.writeText(content).then(function () {
-                            WebUtils.showSuccessNotification("成功", "配置已复制到剪贴板", 3000);
-                        })
-                    }
-                }, _('Copy Configuration'))
-            ])
-        ]);
-    } catch (err) {
-        console.log(err);
-        WebUtils.showErrorNotification("配置生成失败", _(err.message), 5000);
-    }
-}
-
-function shuntConfWrite(func: Function) {
-    return function (section_id: string) {
-        if (uci.get_first(LuciFlied.CONF_NAME,
-            LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl') {
-            resetHash()
-        } else {
-            return func.call(this, section_id, "");
-        }
-    }
-}
-
-// 封装：动态加载代理节点选项（委托给 WebUtils）
-function loadProxyNodeOptions(option: LuCI.form.AbstractValue, includeSLB: boolean) {
-    WebUtils.loadProxyNodeOptions(option, includeSLB);
-}
-
-
-// 封装：动态加载DNS服务器选项
-function loadDNSServerOptions(option: LuCI.form.AbstractValue, includeDefault: boolean) {
-    option.load = function (section_id) {
-        delete this.keylist;
-        delete this.vallist;
-
-        if (includeDefault) {
-            this.value('', _('Use Global Default DNS'));
-        }
-
-        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, function (section: any) {
-            if (section.tag) {
-                let displayName = section.tag;
-                if (section.server) {
-                    displayName += ' (' + section.server + ')';
-                }
-                this.value(section.tag, displayName);
-            }
-        }.bind(this));
-
-        return form.ListValue.prototype.load.apply(this, [section_id]);
-    };
-}
-
-// 创建SectionValue容器
-function createSectionContainer<T extends LuCI.form.AbstractSection>(s: LuCI.form.AbstractSection, tab: string, id: string,
-    sectionType: T, sectionName: string, title: string) {
-    let o = s.taboption(tab, form.SectionValue, id, sectionType, sectionName, title);
-    o.depends({ config_type: "tmpl" });
-    return o;
-}
-
-// 创建必填的ListValue
-function createRequiredListValue(section: LuCI.form.AbstractSection,
-    name: string, title: string, description: string,
-    validator?: Function) {
-    let o = section.option(form.ListValue, name, title, description);
-    o.rmempty = false;
-    if (validator) {
-        o.validate = validator;
-    }
-    return o;
-}
-
-
-// 创建DynamicList并添加校验
-function createValidatedDynamicList(section: LuCI.form.AbstractSection,
-    name: string, title: string, description: string,
-    sectionType: string, getItemName: (section: any) => any) {
-    let o = section.option(form.DynamicList, name, title, description);
-
-    // 动态加载选项
-    o.load = function (section_id: any) {
-        delete this.keylist;
-        delete this.vallist;
-
-        uci.sections(LuciFlied.CONF_NAME, sectionType, function (section: any) {
-            let itemName = getItemName(section);
-            if (itemName) {
-                this.value(itemName.value, itemName.display);
-            }
-        }.bind(this));
-
-        return form.DynamicList.prototype.load.apply(this, [section_id]);
-    };
-
-    // 校验输入值是否存在
-    o.validate = function (section_id: string, value: string) {
-        if (!value || value === '') {
-            return true;
-        }
-
-        let availableItems = [];
-        uci.sections(LuciFlied.CONF_NAME, sectionType, function (section) {
-            let itemName = getItemName(section);
-            if (itemName) {
-                availableItems.push(itemName.value);
-            }
-        });
-
-        if (availableItems.indexOf(value) === -1) {
-            return _('Item Not Found').format(title, value);
-        }
-
-        return true;
-    };
-
-    return o;
 }
 
 export default v;

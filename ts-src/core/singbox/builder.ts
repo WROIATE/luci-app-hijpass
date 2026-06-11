@@ -5,7 +5,7 @@ import {
     Log, Outbound, RemoteRuleSet, LocalRuleSet, Route, RouteRule, RuleSet,
     SocksInbound, SocksOutbound, TproxyInbound, URLTest
 } from './models'
-import { ShuntUtils } from '../../utils/common'
+import { ShuntUtils } from '../../utils/feature/shunt/section'
 import { LuciFlied, ShuntTag } from '../../enum/hijpass'
 import { SingBoxEnum } from '../../enum/singbox'
 import { CoreAdapter, ProxyNode, RuleDTO, RuleSetDTO } from '../../module/luci'

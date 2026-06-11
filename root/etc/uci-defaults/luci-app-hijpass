@@ -18,6 +18,16 @@ uci -q batch <<-EOF >/dev/null
 	commit firewall
 EOF
 
+shunt_type="$(uci -q get hijpass.@shunt[0].type || :)"
+[ -z "$shunt_type" ] && uci -q set hijpass.@shunt[0].type='sing-box'
+[ "$shunt_type" = "singbox" ] && uci -q set hijpass.@shunt[0].type='sing-box'
+uci -q show hijpass | sed -n "s/^\(hijpass\.[^.]*\)\.core='singbox'$/\1/p" | while read -r section; do
+	uci -q set "$section.core=sing-box"
+done
+uci -q commit hijpass
+
+mkdir -p /etc/hijpass/client /etc/hijpass/server /tmp/hijpass/log /tmp/hijserver/log
+
 chmod +x /usr/lib/hijpass/*
 chmod +x /etc/hijpass/hook/*
 

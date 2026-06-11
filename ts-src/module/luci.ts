@@ -214,7 +214,7 @@ export class Hysteria2Config implements ProxyNode {
     name: string;
     type: 'hysteria2' = 'hysteria2';
     enabled: string = '1';
-    /** 核心选择：'' 或 'singbox' 使用 sing-box，'xray' 使用 xray */
+    /** 核心选择：'' 或 'sing-box' 使用 sing-box，'xray' 使用 xray */
     core: string;
     server: string;
     server_port: string;
@@ -242,7 +242,7 @@ export class Hysteria2Config implements ProxyNode {
     constructor() {
         this.type = 'hysteria2';
         this.enabled = '1';
-        this.core = 'singbox';
+        this.core = 'sing-box';
         this.server_ports = [];
         this.network = '';
         this.brutal_debug = '0';
@@ -258,7 +258,7 @@ export class ShadowsocksConfig implements ProxyNode {
     name: string;
     type: 'shadowsocks' = 'shadowsocks';
     enabled: string = '1';
-    /** 核心选择：'singbox'（默认）或 'xray' */
+    /** 核心选择：'sing-box'（默认）或 'xray' */
     core: string;
     server: string;
     server_port: string;
@@ -285,7 +285,7 @@ export class ShadowsocksConfig implements ProxyNode {
     constructor() {
         this.type = 'shadowsocks';
         this.enabled = '1';
-        this.core = 'singbox';
+        this.core = 'sing-box';
         this.network = '';
         this.udp_over_tcp = '0';
         this.multiplex_enabled = '0';
@@ -323,7 +323,7 @@ export class TuicConfig implements ProxyNode {
     constructor() {
         this.type = 'tuic';
         this.enabled = '1';
-        this.core = 'singbox';
+        this.core = 'sing-box';
         this.congestion_control = 'cubic';
         this.udp_relay_mode = '';
         this.udp_over_stream = '0';
@@ -356,7 +356,7 @@ export class ShadowTLSConfig implements ProxyNode {
     constructor() {
         this.type = 'shadowtls';
         this.enabled = '1';
-        this.core = 'singbox';
+        this.core = 'sing-box';
         this.version = '1';
         this.tls_insecure = '0';
     }
@@ -369,7 +369,7 @@ export class VlessConfig implements ProxyNode {
     name: string;
     type: 'vless' = 'vless';
     enabled: string = '1';
-    /** 核心选择：'singbox' 使用 sing-box，'xray'（默认）使用 xray */
+    /** 核心选择：'sing-box' 使用 sing-box，'xray'（默认）使用 xray */
     core: string;
     server: string;
     server_port: string;

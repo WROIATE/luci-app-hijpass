@@ -1,0 +1,10 @@
+.DS_Store
+*.log
+
+.claude/
+.idea/
+.vscode/
+
+graphify-out/
+ts-src/package-lock.json
+ts-src/node_modules/

@@ -17,5 +17,5 @@
     "module/**/*.ts",
     "utils/**/*.ts",
     "core/**/*.ts"
-  ],
+  ]
 }

@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 // 源码目录（你问的“入口目录”）
 const VIEWS_DIR = path.join(__dirname, 'views');
 // 输出目录
-const DIST_DIR = path.join(__dirname, '../root/www/luci-static/resources/view/hijpass');
+const DIST_DIR = path.join(__dirname, '../htdocs/luci-static/resources/view/hijpass');
 
 // 限定哪些 from 模块名当作 luci 模块（name = require name）
 const luciModuleNames = new Set(
@@ -128,4 +128,3 @@ bundleAll().catch(err => {
     console.error(err);
     process.exit(1);
 });
-

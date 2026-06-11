@@ -17,7 +17,7 @@ PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Trojan_Plus \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_tuic_client
 
-LUCI_DEPENDS:= +curl +file +sing-box +xray-core \
+LUCI_DEPENDS:= +curl +file +luci-lua-runtime +sing-box +unzip +xray-core \
 	+kmod-nft-socket +kmod-nft-tproxy +kmod-nft-nat \
 	+v2ray-geosite +v2ray-geoip +geoview +chinadns-ng +jq
 

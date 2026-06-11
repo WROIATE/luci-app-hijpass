@@ -1,7 +1,11 @@
 import view from "view";
 import uci from "uci";
 import form from "form";
-import {LuciUtils, WebUtils} from "../utils/common";
+import {SaveApplyUtils} from "../utils/actions/save-apply/index";
+import {ServiceUtils} from "../utils/base/luci/service";
+import {FormUtils} from "../utils/base/luci/form";
+import {ValidationUtils} from "../utils/base/luci/validation";
+import {FilePathUtils} from "../utils/base/files/paths";
 import {LuciFlied} from "../enum/hijpass";
 
 
@@ -12,12 +16,12 @@ const v = view.extend({
         ]);
     },
 
-    handleSaveApply: LuciUtils.genHandleSaveApply(),
+    handleSaveApply: SaveApplyUtils.genHandleSaveApply(),
 
     render: function () {
 
         let m = new form.Map(LuciFlied.CONF_NAME, _('DNS Routing Configuration'), _('Configure DNS Routing'));
-        WebUtils.createServiceStatusSection(m, 'dns');
+        ServiceUtils.createStatusSection(m, 'dns');
 
         let s = m.section(form.TypedSection, LuciFlied.DNS_SECTION_TYPE);
         s.anonymous = true;
@@ -44,7 +48,7 @@ const v = view.extend({
         chinaDnsPort.default = '53653';
         chinaDnsPort.datatype = "port"
         chinaDnsPort.rmempty = false;
-        chinaDnsPort.validate = WebUtils.validatePortConflict;
+        chinaDnsPort.validate = ValidationUtils.validatePortConflict;
 
         let directDns = s.taboption('basic', form.ListValue, 'direct_dns', _('Direct Domain DNS'),
             _('Select Direct Domain DNS'));
@@ -101,9 +105,9 @@ const v = view.extend({
         useChn.depends('dns_service', 'chinadns-ng');
 
         // Hook 脚本编辑（启动传 start，停止传 stop，路径从 UCI hijpass.dns_hook 读取）
-        WebUtils.createTextOption(s, 'dns_hook', 'dns_hook_hash', null,
+        FormUtils.createTextOption(s, 'dns_hook', 'dns_hook_hash', null,
             _('Edit DNS Hook Script'),
-            WebUtils.getFilePath('dns_hook'));
+            FilePathUtils.getFilePath('dns_hook'));
 
         // 域名直连列表（仅 chinadns-ng 时通过 subsection 显示）
         let oDomainDirect = s.taboption('domain_direct', form.SectionValue, '_domain_direct',
@@ -112,10 +116,10 @@ const v = view.extend({
         let ssDirect = oDomainDirect.subsection;
         ssDirect.anonymous = true;
         ssDirect.addremove = false;
-        WebUtils.setEditorOptionMembers(
+        FormUtils.setEditorOptionMembers(
             ssDirect.option(form.TextValue, 'domain_direct_hash', null,
                 _('Edit Domain Direct List')),
-            WebUtils.getFilePath('domain_direct'), 'domain_direct_hash');
+            FilePathUtils.getFilePath('domain_direct'), 'domain_direct_hash');
 
         // 域名代理列表（仅 chinadns-ng 时通过 subsection 显示）
         let oDomainProxy = s.taboption('domain_proxy', form.SectionValue, '_domain_proxy',
@@ -124,10 +128,10 @@ const v = view.extend({
         let ssProxy = oDomainProxy.subsection;
         ssProxy.anonymous = true;
         ssProxy.addremove = false;
-        WebUtils.setEditorOptionMembers(
+        FormUtils.setEditorOptionMembers(
             ssProxy.option(form.TextValue, 'domain_proxy_hash', null,
                 _('Edit Domain Proxy List')),
-            WebUtils.getFilePath('domain_proxy'), 'domain_proxy_hash');
+            FilePathUtils.getFilePath('domain_proxy'), 'domain_proxy_hash');
 
         return m.render();
     }

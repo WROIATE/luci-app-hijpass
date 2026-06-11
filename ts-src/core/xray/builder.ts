@@ -1,7 +1,7 @@
 import './protocols/registry'
 import uci from 'uci'
 import {XrayEnum} from '../../enum/xray'
-import {ShuntUtils} from '../../utils/common'
+import {ShuntUtils} from '../../utils/feature/shunt/section'
 import {
     Balancer, BurstObservatory,
     DNS, DnsOutbound, DnsRule, DnsServer,

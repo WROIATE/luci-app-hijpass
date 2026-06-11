@@ -94,7 +94,7 @@ run_proxy() {
 
   case "$core" in
     xray)    command="xray -c $conf_path" ;;
-    singbox) command="sing-box -c $conf_path run" ;;
+    sing-box) command="sing-box -c $conf_path run" ;;
     custom)  command=$(echo "$command" | sed "s|{conf_path}|$conf_path|g") ;;
     *)       log_warn "Node '$name' has unknown core='$core', skipping"; return ;;
   esac

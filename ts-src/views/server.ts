@@ -2,15 +2,25 @@ import view from "view";
 import uci from "uci";
 import {LuciFlied} from "../enum/hijpass";
 import form from "form";
-import {LuciUtils, WebUtils} from "../utils/common";
+import {SaveApplyUtils} from "../utils/actions/save-apply/index";
+import {ServiceUtils} from "../utils/base/luci/service";
+import {FormUtils} from "../utils/base/luci/form";
+import {ValidationUtils} from "../utils/base/luci/validation";
+import {FilePathUtils} from "../utils/base/files/paths";
+import {UciUtils} from "../utils/base/luci/uci";
 
 const v = view.extend({
     load: function () {
         return Promise.all([
             uci.load(LuciFlied.SERVER_CONF_NAME),
             uci.load(LuciFlied.CONF_NAME),
-            LuciUtils.getServiceInstances(LuciFlied.SERVER_CONF_NAME),
+            ServiceUtils.getServiceInstances(LuciFlied.SERVER_CONF_NAME),
         ]);
+    },
+
+    handleSaveApply: SaveApplyUtils.genHandleSaveApply(),
+    handleSave: function (ev?: Event) {
+        return view.prototype.handleSave.call(this, ev);
     },
 
     render: async function (data: any[]) {
@@ -22,7 +32,7 @@ const v = view.extend({
         globalSection.anonymous = true;
         globalSection.option(form.Flag, 'enabled', _('Enable'), _(''))
         let s = m.section(form.GridSection, LuciFlied.SERVER_NODE_TYPE)
-        WebUtils.setGridSectionMembers(s);
+        FormUtils.setGridSectionMembers(s);
         s.anonymous = true;
         s.sectiontitle = function (sectionId: any) {
             return uci.get(LuciFlied.SERVER_CONF_NAME, sectionId, 'name')
@@ -30,7 +40,7 @@ const v = view.extend({
         };
 
         s.handleAdd = function (ev: Event, name?: string) {
-            let sectionId = WebUtils.generateUniqueSectionId();
+            let sectionId = UciUtils.generateUniqueSectionId(LuciFlied.SERVER_CONF_NAME);
             return L.bind(form.GridSection.prototype.handleAdd, this, ev, sectionId)();
         };
         s.handleRemove = function (ev: Event, name?: string) {
@@ -100,7 +110,7 @@ function createNodeNameOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.Value, 'name', _('Node Name'),
         _('Modify Server Node Name'));
     o.modalonly = true;
-    o.validate = WebUtils.createTagValidator(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, 'name')
+    o.validate = ValidationUtils.createTagValidator(LuciFlied.SERVER_CONF_NAME, LuciFlied.SERVER_NODE_TYPE, 'name')
     return o;
 }
 
@@ -119,8 +129,8 @@ function createConfContentOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.TextValue, 'custom_conf', _('Configuration File Content'),
         _('Edit Configuration File'));
     o.modalonly = true;
-    const serverDir = WebUtils.getFilePath('server_dir');
-    WebUtils.setConfContentOptionMembers(o, LuciFlied.SERVER_CONF_NAME, serverDir);
+    const serverDir = FilePathUtils.getFilePath('server_dir', LuciFlied.SERVER_CONF_NAME);
+    FormUtils.setConfContentOptionMembers(o, LuciFlied.SERVER_CONF_NAME, serverDir);
     return o;
 }
 
@@ -131,7 +141,7 @@ function createListenPortOption(s: LuCI.form.AbstractSection) {
     o.datatype = 'port';
     o.rmempty = false;
     o.modalonly = true;
-    o.validate = WebUtils.validatePortConflict
+    o.validate = ValidationUtils.validatePortConflict
     return o;
 }
 
@@ -143,7 +153,7 @@ function createProcdEnvOption(s: LuCI.form.AbstractSection) {
 }
 
 function createLogRedirectOption(s: LuCI.form.AbstractSection) {
-    return WebUtils.createLogFlagOption(s, LuciFlied.SERVER_CONF_NAME, undefined);
+    return FormUtils.createLogFlagOption(s, LuciFlied.SERVER_CONF_NAME, undefined);
 }
 
 // 创建所有代理配置选项
@@ -161,6 +171,5 @@ function createProxyOptions(s: LuCI.form.AbstractSection, instances: any) {
     createProcdEnvOption(s);
     createLogRedirectOption(s);
 }
-
 
 export default v;

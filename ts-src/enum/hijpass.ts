@@ -27,15 +27,15 @@ export const PROXY_TYPE = {
     VLESS: 'vless'
 } as const;
 
-// 'custom' 与 xray/singbox 平级，是独立的核心类型
-export type CoreType = 'xray' | 'singbox' | 'custom';
+// 'custom' 与 xray/sing-box 平级，是独立的核心类型
+export type CoreType = 'xray' | 'sing-box' | 'custom';
 export type ProxyType = typeof PROXY_TYPE[keyof typeof PROXY_TYPE];
 
-// 仅 xray/singbox 有协议列表；custom 无需协议选择
+// 仅 xray/sing-box 有协议列表；custom 无需协议选择
 export const CORE_PROTOCOLS: Partial<Record<CoreType, ProxyType[]>> = {
     xray:    [PROXY_TYPE.SHADOWSOCKS, PROXY_TYPE.HYSTERIA2, PROXY_TYPE.VLESS],
-    singbox: [PROXY_TYPE.SHADOWSOCKS, PROXY_TYPE.HYSTERIA2, PROXY_TYPE.VLESS,
-              PROXY_TYPE.TUIC, PROXY_TYPE.SHADOWTLS],
+    'sing-box': [PROXY_TYPE.SHADOWSOCKS, PROXY_TYPE.HYSTERIA2, PROXY_TYPE.VLESS,
+                 PROXY_TYPE.TUIC, PROXY_TYPE.SHADOWTLS],
 };
 
 export const HijpassValues = {
@@ -46,7 +46,7 @@ export const HijpassValues = {
         {label: '只使用v4', value: '4'}
     ],
     SHUNT_LOG_LEVELS: ['info', 'warn', 'error', 'debug'] as const,
-    SHUNT_CONF_TYPE: ['xray', 'singbox'] as const,
+    SHUNT_CONF_TYPE: ['xray', 'sing-box'] as const,
     PROXY_TYPES: [
         {label: 'Shadowsocks', value: 'shadowsocks'},
         {label: 'Hysteria2',   value: 'hysteria2'},
@@ -107,7 +107,7 @@ export const HijpassValues = {
     ] as const,
     // 通用 core 选项（支持双核心的协议使用）
     DUAL_CORES: [
-        {label: 'singbox', value: 'singbox'},
+        {label: 'sing-box', value: 'sing-box'},
         {label: 'xray',     value: 'xray'},
         {label: '自定义',   value: 'custom'}
     ] as const,

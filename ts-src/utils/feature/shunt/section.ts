@@ -128,6 +128,8 @@ const ShuntUtils = {
             // 按行分割并处理
             let lines = ipRules.split('\n');
             for (let line of lines) {
+                line = line.trim();
+
                 // 跳过空行和注释
                 if (line === '' || line.startsWith('#')) {
                     continue;

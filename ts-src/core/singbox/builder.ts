@@ -92,9 +92,14 @@ function genConf() {
         if (routeRule.enabled !== '1') return
         const luciRuleDTO = ShuntUtils.parseRuleList(routeRule)
 
-        if (routeConf.rulesetConvert === '1') convertGeoRule(luciRuleDTO)
+        if (routeConf.rulesetConvert === '1') {
+            convertGeoRule(luciRuleDTO)
+        } else if (luciRuleDTO.containGeo()) {
+            dropGeoRule(luciRuleDTO)
+            if (!hasSingBoxTargetRule(luciRuleDTO)) return
+        }
 
-        if (luciRuleDTO.isEmpty('set')) throw new Error('Empty rule: ' + routeRule.name)
+        if (luciRuleDTO.isEmpty('set')) return
 
         for (const rs of luciRuleDTO.ruleSet) {
             ruleSetMap.set(rs.tag, genRuleSet(rs, routeConf.rulesetOutNode ? SingBoxEnum.RULESET_OUTBOUND_TAG : undefined))
@@ -152,6 +157,7 @@ function writeGeoRule() {
     const geoSiteSet = new Set<string>()
     const geoIpSet = new Set<string>()
     for (const rule of routeConf.rules) {
+        if (rule.enabled !== '1') continue
         const luciRuleDTO = ShuntUtils.parseRuleList(rule)
         for (const geo of luciRuleDTO.geoSite) geoSiteSet.add(geo.replace('geosite:', ''))
         for (const geo of luciRuleDTO.geoIp) geoIpSet.add(geo.replace('geoip:', ''))
@@ -215,6 +221,17 @@ function convertGeoRule(luciRuleDTO: RuleDTO) {
         const tag = geo.replace('geoip:', 'geoip-')
         luciRuleDTO.ruleSet.push({ tag, type: 'local', format: 'binary', pathOrUrl: '/etc/hijpass/ruleset/' + tag + '.srs' })
     }
+}
+
+function dropGeoRule(luciRuleDTO: RuleDTO) {
+    luciRuleDTO.geoSite = []
+    luciRuleDTO.geoIp = []
+}
+
+function hasSingBoxTargetRule(luciRuleDTO: RuleDTO) {
+    return luciRuleDTO.containDomain()
+        || luciRuleDTO.containIp()
+        || luciRuleDTO.containRuleSet()
 }
 
 function isArrEqual(arr1: any[], arr2: any[]) {

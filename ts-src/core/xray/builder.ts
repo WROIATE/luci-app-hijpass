@@ -9,7 +9,7 @@ import {
     RouteRule, Socks, BlockOutbound
 } from './models'
 import {LuciFlied, ShuntTag} from '../../enum/hijpass'
-import { CoreAdapter, ProxyNode } from '../../module/luci'
+import { CoreAdapter, ProxyNode, RuleDTO } from '../../module/luci'
 import {xrayRegistry} from './protocols/protocol'
 
 export const XrayUtils: CoreAdapter = {
@@ -67,7 +67,7 @@ function genConf() {
         const routeRule = new RouteRule(rule.name, ruleOutBoundTag)
 
         const luciRuleDTO = ShuntUtils.parseRuleList(rule)
-        if (luciRuleDTO.isEmpty('geo')) throw new Error('Empty rule: ' + rule.name)
+        if (shouldSkipXrayRule(luciRuleDTO)) return
 
         routeRule.network = luciRuleDTO.network
         routeRule.protocol = transRouteProtocol(luciRuleDTO.protocol)
@@ -126,7 +126,7 @@ function genConf() {
     defaultDnsServer.skipFallback = false
     dns.servers.push(defaultDnsServer)
 
-    dnsInOutMap.forEach((v, k) => dns.rules.push(new DnsRule(v, k)))
+    dnsInOutMap.forEach((v, k) => dnsRules.push(new DnsRule(v, k)))
 
     route.rules = route.rules.concat(dnsRules)
     route.rules = route.rules.concat(routeRules)
@@ -190,6 +190,14 @@ function buildBaseProxyConf(config: ProxyNode, outbound: Outbound): {} {
 
 function transDnsTag(name: string) {
     return name + '-dns'
+}
+
+function shouldSkipXrayRule(luciRuleDTO: RuleDTO) {
+    if (luciRuleDTO.isEmpty('geo')) return true
+    return luciRuleDTO.containRuleSet()
+        && !luciRuleDTO.containDomain()
+        && !luciRuleDTO.containIp()
+        && !luciRuleDTO.containGeo()
 }
 
 function transOutTag(tag: string) {

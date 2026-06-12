@@ -111,15 +111,17 @@ run_proxy() {
 }
 
 run_shunt() {
-  local type log_path enabled
+  local type log_path enabled ruleset_convert
   config_get enabled "$1" enabled
   [ "$enabled" = "0" ] && log_info "Shunt disabled, skipping" && return
   config_get type "$1" type
   [ -z "$type" ] && log_error "Shunt type not set" && return
   config_get log_path "$1" log_path
+  config_get ruleset_convert "$1" ruleset_convert
 
   local shunt_command="$type -c $SHUNT_CONF"
-  [ "$type" = "sing-box" ] && shunt_command="$type run -c $SHUNT_CONF" && $GEOVIEW_SCRIPT -t
+  [ "$type" = "sing-box" ] && shunt_command="$type run -c $SHUNT_CONF"
+  [ "$type" = "sing-box" ] && [ "$ruleset_convert" = "1" ] && $GEOVIEW_SCRIPT -t
 
   local enable_std_log="0"
   if [ -n "$log_path" ]; then

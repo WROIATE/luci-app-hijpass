@@ -1,6 +1,11 @@
 import { LuciFlied, ShuntTag } from "../../../enum/hijpass";
 import uci from "uci";
+import ui from "ui";
 import { NotificationUtils } from "../../base/luci/notification";
+import { FactoryType } from "../../../core/adapter";
+import { ShuntUtils } from "../../feature/shunt/section";
+
+const XRAY_ROUTE_PROTOCOLS = ['http', 'tls', 'quic', 'bittorrent'];
 
 function normalizeList(value: any): string[] {
     if (!value) {
@@ -189,12 +194,133 @@ function checkDisabledShuntFirewallPort() {
     return true;
 }
 
+function checkXrayRouteProtocols() {
+    const shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
+    if (shuntType !== FactoryType.XRAY) {
+        return true;
+    }
+
+    const warnings: string[] = [];
+    uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
+        if (section.enabled === '0') {
+            return;
+        }
+
+        const unsupported = normalizeList(section.protocol)
+            .filter((protocol) => XRAY_ROUTE_PROTOCOLS.indexOf(protocol) === -1);
+        if (unsupported.length > 0) {
+            warnings.push(_('路由规则 "%s" 包含 Xray 不支持的协议: %s')
+                .format(section.name || section['.name'], unsupported.join(', ')));
+        }
+    });
+
+    if (warnings.length > 0) {
+        NotificationUtils.warning(
+            _('Xray 协议配置不支持'),
+            warnings.join('<br>') + '<br>' + _('Xray route protocol 仅支持: %s').format(XRAY_ROUTE_PROTOCOLS.join(', ')),
+            8000
+        );
+        return false;
+    }
+
+    return true;
+}
+
+function confirmWarning(title: string, description: string, warnings: string[]) {
+    return new Promise<boolean>((resolve) => {
+        ui.showModal(title, [
+            E('div', {class: 'cbi-section'}, [
+                E('div', {class: 'cbi-section-descr'}, description),
+                E('ul', {style: 'margin-top: 12px;'}, warnings.map((warning) => E('li', {}, warning)))
+            ]),
+            E('div', {class: 'right', style: 'display:flex;justify-content:flex-end;gap:10px'}, [
+                E('button', {
+                    class: 'btn cbi-button',
+                    click: function (ev: Event) {
+                        ev.preventDefault();
+                        ui.hideModal();
+                        resolve(false);
+                    }
+                }, _('Cancel')),
+                E('button', {
+                    class: 'btn cbi-button-action',
+                    click: function (ev: Event) {
+                        ev.preventDefault();
+                        ui.hideModal();
+                        resolve(true);
+                    }
+                }, _('Continue Apply'))
+            ])
+        ]);
+    });
+}
+
+function getSkippedRouteRuleMessage(rule: any, shuntType: string, rulesetConvert: string) {
+    const ruleDTO = ShuntUtils.parseRuleList(rule);
+    const ruleName = rule.name || rule['.name'] || _('Unnamed Rule');
+
+    if (shuntType === FactoryType.XRAY) {
+        if (ruleDTO.isEmpty('geo')) {
+            return _('路由规则 "%s" 没有可写入 Xray 的有效匹配条件').format(ruleName);
+        }
+        if (ruleDTO.containRuleSet()
+            && !ruleDTO.containDomain()
+            && !ruleDTO.containIp()
+            && !ruleDTO.containGeo()) {
+            return _('路由规则 "%s" 只包含 Xray 不支持的 rule-set 目标条件').format(ruleName);
+        }
+        return null;
+    }
+
+    if (shuntType === FactoryType.SING_BOX) {
+        if (rulesetConvert !== '1' && ruleDTO.containGeo()) {
+            ruleDTO.geoSite = [];
+            ruleDTO.geoIp = [];
+            if (!ruleDTO.containDomain() && !ruleDTO.containIp() && !ruleDTO.containRuleSet()) {
+                return _('路由规则 "%s" 去除未转换的 geosite/geoip 后没有可写入 sing-box 的目标条件').format(ruleName);
+            }
+        }
+        if (ruleDTO.isEmpty('set')) {
+            return _('路由规则 "%s" 没有可写入 sing-box 的有效匹配条件').format(ruleName);
+        }
+    }
+
+    return null;
+}
+
+function confirmSkippedRouteRules() {
+    const shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
+    const rulesetConvert = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_convert');
+    const warnings: string[] = [];
+
+    ShuntUtils.getRouteSection().rules.forEach((rule) => {
+        if (rule.enabled === '0') {
+            return;
+        }
+
+        const message = getSkippedRouteRuleMessage(rule, shuntType, rulesetConvert);
+        if (message) warnings.push(message);
+    });
+
+    if (warnings.length > 0) {
+        return confirmWarning(
+            _('部分路由规则将被跳过'),
+            _('下列规则在当前核心和选项下没有可生成的有效配置，因此不会写入最终配置。是否继续应用配置？'),
+            warnings
+        );
+    }
+
+    return true;
+}
+
 const PrecheckUtils = {
-    runSaveApplyPrechecks: function () {
+    runSaveApplyPrechecks: async function () {
         return checkMissingProxyRefs()
             && checkDisabledProxyRefs()
             && checkInvalidDnsNodeRefs()
             && checkMissingDnsExitRefs()
+            && await confirmSkippedRouteRules()
+            && checkXrayRouteProtocols()
             && checkDisabledShuntFirewallPort();
     },
 }

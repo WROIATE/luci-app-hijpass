@@ -20,6 +20,10 @@ ENABLED=$(uci -q get hijpass.@hijpass[0].enabled || :)
 
 LUA_SCRIPT="/usr/lib/hijpass/luci-utils.lua"
 
+is_safe_query_arg() {
+    [ -n "$1" ] && echo "$1" | grep -Eq "^[A-Za-z0-9._:/-]{1,255}$" >/dev/null 2>&1
+}
+
 # 下载函数（单个文件）
 download_file() {
     local url output temp_file backup_file processed_file
@@ -556,6 +560,10 @@ main() {
         /etc/init.d/hijpass restart
         ;;
     "query")
+        if ! is_safe_query_arg "$2"; then
+            echo "Invalid query" >&2
+            exit 1
+        fi
         query_rule "$2"
         ;;
     *)

@@ -11,6 +11,27 @@ CORE="$2"
 
 SINGBOX_BIN="/usr/bin/sing-box"
 XRAY_BIN="/usr/bin/xray"
+UPDATE_TMP_DIR=""
+
+json_error() {
+    printf '{"success":false,"error":"%s"}\n' "$1"
+}
+
+case "$ACTION" in
+    version|update) ;;
+    *)
+        echo "Usage: $0 <version|update> <sing-box|xray>" >&2
+        exit 1
+        ;;
+esac
+
+case "$CORE" in
+    sing-box|xray) ;;
+    *)
+        json_error "unknown core"
+        exit 1
+        ;;
+esac
 
 # ── 检测架构，sing-box 和 xray 的文件名规则不同 ─────────────────────
 # sing-box: linux-amd64 / linux-arm64 / linux-armv7 / linux-mips-softfloat ...
@@ -84,6 +105,65 @@ get_latest_version() {
     echo "$latest"
 }
 
+verify_binary() {
+    local bin version
+    bin="$1"
+
+    [ -f "$bin" ] || return 1
+    chmod +x "$bin" 2>/dev/null || return 1
+
+    case "$CORE" in
+        sing-box)
+            version=$("$bin" version 2>/dev/null | grep -oE 'sing-box version [0-9]+\.[0-9]+\.[0-9]+[^ ]*' | awk '{print $3}')
+            ;;
+        xray)
+            version=$("$bin" version 2>/dev/null | grep -oE 'Xray [0-9]+\.[0-9]+\.[0-9]+[^ ]*' | awk '{print $2}')
+            ;;
+    esac
+
+    [ -n "$version" ]
+}
+
+fail_update() {
+    local message="$1"
+    [ -n "$UPDATE_TMP_DIR" ] && rm -rf "$UPDATE_TMP_DIR"
+    log_error "$message"
+    json_error "$message"
+    exit 1
+}
+
+install_verified_binary() {
+    local src dest tmp_dest backup_file
+    src="$1"
+    dest="$2"
+    tmp_dest="${dest}.new.$$"
+    backup_file="${dest}.bak"
+
+    verify_binary "$src" || fail_update "binary verification failed"
+    cp "$src" "$tmp_dest" || {
+        rm -f "$tmp_dest"
+        fail_update "install copy failed"
+    }
+    chmod +x "$tmp_dest" || {
+        rm -f "$tmp_dest"
+        fail_update "install chmod failed"
+    }
+
+    if [ -f "$dest" ]; then
+        cp "$dest" "$backup_file" || {
+            rm -f "$tmp_dest"
+            fail_update "backup failed"
+        }
+    fi
+
+    if ! mv "$tmp_dest" "$dest"; then
+        [ -f "$backup_file" ] && cp "$backup_file" "$dest"
+        rm -f "$tmp_dest"
+        fail_update "install failed"
+    fi
+    rm -f "$backup_file"
+}
+
 # ── 下载并安装最新版 ─────────────────────────────────────────────────
 do_update() {
     local arch latest_tag download_url tmp_dir
@@ -93,12 +173,16 @@ do_update() {
 
     if [ -z "$latest_tag" ]; then
         log_error "Failed to fetch latest version for $CORE"
-        printf '{"success":false,"error":"fetch latest version failed"}\n'
+        json_error "fetch latest version failed"
         exit 1
     fi
 
     log_info "Latest $CORE version: $latest_tag, arch: $arch"
-    tmp_dir=$(mktemp -d)
+    tmp_dir=$(mktemp -d) || {
+        json_error "create temp dir failed"
+        exit 1
+    }
+    UPDATE_TMP_DIR="$tmp_dir"
 
     case "$CORE" in
         sing-box)
@@ -107,47 +191,34 @@ do_update() {
             download_url="https://github.com/SagerNet/sing-box/releases/download/${latest_tag}/sing-box-${version_num}-${arch}.tar.gz"
             log_info "Downloading $download_url ..."
             if ! curl -sfL --max-time 120 -o "$tmp_dir/sing-box.tar.gz" "$download_url"; then
-                rm -rf "$tmp_dir"
-                log_error "Download failed"
-                printf '{"success":false,"error":"download failed"}\n'
-                exit 1
+                fail_update "download failed"
             fi
             # busybox tar 不支持 --wildcards，先全量解压再 find
             tar -xzf "$tmp_dir/sing-box.tar.gz" -C "$tmp_dir" 2>/dev/null
             local extracted
             extracted=$(find "$tmp_dir" -name "sing-box" -not -name "*.tar.gz" -type f | head -1)
             if [ -z "$extracted" ]; then
-                rm -rf "$tmp_dir"
-                log_error "Binary not found in archive"
-                printf '{"success":false,"error":"binary not found in archive"}\n'
-                exit 1
+                fail_update "binary not found in archive"
             fi
-            cp "$extracted" "$SINGBOX_BIN"
-            chmod +x "$SINGBOX_BIN"
+            install_verified_binary "$extracted" "$SINGBOX_BIN"
             ;;
         xray)
             download_url="https://github.com/XTLS/Xray-core/releases/download/${latest_tag}/Xray-${arch}.zip"
             log_info "Downloading $download_url ..."
             if ! curl -sfL --max-time 120 -o "$tmp_dir/xray.zip" "$download_url"; then
-                rm -rf "$tmp_dir"
-                log_error "Download failed"
-                printf '{"success":false,"error":"download failed"}\n'
-                exit 1
+                fail_update "download failed"
             fi
             # xray zip 根目录直接包含 xray 二进制；重定向 stdout 避免污染 JSON 输出
             unzip -o "$tmp_dir/xray.zip" xray -d "$tmp_dir" >/dev/null 2>&1
             if [ ! -f "$tmp_dir/xray" ]; then
-                rm -rf "$tmp_dir"
-                log_error "Binary not found in archive"
-                printf '{"success":false,"error":"binary not found in archive"}\n'
-                exit 1
+                fail_update "binary not found in archive"
             fi
-            cp "$tmp_dir/xray" "$XRAY_BIN"
-            chmod +x "$XRAY_BIN"
+            install_verified_binary "$tmp_dir/xray" "$XRAY_BIN"
             ;;
     esac
 
     rm -rf "$tmp_dir"
+    UPDATE_TMP_DIR=""
     log_info "$CORE updated to $latest_tag"
     printf '{"success":true,"version":"%s"}\n' "$latest_tag"
 }
@@ -156,8 +227,4 @@ do_update() {
 case "$ACTION" in
     version) get_local_version ;;
     update)  do_update ;;
-    *)
-        echo "Usage: $0 <version|update> <sing-box|xray>" >&2
-        exit 1
-        ;;
 esac

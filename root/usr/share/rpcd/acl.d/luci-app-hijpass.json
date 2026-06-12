@@ -56,10 +56,19 @@
         "/usr/lib/hijpass/rules.sh update": [
           "exec"
         ],
-        "/usr/lib/hijpass/rules.sh query *": [
+        "/usr/lib/hijpass/rules.sh query [A-Za-z0-9._:/-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/connect.sh https://* [0-9]*": [
+        "/usr/lib/hijpass/connect.sh https://www.baidu.com [0-9]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/connect.sh https://www.google.com/ncr [0-9]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/connect.sh https://github.com [0-9]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/connect.sh https://www.bilibili.com [0-9]*": [
           "exec"
         ],
         "/usr/lib/hijpass/net.sh port [0-9]*": [
@@ -68,37 +77,46 @@
         "/usr/lib/hijpass/net.sh ping [0-9]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/geoview.sh -e *": [
+        "/usr/lib/hijpass/geoview.sh -e geosite [A-Za-z0-9_.:,/!-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/geoview.sh -l *": [
+        "/usr/lib/hijpass/geoview.sh -e geoip [A-Za-z0-9_.:,/!-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/geoview.sh -t *": [
+        "/usr/lib/hijpass/geoview.sh -l geosite [A-Za-z0-9._:/-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/route-match.sh *": [
+        "/usr/lib/hijpass/geoview.sh -l geoip [A-Za-z0-9._:/-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/rm.sh proxy *": [
+        "/usr/lib/hijpass/route-match.sh [A-Za-z0-9._:/-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/rm.sh proxy * *": [
+        "/usr/lib/hijpass/rm.sh proxy [A-Za-z0-9_-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/rm.sh server *": [
+        "/usr/lib/hijpass/rm.sh proxy [A-Za-z0-9_-]* /etc/hijpass/client/*": [
           "exec"
         ],
-        "/usr/lib/hijpass/rm.sh server * *": [
+        "/usr/lib/hijpass/rm.sh server [A-Za-z0-9_-]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/rm.sh server [A-Za-z0-9_-]* /etc/hijpass/server/*": [
           "exec"
         ],
         "/bin/cat /proc/net/arp": [
           "exec"
         ],
-        "/usr/lib/hijpass/core-update.sh version *": [
+        "/usr/lib/hijpass/core-update.sh version sing-box": [
           "exec"
         ],
-        "/usr/lib/hijpass/core-update.sh update *": [
+        "/usr/lib/hijpass/core-update.sh version xray": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/core-update.sh update sing-box": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/core-update.sh update xray": [
           "exec"
         ]
       }

@@ -1,7 +1,15 @@
 #!/bin/sh
 
+is_port_value() {
+	echo "$1" | grep -Eq "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$" >/dev/null 2>&1
+}
+
+is_safe_target() {
+	echo "$1" | grep -Eq "^[A-Za-z0-9.-]+$" >/dev/null 2>&1
+}
+
 check_port() {
-	if echo "$1" | grep -Eq "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$" >>/dev/null 2>&1; then
+	if is_port_value "$1"; then
 		if netstat -tlnp | grep -q ":$1 " >>/dev/null 2>&1; then
 			return 0
 		fi
@@ -30,6 +38,10 @@ main() {
 		local socks_port="$1"
 		local target="${2:-www.google.com}"
 		local output
+		if ! is_port_value "$socks_port" || ! is_safe_target "$target"; then
+			echo "{\"error\":\"invalid argument\"}"
+			exit 1
+		fi
 		output=$(curl -I -o /dev/null -sSk \
 			-w '{"t_namelookup":%{time_namelookup},"t_starttransfer":%{time_starttransfer},"t_total":%{time_total}}' \
 			--max-time 5 \

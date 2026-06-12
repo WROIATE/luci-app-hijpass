@@ -10,7 +10,7 @@ declare namespace LuCI {
 
         handleSave?(ev?: Event): any | Promise<any>;
 
-        handleSaveApply?(ev?: Event): any | Promise<any>;
+        handleSaveApply?(ev?: Event, mode?: string | number): any | Promise<any>;
 
         handleReset?(ev?: Event): any | Promise<any>;
 
@@ -220,7 +220,9 @@ declare namespace LuCI {
 
     declare namespace ui {
         interface UI {
-            changes(): void;
+            changes: {
+                apply(checked?: boolean): void;
+            };
 
             showModal(modal: any, e: any): void;
 
@@ -280,7 +282,7 @@ declare namespace LuCI {
 
             changes(): Promise.<Object.<string, Array.<string>>>
 
-            save(): Array.<string>;
+            save(): Promise<string[]>;
         }
     }
 

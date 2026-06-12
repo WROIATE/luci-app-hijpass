@@ -9,6 +9,8 @@ import form from "form";
 import view from 'view';
 import uci from 'uci';
 
+const XRAY_ROUTE_PROTOCOLS = ['http', 'tls', 'quic', 'bittorrent'];
+
 const v = view.extend({
     load: function () {
         return Promise.all([
@@ -272,6 +274,19 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     protocol.value('rdp');
     protocol.value('ntp');
     // protocol.modalonly = true
+    protocol.validate = function (_sectionId: string, value: any) {
+        const shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
+        if (shuntType !== 'xray') {
+            return true;
+        }
+
+        const selectedProtocols = Array.isArray(value) ? value : (value ? [value] : []);
+        const unsupported = selectedProtocols.filter((item) => XRAY_ROUTE_PROTOCOLS.indexOf(item) === -1);
+        if (unsupported.length > 0) {
+            return _('Xray only supports route protocol filters: %s').format(XRAY_ROUTE_PROTOCOLS.join(', '));
+        }
+        return true;
+    }
     protocol.cfgvalue = function (sectionId) {
         let protocols = uci.get(LuciFlied.CONF_NAME, sectionId, 'protocol');
         if (protocols) {

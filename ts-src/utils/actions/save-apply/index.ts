@@ -14,11 +14,11 @@ import { PrecheckUtils } from "./precheck";
 
 const SaveApplyUtils = {
     genHandleSaveApply: function () {
-        return async function (ev: Event) {
+        return async function (ev: Event, mode?: string | number) {
             try {
                 await this.handleSave(ev)
 
-                if (!PrecheckUtils.runSaveApplyPrechecks()) {
+                if (!await PrecheckUtils.runSaveApplyPrechecks()) {
                     return;
                 }
 
@@ -36,13 +36,14 @@ const SaveApplyUtils = {
                         'shunt_hash', data ? String(FormUtils.simpleHash(data)) : '-1');
                 }
 
+                await uci.save();
                 let changes = await uci.changes()
                 await NodeFileCleanupUtils.cleanupChangedNodeFiles(changes)
 
                 // 生成各代理节点客户端配置文件
                 await ProxyConfigFileUtils.writeGeneratedProxyConfigs();
 
-                await ui.changes.apply(true);
+                await ui.changes.apply(mode == '0');
             } catch (e) {
                 console.log(e)
                 NotificationUtils.error("配置应用失败", _(e.message), 5000);

@@ -121,6 +121,9 @@ export class RuleDTO {
         this.geoIp = [];
         this.geoSite = [];
         this.network = [];
+        this.protocol = [];
+        this.port = [];
+        this.portRange = [];
     }
 
     containDomain(): boolean {

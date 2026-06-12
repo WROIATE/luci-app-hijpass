@@ -1,75 +1,43 @@
 import fs from "fs";
 
-function updateRuleFile() {
-    updateUpdateStatus('正在更新规则...');
+function updateRuleFile(statusElement: HTMLElement) {
+    updateUpdateStatus(statusElement, '正在更新规则...');
     fs.exec('/usr/lib/hijpass/rules.sh', ['update'])
         .then(function (result) {
             if (result.code === 0) {
-                updateUpdateStatus('规则文件更新成功！');
+                updateUpdateStatus(statusElement, '规则文件更新成功！');
             } else {
-                updateUpdateStatus('规则文件更新失败: ' + (result.stderr || result.stdout));
+                updateUpdateStatus(statusElement, '规则文件更新失败: ' + (result.stderr || result.stdout));
             }
         })
         .catch(function (error) {
-            updateUpdateStatus('更新过程中发生错误：' + error.message);
+            updateUpdateStatus(statusElement, '更新过程中发生错误：' + error.message);
         });
 }
 
-function setupUpdateListeners() {
-    let reloadBtn = document.getElementById('update-rule');
-    if (reloadBtn) {
-        reloadBtn.addEventListener('click', function () {
-            updateRuleFile();
-        });
-    }
+function updateUpdateStatus(statusElement: HTMLElement, message: string) {
+    statusElement.textContent = message;
+    statusElement.style.color = message.includes('成功') ? '#4caf50' :
+        message.includes('失败') ? '#f44336' : '#666';
 }
 
-function updateUpdateStatus(message: string) {
-    let statusElement = document.getElementById('update-status');
-    if (statusElement) {
-        statusElement.textContent = message;
-        statusElement.style.color = message.includes('成功') ? '#4caf50' :
-            message.includes('失败') ? '#f44336' : '#666';
-    }
-}
-
-function setupQueryListeners() {
-    let queryBtn = document.getElementById('query-btn');
-    let keywordInput = document.getElementById('query-keyword');
-
-    if (queryBtn) {
-        queryBtn.addEventListener('click', function () {
-            performQuery();
-        });
-    }
-
-    if (keywordInput) {
-        keywordInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                performQuery();
-            }
-        });
-    }
-}
-
-function performQuery() {
-    let keyword = (document.getElementById('query-keyword') as HTMLInputElement).value.trim();
-    let queryType = (document.getElementById('query-type') as HTMLSelectElement).value;
-    let statusElement = document.getElementById('query-status');
-    let outputElement = document.getElementById('query-output');
+function performQuery(
+    keywordInput: HTMLInputElement,
+    queryTypeSelect: HTMLSelectElement,
+    statusElement: HTMLElement,
+    outputElement: HTMLTextAreaElement
+) {
+    let keyword = keywordInput.value.trim();
+    let queryType = queryTypeSelect.value;
 
     if (!keyword) {
-        if (statusElement) {
-            statusElement.textContent = _('Enter Query Keyword');
-            statusElement.style.color = '#f44336';
-        }
+        statusElement.textContent = _('Enter Query Keyword');
+        statusElement.style.color = '#f44336';
         return;
     }
 
-    if (statusElement) {
-        statusElement.textContent = _('Querying');
-        statusElement.style.color = '#666';
-    }
+    statusElement.textContent = _('Querying');
+    statusElement.style.color = '#666';
 
     switch (queryType) {
         case 'domain':
@@ -82,15 +50,13 @@ function performQuery() {
             queryShunt(keyword, outputElement, statusElement);
             break;
         default:
-            if (statusElement) {
-                statusElement.textContent = _('Unknown Query Type');
-                statusElement.style.color = '#f44336';
-            }
+            statusElement.textContent = _('Unknown Query Type');
+            statusElement.style.color = '#f44336';
     }
 }
 
-function queryDomain(keyword: string, outputElement, statusElement) {
-    clearQuery()
+function queryDomain(keyword: string, outputElement: HTMLTextAreaElement, statusElement: HTMLElement) {
+    clearQuery(outputElement)
     fs.exec('/usr/lib/hijpass/geoview.sh', ['-l', 'geosite', keyword])
         .then(setOutput(outputElement, statusElement, '# geosite\n'))
         .catch(setError(statusElement))
@@ -99,29 +65,25 @@ function queryDomain(keyword: string, outputElement, statusElement) {
         .catch(setError(statusElement));
 }
 
-function queryShunt(keyword: string, outputElement, statusElement) {
-    clearQuery()
+function queryShunt(keyword: string, outputElement: HTMLTextAreaElement, statusElement: HTMLElement) {
+    clearQuery(outputElement)
     fs.exec('/usr/lib/hijpass/route-match.sh', [keyword])
         .then(setOutput(outputElement, statusElement, '# 分流规则\n'))
         .catch(setError(statusElement))
 }
 
-function queryGeoTag(keyword, geoType, outputElement, statusElement) {
-    clearQuery()
+function queryGeoTag(keyword: string, geoType: string, outputElement: HTMLTextAreaElement, statusElement: HTMLElement) {
+    clearQuery(outputElement)
     fs.exec_direct('/usr/lib/hijpass/geoview.sh', ['-e', geoType, keyword])
         .then(function (result) {
             if (result) {
-                if (outputElement) {
-                    if (outputElement.value) {
-                        outputElement.value += '\n';
-                    }
-                    outputElement.value += '# ' + geoType + '\n';
-                    outputElement.value += result;
+                if (outputElement.value) {
+                    outputElement.value += '\n';
                 }
-                if (statusElement) {
-                    statusElement.textContent = _('Query Complete');
-                    statusElement.style.color = '#4caf50';
-                }
+                outputElement.value += '# ' + geoType + '\n';
+                outputElement.value += result;
+                statusElement.textContent = _('Query Complete');
+                statusElement.style.color = '#4caf50';
             } else {
                 throw new Error(result.stderr || '查询失败');
             }
@@ -129,31 +91,29 @@ function queryGeoTag(keyword, geoType, outputElement, statusElement) {
         .catch(setError(statusElement));
 }
 
-function clearQuery() {
-    (document.getElementById('query-output') as HTMLTextAreaElement).value = '';
+function clearQuery(outputElement: HTMLTextAreaElement) {
+    outputElement.value = '';
 }
 
-function setOutput(outputElement: HTMLTextAreaElement, statusElement, comment: string) {
+function setOutput(outputElement: HTMLTextAreaElement, statusElement: HTMLElement, comment: string) {
     return function (result: any) {
         if (result.code === 0) {
-            if (outputElement && result.stdout) {
+            if (result.stdout) {
                 if (outputElement.value) {
                     outputElement.value += '\n';
                 }
                 outputElement.value += comment;
                 outputElement.value += result.stdout;
             }
-            if (statusElement) {
-                statusElement.textContent = _('Query Complete');
-                statusElement.style.color = '#4caf50';
-            }
+            statusElement.textContent = _('Query Complete');
+            statusElement.style.color = '#4caf50';
         } else {
             throw new Error(result.stderr || '查询失败');
         }
     }
 }
 
-function setError(statusElement) {
+function setError(statusElement: HTMLElement) {
     return function (error) {
         console.log(error)
         statusElement.textContent = _('Query Failed');
@@ -163,87 +123,89 @@ function setError(statusElement) {
 
 const RulePanelUtils = {
     createUpdateButtons: function () {
-        let view = E('div', {'class': 'cbi-section'}, [
+        const statusElement = E('span', {
+            'style': 'margin-left: 10px; font-size: 12px; color: #666;'
+        }) as HTMLElement;
+
+        return E('div', {'class': 'cbi-section'}, [
             E('div', {'class': 'cbi-section-node'}, [
                 E('div', {'class': 'cbi-value'}, [
                     E('label', {'class': 'cbi-value-title'}, _('Rule Update')),
                     E('div', {'class': 'cbi-value-field'}, [
                         E('button', {
                             'class': 'cbi-button cbi-button-neutral',
-                            'id': 'update-rule',
-                            'style': 'margin-right: 10px;'
+                            'style': 'margin-right: 10px;',
+                            'type': 'button',
+                            'click': function (ev: Event) {
+                                ev.preventDefault();
+                                updateRuleFile(statusElement);
+                            }
                         }, _('Update Rule Files')),
-                        E('span', {
-                            'id': 'update-status',
-                            'style': 'margin-left: 10px; font-size: 12px; color: #666;'
-                        })
+                        statusElement
                     ])
                 ])
             ])
         ]);
-        requestAnimationFrame(function () {
-            setupUpdateListeners();
-        });
-        return view
     },
 
     createQueryPanel: function () {
-        let view = E('div', {'class': 'cbi-section'}, [
+        const queryTypeSelect = E('select', {
+            'class': 'cbi-input-select',
+            'style': 'width: 200px; margin-right: 10px;'
+        }, [
+            E('option', {'value': 'domain'}, _('Domain Query')),
+            E('option', {'value': 'geosite'}, _('GeoSite')),
+            E('option', {'value': 'shunt'}, _('Shunt Query')),
+        ]) as HTMLSelectElement;
+        const keywordInput = E('input', {
+            'type': 'text',
+            'class': 'cbi-input-text',
+            'placeholder': _('Enter Domain or GeoSite Tag'),
+            'style': 'margin-right: 10px;',
+            'keydown': function (ev: KeyboardEvent) {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    performQuery(keywordInput, queryTypeSelect, statusElement, outputElement);
+                }
+            }
+        }) as HTMLInputElement;
+        const statusElement = E('span', {
+            'style': 'margin-left: 10px; font-size: 12px; color: #666;'
+        }) as HTMLElement;
+        const outputElement = E('textarea', {
+            'class': 'cbi-input-textarea',
+            'readonly': 'readonly',
+            'style': 'width: 100%; height: 300px;'
+        }) as HTMLTextAreaElement;
+
+        return E('div', {'class': 'cbi-section'}, [
             E('div', {'class': 'cbi-section-node'}, [
                 E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 20px;'}, [
                     E('label', {'class': 'cbi-value-title'}, _('Query Type')),
-                    E('div', {'class': 'cbi-value-field'}, [
-                        E('select', {
-                            'id': 'query-type',
-                            'class': 'cbi-input-select',
-                            'style': 'width: 200px; margin-right: 10px;'
-                        }, [
-                            E('option', {'value': 'domain'}, _('Domain Query')),
-                            E('option', {'value': 'geosite'}, _('GeoSite')),
-                            E('option', {'value': 'shunt'}, _('Shunt Query')),
-                        ])
-                    ])
+                    E('div', {'class': 'cbi-value-field'}, [queryTypeSelect])
                 ]),
                 E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 20px;'}, [
                     E('label', {'class': 'cbi-value-title'}, _('Query Keyword')),
                     E('div', {'class': 'cbi-value-field'}, [
-                        E('input', {
-                            'type': 'text',
-                            'id': 'query-keyword',
-                            'class': 'cbi-input-text',
-                            'placeholder': _('Enter Domain or GeoSite Tag'),
-                            'style': 'margin-right: 10px;'
-                        }),
+                        keywordInput,
                         E('button', {
                             'class': 'cbi-button cbi-button-action',
-                            'id': 'query-btn',
-                            'style': 'margin-right: 10px;'
+                            'style': 'margin-right: 10px;',
+                            'type': 'button',
+                            'click': function (ev: Event) {
+                                ev.preventDefault();
+                                performQuery(keywordInput, queryTypeSelect, statusElement, outputElement);
+                            }
                         }, _('Query')),
-                        E('span', {
-                            'id': 'query-status',
-                            'style': 'margin-left: 10px; font-size: 12px; color: #666;'
-                        })
+                        statusElement
                     ])
                 ]),
                 E('div', {'class': 'cbi-value'}, [
                     E('label', {'class': 'cbi-value-title', 'style': 'visibility: hidden'}, _('Query Results')),
-                    E('div', {'class': 'cbi-value-field'}, [
-                        E('textarea', {
-                            'id': 'query-output',
-                            'class': 'cbi-input-textarea',
-                            'readonly': 'readonly',
-                            'style': 'width: 100%; height: 300px;'
-                        })
-                    ])
+                    E('div', {'class': 'cbi-value-field'}, [outputElement])
                 ])
             ])
         ]);
-
-        requestAnimationFrame(function () {
-            setupQueryListeners();
-        });
-
-        return view;
     },
 }
 

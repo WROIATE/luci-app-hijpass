@@ -11,6 +11,16 @@ const callServiceList = rpc.declare({
     expect: { '': {} }
 })
 
+const statusRefreshers: Record<string, () => Promise<void>> = {};
+
+function getStatusKey(type?: string) {
+    return type || 'all';
+}
+
+function getStatusElementId(type?: string) {
+    return 'service_status_' + getStatusKey(type);
+}
+
 const ServiceUtils = {
     getServiceInstances: async function (confName: string): Promise<any> {
         const res = await callServiceList(confName);
@@ -92,21 +102,28 @@ const ServiceUtils = {
         return renderHTML;
     },
 
-    refreshServiceStatus: function (type: string) {
-        return async function () {
-            const res = await L.resolveDefault(ServiceUtils.getServiceInfo());
-            let view = document.getElementById("service_status");
-            if (view) view.innerHTML = ServiceUtils.renderServiceStatusText(res, type);
+    refreshServiceStatus: function (type?: string) {
+        const key = getStatusKey(type);
+        if (!statusRefreshers[key]) {
+            const elementId = getStatusElementId(type);
+            statusRefreshers[key] = async function () {
+                const res = await L.resolveDefault(ServiceUtils.getServiceInfo());
+                let view = document.getElementById(elementId);
+                if (view) view.innerHTML = ServiceUtils.renderServiceStatusText(res, type);
+            }
         }
+        return statusRefreshers[key];
     },
 
     renderServiceStatus: function (type?: string) {
         return function () {
-            poll.add(ServiceUtils.refreshServiceStatus(type));
+            const refresh = ServiceUtils.refreshServiceStatus(type);
+            poll.add(refresh);
+            window.setTimeout(refresh, 0);
 
             return E('div', { class: 'cbi-map' },
                 E('fieldset', { class: 'cbi-section' }, [
-                    E('p', { id: 'service_status', style: 'display: flex; gap: 1rem;' },
+                    E('p', { id: getStatusElementId(type), style: 'display: flex; gap: 1rem;' },
                         _('正在获取状态...'))
                 ])
             );

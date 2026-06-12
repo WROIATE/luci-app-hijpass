@@ -148,7 +148,7 @@ const ShuntFormUtils = {
                 E('button', {class: 'btn cbi-button', click: ui.hideModal}, _('Cancel')),
                 E('button', {
                     class: 'btn cbi-button-action',
-                    click: function () {
+                    click: async function () {
                         const fromVal = fromSel.value;
                         const toVal = toSel.value;
                         if (fromVal === toVal) {
@@ -160,7 +160,7 @@ const ShuntFormUtils = {
                                 uci.set(LuciFlied.CONF_NAME, section['.name'], 'proxy_node', toVal);
                             }
                         });
-                        uci.save();
+                        await uci.save();
                         ui.hideModal();
                         location.reload();
                     }

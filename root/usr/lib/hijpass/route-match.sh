@@ -18,6 +18,11 @@ if [ -z "$INPUT" ]; then
     exit 1
 fi
 
+if ! echo "$INPUT" | grep -Eq "^[A-Za-z0-9._:/-]{1,255}$" >/dev/null 2>&1; then
+    echo "非法输入: $INPUT" >&2
+    exit 1
+fi
+
 # =========================================
 # 函数 1: IP/CIDR 匹配检查
 # 参数 1: 目标 IP (例如 192.168.1.5)

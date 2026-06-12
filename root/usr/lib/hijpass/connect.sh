@@ -12,6 +12,19 @@ if [ -z "$URL" ]; then
   echo "Usage: $0 <url> [timeout_seconds]" >&2
   exit 1
 fi
+case "$URL" in
+  https://*) ;;
+  *)
+    echo "Only https URLs are allowed" >&2
+    exit 1
+    ;;
+esac
+case "$TIMEOUT" in
+  ''|*[!0-9]*)
+    echo "Invalid timeout" >&2
+    exit 1
+    ;;
+esac
 
 TMP_ERR=/tmp/net_check_curl_err.$$.log
 

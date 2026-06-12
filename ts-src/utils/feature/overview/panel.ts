@@ -34,181 +34,150 @@ const TEST_SITES: TestSite[] = [
     }
 ];
 
-function setupActionListeners() {
-    let restartBtn = document.getElementById('restart-service');
-    if (restartBtn) {
-        restartBtn.addEventListener('click', function () {
-            restartService();
-        });
-    }
-
-    let reloadBtn = document.getElementById('reload-firewall');
-    if (reloadBtn) {
-        reloadBtn.addEventListener('click', function () {
-            reloadFirewall();
-        });
-    }
-}
-
-function restartService() {
-    updateActionStatus(_('Restarting Service'));
+function restartService(statusElement: HTMLElement) {
+    updateActionStatus(statusElement, _('Restarting Service'));
 
     fs.exec('/etc/init.d/hijpass', ['restart']).then(function (result) {
         if (result.code === 0) {
-            updateActionStatus(_('Service Restarted'));
+            updateActionStatus(statusElement, _('Service Restarted'));
             setTimeout(function () {
                 location.reload();
             }, 2000);
         } else {
-            updateActionStatus(_('Service Restart Failed') + (result.stderr || result.stdout));
+            updateActionStatus(statusElement, _('Service Restart Failed') + (result.stderr || result.stdout));
         }
     }).catch(function (error) {
-        updateActionStatus(_('Service Restart Failed') + error.message);
+        updateActionStatus(statusElement, _('Service Restart Failed') + error.message);
     });
 }
 
-function reloadFirewall() {
-    updateActionStatus(_('Refreshing Firewall'));
+function reloadFirewall(statusElement: HTMLElement) {
+    updateActionStatus(statusElement, _('Refreshing Firewall'));
 
     fs.exec('/usr/lib/hijpass/nft.sh', ['reset']).then(function (result) {
         if (result.code === 0) {
-            updateActionStatus(_('Firewall Refreshed'));
+            updateActionStatus(statusElement, _('Firewall Refreshed'));
         } else {
-            updateActionStatus(_('Firewall Refresh Failed') + (result.stderr || result.stdout));
+            updateActionStatus(statusElement, _('Firewall Refresh Failed') + (result.stderr || result.stdout));
         }
     }).catch(function (error) {
-        updateActionStatus(_('Firewall Refresh Failed') + error.message);
+        updateActionStatus(statusElement, _('Firewall Refresh Failed') + error.message);
     });
 }
 
-function updateActionStatus(message) {
-    let statusElement = document.getElementById('action-status');
-    if (statusElement) {
-        statusElement.textContent = message;
-        statusElement.style.color = message.includes('成功') ? '#4caf50' :
-            message.includes('失败') ? '#f44336' : '#666';
-    }
+function updateActionStatus(statusElement: HTMLElement, message: string) {
+    statusElement.textContent = message;
+    statusElement.style.color = message.includes('成功') ? '#4caf50' :
+        message.includes('失败') ? '#f44336' : '#666';
 }
 
 function createTestButton(info: TestSite) {
+    const resultElement = E('div', {
+        'style': 'font-size: 13px; color: #f44336;'
+    }, _('Click to Test')) as HTMLElement;
+    let buttonElement: HTMLElement;
+
+    buttonElement = E('div', {
+        'class': 'connectivity-btn cbi-section',
+        'style': 'width: 100%; height: 100px; display: flex; ' +
+            'flex-direction: column; align-items: center; justify-content: center; ' +
+            'font-size: 15px; border-radius: 8px; padding: 0; ' +
+            'box-shadow: 0 0 2rem 0 rgba(136, 152, 170, .15); border:1px solid rgba(0, 0, 0, .05); ' +
+            'cursor: pointer;',
+        'click': function () {
+            testConnectivity(info.url, buttonElement, resultElement);
+        }
+    }, [
+        E('div', {
+            'style': 'display: flex; align-items: center; justify-content: center;'
+        }, [
+            E('span', {
+                'style': 'width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;'
+            }, [E('raw', {}, info.svg)])
+        ]),
+        E('div', {
+            'style': 'font-weight: bold; font-size: 16px; margin-bottom: 2px;'
+        }, info.name),
+        resultElement
+    ]) as HTMLElement;
+
     return E('div', {
         'class': 'connectivity-test-button',
         'style': 'flex: 1; min-width: 120px;'
-    }, [
-        E('div', {
-            'class': 'connectivity-btn cbi-section',
-            'id': 'test-' + info.id,
-            'style': 'width: 100%; height: 100px; display: flex; ' +
-                'flex-direction: column; align-items: center; justify-content: center; ' +
-                'font-size: 15px; border-radius: 8px; padding: 0; ' +
-                'box-shadow: 0 0 2rem 0 rgba(136, 152, 170, .15); border:1px solid rgba(0, 0, 0, .05); ' +
-                'cursor: pointer;'
-        }, [
-            E('div', {
-                'style': 'display: flex; align-items: center; justify-content: center;'
-            }, [
-                E('span', {
-                    'style': 'width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;'
-                }, [E('raw', {}, info.svg)])
-            ]),
-            E('div', {
-                'style': 'font-weight: bold; font-size: 16px; margin-bottom: 2px;'
-            }, info.name),
-            E('div', {
-                'id': 'test-result-' + info.id,
-                'style': 'font-size: 13px; color: #f44336;'
-            }, _('Click to Test'))
-        ])
-    ])
+    }, [buttonElement])
 }
 
-function setupConnectivityTestListeners(testSites: TestSite[]) {
-    return function () {
-        testSites.forEach(site => {
-            let testBtn = document.getElementById('test-' + site.id);
-            if (testBtn) {
-                testBtn.addEventListener('click', function () {
-                    testConnectivity(site.id, site.url);
-                });
-            }
-        });
+function testConnectivity(url: string, buttonElement: HTMLElement, resultElement: HTMLElement) {
+    if (buttonElement.dataset.loading === '1') {
+        return;
     }
+
+    resultElement.textContent = _('Testing');
+    resultElement.style.color = '#666';
+    buttonElement.dataset.loading = '1';
+    buttonElement.style.opacity = '0.7';
+
+    fs.exec_direct("/usr/lib/hijpass/connect.sh", [url, '5'], 'json')
+        .then(r => {
+            updateTestResult(buttonElement, resultElement, r.success, r);
+        })
+        .catch(e => {
+            console.error(e)
+            updateTestResult(buttonElement, resultElement, false, undefined)
+        })
 }
 
-function testConnectivity(id: string, url: string) {
-    const resultElement = document.getElementById('test-result-' + id);
-    const buttonElement = document.getElementById('test-' + id) as HTMLButtonElement;
+function updateTestResult(buttonElement: HTMLElement, resultElement: HTMLElement, success: boolean, response: any) {
+    delete buttonElement.dataset.loading;
+    buttonElement.style.opacity = '1';
 
-    if (resultElement && buttonElement) {
-        resultElement.textContent = _('Testing');
-        resultElement.style.color = '#666';
-        buttonElement.disabled = true;
-        buttonElement.style.opacity = '0.7';
-
-        fs.exec_direct("/usr/lib/hijpass/connect.sh", [url, '5'], 'json')
-            .then(r => {
-                console.log(r);
-                updateTestResult(id, r.success, r);
-            })
-            .catch(e => {
-                console.error(e)
-                updateTestResult(id, false, undefined)
-            })
-    }
-}
-
-function updateTestResult(id: string, success: boolean, response: any) {
-    const resultElement = document.getElementById('test-result-' + id);
-    const buttonElement = document.getElementById('test-' + id) as HTMLButtonElement;
-
-    if (resultElement && buttonElement) {
-        buttonElement.disabled = false;
-        buttonElement.style.opacity = '1';
-
-        if (success) {
-            if (/^([45])\d{2}$/.test(response.http_code)) {
-                resultElement.textContent = _('Connection Abnormal') + response.http_code;
-                resultElement.style.color = '#f44336';
-            } else {
-                resultElement.textContent = response.tls_handshake_time_ms + ' ms'
-                resultElement.style.color = '#4caf50';
-            }
-        } else {
-            resultElement.textContent = _('Test Failed');
+    if (success) {
+        if (/^([45])\d{2}$/.test(response.http_code)) {
+            resultElement.textContent = _('Connection Abnormal') + response.http_code;
             resultElement.style.color = '#f44336';
+        } else {
+            resultElement.textContent = response.tls_handshake_time_ms + ' ms'
+            resultElement.style.color = '#4caf50';
         }
+    } else {
+        resultElement.textContent = _('Test Failed');
+        resultElement.style.color = '#f44336';
     }
 }
 
 const OverviewPanelUtils = {
     createActionButtons: function () {
-        requestAnimationFrame(function () {
-            setupActionListeners();
-        });
+        const statusElement = E('span', {
+            'style': 'margin-left: 10px; font-size: 12px; color: #666;'
+        }) as HTMLElement;
 
         return E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 2rem;'}, [
             E('label', {'class': 'cbi-value-title', 'style': 'visibility: hidden'}, _('Service Control')),
             E('div', {'class': 'cbi-value-field'}, [
                 E('button', {
                     'class': 'cbi-button cbi-button-action',
-                    'id': 'restart-service',
-                    'style': 'margin-right: 10px;'
+                    'style': 'margin-right: 10px;',
+                    'type': 'button',
+                    'click': function (ev: Event) {
+                        ev.preventDefault();
+                        restartService(statusElement);
+                    }
                 }, _('Restart Service')),
                 E('button', {
                     'class': 'cbi-button cbi-button-action',
-                    'id': 'reload-firewall',
-                    'style': 'margin-right: 10px;'
+                    'style': 'margin-right: 10px;',
+                    'type': 'button',
+                    'click': function (ev: Event) {
+                        ev.preventDefault();
+                        reloadFirewall(statusElement);
+                    }
                 }, _('Refresh Firewall')),
-                E('span', {
-                    'id': 'action-status',
-                    'style': 'margin-left: 10px; font-size: 12px; color: #666;'
-                })
+                statusElement
             ])
         ])
     },
 
     createConnectivityTest: function () {
-        requestAnimationFrame(setupConnectivityTestListeners(TEST_SITES));
         return E('div', {
             'id': 'custom-connectivity-test',
             'class': 'cbi-map'

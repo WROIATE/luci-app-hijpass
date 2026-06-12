@@ -6,5 +6,6 @@
 .vscode/
 
 graphify-out/
+/scripts/sync-openwrt.sh
 ts-src/package-lock.json
 ts-src/node_modules/

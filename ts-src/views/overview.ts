@@ -25,7 +25,7 @@ const v = view.extend({
         s.anonymous = true;
         s.addremove = false;
 
-        let enabled = s.option(form.Flag, 'enabled', _('启用'),
+        let enabled = s.option(form.Flag, 'enabled', _('Enable'),
             _('Enable or Disable HiJpass'));
         enabled.default = '0';
         enabled.rmempty = false;
@@ -36,13 +36,13 @@ const v = view.extend({
         delayTime.default = '60';
         delayTime.rmempty = false;
 
-        let logLevel = s.option(form.ListValue, 'log_level', _('日志等级'),
+        let logLevel = s.option(form.ListValue, 'log_level', _('Log Level'),
             _('Service Log Level'));
         logLevel.modalonly = true;
-        logLevel.value('DEBUG', _('调试'));
-        logLevel.value('INFO', _('信息'));
-        logLevel.value('WARN', _('警告'));
-        logLevel.value('ERROR', _('错误'));
+        logLevel.value('DEBUG', _('Debug'));
+        logLevel.value('INFO', _('Info'));
+        logLevel.value('WARN', _('Warning'));
+        logLevel.value('ERROR', _('Error'));
         logLevel.default = 'INFO';
         logLevel.rmempty = false;
 

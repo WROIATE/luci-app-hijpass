@@ -7,10 +7,12 @@ type TestSite = {
     svg: string
 }
 
+type ActionStatus = 'success' | 'error' | 'neutral';
+
 const TEST_SITES: TestSite[] = [
     {
         id: 'baidu',
-        name: '百度',
+        name: 'Baidu',
         url: 'https://www.baidu.com',
         svg: '<svg height="32" style="flex:none;line-height:1" viewBox="0 0 24 24" width="32" xmlns="http://www.w3.org/2000/svg"><title>Baidu</title><path d="M8.859 11.735c1.017-1.71 4.059-3.083 6.202.286 1.579 2.284 4.284 4.397 4.284 4.397s2.027 1.601.73 4.684c-1.24 2.956-5.64 1.607-6.005 1.49l-.024-.009s-1.746-.568-3.776-.112c-2.026.458-3.773.286-3.773.286l-.045-.001c-.328-.01-2.38-.187-3.001-2.968-.675-3.028 2.365-4.687 2.592-4.968.226-.288 1.802-1.37 2.816-3.085zm.986 1.738v2.032h-1.64s-1.64.138-2.213 2.014c-.2 1.252.177 1.99.242 2.148.067.157.596 1.073 1.927 1.342h3.078v-7.514l-1.394-.022zm3.588 2.191l-1.44.024v3.956s.064.985 1.44 1.344h3.541v-5.3h-1.528v3.979h-1.46s-.466-.068-.553-.447v-3.556zM9.82 16.715v3.06H8.58s-.863-.045-1.126-1.049c-.136-.445.02-.959.088-1.16.063-.203.353-.671.951-.85H9.82zm9.525-9.036c2.086 0 2.646 2.06 2.646 2.742 0 .688.284 3.597-2.309 3.655-2.595.057-2.704-1.77-2.704-3.08 0-1.374.277-3.317 2.367-3.317zM4.24 6.08c1.523-.135 2.645 1.55 2.762 2.513.07.625.393 3.486-1.975 4-2.364.515-3.244-2.249-2.984-3.544 0 0 .28-2.797 2.197-2.969zm8.847-1.483c.14-1.31 1.69-3.316 2.931-3.028 1.236.285 2.367 1.944 2.137 3.37-.224 1.428-1.345 3.313-3.095 3.082-1.748-.226-2.143-1.823-1.973-3.424zM9.425 1c1.307 0 2.364 1.519 2.364 3.398 0 1.879-1.057 3.4-2.364 3.4s-2.367-1.521-2.367-3.4C7.058 2.518 8.118 1 9.425 1z" fill="#2932E1" fill-rule="nonzero"></path></svg>'
     },
@@ -28,47 +30,47 @@ const TEST_SITES: TestSite[] = [
     },
     {
         id: 'bilibili',
-        name: '哔哩哔哩',
+        name: 'Bilibili',
         url: 'https://www.bilibili.com',
         svg: '<svg height="32" width="32" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>bilibili</title><path clip-rule="evenodd" d="M4.977 3.561a1.31 1.31 0 111.818-1.884l2.828 2.728c.08.078.149.163.205.254h4.277a1.32 1.32 0 01.205-.254l2.828-2.728a1.31 1.31 0 011.818 1.884L17.82 4.66h.848A5.333 5.333 0 0124 9.992v7.34a5.333 5.333 0 01-5.333 5.334H5.333A5.333 5.333 0 010 17.333V9.992a5.333 5.333 0 015.333-5.333h.781L4.977 3.56zm.356 3.67a2.667 2.667 0 00-2.666 2.667v7.529a2.667 2.667 0 002.666 2.666h13.334a2.667 2.667 0 002.666-2.666v-7.53a2.667 2.667 0 00-2.666-2.666H5.333zm1.334 5.192a1.333 1.333 0 112.666 0v1.192a1.333 1.333 0 11-2.666 0v-1.192zM16 11.09c-.736 0-1.333.597-1.333 1.333v1.192a1.333 1.333 0 102.666 0v-1.192c0-.736-.597-1.333-1.333-1.333z" fill="#1b7be1" fill-rule="evenodd"></path></svg>'
     }
 ];
 
 function restartService(statusElement: HTMLElement) {
-    updateActionStatus(statusElement, _('Restarting Service'));
+    updateActionStatus(statusElement, _('Restarting Service'), 'neutral');
 
     fs.exec('/etc/init.d/hijpass', ['restart']).then(function (result) {
         if (result.code === 0) {
-            updateActionStatus(statusElement, _('Service Restarted'));
+            updateActionStatus(statusElement, _('Service Restarted'), 'success');
             setTimeout(function () {
                 location.reload();
             }, 2000);
         } else {
-            updateActionStatus(statusElement, _('Service Restart Failed') + (result.stderr || result.stdout));
+            updateActionStatus(statusElement, _('Service Restart Failed') + (result.stderr || result.stdout), 'error');
         }
     }).catch(function (error) {
-        updateActionStatus(statusElement, _('Service Restart Failed') + error.message);
+        updateActionStatus(statusElement, _('Service Restart Failed') + error.message, 'error');
     });
 }
 
 function reloadFirewall(statusElement: HTMLElement) {
-    updateActionStatus(statusElement, _('Refreshing Firewall'));
+    updateActionStatus(statusElement, _('Refreshing Firewall'), 'neutral');
 
     fs.exec('/usr/lib/hijpass/nft.sh', ['reset']).then(function (result) {
         if (result.code === 0) {
-            updateActionStatus(statusElement, _('Firewall Refreshed'));
+            updateActionStatus(statusElement, _('Firewall Refreshed'), 'success');
         } else {
-            updateActionStatus(statusElement, _('Firewall Refresh Failed') + (result.stderr || result.stdout));
+            updateActionStatus(statusElement, _('Firewall Refresh Failed') + (result.stderr || result.stdout), 'error');
         }
     }).catch(function (error) {
-        updateActionStatus(statusElement, _('Firewall Refresh Failed') + error.message);
+        updateActionStatus(statusElement, _('Firewall Refresh Failed') + error.message, 'error');
     });
 }
 
-function updateActionStatus(statusElement: HTMLElement, message: string) {
+function updateActionStatus(statusElement: HTMLElement, message: string, status: ActionStatus) {
     statusElement.textContent = message;
-    statusElement.style.color = message.includes('成功') ? '#4caf50' :
-        message.includes('失败') ? '#f44336' : '#666';
+    statusElement.style.color = status === 'success' ? '#4caf50' :
+        status === 'error' ? '#f44336' : '#666';
 }
 
 function createTestButton(info: TestSite) {
@@ -97,7 +99,7 @@ function createTestButton(info: TestSite) {
         ]),
         E('div', {
             'style': 'font-weight: bold; font-size: 16px; margin-bottom: 2px;'
-        }, info.name),
+        }, _(info.name)),
         resultElement
     ]) as HTMLElement;
 

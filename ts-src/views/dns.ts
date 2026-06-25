@@ -111,7 +111,7 @@ const v = view.extend({
 
         // 域名直连列表（仅 chinadns-ng 时通过 subsection 显示）
         let oDomainDirect = s.taboption('domain_direct', form.SectionValue, '_domain_direct',
-            form.TypedSection, LuciFlied.DNS_SECTION_TYPE, _(''));
+            form.TypedSection, LuciFlied.DNS_SECTION_TYPE, '');
         oDomainDirect.depends('dns_service', 'chinadns-ng');
         let ssDirect = oDomainDirect.subsection;
         ssDirect.anonymous = true;
@@ -123,7 +123,7 @@ const v = view.extend({
 
         // 域名代理列表（仅 chinadns-ng 时通过 subsection 显示）
         let oDomainProxy = s.taboption('domain_proxy', form.SectionValue, '_domain_proxy',
-            form.TypedSection, LuciFlied.DNS_SECTION_TYPE, _(''));
+            form.TypedSection, LuciFlied.DNS_SECTION_TYPE, '');
         oDomainProxy.depends('dns_service', 'chinadns-ng');
         let ssProxy = oDomainProxy.subsection;
         ssProxy.anonymous = true;

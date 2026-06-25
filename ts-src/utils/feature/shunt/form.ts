@@ -2,7 +2,7 @@ import fs from "fs";
 import form from "form";
 import uci from "uci";
 import ui from "ui";
-import { LuciFlied } from "../../../enum/hijpass";
+import { CORE_TYPE, LuciFlied } from "../../../enum/hijpass";
 import { FilePathUtils } from "../../base/files/paths";
 import { FormUtils } from "../../base/luci/form";
 import { NotificationUtils } from "../../base/luci/notification";
@@ -31,7 +31,7 @@ function updateCore(core: string, title: string, versionEl: HTMLElement, btn: HT
             }
         })
         .catch((e: any) => {
-            NotificationUtils.error(title, _(e.message || 'Update failed'), 5000);
+            NotificationUtils.error(title, e.message || _('Update failed'), 5000);
         })
         .finally(() => {
             btn.disabled = false;
@@ -51,18 +51,46 @@ function makeSelect(id: string, options: { value: string, label: string }[]) {
 }
 
 const ShuntFormUtils = {
-    renderCoreVersionWidget: function (core: string, title: string) {
-        const versionEl = E('span', {style: 'margin-right:12px;color:#666'}, _('Loading...')) as HTMLElement;
-        const updateBtn = E('button', {
-            class: 'btn cbi-button',
-            style: 'background-color:#1a6a8a;border-color:#1a6a8a',
-            click: function (ev: MouseEvent) {
-                updateCore(core, title, versionEl, ev.currentTarget as HTMLButtonElement);
-            }
-        }, _('Update'));
+    renderCoreVersionWidget: function () {
+        const rows = [
+            {core: CORE_TYPE.SING_BOX, label: 'sing-box', title: 'sing-box'},
+            {core: CORE_TYPE.XRAY, label: 'Xray', title: 'Xray'}
+        ];
+        const children: HTMLElement[] = [];
 
-        setCoreVersion(versionEl, core);
-        return E('div', {style: 'display:flex;align-items:center;gap:8px'}, [versionEl, updateBtn]);
+        rows.forEach((row) => {
+            const versionEl = E('span', {
+                style: 'display:inline-block;width:5.5em;color:#666;white-space:nowrap'
+            }, _('Loading...')) as HTMLElement;
+            const updateBtn = E('button', {
+                class: 'btn cbi-button',
+                style: 'width:72px;background-color:#1a6a8a;border-color:#1a6a8a',
+                click: function (ev: MouseEvent) {
+                    updateCore(row.core, row.title, versionEl, ev.currentTarget as HTMLButtonElement);
+                }
+            }, _('Update')) as HTMLElement;
+
+            setCoreVersion(versionEl, row.core);
+            children.push(
+                E('span', {
+                    style: 'justify-self:end;white-space:nowrap;font-weight:600'
+                }, row.label) as HTMLElement,
+                versionEl,
+                updateBtn
+            );
+        });
+
+        return E('span', {
+            style: [
+                'display:grid',
+                'grid-template-columns:5em 5.5em 72px',
+                'align-items:center',
+                'column-gap:12px',
+                'row-gap:12px',
+                'width:max-content',
+                'max-width:100%'
+            ].join(';')
+        }, children);
     },
 
     configureConfigEditor: function (o: LuCI.form.TextValue) {
@@ -88,7 +116,7 @@ const ShuntFormUtils = {
     showPreview: function () {
         try {
             let configJson = ShuntConfigUtils.getShuntConfData()
-            let shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') || 'xray'
+            let shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') || CORE_TYPE.XRAY
             ui.showModal(_('Preview Configuration'), [
                 E('div', {'class': 'cbi-section'}, [
                     E('div', {'class': 'cbi-section-descr'},
@@ -105,7 +133,7 @@ const ShuntFormUtils = {
                     E('button', {
                         'class': 'btn cbi-button',
                         'click': ui.hideModal
-                    }, _('关闭')),
+                    }, _('Close')),
                     E('button', {
                         'class': 'btn cbi-button-action',
                         'click': function (ev) {
@@ -113,7 +141,7 @@ const ShuntFormUtils = {
                             ev.stopPropagation();
                             let content = document.getElementById('config-preview-content').textContent;
                             navigator.clipboard.writeText(content).then(function () {
-                                NotificationUtils.success("成功", "配置已复制到剪贴板", 3000);
+                                NotificationUtils.success(_('Success'), _('Configuration copied to clipboard'), 3000);
                             })
                         }
                     }, _('Copy Configuration'))
@@ -121,7 +149,7 @@ const ShuntFormUtils = {
             ]);
         } catch (err) {
             console.log(err);
-            NotificationUtils.error("配置生成失败", _(err.message), 5000);
+            NotificationUtils.error(_('Configuration Generation Failed'), _(err.message), 5000);
         }
     },
 

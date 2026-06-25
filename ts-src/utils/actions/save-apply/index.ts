@@ -12,11 +12,21 @@ import { ProxyConfigFileUtils } from "../../feature/proxy/config-file";
 import { FormUtils } from "../../base/luci/form";
 import { PrecheckUtils } from "./precheck";
 
+function isGlobalServiceDisabled() {
+    return uci.get_first(LuciFlied.CONF_NAME, LuciFlied.GLOBAL_SECTION_TYPE, 'enabled') === '0';
+}
+
 const SaveApplyUtils = {
     genHandleSaveApply: function () {
         return async function (ev: Event, mode?: string | number) {
             try {
                 await this.handleSave(ev)
+
+                if (isGlobalServiceDisabled()) {
+                    await uci.save();
+                    await ui.changes.apply(mode == '0');
+                    return;
+                }
 
                 if (!await PrecheckUtils.runSaveApplyPrechecks()) {
                     return;
@@ -46,7 +56,7 @@ const SaveApplyUtils = {
                 await ui.changes.apply(mode == '0');
             } catch (e) {
                 console.log(e)
-                NotificationUtils.error("配置应用失败", _(e.message), 5000);
+                NotificationUtils.error(_('Configuration Apply Failed'), _(e.message), 5000);
             }
         }
     },

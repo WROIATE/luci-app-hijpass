@@ -73,9 +73,9 @@ const ServiceUtils = {
 
         let getColorSpan = function (title: string, isRunning: any) {
             if (isRunning) {
-                return spanTemp.format('green', _(title), _("运行中"));
+                return spanTemp.format('green', title, _("Running"));
             } else {
-                return spanTemp.format('red', _(title), _("未运行"));
+                return spanTemp.format('red', title, _("Not Running"));
             }
         }
 
@@ -84,19 +84,19 @@ const ServiceUtils = {
                 renderHTML += getColorSpan(_("DNS"), isDnsRunning)
                 break;
             case 'shunt':
-                renderHTML += getColorSpan(_("分流服务"), isShuntRunning)
+                renderHTML += getColorSpan(_("Shunt Service"), isShuntRunning)
                 break;
             case 'server':
-                renderHTML += getColorSpan(_("服务端"), isServerRunning)
+                renderHTML += getColorSpan(_("Local Server"), isServerRunning)
                 break;
             case 'proxy':
-                renderHTML += getColorSpan(_("代理节点"), isProxyRunning)
+                renderHTML += getColorSpan(_("Proxy Node"), isProxyRunning)
                 break;
             default:
-                renderHTML += getColorSpan(_("代理节点"), isProxyRunning)
-                renderHTML += getColorSpan(_("分流服务"), isShuntRunning)
+                renderHTML += getColorSpan(_("Proxy Node"), isProxyRunning)
+                renderHTML += getColorSpan(_("Shunt Service"), isShuntRunning)
                 renderHTML += getColorSpan(_("DNS"), isDnsRunning)
-                renderHTML += getColorSpan(_("服务端"), isServerRunning)
+                renderHTML += getColorSpan(_("Local Server"), isServerRunning)
         }
 
         return renderHTML;
@@ -124,7 +124,7 @@ const ServiceUtils = {
             return E('div', { class: 'cbi-map' },
                 E('fieldset', { class: 'cbi-section' }, [
                     E('p', { id: getStatusElementId(type), style: 'display: flex; gap: 1rem;' },
-                        _('正在获取状态...'))
+                        _('Fetching Status...'))
                 ])
             );
         }

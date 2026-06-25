@@ -22,7 +22,7 @@ function checkLoadBalanceUsage() {
     }
 
     if (inUse) {
-        throw new Error(_('负载均衡节点列表为空，但仍有规则使用负载均衡出口，请先移除相关规则或添加节点'));
+        throw new Error(_('Load balancing node list is empty, but some rules still use the load balancing outbound. Remove those rules or add nodes first'));
     }
 }
 

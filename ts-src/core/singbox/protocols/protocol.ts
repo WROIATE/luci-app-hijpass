@@ -15,7 +15,7 @@ export class SingBoxProtocolRegistry {
 
     build(type: string, config: ProxyNode): Outbound {
         const p = this.protocols.get(type)
-        if (!p) throw new Error(`Unsupported singbox protocol: ${type}`)
+        if (!p) throw new Error(`Unsupported sing-box protocol: ${type}`)
         return p.build(config)
     }
 }

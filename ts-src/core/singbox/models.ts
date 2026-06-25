@@ -58,6 +58,7 @@ export class Rule {
 }
 
 export class RouteRule extends Rule {
+    ip_version?: 4 | 6
     protocol: string[]
     port: number[]
     port_range: string[]
@@ -74,6 +75,7 @@ export class RouteRule extends Rule {
     }
 
     initRule(rule: RuleDTO): RouteRule {
+        this.ip_version = rule.ipVersion
         this.network = rule.network
         this.protocol = rule.protocol
         this.port = rule.port

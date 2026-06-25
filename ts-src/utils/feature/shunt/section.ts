@@ -5,6 +5,7 @@ import {
     LoadBalanceNode,
     RouteSection,
     RuleDTO,
+    ShuntRouteRuleVariant,
     ShuntRouteRule,
     ShuntSection
 } from "../../../module/luci";
@@ -41,6 +42,27 @@ const ShuntUtils = {
             routeSection.rules.push(rule)
         })
         return routeSection;
+    },
+
+    getRouteRuleVariants: function (rule: ShuntRouteRule): ShuntRouteRuleVariant[] {
+        if (rule.ipVersionSplit !== '1') {
+            return [{ rule, proxyNode: rule.proxyNode }];
+        }
+
+        const variants: ShuntRouteRuleVariant[] = [];
+        if (rule.proxyNodeV4) {
+            const v4Rule = Object.assign(new ShuntRouteRule(), rule);
+            v4Rule.name = rule.name ? rule.name + '-ipv4' : rule.name;
+            v4Rule.proxyNode = rule.proxyNodeV4;
+            variants.push({ rule: v4Rule, proxyNode: rule.proxyNodeV4, ipVersion: 4 });
+        }
+        if (rule.proxyNodeV6) {
+            const v6Rule = Object.assign(new ShuntRouteRule(), rule);
+            v6Rule.name = rule.name ? rule.name + '-ipv6' : rule.name;
+            v6Rule.proxyNode = rule.proxyNodeV6;
+            variants.push({ rule: v6Rule, proxyNode: rule.proxyNodeV6, ipVersion: 6 });
+        }
+        return variants;
     },
 
     getDnsSection: function () {

@@ -237,6 +237,121 @@ function updateLogStatus(statusElement: HTMLElement, message: string) {
     statusElement.style.color = '#666';
 }
 
+type TraceDiagnosticsValues = {
+    url: string;
+    mode: string;
+    clientIp: string;
+    method: string;
+    timeout: string;
+    tcpdump: boolean;
+    tcpdumpInterface: string;
+    verbose: boolean;
+};
+
+function setTraceStatus(statusElement: HTMLElement, message: string, color?: string) {
+    statusElement.textContent = message;
+    statusElement.style.display = message ? 'block' : 'none';
+    statusElement.style.color = color || '#666';
+}
+
+function buildTraceArgs(values: TraceDiagnosticsValues) {
+    const url = values.url.trim();
+    const timeout = values.timeout.trim();
+    const method = values.method || 'HEAD';
+    const args = [];
+
+    if (!/^https?:\/\/[A-Za-z0-9_.:\-/?#%=&+~[\]]+$/.test(url)) {
+        throw new Error(_('Please enter a valid HTTP or HTTPS URL'));
+    }
+
+    if (!/^[0-9]+$/.test(timeout) || parseInt(timeout, 10) < 1 || parseInt(timeout, 10) > 120) {
+        throw new Error(_('Timeout must be an integer between 1 and 120'));
+    }
+
+    args.push('-t', timeout);
+    args.push('-X', method);
+
+    if (values.mode === 'client') {
+        const clientIp = values.clientIp.trim();
+        if (!/^[A-Fa-f0-9:.]+$/.test(clientIp)) {
+            throw new Error(_('Please enter a valid client IP address'));
+        }
+        args.push('-c', clientIp);
+    }
+
+    if (values.tcpdump) {
+        const iface = values.tcpdumpInterface.trim() || 'any';
+        args.push('-p');
+        if (!/^[A-Za-z0-9_.:@-]+$/.test(iface)) {
+            throw new Error(_('Please enter a valid tcpdump interface'));
+        }
+        args.push('-i', iface);
+    }
+
+    if (values.verbose) {
+        args.push('-v');
+    }
+
+    args.push(url);
+    return args;
+}
+
+function runTraceDiagnostics(
+    values: TraceDiagnosticsValues,
+    statusElement: HTMLElement,
+    outputElement: HTMLElement,
+    runButton: HTMLButtonElement
+) {
+    let args;
+
+    try {
+        args = buildTraceArgs(values);
+    } catch (error) {
+        setTraceStatus(statusElement, (error as Error).message, '#b00020');
+        return;
+    }
+
+    outputElement.textContent = '';
+    runButton.disabled = true;
+    setTraceStatus(statusElement, _('Running Trace Diagnostics'));
+
+    fs.exec('/usr/lib/hijpass/trace-url.sh', args).then(function (result) {
+        const stdout = result.stdout || '';
+        const stderr = result.stderr || '';
+        outputElement.textContent = stdout || stderr || _('No Output');
+        outputElement.scrollTop = 0;
+
+        if (result.code === 0) {
+            setTraceStatus(statusElement, _('Trace Completed') + ' - ' + new Date().toLocaleTimeString());
+        } else {
+            setTraceStatus(statusElement, _('Trace Failed') + ' - ' + (stderr || _('Exit Code') + ': ' + result.code), '#b00020');
+        }
+    }).catch(function (error) {
+        outputElement.textContent = error.message || String(error);
+        setTraceStatus(statusElement, _('Trace Failed') + ' - ' + error.message, '#b00020');
+    }).finally(function () {
+        runButton.disabled = false;
+    });
+}
+
+function createTraceOutputPanel() {
+    const statusElement = E('div', {
+        'style': 'display: none; font-size: 12px; color: #666; margin-bottom: 6px;'
+    }) as HTMLElement;
+    const outputElement = E('pre', {
+        'style': 'width: 100%; min-height: 260px; max-height: 520px; box-sizing: border-box; margin: 0; font-family: monospace; font-size: 12px; background: #101010; color: #eee; border: 1px solid #ccc; padding: 10px; overflow: auto; white-space: pre-wrap; line-height: 1.45;'
+    }, _('Trace output will be shown here')) as HTMLElement;
+
+    return {
+        statusElement,
+        outputElement,
+        node: E('div', {}, [
+            statusElement,
+            outputElement
+        ]) as HTMLElement
+    };
+}
+
 const LogPanelUtils = {
     createLogControlPanel: function () {
         const logFileSelect = E('select', {
@@ -312,7 +427,7 @@ const LogPanelUtils = {
         levelFilterSelect.addEventListener('change', load);
         linesCountSelect.addEventListener('change', load);
 
-        panel = E('div', {'class': 'cbi-section', 'style': 'display: flex;flex-direction: column;gap: 20px;'}, [
+        panel = E('div', {'class': 'cbi-section'}, [
             E('div', {'class': 'cbi-section-node'}, [
                 E('div', {'class': 'cbi-value'}, [
                     E('label', {'class': 'cbi-value-title'}, _('Log File')),
@@ -327,7 +442,7 @@ const LogPanelUtils = {
                     E('div', {'class': 'cbi-value-field'}, [linesCountSelect])
                 ]),
                 E('div', {'class': 'cbi-value'}, [
-                    E('label', {'class': 'cbi-value-title'}, _('操作')),
+                    E('label', {'class': 'cbi-value-title'}, _('Actions')),
                     E('div', {'class': 'cbi-value-field'}, [
                         E('button', {
                             'class': 'cbi-button cbi-button-action',
@@ -370,6 +485,9 @@ const LogPanelUtils = {
         load();
         return panel;
     },
+
+    createTraceOutputPanel: createTraceOutputPanel,
+    runTraceDiagnostics: runTraceDiagnostics,
 }
 
 export { LogPanelUtils }

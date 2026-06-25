@@ -4,6 +4,7 @@ import ui from "ui";
 import { NotificationUtils } from "../../base/luci/notification";
 import { FactoryType } from "../../../core/adapter";
 import { ShuntUtils } from "../../feature/shunt/section";
+import { MAX_PROXY_CHAIN_NODES, ProxyChainUtils } from "../../feature/proxy/chain";
 
 const XRAY_ROUTE_PROTOCOLS = ['http', 'tls', 'quic', 'bittorrent'];
 
@@ -36,20 +37,35 @@ function checkMissingProxyRefs() {
     }
 
     const defaultNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'default_proxy_node');
-    checkRef(defaultNode, _('默认全局出口 "%s" 不存在').format(defaultNode));
+    checkRef(defaultNode, _('Default global exit "%s" does not exist').format(defaultNode));
 
     const rulesetNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_out_node');
-    checkRef(rulesetNode, _('规则集出口 "%s" 不存在').format(rulesetNode));
+    checkRef(rulesetNode, _('Rule-set exit "%s" does not exist').format(rulesetNode));
 
     normalizeList(uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list'))
-        .forEach((node) => checkRef(node, _('负载均衡节点 "%s" 不存在').format(node)));
+        .forEach((node) => checkRef(node, _('Load balancing node "%s" does not exist').format(node)));
 
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-        checkRef(section.proxy_node, _('路由规则 "%s" 的代理节点 "%s" 不存在').format(section.name || section['.name'], section.proxy_node));
+        const ruleName = section.name || section['.name'];
+        if (section.ip_version_split === '1') {
+            if (!section.proxy_node_v4) {
+                warnings.push(_('Route rule "%s" IPv4 proxy node is not configured').format(ruleName));
+            } else {
+                checkRef(section.proxy_node_v4, _('Route rule "%s" IPv4 proxy node "%s" does not exist').format(ruleName, section.proxy_node_v4));
+            }
+            if (!section.proxy_node_v6) {
+                warnings.push(_('Route rule "%s" IPv6 proxy node is not configured').format(ruleName));
+            } else {
+                checkRef(section.proxy_node_v6, _('Route rule "%s" IPv6 proxy node "%s" does not exist').format(ruleName, section.proxy_node_v6));
+            }
+            return;
+        }
+
+        checkRef(section.proxy_node, _('Route rule "%s" proxy node "%s" does not exist').format(ruleName, section.proxy_node));
     });
 
     if (warnings.length > 0) {
-        NotificationUtils.warning(_('配置包含不存在的代理节点'), warnings.join('<br>'), 8000);
+        NotificationUtils.warning(_('Configuration contains missing proxy nodes'), warnings.join('<br>'), 8000);
         return false;
     }
 
@@ -72,32 +88,81 @@ function checkDisabledProxyRefs() {
 
     const defaultNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'default_proxy_node');
     if (defaultNode && disabledNodes.has(defaultNode)) {
-        warnings.push(_('默认全局出口 "%s" 未启用').format(defaultNode));
+        warnings.push(_('Default global exit "%s" is not enabled').format(defaultNode));
     }
 
     const rulesetNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_out_node');
     if (rulesetNode && disabledNodes.has(rulesetNode)) {
-        warnings.push(_('规则集出口 "%s" 未启用').format(rulesetNode));
+        warnings.push(_('Rule-set exit "%s" is not enabled').format(rulesetNode));
     }
 
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-        if (section.proxy_node && disabledNodes.has(section.proxy_node)) {
-            warnings.push(_('路由规则 "%s" 的代理节点 "%s" 未启用').format(section.name || section['.name'], section.proxy_node));
+        const ruleName = section.name || section['.name'];
+        if (section.ip_version_split === '1') {
+            if (section.proxy_node_v4 && disabledNodes.has(section.proxy_node_v4)) {
+                warnings.push(_('Route rule "%s" IPv4 proxy node "%s" is not enabled').format(ruleName, section.proxy_node_v4));
+            }
+            if (section.proxy_node_v6 && disabledNodes.has(section.proxy_node_v6)) {
+                warnings.push(_('Route rule "%s" IPv6 proxy node "%s" is not enabled').format(ruleName, section.proxy_node_v6));
+            }
+        } else if (section.proxy_node && disabledNodes.has(section.proxy_node)) {
+            warnings.push(_('Route rule "%s" proxy node "%s" is not enabled').format(ruleName, section.proxy_node));
         }
         if (section.dns_proxy_node && disabledNodes.has(section.dns_proxy_node)) {
-            warnings.push(_('路由规则 "%s" 的DNS出口节点 "%s" 未启用').format(section.name || section['.name'], section.dns_proxy_node));
+            warnings.push(_('Route rule "%s" DNS exit node "%s" is not enabled').format(ruleName, section.dns_proxy_node));
         }
     });
 
     normalizeList(uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list'))
         .forEach((node) => {
             if (disabledNodes.has(node)) {
-                warnings.push(_('负载均衡节点 "%s" 未启用').format(node));
+                warnings.push(_('Load balancing node "%s" is not enabled').format(node));
             }
         });
 
     if (warnings.length > 0) {
-        NotificationUtils.warning(_('配置包含未启用的节点'), warnings.join('<br>'), 8000);
+        NotificationUtils.warning(_('Configuration contains disabled nodes'), warnings.join('<br>'), 8000);
+        return false;
+    }
+
+    return true;
+}
+
+function checkProxyChainRefs() {
+    const sections = ProxyChainUtils.getProxySectionMap();
+    const warnings: string[] = [];
+
+    sections.forEach((section: any) => {
+        if (section.enabled === '0' || !section.upstream_proxy_node) {
+            return;
+        }
+
+        const nodeName = ProxyChainUtils.getProxyName(section);
+        const upstreamName = section.upstream_proxy_node;
+        const upstreamSection = sections.get(upstreamName);
+
+        if (!upstreamSection) {
+            warnings.push(_('Proxy node "%s" upstream proxy node "%s" does not exist').format(nodeName, upstreamName));
+            return;
+        }
+        if (upstreamSection.enabled === '0') {
+            warnings.push(_('Proxy node "%s" upstream proxy node "%s" is not enabled').format(nodeName, upstreamName));
+        }
+        if (!ProxyChainUtils.isPort(upstreamSection.socks_port)) {
+            warnings.push(_('Proxy node "%s" upstream proxy node "%s" has no valid SOCKS port configured').format(nodeName, upstreamName));
+        }
+
+        const result = ProxyChainUtils.collectProxyChain(nodeName, sections);
+        if (result.cycle) {
+            warnings.push(_('Proxy node nesting chain has a cycle: %s').format(result.chain.join(' -> ')));
+        } else if (result.chain.length > MAX_PROXY_CHAIN_NODES) {
+            warnings.push(_('Proxy node "%s" nesting chain exceeds %d nodes: %s')
+                .format(nodeName, MAX_PROXY_CHAIN_NODES, result.chain.join(' -> ')));
+        }
+    });
+
+    if (warnings.length > 0) {
+        NotificationUtils.warning(_('Configuration contains invalid upstream proxy nodes'), warnings.join('<br>'), 8000);
         return false;
     }
 
@@ -124,32 +189,32 @@ function checkInvalidDnsNodeRefs() {
             return;
         }
         if (!existingDnsNodes.has(ref)) {
-            missingWarnings.push(_('%s "%s" 不存在').format(label, ref));
+            missingWarnings.push(_('%s "%s" does not exist').format(label, ref));
             return;
         }
         if (disabledDnsNodes.has(ref)) {
-            disabledWarnings.push(_('%s "%s" 未启用').format(label, ref));
+            disabledWarnings.push(_('%s "%s" is not enabled').format(label, ref));
         }
     }
 
     checkRef(
         uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'default_dns_node'),
-        _('默认全局DNS')
+        _('Default global DNS')
     );
     checkRef(
         uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_dns_node'),
-        _('规则集DNS')
+        _('Rule-set DNS')
     );
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-        checkRef(section.dns_node, _('路由规则 "%s" 的DNS节点').format(section.name || section['.name']));
+        checkRef(section.dns_node, _('Route rule "%s" DNS node').format(section.name || section['.name']));
     });
 
     if (missingWarnings.length > 0) {
-        NotificationUtils.warning(_('配置包含不存在的DNS节点'), missingWarnings.join('<br>'), 8000);
+        NotificationUtils.warning(_('Configuration contains missing DNS nodes'), missingWarnings.join('<br>'), 8000);
         return false;
     }
     if (disabledWarnings.length > 0) {
-        NotificationUtils.warning(_('配置包含未启用的DNS节点'), disabledWarnings.join('<br>'), 8000);
+        NotificationUtils.warning(_('Configuration contains disabled DNS nodes'), disabledWarnings.join('<br>'), 8000);
         return false;
     }
 
@@ -162,20 +227,42 @@ function checkMissingDnsExitRefs() {
         if (section.name) existingNodeNames.add(section.name);
     });
 
+    const shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
+    const rulesetConvert = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_convert');
     const missingDnsExits: string[] = [];
-    uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-        const dnsExit = section.dns_proxy_node;
+    ShuntUtils.getRouteSection().rules.forEach(function (section: any) {
+        const dnsExit = section.dnsProxyNode;
+        const ruleName = section.name || _('Unnamed Rule');
+        if (routeRuleRequiresDnsExit(section, shuntType, rulesetConvert) && !dnsExit) {
+            missingDnsExits.push(_('Route rule "%s" uses IPv4/IPv6 split and must specify a DNS exit node').format(ruleName));
+            return;
+        }
         if (dnsExit && dnsExit !== ShuntTag.DIRECT_OUTBOUND_TAG && !existingNodeNames.has(dnsExit)) {
-            missingDnsExits.push(_('路由规则 "%s" 的DNS出口节点 "%s" 不存在').format(section.name || section['.name'], dnsExit));
+            missingDnsExits.push(_('Route rule "%s" DNS exit node "%s" does not exist').format(ruleName, dnsExit));
         }
     });
 
     if (missingDnsExits.length > 0) {
-        NotificationUtils.warning(_('配置包含无效的DNS出口节点'), missingDnsExits.join('<br>'), 8000);
+        NotificationUtils.warning(_('Configuration contains invalid DNS exit nodes'), missingDnsExits.join('<br>'), 8000);
         return false;
     }
 
     return true;
+}
+
+function routeRuleRequiresDnsExit(rule: any, shuntType: string, rulesetConvert: string) {
+    if (rule.ipVersionSplit !== '1') {
+        return false;
+    }
+
+    const ruleDTO = ShuntUtils.parseRuleList(rule);
+    if (shuntType === FactoryType.XRAY) {
+        return ruleDTO.containDomain() || ruleDTO.geoSite.length > 0;
+    }
+
+    return ruleDTO.containDomain()
+        || ruleDTO.containRuleSet()
+        || (rulesetConvert === '1' && ruleDTO.geoSite.length > 0);
 }
 
 function checkDisabledShuntFirewallPort() {
@@ -187,7 +274,7 @@ function checkDisabledShuntFirewallPort() {
     const shuntListenPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_listen_port');
     const fwShuntPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.FIREWALL_SECTION_TYPE, 'shunt_port');
     if (shuntListenPort && fwShuntPort === shuntListenPort) {
-        NotificationUtils.warning(_('配置冲突'), _('分流已禁用，请先将防火墙默认分流端口切换为不使用'), 8000);
+        NotificationUtils.warning(_('Configuration conflict'), _('Shunt is disabled. Set the firewall default shunt port to disabled first'), 8000);
         return false;
     }
 
@@ -209,15 +296,15 @@ function checkXrayRouteProtocols() {
         const unsupported = normalizeList(section.protocol)
             .filter((protocol) => XRAY_ROUTE_PROTOCOLS.indexOf(protocol) === -1);
         if (unsupported.length > 0) {
-            warnings.push(_('路由规则 "%s" 包含 Xray 不支持的协议: %s')
+            warnings.push(_('Route rule "%s" contains protocols unsupported by Xray: %s')
                 .format(section.name || section['.name'], unsupported.join(', ')));
         }
     });
 
     if (warnings.length > 0) {
         NotificationUtils.warning(
-            _('Xray 协议配置不支持'),
-            warnings.join('<br>') + '<br>' + _('Xray route protocol 仅支持: %s').format(XRAY_ROUTE_PROTOCOLS.join(', ')),
+            _('Unsupported Xray protocol configuration'),
+            warnings.join('<br>') + '<br>' + _('Xray route protocol only supports: %s').format(XRAY_ROUTE_PROTOCOLS.join(', ')),
             8000
         );
         return false;
@@ -229,11 +316,23 @@ function checkXrayRouteProtocols() {
 function confirmWarning(title: string, description: string, warnings: string[]) {
     return new Promise<boolean>((resolve) => {
         ui.showModal(title, [
-            E('div', {class: 'cbi-section'}, [
-                E('div', {class: 'cbi-section-descr'}, description),
-                E('ul', {style: 'margin-top: 12px;'}, warnings.map((warning) => E('li', {}, warning)))
+            E('div', {
+                style: [
+                    'box-sizing:border-box',
+                    'width:100%',
+                    'margin:0 0 14px 0',
+                    'padding:14px 16px',
+                    'border-radius:4px',
+                    'background:rgba(127,127,127,0.08)',
+                    'line-height:1.55'
+                ].join(';')
+            }, [
+                E('div', {style: 'margin:0 0 12px 0'}, description),
+                E('div', {style: 'display:flex;flex-direction:column;gap:6px;margin:0'}, warnings.map((warning) => (
+                    E('div', {style: 'margin:0;word-break:break-word'}, warning)
+                )))
             ]),
-            E('div', {class: 'right', style: 'display:flex;justify-content:flex-end;gap:10px'}, [
+            E('div', {style: 'display:flex;justify-content:flex-end;gap:10px;margin:0'}, [
                 E('button', {
                     class: 'btn cbi-button',
                     click: function (ev: Event) {
@@ -261,13 +360,13 @@ function getSkippedRouteRuleMessage(rule: any, shuntType: string, rulesetConvert
 
     if (shuntType === FactoryType.XRAY) {
         if (ruleDTO.isEmpty('geo')) {
-            return _('路由规则 "%s" 没有可写入 Xray 的有效匹配条件').format(ruleName);
+            return _('Route rule "%s" has no valid match conditions for Xray').format(ruleName);
         }
         if (ruleDTO.containRuleSet()
             && !ruleDTO.containDomain()
             && !ruleDTO.containIp()
             && !ruleDTO.containGeo()) {
-            return _('路由规则 "%s" 只包含 Xray 不支持的 rule-set 目标条件').format(ruleName);
+            return _('Route rule "%s" only contains rule-set target conditions unsupported by Xray').format(ruleName);
         }
         return null;
     }
@@ -277,11 +376,11 @@ function getSkippedRouteRuleMessage(rule: any, shuntType: string, rulesetConvert
             ruleDTO.geoSite = [];
             ruleDTO.geoIp = [];
             if (!ruleDTO.containDomain() && !ruleDTO.containIp() && !ruleDTO.containRuleSet()) {
-                return _('路由规则 "%s" 去除未转换的 geosite/geoip 后没有可写入 sing-box 的目标条件').format(ruleName);
+                return _('Route rule "%s" has no target conditions for sing-box after removing unconverted geosite/geoip').format(ruleName);
             }
         }
         if (ruleDTO.isEmpty('set')) {
-            return _('路由规则 "%s" 没有可写入 sing-box 的有效匹配条件').format(ruleName);
+            return _('Route rule "%s" has no valid match conditions for sing-box').format(ruleName);
         }
     }
 
@@ -304,8 +403,8 @@ function confirmSkippedRouteRules() {
 
     if (warnings.length > 0) {
         return confirmWarning(
-            _('部分路由规则将被跳过'),
-            _('下列规则在当前核心和选项下没有可生成的有效配置，因此不会写入最终配置。是否继续应用配置？'),
+            _('Some route rules will be skipped'),
+            _('The following rules have no valid configuration for the current core and options, so they will not be written to the final configuration. Continue applying the configuration?'),
             warnings
         );
     }
@@ -317,6 +416,7 @@ const PrecheckUtils = {
     runSaveApplyPrechecks: async function () {
         return checkMissingProxyRefs()
             && checkDisabledProxyRefs()
+            && checkProxyChainRefs()
             && checkInvalidDnsNodeRefs()
             && checkMissingDnsExitRefs()
             && await confirmSkippedRouteRules()

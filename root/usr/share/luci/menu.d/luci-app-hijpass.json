@@ -40,7 +40,7 @@
     }
   },
   "admin/services/hijpass/server": {
-    "title": "Server",
+    "title": "Local Server",
     "order": 4,
     "action": {
       "type": "view",

@@ -93,8 +93,8 @@ const FormUtils = {
     createLogFlagOption: function (s: LuCI.form.AbstractSection, conf_type: string, tab: string) {
         let log_dir = uci.get_first(conf_type, conf_type, 'log_dir');
 
-        let o = tab ? s.taboption(tab, form.Flag, 'log_enabled', _('记录日志'))
-            : s.option(form.Flag, 'log_enabled', _('记录日志'));
+        let o = tab ? s.taboption(tab, form.Flag, 'log_enabled', _('Record Logs'))
+            : s.option(form.Flag, 'log_enabled', _('Record Logs'));
         o.modalonly = true;
         o.write = function (section_id: string, value: string) {
             let log_file = 'shunt.log'
@@ -121,7 +121,7 @@ const FormUtils = {
     appendEnabledNodeListenPorts: function (option: LuCI.form.ListValue) {
         uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
             if (section.listen_port && section.enabled !== '0') {
-                let displayName = _('代理节点 %s: %s').format(section.name, section.listen_port);
+                let displayName = _('Proxy node %s: %s').format(section.name, section.listen_port);
                 option.value(section.listen_port, displayName);
             }
         });
@@ -132,9 +132,9 @@ const FormUtils = {
             delete this.keylist;
             delete this.vallist;
 
-            this.value(ShuntTag.DIRECT_OUTBOUND_TAG, _('直连'));
+            this.value(ShuntTag.DIRECT_OUTBOUND_TAG, _('Direct'));
             if (includeSlb) {
-                this.value(ShuntTag.BLOCK_OUTBOUND_TAG, _('阻止'));
+                this.value(ShuntTag.BLOCK_OUTBOUND_TAG, _('Block'));
             }
 
             uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
@@ -148,7 +148,7 @@ const FormUtils = {
             if (includeSlb) {
                 const lbList = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
                 if (lbList && lbList.length > 0) {
-                    this.value(ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, _('负载均衡'));
+                    this.value(ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, _('Load Balancing'));
                 }
             }
 
@@ -160,8 +160,8 @@ const FormUtils = {
         const options: { value: string, label: string }[] = [];
 
         if (includeSpecial) {
-            options.push({ value: ShuntTag.DIRECT_OUTBOUND_TAG, label: _('直连') });
-            options.push({ value: ShuntTag.BLOCK_OUTBOUND_TAG, label: _('阻止') });
+            options.push({ value: ShuntTag.DIRECT_OUTBOUND_TAG, label: _('Direct') });
+            options.push({ value: ShuntTag.BLOCK_OUTBOUND_TAG, label: _('Block') });
         }
 
         uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
@@ -175,7 +175,7 @@ const FormUtils = {
         if (includeSpecial) {
             const lbList = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
             if (lbList && lbList.length > 0) {
-                options.push({ value: ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, label: _('负载均衡') });
+                options.push({ value: ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, label: _('Load Balancing') });
             }
         }
 

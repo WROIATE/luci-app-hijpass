@@ -11,6 +11,7 @@ import {
 import {LuciFlied, ShuntTag} from '../../enum/hijpass'
 import { CoreAdapter, ProxyNode, RuleDTO } from '../../module/luci'
 import {xrayRegistry} from './protocols/protocol'
+import { ProxyChainUtils } from '../../utils/feature/proxy/chain'
 
 export const XrayUtils: CoreAdapter = {
     genShuntConf: genConf,
@@ -62,62 +63,44 @@ function genConf() {
 
     routeConf.rules.forEach(function (rule) {
         if (rule.enabled !== '1') return
+        const isIpVersionSplit = rule.ipVersionSplit === '1'
+        let splitDnsRuleDTO: RuleDTO = undefined
+        let splitDnsNeeded = false
 
-        const ruleOutBoundTag = transOutTag(rule.proxyNode) || outbounds[0].tag
-        const routeRule = new RouteRule(rule.name, ruleOutBoundTag)
+        ShuntUtils.getRouteRuleVariants(rule).forEach(function (variant) {
+            const ruleOutBoundTag = transOutTag(variant.proxyNode) || outbounds[0].tag
 
-        const luciRuleDTO = ShuntUtils.parseRuleList(rule)
-        if (shouldSkipXrayRule(luciRuleDTO)) return
+            const luciRuleDTO = ShuntUtils.parseRuleList(variant.rule)
+            const hasDnsTarget = hasXrayDnsTargetRule(luciRuleDTO)
+            luciRuleDTO.ipVersion = variant.ipVersion
+            if (shouldSkipXrayRule(luciRuleDTO)) return
 
-        routeRule.network = luciRuleDTO.network
-        routeRule.protocol = transRouteProtocol(luciRuleDTO.protocol)
-        let allPorts: string[] = luciRuleDTO.port.map(p => String(p))
-        if (luciRuleDTO.portRange && luciRuleDTO.portRange.length > 0) {
-            allPorts = allPorts.concat(luciRuleDTO.portRange)
-        }
-        routeRule.port = allPorts.join(',')
+            buildXrayRouteRules(variant.rule.name, ruleOutBoundTag, luciRuleDTO).forEach((routeRule) => {
+                routeRules.push(routeRule)
+            })
 
-        const domainArrays = [
-            addPrefixToElements(luciRuleDTO.domain, 'full:'),
-            addPrefixToElements(luciRuleDTO.domainSuffix, 'domain:'),
-            luciRuleDTO.domainKeyword,
-            addPrefixToElements(luciRuleDTO.domainRegex, 'regexp:'),
-            luciRuleDTO.geoSite
-        ]
-        const ipArrays = [luciRuleDTO.ipCidr, luciRuleDTO.geoIp]
-        routeRule.domain = ([] as string[]).concat(...domainArrays.filter(a => Array.isArray(a) && a.length > 0))
-        routeRule.domain = routeRule.domain.length > 0 ? routeRule.domain : undefined
-        routeRule.ip = ([] as string[]).concat(...ipArrays.filter(a => Array.isArray(a) && a.length > 0))
-        routeRule.ip = routeRule.ip.length > 0 ? routeRule.ip : undefined
+            if (ruleOutBoundTag === XrayEnum.BLOCK_OUTBOUND_TAG) return
 
-        if (routeRule.domain) {
-            const domainRule = structuredClone(routeRule)
-            domainRule.ip = undefined
-            routeRules.push(domainRule)
-        }
-        if (routeRule.ip) {
-            const ipRule = structuredClone(routeRule)
-            ipRule.domain = undefined
-            routeRules.push(ipRule)
-        }
-        if (!routeRule.domain && !routeRule.ip) routeRules.push(routeRule)
-
-        if (routeRule.outboundTag === XrayEnum.BLOCK_OUTBOUND_TAG) return
-
-        if (luciRuleDTO.containDomain() || luciRuleDTO.containGeo()) {
-            const outboundTag = transOutTag(rule.dnsProxyNode) || ruleOutBoundTag
-            const dnsTag = transDnsTag(rule.name)
-            if (dnsInOutMap.has(outboundTag)) {
-                dnsInOutMap.get(outboundTag).push(dnsTag)
-            } else {
-                dnsInOutMap.set(outboundTag, [dnsTag])
+            if (isIpVersionSplit) {
+                if (hasDnsTarget) {
+                    splitDnsRuleDTO = splitDnsRuleDTO || luciRuleDTO
+                    splitDnsNeeded = true
+                }
+                return
             }
-            const dnsTmpl = rule.dnsNode ? dnsServerMap.get(rule.dnsNode) : defaultDnsTmpl
-            const server = structuredClone(dnsTmpl)
-            server.tag = dnsTag
-            server.queryStrategy = transDnsStrategy(rule.dnsStrategy)
-            server.domains = routeRule.domain
-            dns.servers.push(server)
+
+            if (hasDnsTarget) {
+                const outboundTag = transOutTag(rule.dnsProxyNode) || ruleOutBoundTag
+                appendXrayDnsServer(rule, variant.rule.name, outboundTag, luciRuleDTO, dnsServerMap, defaultDnsTmpl, dns, dnsInOutMap)
+            }
+        })
+
+        if (isIpVersionSplit && splitDnsNeeded && splitDnsRuleDTO) {
+            const outboundTag = transOutTag(rule.dnsProxyNode)
+            if (!outboundTag) {
+                throw new Error(_('Route rule "%s" uses IPv4/IPv6 split and must specify a DNS exit node').format(rule.name))
+            }
+            appendXrayDnsServer(rule, rule.name, outboundTag, splitDnsRuleDTO, dnsServerMap, defaultDnsTmpl, dns, dnsInOutMap)
         }
     })
 
@@ -181,11 +164,33 @@ function buildBaseProxyConf(config: ProxyNode, outbound: Outbound): {} {
     socksInbound.settings = {udp: true}
     socksInbound.protocol = 'socks'
 
+    const outbounds = [outbound]
+    appendProxyChainOutbounds(config, outbound, outbounds)
+
     return {
-        log: {loglevel: 'info', dnsLog: false},
+        log: new Log(transProxyLogLevel(config.log_level)),
         inbounds: [tproxyInbound, socksInbound],
-        outbounds: [outbound]
+        outbounds
     }
+}
+
+function transProxyLogLevel(logLevel: string) {
+    return logLevel === 'warn' ? 'warning' : logLevel
+}
+
+function appendProxyChainOutbounds(config: ProxyNode, outbound: Outbound, outbounds: Outbound[]) {
+    const upstream = ProxyChainUtils.resolveUpstreamProxy(config)
+    if (!upstream) return
+
+    setDialerProxy(outbound, upstream.tag)
+    outbounds.push(new Socks('127.0.0.1', upstream.socksPort, upstream.tag))
+}
+
+function setDialerProxy(outbound: Outbound, tag: string) {
+    outbound.streamSettings = outbound.streamSettings || {}
+    outbound.streamSettings.sockopt = outbound.streamSettings.sockopt || {}
+    outbound.streamSettings.sockopt.dialerProxy = tag
+    outbound.streamSettings.sockopt.domainStrategy = 'UseIP'
 }
 
 function transDnsTag(name: string) {
@@ -198,6 +203,97 @@ function shouldSkipXrayRule(luciRuleDTO: RuleDTO) {
         && !luciRuleDTO.containDomain()
         && !luciRuleDTO.containIp()
         && !luciRuleDTO.containGeo()
+}
+
+function hasXrayDnsTargetRule(luciRuleDTO: RuleDTO) {
+    return luciRuleDTO.containDomain() || luciRuleDTO.geoSite.length > 0
+}
+
+function appendXrayDnsServer(rule: any, ruleName: string, outboundTag: string, luciRuleDTO: RuleDTO, dnsServerMap: Map<string, DnsServer>, defaultDnsTmpl: DnsServer, dns: DNS, dnsInOutMap: Map<string, string[]>) {
+    const dnsTag = transDnsTag(ruleName)
+    if (dnsInOutMap.has(outboundTag)) {
+        dnsInOutMap.get(outboundTag).push(dnsTag)
+    } else {
+        dnsInOutMap.set(outboundTag, [dnsTag])
+    }
+    const dnsTmpl = rule.dnsNode ? dnsServerMap.get(rule.dnsNode) : defaultDnsTmpl
+    const server = structuredClone(dnsTmpl)
+    server.tag = dnsTag
+    server.queryStrategy = transDnsStrategy(rule.dnsStrategy)
+    server.domains = buildXrayDomains(luciRuleDTO)
+    dns.servers.push(server)
+}
+
+function buildXrayRouteRules(name: string, outboundTag: string, luciRuleDTO: RuleDTO): RouteRule[] {
+    const routeRule = new RouteRule(name, outboundTag)
+    routeRule.network = luciRuleDTO.network
+    routeRule.protocol = transRouteProtocol(luciRuleDTO.protocol)
+
+    let allPorts: string[] = luciRuleDTO.port.map(p => String(p))
+    if (luciRuleDTO.portRange && luciRuleDTO.portRange.length > 0) {
+        allPorts = allPorts.concat(luciRuleDTO.portRange)
+    }
+    routeRule.port = allPorts.join(',')
+
+    routeRule.domain = buildXrayDomains(luciRuleDTO)
+    routeRule.domain = routeRule.domain.length > 0 ? routeRule.domain : undefined
+    routeRule.ip = buildXrayIps(luciRuleDTO)
+    routeRule.ip = routeRule.ip.length > 0 ? routeRule.ip : undefined
+
+    const rules: RouteRule[] = []
+    const ipVersionRange = transXrayIpVersion(luciRuleDTO.ipVersion)
+    if (routeRule.domain) {
+        const domainRule = structuredClone(routeRule)
+        if (ipVersionRange) domainRule.ip = [ipVersionRange]
+        else domainRule.ip = undefined
+        rules.push(domainRule)
+    }
+    if (routeRule.ip) {
+        const ipRule = structuredClone(routeRule)
+        ipRule.domain = undefined
+        rules.push(ipRule)
+    }
+    if (!routeRule.domain && !routeRule.ip) {
+        if (ipVersionRange) routeRule.ip = [ipVersionRange]
+        rules.push(routeRule)
+    }
+    return rules
+}
+
+function buildXrayDomains(luciRuleDTO: RuleDTO): string[] {
+    const domainArrays = [
+        addPrefixToElements(luciRuleDTO.domain, 'full:'),
+        addPrefixToElements(luciRuleDTO.domainSuffix, 'domain:'),
+        luciRuleDTO.domainKeyword,
+        addPrefixToElements(luciRuleDTO.domainRegex, 'regexp:'),
+        luciRuleDTO.geoSite
+    ]
+    return ([] as string[]).concat(...domainArrays.filter(a => Array.isArray(a) && a.length > 0))
+}
+
+function buildXrayIps(luciRuleDTO: RuleDTO): string[] {
+    const ipArrays = [
+        filterIpRulesByVersion(luciRuleDTO.ipCidr, luciRuleDTO.ipVersion),
+        luciRuleDTO.geoIp
+    ]
+    return ([] as string[]).concat(...ipArrays.filter(a => Array.isArray(a) && a.length > 0))
+}
+
+function filterIpRulesByVersion(rules: string[], ipVersion?: 4 | 6): string[] {
+    if (!ipVersion || !Array.isArray(rules)) return rules || []
+    return rules.filter((rule) => {
+        const normalized = rule.replace(/^!/, '')
+        if (normalized.startsWith('geoip:') || normalized.startsWith('ext:')) return true
+        if (normalized.indexOf(':') >= 0) return ipVersion === 6
+        if (/^\d{1,3}(\.\d{1,3}){3}(\/\d+)?$/.test(normalized)) return ipVersion === 4
+        return true
+    })
+}
+
+function transXrayIpVersion(ipVersion?: 4 | 6) {
+    if (ipVersion === 4) return '0.0.0.0/0'
+    if (ipVersion === 6) return '::/0'
+    return undefined
 }
 
 function transOutTag(tag: string) {

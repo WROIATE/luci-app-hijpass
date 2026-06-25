@@ -1,24 +1,26 @@
 import fs from "fs";
 
+type RuleUpdateStatus = 'success' | 'error' | 'neutral';
+
 function updateRuleFile(statusElement: HTMLElement) {
-    updateUpdateStatus(statusElement, '正在更新规则...');
+    updateUpdateStatus(statusElement, _('Updating Rule Files'), 'neutral');
     fs.exec('/usr/lib/hijpass/rules.sh', ['update'])
         .then(function (result) {
             if (result.code === 0) {
-                updateUpdateStatus(statusElement, '规则文件更新成功！');
+                updateUpdateStatus(statusElement, _('Rule Files Updated'), 'success');
             } else {
-                updateUpdateStatus(statusElement, '规则文件更新失败: ' + (result.stderr || result.stdout));
+                updateUpdateStatus(statusElement, _('Rule File Update Failed: %s').format(result.stderr || result.stdout), 'error');
             }
         })
         .catch(function (error) {
-            updateUpdateStatus(statusElement, '更新过程中发生错误：' + error.message);
+            updateUpdateStatus(statusElement, _('Error occurred while updating: %s').format(error.message), 'error');
         });
 }
 
-function updateUpdateStatus(statusElement: HTMLElement, message: string) {
+function updateUpdateStatus(statusElement: HTMLElement, message: string, status: RuleUpdateStatus) {
     statusElement.textContent = message;
-    statusElement.style.color = message.includes('成功') ? '#4caf50' :
-        message.includes('失败') ? '#f44336' : '#666';
+    statusElement.style.color = status === 'success' ? '#4caf50' :
+        status === 'error' ? '#f44336' : '#666';
 }
 
 function performQuery(
@@ -61,14 +63,14 @@ function queryDomain(keyword: string, outputElement: HTMLTextAreaElement, status
         .then(setOutput(outputElement, statusElement, '# geosite\n'))
         .catch(setError(statusElement))
     fs.exec('/usr/lib/hijpass/rules.sh', ['query', keyword])
-        .then(setOutput(outputElement, statusElement, '# 本地规则文件\n'))
+        .then(setOutput(outputElement, statusElement, _('# Local Rule Files\n')))
         .catch(setError(statusElement));
 }
 
 function queryShunt(keyword: string, outputElement: HTMLTextAreaElement, statusElement: HTMLElement) {
     clearQuery(outputElement)
     fs.exec('/usr/lib/hijpass/route-match.sh', [keyword])
-        .then(setOutput(outputElement, statusElement, '# 分流规则\n'))
+        .then(setOutput(outputElement, statusElement, _('# Shunt Rules\n')))
         .catch(setError(statusElement))
 }
 
@@ -85,7 +87,7 @@ function queryGeoTag(keyword: string, geoType: string, outputElement: HTMLTextAr
                 statusElement.textContent = _('Query Complete');
                 statusElement.style.color = '#4caf50';
             } else {
-                throw new Error(result.stderr || '查询失败');
+                throw new Error(result.stderr || _('Query Failed'));
             }
         })
         .catch(setError(statusElement));
@@ -108,7 +110,7 @@ function setOutput(outputElement: HTMLTextAreaElement, statusElement: HTMLElemen
             statusElement.textContent = _('Query Complete');
             statusElement.style.color = '#4caf50';
         } else {
-            throw new Error(result.stderr || '查询失败');
+            throw new Error(result.stderr || _('Query Failed'));
         }
     }
 }

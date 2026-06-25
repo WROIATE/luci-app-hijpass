@@ -27,26 +27,38 @@ export const PROXY_TYPE = {
     VLESS: 'vless'
 } as const;
 
+export const CORE_TYPE = {
+    XRAY: 'xray',
+    SING_BOX: 'sing-box',
+    CUSTOM: 'custom',
+} as const;
+
 // 'custom' 与 xray/sing-box 平级，是独立的核心类型
-export type CoreType = 'xray' | 'sing-box' | 'custom';
+export type CoreType = typeof CORE_TYPE[keyof typeof CORE_TYPE];
 export type ProxyType = typeof PROXY_TYPE[keyof typeof PROXY_TYPE];
+
+export function normalizeCoreType(type?: string): string {
+    const normalized = (type || '').trim();
+    return normalized === 'singbox' ? CORE_TYPE.SING_BOX : normalized;
+}
 
 // 仅 xray/sing-box 有协议列表；custom 无需协议选择
 export const CORE_PROTOCOLS: Partial<Record<CoreType, ProxyType[]>> = {
-    xray:    [PROXY_TYPE.SHADOWSOCKS, PROXY_TYPE.HYSTERIA2, PROXY_TYPE.VLESS],
-    'sing-box': [PROXY_TYPE.SHADOWSOCKS, PROXY_TYPE.HYSTERIA2, PROXY_TYPE.VLESS,
-                 PROXY_TYPE.TUIC, PROXY_TYPE.SHADOWTLS],
+    [CORE_TYPE.XRAY]: [PROXY_TYPE.SHADOWSOCKS, PROXY_TYPE.HYSTERIA2, PROXY_TYPE.VLESS],
+    [CORE_TYPE.SING_BOX]: [PROXY_TYPE.SHADOWSOCKS, PROXY_TYPE.HYSTERIA2, PROXY_TYPE.VLESS,
+                           PROXY_TYPE.TUIC, PROXY_TYPE.SHADOWTLS],
 };
 
 export const HijpassValues = {
     DNS_STRATEGY_VALUES: [
-        {label: '优先v6（仅sing-box，xray默认双栈）', value: '64'},
-        {label: '优先v4（仅sing-box，xray默认双栈）', value: '46'},
-        {label: '只使用v6', value: '6'},
-        {label: '只使用v4', value: '4'}
+        {label: 'Prefer IPv6 (sing-box only, xray uses dual stack by default)', value: '64'},
+        {label: 'Prefer IPv4 (sing-box only, xray uses dual stack by default)', value: '46'},
+        {label: 'IPv6 only', value: '6'},
+        {label: 'IPv4 only', value: '4'}
     ],
     SHUNT_LOG_LEVELS: ['info', 'warn', 'error', 'debug'] as const,
-    SHUNT_CONF_TYPE: ['xray', 'sing-box'] as const,
+    PROXY_LOG_LEVELS: ['info', 'warn', 'error', 'debug'] as const,
+    SHUNT_CONF_TYPE: [CORE_TYPE.XRAY, CORE_TYPE.SING_BOX] as const,
     PROXY_TYPES: [
         {label: 'Shadowsocks', value: 'shadowsocks'},
         {label: 'Hysteria2',   value: 'hysteria2'},
@@ -75,8 +87,8 @@ export const HijpassValues = {
         {label: 'bbr', value: 'bbr'}
     ] as const,
     TUIC_UDP_RELAY_MODES: [
-        {label: '原生UDP', value: 'native'},
-        {label: 'QUIC流', value: 'quic'}
+        {label: 'Native UDP', value: 'native'},
+        {label: 'QUIC Stream', value: 'quic'}
     ] as const,
     SHADOWTLS_VERSIONS: [
         {label: 'v1', value: '1'},
@@ -84,17 +96,17 @@ export const HijpassValues = {
         {label: 'v3', value: '3'}
     ] as const,
     VLESS_FLOWS: [
-        {label: '无', value: ''},
+        {label: 'None', value: ''},
         {label: 'xtls-rprx-vision', value: 'xtls-rprx-vision'}
     ] as const,
     VLESS_PACKET_ENCODINGS: [
-        {label: '禁用', value: ''},
+        {label: 'Disabled', value: ''},
         {label: 'packetaddr', value: 'packetaddr'},
         {label: 'xudp', value: 'xudp'}
     ] as const,
     // xray 支持的传输层（含 xhttp；sing-box 不支持 xhttp，由 validate 阻断）
     V2RAY_TRANSPORT_TYPES_XRAY: [
-        {label: '无', value: ''},
+        {label: 'None', value: ''},
         {label: 'HTTP', value: 'http'},
         {label: 'WebSocket', value: 'ws'},
         {label: 'gRPC', value: 'grpc'},
@@ -102,14 +114,14 @@ export const HijpassValues = {
         {label: 'XHTTP', value: 'xhttp'}
     ] as const,
     HYSTERIA2_OBFS_TYPES: [
-        {label: '禁用', value: ''},
+        {label: 'Disabled', value: ''},
         {label: 'Salamander', value: 'salamander'}
     ] as const,
     // 通用 core 选项（支持双核心的协议使用）
     DUAL_CORES: [
-        {label: 'sing-box', value: 'sing-box'},
-        {label: 'xray',     value: 'xray'},
-        {label: '自定义',   value: 'custom'}
+        {label: 'sing-box', value: CORE_TYPE.SING_BOX},
+        {label: 'xray',     value: CORE_TYPE.XRAY},
+        {label: 'Custom',   value: CORE_TYPE.CUSTOM}
     ] as const,
 }
 

@@ -1,16 +1,9 @@
 import { CoreAdapter, ProxyNode } from '../module/luci'
+import { CORE_TYPE, normalizeCoreType } from '../enum/hijpass'
 import { SingBoxUtils } from './singbox/builder'
 import { XrayUtils } from './xray/builder'
 
-const FactoryType = {
-    SING_BOX: 'sing-box',
-    XRAY: 'xray',
-    CUSTOM: 'custom',
-} as const
-
-function normalizeCoreType(type: string) {
-    return type === 'singbox' ? FactoryType.SING_BOX : type;
-}
+const FactoryType = CORE_TYPE
 
 const CoreAdapterFactory = {
     getCoreAdapter: function (type: string): CoreAdapter {

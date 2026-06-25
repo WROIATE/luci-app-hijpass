@@ -24,13 +24,13 @@ const v = view.extend({
     },
 
     render: async function (data: any[]) {
-        let m = new form.Map(LuciFlied.SERVER_CONF_NAME, _('Server Settings'),
-            _('Run as Server'));
+        let m = new form.Map(LuciFlied.SERVER_CONF_NAME, _('Local Server'),
+            _('Run as Local Server'));
 
         let globalSection = m.section(form.TypedSection, LuciFlied.SERVER_CONF_NAME)
         globalSection.addremove = false;
         globalSection.anonymous = true;
-        globalSection.option(form.Flag, 'enabled', _('Enable'), _(''))
+        globalSection.option(form.Flag, 'enabled', _('Enable'), '')
         let s = m.section(form.GridSection, LuciFlied.SERVER_NODE_TYPE)
         FormUtils.setGridSectionMembers(s);
         s.anonymous = true;
@@ -55,7 +55,7 @@ const v = view.extend({
 
 // 创建启用状态选项
 function createEnabledOption(s: LuCI.form.AbstractSection) {
-    let enabled = s.option(form.Flag, 'enabled', _('Enable'), _(''));
+    let enabled = s.option(form.Flag, 'enabled', _('Enable'), '');
     enabled.modalonly = true;
     enabled.default = '1';
     enabled.rmempty = false;
@@ -63,7 +63,7 @@ function createEnabledOption(s: LuCI.form.AbstractSection) {
 }
 
 function createFirewallEnabledOption(s: LuCI.form.AbstractSection) {
-    let o = s.option(form.Flag, 'allow_firewall', _('Allow Public Access'), _(''));
+    let o = s.option(form.Flag, 'allow_firewall', _('Allow Public Access'), '');
     o.default = '1';
     o.rmempty = false;
     return o;
@@ -91,7 +91,7 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
         return E('span', {}, value || '-');
     };
 
-    let statusOpt = s.option(form.TextValue, 'run_status', _('Status'), _(''));
+    let statusOpt = s.option(form.TextValue, 'run_status', _('Status'), '');
     statusOpt.modalonly = false;
     statusOpt.textvalue = function (section_id: string) {
         const name = uci.get(LuciFlied.SERVER_CONF_NAME, section_id, 'name');

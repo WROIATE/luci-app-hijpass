@@ -1,6 +1,6 @@
 import view from "view";
 import uci from "uci";
-import { LuciFlied, HijpassValues, PROXY_TYPE, ProxyType } from "../enum/hijpass";
+import { CORE_TYPE, LuciFlied, HijpassValues, PROXY_TYPE, ProxyType } from "../enum/hijpass";
 import form from "form";
 import { SaveApplyUtils } from "../utils/actions/save-apply/index";
 import { ServiceUtils } from "../utils/base/luci/service";
@@ -25,6 +25,8 @@ const v = view.extend({
     render: async function (data: any[]) {
         let m = new form.Map(LuciFlied.CONF_NAME, _('Proxy Settings'),
             _('Configure Proxy Settings'));
+        ProxyFormUtils.createShareLinkImportSection(m);
+
         let s = m.section(form.GridSection, LuciFlied.PROXY_NODE_TYPE)
         FormUtils.setAnonymousGridSectionMembers(s);
 
@@ -47,7 +49,7 @@ const v = view.extend({
  * 创建启用状态选项
  */
 function createEnabledOption(s: LuCI.form.AbstractSection) {
-    let o = s.option(form.Flag, 'enabled', _('Enable'), _(''));
+    let o = s.option(form.Flag, 'enabled', _('Enable'), '');
     o.modalonly = true;
     o.default = '1';
     o.rmempty = false;
@@ -76,14 +78,14 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
     };
 
     // 显示服务器信息（不同类型显示不同内容）
-    let serverInfoOpt = s.option(form.TextValue, 'server_info', _('Configuration Info'), _(''));
+    let serverInfoOpt = s.option(form.TextValue, 'server_info', _('Configuration Info'), '');
     serverInfoOpt.modalonly = false;
     serverInfoOpt.textvalue = function (section_id: string) {
         return ProxyFormUtils.renderProxyServerInfo(section_id);
     };
 
     // 运行状态列
-    let statusOpt = s.option(form.TextValue, 'run_status', _('Status'), _(''));
+    let statusOpt = s.option(form.TextValue, 'run_status', _('Status'), '');
     statusOpt.modalonly = false;
     statusOpt.textvalue = function (section_id: string) {
         return ProxyFormUtils.renderRunStatus(section_id, instances);
@@ -95,7 +97,7 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
     enabledOpt.modalonly = false;
 
     // 操作列：预览 / 日志 / 测速，三个按钮合并在一列
-    let actionsOpt = s.option(form.TextValue, 'actions', _(''));
+    let actionsOpt = s.option(form.TextValue, 'actions', '');
     actionsOpt.modalonly = false;
     actionsOpt.textvalue = function (section_id: string) {
         return ProxyFormUtils.createGridActionButtons(section_id);
@@ -112,13 +114,13 @@ function createCustomProxyOptions(s: LuCI.form.AbstractSection) {
     cmdOpt.default = '/usr/bin/xray -c {conf_path}';
     cmdOpt.rmempty = false;
     cmdOpt.modalonly = true;
-    cmdOpt.depends('core', 'custom');
+    cmdOpt.depends('core', CORE_TYPE.CUSTOM);
 
     // 配置文件内容编辑器，路径自动生成为 $client_dir/$name-$section_id.json
     let confOpt = s.option(form.TextValue, 'custom_conf', _('Configuration File Content'),
         _('Edit Configuration File'));
     confOpt.modalonly = true;
-    confOpt.depends('core', 'custom');
+    confOpt.depends('core', CORE_TYPE.CUSTOM);
     FormUtils.setConfContentOptionMembers(confOpt, LuciFlied.CONF_NAME, FilePathUtils.getFilePath('client_dir'));
 }
 
@@ -129,6 +131,14 @@ function createProxyEnvironmentOptions(s: LuCI.form.AbstractSection) {
     let procdEnvOpt = s.option(form.DynamicList, 'procd_env', _('Procd Environment Variables'),
         _('Procd Environment Variables'));
     procdEnvOpt.modalonly = true;
+
+    let logLevelOpt = s.option(form.ListValue, 'log_level', _('Log Level'), _('Core Log Level'));
+    logLevelOpt.modalonly = true;
+    logLevelOpt.default = 'info';
+    logLevelOpt.rmempty = false;
+    logLevelOpt.depends('core', CORE_TYPE.XRAY);
+    logLevelOpt.depends('core', CORE_TYPE.SING_BOX);
+    HijpassValues.PROXY_LOG_LEVELS.forEach(level => logLevelOpt.value(level));
 
     FormUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, undefined)
 }
@@ -155,32 +165,34 @@ function createCommonServerOptions(s: LuCI.form.AbstractSection) {
 }
 
 /**
- * 创建Hysteria2代理的高级选项（sing-box 核心独有）
+ * 创建Hysteria2代理的高级选项
  */
 function createHysteria2AdvancedOptions(s: LuCI.form.AbstractSection) {
     let serverPortsOpt = s.option(form.DynamicList, 'server_ports', _('Port Hopping'),
         _('Port Hopping Range'));
     serverPortsOpt.modalonly = true;
     serverPortsOpt.datatype = 'portrange';
-    serverPortsOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: 'sing-box' });
+    serverPortsOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.SING_BOX });
 
     let hopIntervalOpt = s.option(form.Value, 'hop_interval', _('Port Hop Interval'),
         _('Port Hop Interval'));
     hopIntervalOpt.modalonly = true;
     // hop_interval 依赖于类型是 Hysteria2 且 server_ports 有值
-    hopIntervalOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: 'sing-box', server_ports: /./ });
+    hopIntervalOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.SING_BOX, server_ports: /./ });
 
     let upMbpsOpt = s.option(form.Value, 'up_mbps', _('Uplink Speed'),
         _('Maximum Uplink Bandwidth'));
     upMbpsOpt.datatype = 'uinteger';
     upMbpsOpt.modalonly = true;
-    upMbpsOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: 'sing-box' });
+    upMbpsOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.SING_BOX });
+    upMbpsOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.XRAY });
 
     let downMbpsOpt = s.option(form.Value, 'down_mbps', _('Downlink Speed'),
         _('Maximum Downlink Bandwidth'));
     downMbpsOpt.datatype = 'uinteger';
     downMbpsOpt.modalonly = true;
-    downMbpsOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: 'sing-box' });
+    downMbpsOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.SING_BOX });
+    downMbpsOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.XRAY });
 }
 
 /**
@@ -192,7 +204,7 @@ function createHysteria2XrayOptions(s: LuCI.form.AbstractSection) {
     udpIdleTimeoutOpt.datatype = 'uinteger';
     udpIdleTimeoutOpt.modalonly = true;
     udpIdleTimeoutOpt.placeholder = '60';
-    udpIdleTimeoutOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: 'xray' });
+    udpIdleTimeoutOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.XRAY });
 }
 
 /**
@@ -202,7 +214,7 @@ function createHysteria2ObfsOptions(s: LuCI.form.AbstractSection) {
     let obfsTypeOpt = s.option(form.ListValue, 'obfs_type', _('OBFS Type'),
         _('QUIC Obfuscation Type'));
     obfsTypeOpt.modalonly = true;
-    obfsTypeOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: 'sing-box' });
+    obfsTypeOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.SING_BOX });
 
     HijpassValues.HYSTERIA2_OBFS_TYPES.forEach((item) => {
         obfsTypeOpt.value(item.value, _(item.label));
@@ -211,7 +223,7 @@ function createHysteria2ObfsOptions(s: LuCI.form.AbstractSection) {
     let obfsPasswordOpt = s.option(form.Value, 'obfs_password', _('OBFS Password'),
         _('QUIC Obfuscation Password'));
     obfsPasswordOpt.modalonly = true;
-    obfsPasswordOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: 'sing-box', obfs_type: 'salamander' });
+    obfsPasswordOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.SING_BOX, obfs_type: 'salamander' });
 }
 
 /**
@@ -223,10 +235,10 @@ function createVlessNetworkOptions(s: LuCI.form.AbstractSection) {
         _('UDP Packet Encoding Method'));
     packetEncodingOpt.modalonly = true;
     // packet_encoding 只对 sing-box core 有意义
-    packetEncodingOpt.depends({ type: PROXY_TYPE.VLESS, core: 'sing-box' });
+    packetEncodingOpt.depends({ type: PROXY_TYPE.VLESS, core: CORE_TYPE.SING_BOX });
 
     HijpassValues.VLESS_PACKET_ENCODINGS.forEach((item) => {
-        packetEncodingOpt.value(item.value, item.label);
+        packetEncodingOpt.value(item.value, _(item.label));
     });
 }
 
@@ -243,7 +255,7 @@ function createTransportTypeOption(s: LuCI.form.AbstractSection) {
     transportOpt.depends('type', PROXY_TYPE.VLESS);
 
     HijpassValues.V2RAY_TRANSPORT_TYPES_XRAY.forEach((item) => {
-        transportOpt.value(item.value, item.label);
+        transportOpt.value(item.value, _(item.label));
     });
 
     // sing-box 不支持 xhttp
@@ -252,7 +264,7 @@ function createTransportTypeOption(s: LuCI.form.AbstractSection) {
     transportOpt.validate = function (sectionId: string, value: string) {
         if (value === 'xhttp') {
             let core = (this as any).section.formvalue(sectionId, 'core');
-            if (core !== 'xray') {
+            if (core !== CORE_TYPE.XRAY) {
                 return _('XHTTP transport is only supported by Xray core');
             }
         }
@@ -302,7 +314,7 @@ function createTransportWsOptions(s: LuCI.form.AbstractSection) {
     pathOpt.depends({ type: PROXY_TYPE.VLESS, transport_type: 'ws' });
 
     let earlyDataOpt = s.option(form.Value, 'transport_ws_max_early_data', _('Max Early Data'),
-        _('请求中允许的最大有效负载大小'));
+        _('Maximum allowed payload size in requests'));
     earlyDataOpt.datatype = 'uinteger';
     earlyDataOpt.modalonly = true;
     earlyDataOpt.depends({ type: PROXY_TYPE.VLESS, transport_type: 'ws' });
@@ -401,7 +413,7 @@ function createHysteria2DebugOptions(s: LuCI.form.AbstractSection) {
     let o = s.option(form.Flag, 'brutal_debug', _('Enable Brutal CC Debug'),
         _('Enable Hysteria Brutal CC Debug'));
     o.modalonly = true;
-    o.depends({ type: PROXY_TYPE.HYSTERIA2, core: 'sing-box' });
+    o.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.SING_BOX });
 }
 
 function createNetworkOption(s: LuCI.form.AbstractSection) {
@@ -409,7 +421,7 @@ function createNetworkOption(s: LuCI.form.AbstractSection) {
         _('Enabled Network Protocols'));
     networkOpt.modalonly = true;
     networkOpt.default = '';
-    networkOpt.value('', '默认');
+    networkOpt.value('', _('Default'));
     networkOpt.value('tcp', 'TCP');
     networkOpt.value('udp', 'UDP');
     ProxyFormUtils.forProtocols(networkOpt, [PROXY_TYPE.HYSTERIA2, PROXY_TYPE.SHADOWSOCKS,
@@ -441,49 +453,49 @@ function createMultiplexOptions(s: LuCI.form.AbstractSection) {
     let enabledOpt = s.option(form.Flag, 'multiplex_enabled', _('Enable Multiplexing'),
         _('Enable Multiplexing for Better Efficiency'));
     enabledOpt.modalonly = true;
-    ProxyFormUtils.forCoreProtocols(enabledOpt, 'sing-box', muxTypes);
+    ProxyFormUtils.forCoreProtocols(enabledOpt, CORE_TYPE.SING_BOX, muxTypes);
 
     let protocolOpt = s.option(form.ListValue, 'multiplex_protocol', _('Multiplexing Protocol'),
         _('Multiplexing Protocol'));
     protocolOpt.modalonly = true;
     protocolOpt.default = 'h2mux';
-    muxTypes.forEach(t => protocolOpt.depends({ type: t, core: 'sing-box', multiplex_enabled: '1' }));
+    muxTypes.forEach(t => protocolOpt.depends({ type: t, core: CORE_TYPE.SING_BOX, multiplex_enabled: '1' }));
     HijpassValues.MULTIPLEX_PROTOCOLS.forEach(item => protocolOpt.value(item.value, item.label));
 
     let maxConnOpt = s.option(form.Value, 'multiplex_max_connections', _('Max Connections'),
         _('Max Connections'));
     maxConnOpt.datatype = 'uinteger';
     maxConnOpt.modalonly = true;
-    muxTypes.forEach(t => maxConnOpt.depends({ type: t, core: 'sing-box', multiplex_enabled: '1' }));
+    muxTypes.forEach(t => maxConnOpt.depends({ type: t, core: CORE_TYPE.SING_BOX, multiplex_enabled: '1' }));
 
     let minStreamsOpt = s.option(form.Value, 'multiplex_min_streams', _('Min Streams'),
         _('Min Concurrent Streams'));
     minStreamsOpt.datatype = 'uinteger';
     minStreamsOpt.modalonly = true;
-    muxTypes.forEach(t => minStreamsOpt.depends({ type: t, core: 'sing-box', multiplex_enabled: '1' }));
+    muxTypes.forEach(t => minStreamsOpt.depends({ type: t, core: CORE_TYPE.SING_BOX, multiplex_enabled: '1' }));
 
     let maxStreamsOpt = s.option(form.Value, 'multiplex_max_streams', _('Max Streams'),
         _('Max Concurrent Streams'));
     maxStreamsOpt.datatype = 'uinteger';
     maxStreamsOpt.modalonly = true;
-    muxTypes.forEach(t => maxStreamsOpt.depends({ type: t, core: 'sing-box', multiplex_enabled: '1' }));
+    muxTypes.forEach(t => maxStreamsOpt.depends({ type: t, core: CORE_TYPE.SING_BOX, multiplex_enabled: '1' }));
 
     let brutalEnabledOpt = s.option(form.Flag, 'multiplex_brutal_enabled', _('Enable TCP Brutal'),
         _('Enable TCP Brutal Congestion Control'));
     brutalEnabledOpt.modalonly = true;
-    muxTypes.forEach(t => brutalEnabledOpt.depends({ type: t, core: 'sing-box', multiplex_enabled: '1' }));
+    muxTypes.forEach(t => brutalEnabledOpt.depends({ type: t, core: CORE_TYPE.SING_BOX, multiplex_enabled: '1' }));
 
     let brutalUpOpt = s.option(form.Value, 'multiplex_brutal_up_mbps', _('Uplink Bandwidth'),
         _('Uplink Bandwidth'));
     brutalUpOpt.datatype = 'uinteger';
     brutalUpOpt.modalonly = true;
-    muxTypes.forEach(t => brutalUpOpt.depends({ type: t, core: 'sing-box', multiplex_enabled: '1', multiplex_brutal_enabled: '1' }));
+    muxTypes.forEach(t => brutalUpOpt.depends({ type: t, core: CORE_TYPE.SING_BOX, multiplex_enabled: '1', multiplex_brutal_enabled: '1' }));
 
     let brutalDownOpt = s.option(form.Value, 'multiplex_brutal_down_mbps', _('Downlink Bandwidth'),
         _('Downlink Bandwidth'));
     brutalDownOpt.datatype = 'uinteger';
     brutalDownOpt.modalonly = true;
-    muxTypes.forEach(t => brutalDownOpt.depends({ type: t, core: 'sing-box', multiplex_enabled: '1', multiplex_brutal_enabled: '1' }));
+    muxTypes.forEach(t => brutalDownOpt.depends({ type: t, core: CORE_TYPE.SING_BOX, multiplex_enabled: '1', multiplex_brutal_enabled: '1' }));
 }
 
 /**
@@ -509,7 +521,7 @@ function createShadowsocksPluginOptions(s: LuCI.form.AbstractSection) {
     let pluginOpt = s.option(form.ListValue, 'plugin', _('Plugin'),
         _('Shadowsocks SIP003 Plugin'));
     pluginOpt.modalonly = true;
-    pluginOpt.value('', _('无'));
+    pluginOpt.value('', _('None'));
     pluginOpt.value('obfs-local', 'obfs-local');
     pluginOpt.value('v2ray-plugin', 'v2ray-plugin');
     pluginOpt.depends('type', PROXY_TYPE.SHADOWSOCKS);
@@ -552,9 +564,9 @@ function createTuicAdvancedOptions(s: LuCI.form.AbstractSection) {
     // udp_relay_mode 依赖于 udp_over_stream 未启用
     udpRelayOpt.depends({ type: PROXY_TYPE.TUIC, udp_over_stream: '0' });
 
-    udpRelayOpt.value('', _('无'));
+    udpRelayOpt.value('', _('None'));
     HijpassValues.TUIC_UDP_RELAY_MODES.forEach((item) => {
-        udpRelayOpt.value(item.value, item.label);
+        udpRelayOpt.value(item.value, _(item.label));
     });
 
     let udpOverStreamOpt = s.option(form.Flag, 'udp_over_stream', _('UDP over Stream'),
@@ -601,7 +613,7 @@ function createVlessAuthOptions(s: LuCI.form.AbstractSection) {
     flowOpt.depends('type', PROXY_TYPE.VLESS);
 
     HijpassValues.VLESS_FLOWS.forEach((item) => {
-        flowOpt.value(item.value, item.label);
+        flowOpt.value(item.value, _(item.label));
     });
 }
 
@@ -612,22 +624,22 @@ function createTransportXhttpOptions(s: LuCI.form.AbstractSection) {
     let hostOpt = s.option(form.Value, 'transport_xhttp_host', _('XHTTP Host'),
         _('XHTTP Host Domain'));
     hostOpt.modalonly = true;
-    hostOpt.depends({ type: PROXY_TYPE.VLESS, core: 'xray', transport_type: 'xhttp' });
+    hostOpt.depends({ type: PROXY_TYPE.VLESS, core: CORE_TYPE.XRAY, transport_type: 'xhttp' });
 
     let pathOpt = s.option(form.Value, 'transport_xhttp_path', _('XHTTP Path'),
         _('XHTTP Request Path'));
     pathOpt.modalonly = true;
     pathOpt.default = '/';
-    pathOpt.depends({ type: PROXY_TYPE.VLESS, core: 'xray', transport_type: 'xhttp' });
+    pathOpt.depends({ type: PROXY_TYPE.VLESS, core: CORE_TYPE.XRAY, transport_type: 'xhttp' });
 
     let modeOpt = s.option(form.ListValue, 'transport_xhttp_mode', _('XHTTP Mode'),
         _('XHTTP Transport Mode'));
     modeOpt.modalonly = true;
     modeOpt.default = 'auto';
-    modeOpt.value('auto', _('自动'));
+    modeOpt.value('auto', _('Auto'));
     modeOpt.value('stream-one', 'stream-one');
     modeOpt.value('stream-up', 'stream-up');
-    modeOpt.depends({ type: PROXY_TYPE.VLESS, core: 'xray', transport_type: 'xhttp' });
+    modeOpt.depends({ type: PROXY_TYPE.VLESS, core: CORE_TYPE.XRAY, transport_type: 'xhttp' });
 }
 
 
@@ -642,6 +654,7 @@ function createProxyOptions(s: LuCI.form.AbstractSection, instances: any) {
     createNodeNameOption(s);
     createEnabledOption(s);
     ProxyFormUtils.createCoreAndTypeOptions(s);
+    ProxyFormUtils.createUpstreamProxyNodeOption(s);
 
     // 类型特定的选项 - 服务器地址和端口
     createCommonServerOptions(s);

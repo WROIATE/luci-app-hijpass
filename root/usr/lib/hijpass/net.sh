@@ -8,6 +8,18 @@ is_safe_target() {
 	echo "$1" | grep -Eq "^[A-Za-z0-9.-]+$" >/dev/null 2>&1
 }
 
+is_ipv4_value() {
+	echo "$1" | grep -Eq "^([0-9]{1,3}\.){3}[0-9]{1,3}$" >/dev/null 2>&1
+}
+
+is_ipv6_value() {
+	echo "$1" | grep -Eq "^[0-9A-Fa-f:]+$" >/dev/null 2>&1 && echo "$1" | grep -q ":" >/dev/null 2>&1
+}
+
+json_escape() {
+	echo "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
 check_port() {
 	if is_port_value "$1"; then
 		if netstat -tlnp | grep -q ":$1 " >>/dev/null 2>&1; then
@@ -57,8 +69,30 @@ main() {
 			echo "{\"error\":\"timeout\"}"
 		fi
 		;;
+	"resolve")
+		local target="$1"
+		local address
+		if ! is_safe_target "$target" && ! is_ipv6_value "$target"; then
+			echo "{\"error\":\"invalid argument\"}"
+			exit 1
+		fi
+		if is_ipv4_value "$target" || is_ipv6_value "$target"; then
+			echo "{\"address\":\"$(json_escape "$target")\"}"
+			exit 0
+		fi
+		address=$(nslookup "$target" 2>/dev/null | awk '
+			/^Address[[:space:]][0-9]+:[[:space:]]/ { print $3; exit }
+			/^Address:[[:space:]]/ && $2 !~ /#/ { print $2; exit }
+		')
+		if [ -n "$address" ]; then
+			echo "{\"address\":\"$(json_escape "$address")\"}"
+		else
+			echo "{\"error\":\"resolve failed\"}"
+			exit 1
+		fi
+		;;
 	*)
-		echo -e "Usage: \n    $0 [port|ping] args"
+		echo -e "Usage: \n    $0 [port|ping|resolve] args"
 		exit 1
 		;;
 	esac

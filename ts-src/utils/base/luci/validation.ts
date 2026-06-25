@@ -17,7 +17,7 @@ const ValidationUtils = {
             });
 
             if (duplicate) {
-                return _('%s已存在，请使用其他%s').format(fieldName === 'tag' ? _('标签') : _('名称'), fieldName === 'tag' ? _('标签') : _('名称'));
+                return _('%s already exists, use another %s').format(fieldName === 'tag' ? _('Tag') : _('Name'), fieldName === 'tag' ? _('Tag') : _('Name'));
             }
 
             return true;
@@ -72,12 +72,12 @@ const ValidationUtils = {
         let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
         if (shuntSection && shuntSection[".name"] !== sectionId && (shuntSection.dns_listen_port === value
             || shuntSection.shunt_listen_port === value)) {
-            return _('端口 %s 已被分流配置占用').format(value);
+            return _('Port %s is used by shunt configuration').format(value);
         }
 
         let dnsSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE)
         if (dnsSection && dnsSection[".name"] !== sectionId && dnsSection.cdg_port === value) {
-            return _('端口 %s 已被DNS配置占用').format(value);
+            return _('Port %s is used by DNS configuration').format(value);
         }
 
         let proxySections = uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE);
@@ -87,7 +87,7 @@ const ValidationUtils = {
                 continue
             }
             if (section.listen_port === value || section.socks_port === value) {
-                return _('端口 %s 已被代理节点 "%s" 使用').format(value, section.name);
+                return _('Port %s is used by proxy node "%s"').format(value, section.name);
             }
         }
 
@@ -99,7 +99,7 @@ const ValidationUtils = {
             }
 
             if (section.listen_port === value) {
-                return _('端口 %s 已被服务端节点 "%s" 使用').format(value, section.name);
+                return _('Port %s is used by server node "%s"').format(value, section.name);
             }
         }
         return true;
@@ -107,11 +107,11 @@ const ValidationUtils = {
 
     validateNameFormat: function (sectionId: any, value: any) {
         if (!value || value === '') {
-            return _('节点名称不能为空');
+            return _('Node name cannot be empty');
         }
 
         if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
-            return _('节点名称只能包含英文字母、数字、下划线和连字符');
+            return _('Node name can only contain letters, numbers, underscores, and hyphens');
         }
 
         return true;

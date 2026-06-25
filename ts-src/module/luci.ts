@@ -1,3 +1,5 @@
+import { CORE_TYPE } from "../enum/hijpass";
+
 export class DnsNode {
     tag: string;
     type: string;
@@ -21,6 +23,9 @@ export class ShuntRouteRule {
     enabled: string;
     name: string;
     proxyNode: string;
+    ipVersionSplit: string;
+    proxyNodeV4: string;
+    proxyNodeV6: string;
 
     protocol: string[];
     network: string[];
@@ -38,6 +43,7 @@ export class ShuntRouteRule {
         this.portRange = [];
         this.network = [];
         this.protocol = [];
+        this.ipVersionSplit = '0';
     }
 }
 
@@ -106,6 +112,7 @@ export class RuleDTO {
     protocol: string[];
     port: number[];
     portRange: string[];
+    ipVersion?: 4 | 6;
 
     ruleSet: RuleSetDTO[]; // 规则集合
     geoIp: string[];
@@ -158,6 +165,12 @@ export class RuleDTO {
     }
 }
 
+export interface ShuntRouteRuleVariant {
+    rule: ShuntRouteRule;
+    proxyNode: string;
+    ipVersion?: 4 | 6;
+}
+
 export interface RuleSetDTO {
     tag: string;
     type: string;
@@ -185,7 +198,9 @@ export interface ProxyNode {
     enabled: string;
     listen_port: string;
     socks_port: string;
+    upstream_proxy_node?: string;
     procd_env: string[];
+    log_level?: string;
     log_path: string;
 }
 
@@ -224,14 +239,14 @@ export class Hysteria2Config implements ProxyNode {
     // sing-box 独有
     server_ports: string[];
     hop_interval: string;
-    up_mbps: string;
-    down_mbps: string;
     obfs_type: string;
     obfs_password: string;
     brutal_debug: string;
     // xray 独有
     udp_idle_timeout: string;
     // 共有
+    up_mbps: string;
+    down_mbps: string;
     password: string;
     network: string;
     tls_server_name: string;
@@ -245,7 +260,7 @@ export class Hysteria2Config implements ProxyNode {
     constructor() {
         this.type = 'hysteria2';
         this.enabled = '1';
-        this.core = 'sing-box';
+        this.core = CORE_TYPE.SING_BOX;
         this.server_ports = [];
         this.network = '';
         this.brutal_debug = '0';
@@ -288,7 +303,7 @@ export class ShadowsocksConfig implements ProxyNode {
     constructor() {
         this.type = 'shadowsocks';
         this.enabled = '1';
-        this.core = 'sing-box';
+        this.core = CORE_TYPE.SING_BOX;
         this.network = '';
         this.udp_over_tcp = '0';
         this.multiplex_enabled = '0';
@@ -326,7 +341,7 @@ export class TuicConfig implements ProxyNode {
     constructor() {
         this.type = 'tuic';
         this.enabled = '1';
-        this.core = 'sing-box';
+        this.core = CORE_TYPE.SING_BOX;
         this.congestion_control = 'cubic';
         this.udp_relay_mode = '';
         this.udp_over_stream = '0';
@@ -359,7 +374,7 @@ export class ShadowTLSConfig implements ProxyNode {
     constructor() {
         this.type = 'shadowtls';
         this.enabled = '1';
-        this.core = 'sing-box';
+        this.core = CORE_TYPE.SING_BOX;
         this.version = '1';
         this.tls_insecure = '0';
     }
@@ -422,7 +437,7 @@ export class VlessConfig implements ProxyNode {
     constructor() {
         this.type = 'vless';
         this.enabled = '1';
-        this.core = 'xray';   // VLESS 默认用 xray（支持 Vision/XHTTP+REALITY）
+        this.core = CORE_TYPE.XRAY;   // VLESS 默认用 xray（支持 Vision/XHTTP+REALITY）
         this.network = 'tcp';
         this.packet_encoding = '';
         this.tls_insecure = '0';

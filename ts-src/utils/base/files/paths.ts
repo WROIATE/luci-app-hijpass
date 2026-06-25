@@ -38,7 +38,7 @@ function getFilePath(option: any, confName: string = LuciFlied.CONF_NAME) {
 
 function getNodeConfigFilePath(confName: string, dirPath: string, sectionId: string, optionContext?: any) {
     if (!dirPath) {
-        throw new Error(_('配置文件目录为空'));
+        throw new Error(_('Configuration file directory is empty'));
     }
 
     const formName = optionContext?.section?.formvalue?.(sectionId, 'name');

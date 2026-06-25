@@ -262,6 +262,8 @@ declare namespace LuCI {
 
             load(config: string): Promise<void>;
 
+            add(config: string, type: string, name?: string): string;
+
             sections(config: string, type: string, callback: (section: any) => void): any[];
 
             sections(config: string, type: string): any[];

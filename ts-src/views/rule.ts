@@ -21,12 +21,12 @@ const v = view.extend({
         s.anonymous = true;
         s.addremove = false;
 
-        s.tab("config", _("配置"))
-        s.tab("query", _("查询"))
+        s.tab("config", _("Configuration"))
+        s.tab("query", _("Query"))
 
         let downloadButton = s.taboption('config', form.Button, '_download_all', _('Update All Rules'),
             _('Download All Rules Now'));
-        downloadButton.inputtitle = _('更新');
+        downloadButton.inputtitle = _('Update');
         downloadButton.render = function () {
             return RulePanelUtils.createUpdateButtons();
         }

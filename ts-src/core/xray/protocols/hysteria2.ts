@@ -14,6 +14,12 @@ interface Hysteria2StreamSettings {
     security: 'tls'
     tlsSettings: TlsObject
     hysteriaSettings: HysteriaSettings
+    finalmask?: {
+        quicParams: {
+            brutalUp?: string
+            brutalDown?: string
+        }
+    }
 }
 
 export class Hysteria2Outbound implements Outbound {
@@ -29,7 +35,9 @@ export class Hysteria2Outbound implements Outbound {
         password: string,
         serverName: string,
         allowInsecure: boolean = false,
-        udpIdleTimeout?: number
+        udpIdleTimeout?: number,
+        brutalUp?: string,
+        brutalDown?: string
     ) {
         this.protocol = 'hysteria'
         this.tag = tag
@@ -42,9 +50,23 @@ export class Hysteria2Outbound implements Outbound {
                 version: 2,
                 auth: password,
                 ...(udpIdleTimeout !== undefined ? { udpIdleTimeout } : {})
-            }
+            },
+            ...((brutalUp || brutalDown) ? {
+                finalmask: {
+                    quicParams: {
+                        ...(brutalUp ? { brutalUp } : {}),
+                        ...(brutalDown ? { brutalDown } : {})
+                    }
+                }
+            } : {})
         }
     }
+}
+
+function formatBrutalMbps(value: string | undefined): string | undefined {
+    const mbps = (value || '').trim()
+    if (!mbps) return undefined
+    return mbps === '0' ? '0' : mbps + ' mbps'
 }
 
 const hysteria2Protocol: XrayProtocol = {
@@ -52,6 +74,8 @@ const hysteria2Protocol: XrayProtocol = {
     build(config: ProxyNode): Outbound {
         const c = config as Hysteria2Config
         const udpIdleTimeout = c.udp_idle_timeout ? Number(c.udp_idle_timeout) : undefined
+        const brutalUp = formatBrutalMbps(c.up_mbps)
+        const brutalDown = formatBrutalMbps(c.down_mbps)
         return new Hysteria2Outbound(
             c.server,
             Number(c.server_port),
@@ -59,7 +83,9 @@ const hysteria2Protocol: XrayProtocol = {
             c.password || '',
             c.tls_server_name || c.server,
             c.tls_insecure === '1',
-            udpIdleTimeout
+            udpIdleTimeout,
+            brutalUp,
+            brutalDown
         )
     }
 }

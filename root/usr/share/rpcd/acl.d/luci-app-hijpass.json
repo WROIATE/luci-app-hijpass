@@ -92,6 +92,30 @@
         "/usr/lib/hijpass/route-match.sh [A-Za-z0-9._:/-]*": [
           "exec"
         ],
+        "/usr/lib/hijpass/trace-url.sh -t [0-9]* -X [A-Z]* [A-Za-z0-9._:/?&=%#~+-]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/trace-url.sh -t [0-9]* -X [A-Z]* -v [A-Za-z0-9._:/?&=%#~+-]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/trace-url.sh -t [0-9]* -X [A-Z]* -c [A-Fa-f0-9:.]* [A-Za-z0-9._:/?&=%#~+-]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/trace-url.sh -t [0-9]* -X [A-Z]* -c [A-Fa-f0-9:.]* -v [A-Za-z0-9._:/?&=%#~+-]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/trace-url.sh -t [0-9]* -X [A-Z]* -p -i [A-Za-z0-9_.:@-]* [A-Za-z0-9._:/?&=%#~+-]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/trace-url.sh -t [0-9]* -X [A-Z]* -p -i [A-Za-z0-9_.:@-]* -v [A-Za-z0-9._:/?&=%#~+-]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/trace-url.sh -t [0-9]* -X [A-Z]* -c [A-Fa-f0-9:.]* -p -i [A-Za-z0-9_.:@-]* [A-Za-z0-9._:/?&=%#~+-]*": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/trace-url.sh -t [0-9]* -X [A-Z]* -c [A-Fa-f0-9:.]* -p -i [A-Za-z0-9_.:@-]* -v [A-Za-z0-9._:/?&=%#~+-]*": [
+          "exec"
+        ],
         "/usr/lib/hijpass/rm.sh proxy [A-Za-z0-9_-]*": [
           "exec"
         ],

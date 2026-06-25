@@ -70,7 +70,7 @@ const FirewallFormUtils = {
                         .catch(() => { textarea.value = _('Read Failed'); })
                         .finally(() => { (btn as HTMLButtonElement).removeAttribute('disabled'); });
                 }
-            }, _('查看当前防火墙'));
+            }, _('View Current Firewall'));
             return E('div', {}, [widget, btn,]);
         };
     },

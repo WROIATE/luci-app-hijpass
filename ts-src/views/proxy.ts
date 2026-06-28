@@ -262,11 +262,15 @@ function createTransportTypeOption(s: LuCI.form.AbstractSection) {
     // 用 this.section.formvalue 读取表单中 core 字段的当前值（未保存的实时值），
     // 而非 uci.get（那只能读到上次保存的旧值）
     transportOpt.validate = function (sectionId: string, value: string) {
+        let core = (this as any).section.formvalue(sectionId, 'core');
+        let realityEnabled = (this as any).section.formvalue(sectionId, 'tls_reality_enabled');
         if (value === 'xhttp') {
-            let core = (this as any).section.formvalue(sectionId, 'core');
             if (core !== CORE_TYPE.XRAY) {
                 return _('XHTTP transport is only supported by Xray core');
             }
+        }
+        if (core === CORE_TYPE.XRAY && realityEnabled === '1' && (value === 'ws' || value === 'httpupgrade')) {
+            return _('Xray REALITY only supports RAW, XHTTP and gRPC transports');
         }
         return true;
     };
@@ -308,6 +312,11 @@ function createTransportHttpOptions(s: LuCI.form.AbstractSection) {
  * 创建通用的WebSocket传输选项（用于支持Transport的协议：VLESS等）
  */
 function createTransportWsOptions(s: LuCI.form.AbstractSection) {
+    let hostOpt = s.option(form.Value, 'transport_ws_host', _('WebSocket Host'),
+        _('WebSocket Host Domain'));
+    hostOpt.modalonly = true;
+    hostOpt.depends({ type: PROXY_TYPE.VLESS, transport_type: 'ws' });
+
     let pathOpt = s.option(form.Value, 'transport_ws_path', _('WebSocket Path'),
         _('HTTP Request Path'));
     pathOpt.modalonly = true;
@@ -637,6 +646,7 @@ function createTransportXhttpOptions(s: LuCI.form.AbstractSection) {
     modeOpt.modalonly = true;
     modeOpt.default = 'auto';
     modeOpt.value('auto', _('Auto'));
+    modeOpt.value('packet-up', 'packet-up');
     modeOpt.value('stream-one', 'stream-one');
     modeOpt.value('stream-up', 'stream-up');
     modeOpt.depends({ type: PROXY_TYPE.VLESS, core: CORE_TYPE.XRAY, transport_type: 'xhttp' });

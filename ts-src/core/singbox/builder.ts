@@ -70,7 +70,7 @@ function genConf() {
 
     if (route.default_domain_resolver && route.final) {
         const dnsTmpl = dnsServerMap.get(route.default_domain_resolver)
-        if (!dnsTmpl) throw new Error('Default DNS template not found: ' + route.default_domain_resolver)
+        if (!dnsTmpl) throw new Error(_('Default global DNS "%s" does not exist').format(route.default_domain_resolver))
         dns.servers.push(genDnsFromTmpl(dnsTmpl.tag, route.final, dnsTmpl))
     }
 
@@ -83,6 +83,7 @@ function genConf() {
             if (dnsConf.rulesetDnsNode) {
                 rulesetOutNode.domain_resolver = SingBoxEnum.RULESET_DNS_NAME
                 const dnsTmpl = dnsServerMap.get(dnsConf.rulesetDnsNode)
+                if (!dnsTmpl) throw new Error(_('%s "%s" does not exist').format(_('Rule-set DNS'), dnsConf.rulesetDnsNode))
                 dns.servers.push(genDnsFromTmpl(SingBoxEnum.RULESET_DNS_NAME, SingBoxEnum.RULESET_OUTBOUND_TAG, dnsTmpl))
             }
             outbounds.push(rulesetOutNode)
@@ -212,7 +213,7 @@ function writeGeoRule() {
 }
 
 function genDnsFromTmpl(tag: string, detour: string, tmpl: DnsServer): DnsServer {
-    return new DnsServer(tmpl.type, tag, tmpl.server, tmpl.port, detour)
+    return new DnsServer(tmpl.type, tag, tmpl.server, tmpl.server_port, detour)
 }
 
 function genRuleSet(rs: RuleSetDTO, detour: string): RuleSet {
@@ -235,6 +236,9 @@ function appendSingBoxDnsRule(routeRule: any, ruleName: string, luciRuleDTO: Rul
     const dnsTmpl = dnsTag
         ? dnsServerMap.get(dnsTag)
         : dnsServerMap.get(route.default_domain_resolver)
+    if (!dnsTmpl) {
+        throw new Error(_('Route rule "%s" DNS node "%s" does not exist').format(routeRule.name || ruleName, routeRule.dnsNode || route.default_domain_resolver || ''))
+    }
     dns.servers.push(genDnsFromTmpl(transDnsTag(ruleName), detour, dnsTmpl))
     dns.rules.push(
         new DnsRule('route', transDnsTag(ruleName), transDnsStrategy(routeRule.dnsStrategy))

@@ -13,8 +13,9 @@ export interface HttpTransport {
 }
 
 export interface WebSocketTransport {
-    type: 'websocket'
+    type: 'ws'
     path?: string
+    headers?: Record<string, string>
     max_early_data?: number
     early_data_header_name?: string
 }
@@ -74,8 +75,9 @@ function buildTransport(c: VlessConfig): TransportConfig | undefined {
             return t
         }
         case 'ws': {
-            const t: WebSocketTransport = { type: 'websocket' }
+            const t: WebSocketTransport = { type: 'ws' }
             if (c.transport_ws_path) t.path = c.transport_ws_path
+            if (c.transport_ws_host) t.headers = { Host: c.transport_ws_host }
             if (c.transport_ws_max_early_data) t.max_early_data = parseInt(c.transport_ws_max_early_data)
             if (c.transport_ws_early_data_header_name) t.early_data_header_name = c.transport_ws_early_data_header_name
             return t

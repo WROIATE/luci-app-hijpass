@@ -138,14 +138,13 @@ const vlessProtocol: XrayProtocol = {
         } : undefined
 
         const tlsSettings: TlsObject | undefined = !useReality ? {
-            allowInsecure: c.tls_insecure === '1',
             alpn: ['h2', 'http/1.1'],
             serverName: c.tls_server_name || c.server,
         } : undefined
 
         const security = useReality
             ? 'reality'
-            : (c.tls_server_name || c.tls_insecure ? 'tls' : 'none')
+            : (c.tls_server_name ? 'tls' : 'none')
 
         const streamSettings: VlessStreamSettings = { network: 'raw', security }
         if (realitySettings) streamSettings.realitySettings = realitySettings

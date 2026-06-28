@@ -263,6 +263,10 @@ msgstr ""
 msgid "Configuration contains missing DNS nodes"
 msgstr ""
 
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "DNS node \"%s\" uses TLS, which is only supported by sing-box"
+msgstr ""
+
 #: ts-src/utils/actions/save-apply/precheck.ts:53
 msgid "Configuration contains missing proxy nodes"
 msgstr ""
@@ -413,6 +417,10 @@ msgstr ""
 
 #: ts-src/utils/actions/save-apply/precheck.ts:179
 msgid "Default global DNS"
+msgstr ""
+
+#: ts-src/core/xray/builder.ts
+msgid "Default global DNS \"%s\" does not exist"
 msgstr ""
 
 #: ts-src/views/shunt.ts:382
@@ -1520,6 +1528,10 @@ msgstr ""
 msgid "Route rule \"%s\" DNS node"
 msgstr ""
 
+#: ts-src/core/xray/builder.ts
+msgid "Route rule \"%s\" DNS node \"%s\" does not exist"
+msgstr ""
+
 #: ts-src/utils/actions/save-apply/precheck.ts:334
 msgid "Route rule \"%s\" has no target conditions for sing-box after removing unconverted geosite/geoip"
 msgstr ""
@@ -1959,6 +1971,18 @@ msgstr ""
 
 #: ts-src/utils/actions/save-apply/precheck.ts:261
 msgid "Unsupported Xray protocol configuration"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Unsupported Xray DNS configuration"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Proxy node \"%s\" enables insecure TLS, which is not supported by current Xray"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Unsupported Xray TLS configuration"
 msgstr ""
 
 #: ts-src/utils/feature/shunt/form.ts:38 ts-src/utils/feature/shunt/form.ts:71 ts-src/views/rule.ts:29

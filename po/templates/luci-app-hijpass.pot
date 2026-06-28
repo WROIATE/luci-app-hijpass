@@ -2105,6 +2105,14 @@ msgstr ""
 msgid "WebSocket"
 msgstr ""
 
+#: ts-src/views/proxy.ts:315
+msgid "WebSocket Host"
+msgstr ""
+
+#: ts-src/views/proxy.ts:316
+msgid "WebSocket Host Domain"
+msgstr ""
+
 #: ts-src/views/proxy.ts:309
 msgid "WebSocket Path"
 msgstr ""
@@ -2143,6 +2151,10 @@ msgstr ""
 
 #: ts-src/views/proxy.ts:634
 msgid "XHTTP Transport Mode"
+msgstr ""
+
+#: ts-src/views/proxy.ts:273
+msgid "Xray REALITY only supports RAW, XHTTP and gRPC transports"
 msgstr ""
 
 #: ts-src/enum/hijpass.ts:123

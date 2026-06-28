@@ -417,6 +417,7 @@ export class VlessConfig implements ProxyNode {
     transport_http_method: string;
     transport_http_idle_timeout: string;
     transport_http_ping_timeout: string;
+    transport_ws_host: string;
     transport_ws_path: string;
     transport_ws_max_early_data: string;
     transport_ws_early_data_header_name: string;

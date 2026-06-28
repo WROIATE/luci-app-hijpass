@@ -97,7 +97,8 @@ export const HijpassValues = {
     ] as const,
     VLESS_FLOWS: [
         {label: 'None', value: ''},
-        {label: 'xtls-rprx-vision', value: 'xtls-rprx-vision'}
+        {label: 'xtls-rprx-vision', value: 'xtls-rprx-vision'},
+        {label: 'xtls-rprx-vision-udp443', value: 'xtls-rprx-vision-udp443'}
     ] as const,
     VLESS_PACKET_ENCODINGS: [
         {label: 'Disabled', value: ''},

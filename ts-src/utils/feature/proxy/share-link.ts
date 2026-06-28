@@ -141,6 +141,33 @@ function makeQuery(params: Record<string, string | undefined>): string {
     return text ? '?' + text : '';
 }
 
+function splitPathEarlyData(path: string): { path: string; maxEarlyData: string } {
+    if (!path) return { path: '', maxEarlyData: '' };
+
+    try {
+        const url = new URL(path, 'http://hijpass.local');
+        const maxEarlyData = url.searchParams.get('ed') || '';
+        url.searchParams.delete('ed');
+        const query = url.searchParams.toString();
+        return {
+            path: url.pathname + (query ? '?' + query : ''),
+            maxEarlyData,
+        };
+    } catch (err) {
+        return { path, maxEarlyData: '' };
+    }
+}
+
+function appendPathEarlyData(path: string | undefined, maxEarlyData: string | undefined): string | undefined {
+    if (!path || !maxEarlyData) return path;
+
+    const hashIndex = path.indexOf('#');
+    const pathAndQuery = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+    const hash = hashIndex >= 0 ? path.slice(hashIndex) : '';
+    const separator = pathAndQuery.indexOf('?') >= 0 ? '&' : '?';
+    return pathAndQuery + separator + 'ed=' + encodeURIComponent(maxEarlyData) + hash;
+}
+
 function toArray(value: any): string[] {
     if (Array.isArray(value)) return value.filter(v => v != null && v !== '').map(v => String(v));
     if (value == null || value === '') return [];
@@ -349,7 +376,7 @@ function parseVless(uri: ParsedUri, core: CoreType): ImportedProxyConfig {
         flow: queryValue(uri.query, 'flow'),
         network: 'tcp',
         packet_encoding: queryValue(uri.query, 'packetEncoding', 'packet_encoding'),
-        tls_server_name: queryValue(uri.query, 'sni', 'servername', 'host'),
+        tls_server_name: queryValue(uri.query, 'sni', 'servername'),
         tls_insecure: isTruthy(queryValue(uri.query, 'allowInsecure', 'allow_insecure', 'insecure')) ? '1' : '0',
         tls_reality_enabled: security === 'reality' ? '1' : '0',
         tls_reality_public_key: queryValue(uri.query, 'pbk', 'publicKey', 'public_key'),
@@ -368,7 +395,10 @@ function parseVless(uri: ParsedUri, core: CoreType): ImportedProxyConfig {
     };
 
     if (transport === 'ws') {
-        values.transport_ws_path = queryValue(uri.query, 'path');
+        const wsPath = splitPathEarlyData(queryValue(uri.query, 'path'));
+        values.transport_ws_host = queryValue(uri.query, 'host');
+        values.transport_ws_path = wsPath.path;
+        values.transport_ws_max_early_data = wsPath.maxEarlyData;
     } else if (transport === 'grpc') {
         values.transport_grpc_service_name = queryValue(uri.query, 'serviceName', 'service_name');
     } else if (transport === 'http') {
@@ -412,7 +442,8 @@ function generateVless(section: any): string {
     };
 
     if (transport === 'ws') {
-        params.path = section.transport_ws_path;
+        params.host = section.transport_ws_host;
+        params.path = appendPathEarlyData(section.transport_ws_path, section.transport_ws_max_early_data);
     } else if (transport === 'grpc') {
         params.serviceName = section.transport_grpc_service_name;
     } else if (transport === 'http') {

@@ -4,6 +4,7 @@ import type { Outbound, TlsObject } from '../models'
 import { xrayRegistry, type XrayProtocol } from './protocol'
 
 interface WsObject {
+    host?: string
     path?: string
     headers?: Record<string, string>
     heartbeatPeriod?: number
@@ -36,6 +37,7 @@ interface XHTTPObject {
     host?: string
     path?: string
     mode?: string
+    uplinkHTTPMethod?: string
 }
 
 interface RealityObject {
@@ -91,6 +93,27 @@ export class VlessOutbound implements Outbound {
     }
 }
 
+function parseDurationSeconds(value?: string): number | undefined {
+    const raw = (value || '').trim()
+    if (!raw) return undefined
+    const match = raw.match(/^(\d+)(?:s)?$/)
+    if (!match) return undefined
+    const seconds = Number(match[1])
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined
+}
+
+function appendEarlyData(path: string, maxEarlyData?: string): string {
+    const ed = (maxEarlyData || '').trim()
+    if (!ed) return path
+
+    const base = path || '/'
+    const hashIndex = base.indexOf('#')
+    const pathAndQuery = hashIndex >= 0 ? base.slice(0, hashIndex) : base
+    const hash = hashIndex >= 0 ? base.slice(hashIndex) : ''
+    const separator = pathAndQuery.indexOf('?') >= 0 ? '&' : '?'
+    return pathAndQuery + separator + 'ed=' + encodeURIComponent(ed) + hash
+}
+
 const vlessProtocol: XrayProtocol = {
     type: 'vless',
     build(config: ProxyNode): Outbound {
@@ -140,26 +163,26 @@ const vlessProtocol: XrayProtocol = {
             case 'ws':
                 streamSettings.network = 'websocket'
                 streamSettings.wsSettings = {
-                    path: c.transport_ws_path || '/',
-                    ...(c.transport_ws_max_early_data ? {
-                        headers: { 'Sec-WebSocket-Protocol': c.transport_ws_early_data_header_name || '' }
-                    } : {})
+                    host: c.transport_ws_host || undefined,
+                    path: appendEarlyData(c.transport_ws_path || '/', c.transport_ws_max_early_data)
                 }
                 break
             case 'grpc':
                 streamSettings.network = 'grpc'
                 streamSettings.grpcSettings = {
                     serviceName: c.transport_grpc_service_name || 'TunService',
-                    ...(c.transport_grpc_idle_timeout ? { idle_timeout: Number(c.transport_grpc_idle_timeout) } : {}),
+                    ...(parseDurationSeconds(c.transport_grpc_idle_timeout) ? { idle_timeout: parseDurationSeconds(c.transport_grpc_idle_timeout) } : {}),
+                    ...(parseDurationSeconds(c.transport_grpc_ping_timeout) ? { health_check_timeout: parseDurationSeconds(c.transport_grpc_ping_timeout) } : {}),
                     ...(c.transport_grpc_permit_without_stream === '1' ? { permit_without_stream: true } : {})
                 }
                 break
             case 'http':
-                streamSettings.network = 'h2'
-                streamSettings.httpSettings = {
-                    ...(c.transport_http_host ? { host: [c.transport_http_host] } : {}),
+                streamSettings.network = 'xhttp'
+                streamSettings.xhttpSettings = {
+                    ...(c.transport_http_host ? { host: c.transport_http_host } : {}),
                     path: c.transport_http_path || '/',
-                    ...(c.transport_http_method ? { method: c.transport_http_method } : {})
+                    mode: 'stream-one',
+                    ...(c.transport_http_method ? { uplinkHTTPMethod: c.transport_http_method } : {})
                 }
                 break
             case 'httpupgrade':

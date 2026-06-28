@@ -1575,6 +1575,12 @@ msgstr "网站连通性测试"
 msgid "WebSocket"
 msgstr "WebSocket"
 
+msgid "WebSocket Host"
+msgstr "WebSocket主机"
+
+msgid "WebSocket Host Domain"
+msgstr "WebSocket请求的主机域名"
+
 msgid "WebSocket Path"
 msgstr "WebSocket路径"
 
@@ -1613,6 +1619,9 @@ msgstr "Xray"
 
 msgid "Xray Balancer"
 msgstr "Xray Balancer"
+
+msgid "Xray REALITY only supports RAW, XHTTP and gRPC transports"
+msgstr "Xray REALITY 仅支持 RAW、XHTTP 和 gRPC 传输"
 
 msgid "Xray only supports route protocol filters: %s"
 msgstr "Xray 仅支持以下路由协议过滤器：%s"

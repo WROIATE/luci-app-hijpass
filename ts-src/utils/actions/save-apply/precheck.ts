@@ -406,6 +406,7 @@ function confirmWarning(title: string, description: string, warnings: string[]) 
 function getSkippedRouteRuleMessage(rule: any, shuntType: string, rulesetConvert: string) {
     const ruleDTO = ShuntUtils.parseRuleList(rule);
     const ruleName = rule.name || rule['.name'] || _('Unnamed Rule');
+    const canConvertGeoRule = rulesetConvert === '1';
 
     if (shuntType === FactoryType.XRAY) {
         if (ruleDTO.isEmpty('geo')) {
@@ -421,14 +422,14 @@ function getSkippedRouteRuleMessage(rule: any, shuntType: string, rulesetConvert
     }
 
     if (shuntType === FactoryType.SING_BOX) {
-        if (rulesetConvert !== '1' && ruleDTO.containGeo()) {
+        if (!canConvertGeoRule && ruleDTO.containGeo()) {
             ruleDTO.geoSite = [];
             ruleDTO.geoIp = [];
             if (!ruleDTO.containDomain() && !ruleDTO.containIp() && !ruleDTO.containRuleSet()) {
                 return _('Route rule "%s" has no target conditions for sing-box after removing unconverted geosite/geoip').format(ruleName);
             }
         }
-        if (ruleDTO.isEmpty('set')) {
+        if (ruleDTO.isEmpty('set') && !(canConvertGeoRule && ruleDTO.containGeo())) {
             return _('Route rule "%s" has no valid match conditions for sing-box').format(ruleName);
         }
     }

@@ -17,14 +17,14 @@ export class DnsServer {
     type: string
     tag: string
     server: string
-    port: number
-    detour: string
+    server_port?: number
+    detour?: string
 
-    constructor(type: string, tag: string, server: string, port: number, detour: string) {
+    constructor(type: string, tag: string, server: string, port: number | undefined, detour?: string) {
         this.type = type
         this.tag = tag
         this.server = server
-        this.port = port
+        this.server_port = Number.isFinite(port) && port > 0 ? port : undefined
         this.detour = detour === SingBoxEnum.DIRECT_OUTBOUND_TAG ? undefined : detour
     }
 }
@@ -144,14 +144,22 @@ export class RuleSet {
 
 export class RemoteRuleSet extends RuleSet {
     url: string
-    download_detour: string
+    http_client?: HTTPClient
     update_interval: number
 
     constructor(tag: string, format: string, url: string, download_detour: string, update_interval: number) {
         super(tag, 'remote', format)
         this.url = url
-        this.download_detour = download_detour
+        if (download_detour) this.http_client = new HTTPClient(download_detour)
         this.update_interval = update_interval
+    }
+}
+
+export class HTTPClient {
+    detour: string
+
+    constructor(detour: string) {
+        this.detour = detour
     }
 }
 

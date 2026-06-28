@@ -59,6 +59,9 @@ function genConf() {
     const dnsRules = [new DnsRule([XrayEnum.DNS_INBOUND_TAG], XrayEnum.DNS_OUTBOUND_TAG)]
     const routeRules: RouteRule[] = []
     const defaultDnsTmpl = dnsServerMap.get(dnsConf.defaultDnsNode)
+    if (!defaultDnsTmpl) {
+        throw new Error(_('Default global DNS "%s" does not exist').format(dnsConf.defaultDnsNode || ''))
+    }
     const dnsInOutMap = new Map<string, string[]>()
 
     routeConf.rules.forEach(function (rule) {
@@ -126,6 +129,8 @@ function genConf() {
             if (lbConf.strategyExpected) balancer.strategy.settings.expected = parseInt(lbConf.strategyExpected, 10)
             if (lbConf.strategyMaxRtt) balancer.strategy.settings.maxRTT = lbConf.strategyMaxRtt
             if (lbConf.strategyTolerance) balancer.strategy.settings.tolerance = parseFloat(lbConf.strategyTolerance)
+        } else {
+            balancer.strategy.settings = undefined
         }
         route.balancers.push(balancer)
         burstObservatory = new BurstObservatory(
@@ -217,6 +222,9 @@ function appendXrayDnsServer(rule: any, ruleName: string, outboundTag: string, l
         dnsInOutMap.set(outboundTag, [dnsTag])
     }
     const dnsTmpl = rule.dnsNode ? dnsServerMap.get(rule.dnsNode) : defaultDnsTmpl
+    if (!dnsTmpl) {
+        throw new Error(_('Route rule "%s" DNS node "%s" does not exist').format(rule.name || ruleName, rule.dnsNode || ''))
+    }
     const server = structuredClone(dnsTmpl)
     server.tag = dnsTag
     server.queryStrategy = transDnsStrategy(rule.dnsStrategy)

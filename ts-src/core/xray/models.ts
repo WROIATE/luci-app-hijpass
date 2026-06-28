@@ -160,7 +160,12 @@ export class DnsOutbound implements Outbound {
     constructor(tag: string) {
         this.protocol = 'dns'
         this.tag = tag
-        this.settings = { nonIPQuery: 'reject' }
+        this.settings = {
+            rules: [
+                { action: 'hijack', qType: '1,28' },
+                { action: 'return', rCode: 5 }
+            ]
+        }
     }
 }
 
@@ -178,7 +183,6 @@ export class Freedom implements Outbound {
 
 export interface TlsObject {
     serverName: string
-    allowInsecure?: boolean
     alpn?: string[]
 }
 
@@ -206,7 +210,7 @@ export class Balancer {
     fallbackTag: string
     strategy: {
         type: string
-        settings: { expected: number; maxRTT: string; tolerance: number }
+        settings?: { expected: number; maxRTT: string; tolerance: number }
     }
 
     constructor(tag: string) {

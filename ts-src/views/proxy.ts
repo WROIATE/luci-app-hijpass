@@ -391,8 +391,10 @@ function createCommonTlsOptions(s: LuCI.form.AbstractSection) {
     let insecureOpt = s.option(form.Flag, 'tls_insecure', _('Ignore Certificate Verification'),
         _('Accept Any Certificate'));
     insecureOpt.modalonly = true;
-    ProxyFormUtils.forProtocols(insecureOpt, [PROXY_TYPE.HYSTERIA2, PROXY_TYPE.TUIC,
-    PROXY_TYPE.SHADOWTLS, PROXY_TYPE.VLESS]);
+    insecureOpt.depends({ type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.SING_BOX });
+    insecureOpt.depends({ type: PROXY_TYPE.VLESS, core: CORE_TYPE.SING_BOX });
+    insecureOpt.depends('type', PROXY_TYPE.TUIC);
+    insecureOpt.depends('type', PROXY_TYPE.SHADOWTLS);
 }
 
 /**

@@ -34,7 +34,6 @@ export class Hysteria2Outbound implements Outbound {
         tag: string,
         password: string,
         serverName: string,
-        allowInsecure: boolean = false,
         udpIdleTimeout?: number,
         brutalUp?: string,
         brutalDown?: string
@@ -45,7 +44,7 @@ export class Hysteria2Outbound implements Outbound {
         this.streamSettings = {
             network: 'hysteria',
             security: 'tls',
-            tlsSettings: { serverName, allowInsecure, alpn: ['h3'] },
+            tlsSettings: { serverName, alpn: ['h3'] },
             hysteriaSettings: {
                 version: 2,
                 auth: password,
@@ -82,7 +81,6 @@ const hysteria2Protocol: XrayProtocol = {
             c.name,
             c.password || '',
             c.tls_server_name || c.server,
-            c.tls_insecure === '1',
             udpIdleTimeout,
             brutalUp,
             brutalDown

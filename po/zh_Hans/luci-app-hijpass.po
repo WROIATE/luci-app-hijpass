@@ -198,6 +198,9 @@ msgstr "配置包含无效的前置代理节点"
 msgid "Configuration contains missing DNS nodes"
 msgstr "配置包含不存在的DNS节点"
 
+msgid "DNS node \"%s\" uses TLS, which is only supported by sing-box"
+msgstr "DNS 节点 \"%s\" 使用了 TLS，该类型仅 sing-box 支持"
+
 msgid "Configuration contains missing proxy nodes"
 msgstr "配置包含不存在的代理节点"
 
@@ -311,6 +314,9 @@ msgstr "默认 (HEAD)"
 
 msgid "Default global DNS"
 msgstr "默认全局DNS"
+
+msgid "Default global DNS \"%s\" does not exist"
+msgstr "默认全局 DNS \"%s\" 不存在"
 
 msgid "Default Global DNS"
 msgstr "默认全局 DNS"
@@ -1137,6 +1143,9 @@ msgstr "路由规则 \"%s\" 的DNS出口节点 \"%s\" 未启用"
 msgid "Route rule \"%s\" DNS node"
 msgstr "路由规则 \"%s\" 的DNS节点"
 
+msgid "Route rule \"%s\" DNS node \"%s\" does not exist"
+msgstr "路由规则 \"%s\" 的 DNS 节点 \"%s\" 不存在"
+
 msgid "Route rule \"%s\" has no target conditions for sing-box after removing unconverted geosite/geoip"
 msgstr "路由规则 \"%s\" 去除未转换的 geosite/geoip 后没有可写入 sing-box 的目标条件"
 
@@ -1466,6 +1475,15 @@ msgstr "不支持的代理配置服务器字段：%s"
 
 msgid "Unsupported Xray protocol configuration"
 msgstr "Xray 协议配置不支持"
+
+msgid "Unsupported Xray DNS configuration"
+msgstr "Xray DNS 配置不支持"
+
+msgid "Proxy node \"%s\" enables insecure TLS, which is not supported by current Xray"
+msgstr "代理节点 \"%s\" 启用了不安全 TLS，当前 Xray 不支持该选项"
+
+msgid "Unsupported Xray TLS configuration"
+msgstr "Xray TLS 配置不支持"
 
 msgid "Update"
 msgstr "更新"

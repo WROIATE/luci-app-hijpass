@@ -1,4 +1,4 @@
-import { LuciFlied, ShuntTag } from "../../../enum/hijpass";
+import { LuciFlied, normalizeCoreType, ShuntTag } from "../../../enum/hijpass";
 import uci from "uci";
 import ui from "ui";
 import { NotificationUtils } from "../../base/luci/notification";
@@ -7,6 +7,7 @@ import { ShuntUtils } from "../../feature/shunt/section";
 import { MAX_PROXY_CHAIN_NODES, ProxyChainUtils } from "../../feature/proxy/chain";
 
 const XRAY_ROUTE_PROTOCOLS = ['http', 'tls', 'quic', 'bittorrent'];
+const XRAY_TLS_PROTOCOLS = ['hysteria2', 'vless'];
 
 function normalizeList(value: any): string[] {
     if (!value) {
@@ -313,6 +314,54 @@ function checkXrayRouteProtocols() {
     return true;
 }
 
+function checkXrayDnsServerTypes() {
+    const shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
+    if (shuntType !== FactoryType.XRAY) {
+        return true;
+    }
+
+    const warnings: string[] = [];
+    uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, function (section: any) {
+        if (section.type === 'tls') {
+            warnings.push(_('DNS node "%s" uses TLS, which is only supported by sing-box').format(section.tag || section['.name']));
+        }
+    });
+
+    if (warnings.length > 0) {
+        NotificationUtils.warning(
+            _('Unsupported Xray DNS configuration'),
+            warnings.join('<br>'),
+            8000
+        );
+        return false;
+    }
+
+    return true;
+}
+
+function checkXrayTlsInsecure() {
+    const warnings: string[] = [];
+    uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
+        if (section.enabled === '0' || normalizeCoreType(section.core) !== FactoryType.XRAY || section.tls_insecure !== '1') {
+            return;
+        }
+        if (XRAY_TLS_PROTOCOLS.indexOf(section.type) !== -1) {
+            warnings.push(_('Proxy node "%s" enables insecure TLS, which is not supported by current Xray').format(section.name || section['.name']));
+        }
+    });
+
+    if (warnings.length > 0) {
+        NotificationUtils.warning(
+            _('Unsupported Xray TLS configuration'),
+            warnings.join('<br>'),
+            8000
+        );
+        return false;
+    }
+
+    return true;
+}
+
 function confirmWarning(title: string, description: string, warnings: string[]) {
     return new Promise<boolean>((resolve) => {
         ui.showModal(title, [
@@ -421,6 +470,8 @@ const PrecheckUtils = {
             && checkMissingDnsExitRefs()
             && await confirmSkippedRouteRules()
             && checkXrayRouteProtocols()
+            && checkXrayDnsServerTypes()
+            && checkXrayTlsInsecure()
             && checkDisabledShuntFirewallPort();
     },
 }

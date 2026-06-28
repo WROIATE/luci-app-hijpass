@@ -186,11 +186,19 @@ do_update() {
 
     case "$CORE" in
         sing-box)
-            local version_num
+            local version_num candidate_arch downloaded
             version_num=$(echo "$latest_tag" | sed 's/^v//')
-            download_url="https://github.com/SagerNet/sing-box/releases/download/${latest_tag}/sing-box-${version_num}-${arch}.tar.gz"
-            log_info "Downloading $download_url ..."
-            if ! curl -sfL --max-time 120 -o "$tmp_dir/sing-box.tar.gz" "$download_url"; then
+            downloaded=""
+            for candidate_arch in "${arch}-musl" "$arch"; do
+                download_url="https://github.com/SagerNet/sing-box/releases/download/${latest_tag}/sing-box-${version_num}-${candidate_arch}.tar.gz"
+                log_info "Downloading $download_url ..."
+                if curl -sfL --max-time 120 -o "$tmp_dir/sing-box.tar.gz" "$download_url"; then
+                    downloaded="1"
+                    arch="$candidate_arch"
+                    break
+                fi
+            done
+            if [ -z "$downloaded" ]; then
                 fail_update "download failed"
             fi
             # busybox tar 不支持 --wildcards，先全量解压再 find

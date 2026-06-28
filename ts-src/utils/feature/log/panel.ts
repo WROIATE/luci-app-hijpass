@@ -254,6 +254,11 @@ function setTraceStatus(statusElement: HTMLElement, message: string, color?: str
     statusElement.style.color = color || '#666';
 }
 
+function setTraceOutput(outputElement: HTMLElement, content: string) {
+    outputElement.innerHTML = highlightLogContent(content);
+    outputElement.scrollTop = 0;
+}
+
 function buildTraceArgs(values: TraceDiagnosticsValues) {
     const url = values.url.trim();
     const timeout = values.timeout.trim();
@@ -311,15 +316,14 @@ function runTraceDiagnostics(
         return;
     }
 
-    outputElement.textContent = '';
+    outputElement.innerHTML = '';
     runButton.disabled = true;
     setTraceStatus(statusElement, _('Running Trace Diagnostics'));
 
     fs.exec('/usr/lib/hijpass/trace-url.sh', args).then(function (result) {
         const stdout = result.stdout || '';
         const stderr = result.stderr || '';
-        outputElement.textContent = stdout || stderr || _('No Output');
-        outputElement.scrollTop = 0;
+        setTraceOutput(outputElement, stdout || stderr || _('No Output'));
 
         if (result.code === 0) {
             setTraceStatus(statusElement, _('Trace Completed') + ' - ' + new Date().toLocaleTimeString());
@@ -327,7 +331,7 @@ function runTraceDiagnostics(
             setTraceStatus(statusElement, _('Trace Failed') + ' - ' + (stderr || _('Exit Code') + ': ' + result.code), '#b00020');
         }
     }).catch(function (error) {
-        outputElement.textContent = error.message || String(error);
+        setTraceOutput(outputElement, error.message || String(error));
         setTraceStatus(statusElement, _('Trace Failed') + ' - ' + error.message, '#b00020');
     }).finally(function () {
         runButton.disabled = false;

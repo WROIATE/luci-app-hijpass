@@ -11,6 +11,8 @@ import { ProxyConfigFileUtils } from "./config-file";
 import { ProxyChainUtils } from "./chain";
 import { ImportedProxyConfig, ProxyShareLinkUtils } from "./share-link";
 
+const PROTOCOL_CORES: CoreType[] = [CORE_TYPE.XRAY, CORE_TYPE.SING_BOX];
+
 function loadProxyLog(logPath: string, contentEl: HTMLElement) {
     contentEl.textContent = _('Loading...');
     fs.exec('/usr/bin/tail', ['-n', '200', logPath])
@@ -436,20 +438,18 @@ const ProxyFormUtils = {
         return E('span', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, btns);
     },
 
-    forProtocols: function (o: LuCI.form.AbstractValue, types: ProxyType[]): void {
-        types.forEach(t => ProxyFormUtils.forProtocolConditions(o, t));
-    },
-
-    forProtocolConditions: function (
+    forProtocols: function (
         o: LuCI.form.AbstractValue,
-        type: ProxyType,
+        types: ProxyType[],
         conditions: Record<string, string | RegExp> = {}
     ): void {
-        ([CORE_TYPE.XRAY, CORE_TYPE.SING_BOX] as CoreType[]).forEach(core => {
-            if (CORE_PROTOCOLS[core]?.includes(type)) {
-                o.depends({ type, core, ...conditions });
+        for (const type of types) {
+            for (const core of PROTOCOL_CORES) {
+                if (CORE_PROTOCOLS[core]?.includes(type)) {
+                    o.depends({ type, core, ...conditions });
+                }
             }
-        });
+        }
     },
 
     forCoreProtocols: function (o: LuCI.form.AbstractValue, core: CoreType, types: ProxyType[]): void {
@@ -473,7 +473,7 @@ const ProxyFormUtils = {
         typeOpt.depends('core', CORE_TYPE.SING_BOX);
         HijpassValues.PROXY_TYPES.forEach(t => typeOpt.value(t.value, _(t.label)));
         typeOpt.validate = function (sectionId: string, value: ProxyType) {
-            const core = normalizeCoreType((this as any).section.formvalue(sectionId, 'core')) as CoreType;
+            const core = normalizeCoreType(this.section.formvalue(sectionId, 'core')) as CoreType;
             return CORE_PROTOCOLS[core]?.includes(value)
                 ? true
                 : _('Selected core "%s" does not support %s').format(core, value);
@@ -526,7 +526,7 @@ const ProxyFormUtils = {
         };
         upstreamOpt.validate = function (sectionId: string, value: string) {
             if (!value) return true;
-            const currentName = (this as any).section.formvalue(sectionId, 'name')
+            const currentName = this.section.formvalue(sectionId, 'name')
                 || uci.get(LuciFlied.CONF_NAME, sectionId, 'name')
                 || sectionId;
             if (value === currentName) {
@@ -547,8 +547,8 @@ const ProxyFormUtils = {
         listenPortOpt.rmempty = false;
         listenPortOpt.modalonly = true;
         listenPortOpt.validate = function (sectionId: string, value: string) {
-            let socks_port = (this as any).section.formvalue(sectionId, 'socks_port');
-            if (socks_port === value) {
+            const socksPort = this.section.formvalue(sectionId, 'socks_port');
+            if (socksPort === value) {
                 return _("Conflicts with SOCKS Port")
             }
             return ValidationUtils.validatePortConflict.call(this, sectionId, value);
@@ -591,8 +591,8 @@ const ProxyFormUtils = {
         socksPortOpt.rmempty = false;
         socksPortOpt.modalonly = true;
         socksPortOpt.validate = function (sectionId: string, value: string) {
-            let listen_port = (this as any).section.formvalue(sectionId, 'listen_port');
-            if (listen_port === value) {
+            const listenPort = this.section.formvalue(sectionId, 'listen_port');
+            if (listenPort === value) {
                 return _("Conflicts with Transparent Proxy Port")
             }
             return ValidationUtils.validatePortConflict.call(this, sectionId, value);

@@ -22,6 +22,15 @@ function isSpecialProxyNode(node: string) {
         || node === ShuntTag.LOAD_BALANCE_OUTBOUND_TAG;
 }
 
+function reportWarnings(title: string, warnings: string[]): boolean {
+    if (warnings.length === 0) {
+        return true;
+    }
+
+    NotificationUtils.warning(title, warnings.join('<br>'), 8000);
+    return false;
+}
+
 function isTemplateShuntActive() {
     return uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled') !== '0'
         && uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl';
@@ -81,12 +90,7 @@ function checkMissingProxyRefs() {
         }
     });
 
-    if (warnings.length > 0) {
-        NotificationUtils.warning(_('Configuration contains missing proxy nodes'), warnings.join('<br>'), 8000);
-        return false;
-    }
-
-    return true;
+    return reportWarnings(_('Configuration contains missing proxy nodes'), warnings);
 }
 
 function checkDisabledProxyRefs() {
@@ -140,12 +144,7 @@ function checkDisabledProxyRefs() {
             }
         });
 
-    if (warnings.length > 0) {
-        NotificationUtils.warning(_('Configuration contains disabled nodes'), warnings.join('<br>'), 8000);
-        return false;
-    }
-
-    return true;
+    return reportWarnings(_('Configuration contains disabled nodes'), warnings);
 }
 
 function checkProxyChainRefs() {
@@ -181,12 +180,7 @@ function checkProxyChainRefs() {
         }
     });
 
-    if (warnings.length > 0) {
-        NotificationUtils.warning(_('Configuration contains invalid upstream proxy nodes'), warnings.join('<br>'), 8000);
-        return false;
-    }
-
-    return true;
+    return reportWarnings(_('Configuration contains invalid upstream proxy nodes'), warnings);
 }
 
 function checkInvalidDnsNodeRefs() {
@@ -234,16 +228,8 @@ function checkInvalidDnsNodeRefs() {
         checkRef(section.dns_node, _('Route rule "%s" DNS node').format(section.name || section['.name']));
     });
 
-    if (missingWarnings.length > 0) {
-        NotificationUtils.warning(_('Configuration contains missing DNS nodes'), missingWarnings.join('<br>'), 8000);
-        return false;
-    }
-    if (disabledWarnings.length > 0) {
-        NotificationUtils.warning(_('Configuration contains disabled DNS nodes'), disabledWarnings.join('<br>'), 8000);
-        return false;
-    }
-
-    return true;
+    return reportWarnings(_('Configuration contains missing DNS nodes'), missingWarnings)
+        && reportWarnings(_('Configuration contains disabled DNS nodes'), disabledWarnings);
 }
 
 function checkMissingDnsExitRefs() {
@@ -270,12 +256,7 @@ function checkMissingDnsExitRefs() {
         }
     });
 
-    if (missingDnsExits.length > 0) {
-        NotificationUtils.warning(_('Configuration contains invalid DNS exit nodes'), missingDnsExits.join('<br>'), 8000);
-        return false;
-    }
-
-    return true;
+    return reportWarnings(_('Configuration contains invalid DNS exit nodes'), missingDnsExits);
 }
 
 function routeRuleRequiresDnsExit(rule: any, shuntType: string, rulesetConvert: string) {
@@ -316,12 +297,7 @@ function checkFirewallPortTargets() {
         warnings.push(_('Firewall shunt port %s does not reference an enabled proxy node or shunt service').format(shuntPort));
     }
 
-    if (warnings.length > 0) {
-        NotificationUtils.warning(_('Configuration conflict'), warnings.join('<br>'), 8000);
-        return false;
-    }
-
-    return true;
+    return reportWarnings(_('Configuration conflict'), warnings);
 }
 
 function checkDnsProxyTarget() {
@@ -393,16 +369,7 @@ function checkXrayDnsServerTypes() {
         }
     });
 
-    if (warnings.length > 0) {
-        NotificationUtils.warning(
-            _('Unsupported Xray DNS configuration'),
-            warnings.join('<br>'),
-            8000
-        );
-        return false;
-    }
-
-    return true;
+    return reportWarnings(_('Unsupported Xray DNS configuration'), warnings);
 }
 
 function checkXrayTlsInsecure() {
@@ -416,16 +383,7 @@ function checkXrayTlsInsecure() {
         }
     });
 
-    if (warnings.length > 0) {
-        NotificationUtils.warning(
-            _('Unsupported Xray TLS configuration'),
-            warnings.join('<br>'),
-            8000
-        );
-        return false;
-    }
-
-    return true;
+    return reportWarnings(_('Unsupported Xray TLS configuration'), warnings);
 }
 
 function confirmWarning(title: string, description: string, warnings: string[]) {

@@ -12,7 +12,7 @@ import uci from 'uci';
 
 const XRAY_ROUTE_PROTOCOLS = ['http', 'tls', 'quic', 'bittorrent'];
 
-function getCurrentShuntValue(section: any, option: string) {
+function getCurrentShuntValue(section: LuCI.form.AbstractSection, option: string) {
     const shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
     const sectionId = shuntSection?.['.name'];
     const lookup = sectionId ? section.map.lookupOption(option, sectionId) : null;
@@ -108,8 +108,8 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     shuntListenPort.datatype = 'port';
     shuntListenPort.rmempty = false;
     shuntListenPort.validate = function (sectionId: string, value: string) {
-        let dns_listen_port = (this as any).section.formvalue(sectionId, 'dns_listen_port');
-        if (dns_listen_port === value) {
+        const currentDnsListenPort = this.section.formvalue(sectionId, 'dns_listen_port');
+        if (currentDnsListenPort === value) {
             return _("Conflicts with DNS Port")
         }
         return ValidationUtils.validatePortConflict.call(this, sectionId, value);
@@ -122,8 +122,8 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     dnsListenPort.datatype = 'port';
     dnsListenPort.rmempty = false;
     dnsListenPort.validate = function (sectionId: string, value: string) {
-        let shunt_listen_port = (this as any).section.formvalue(sectionId, 'shunt_listen_port');
-        if (shunt_listen_port === value) {
+        const currentShuntListenPort = this.section.formvalue(sectionId, 'shunt_listen_port');
+        if (currentShuntListenPort === value) {
             return _("Conflicts with Shunt Port")
         }
         return ValidationUtils.validatePortConflict.call(this, sectionId, value);
@@ -253,7 +253,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     proxyNode.modalonly = true;
     proxyNode.depends({ip_version_split: '1', '!reverse': true});
     proxyNode.validate = function (sectionId: string, value: string) {
-        if ((this as any).section.formvalue(sectionId, 'ip_version_split') !== '1' && !value) {
+        if (this.section.formvalue(sectionId, 'ip_version_split') !== '1' && !value) {
             return _('Configure Proxy Node First');
         }
         return true;
@@ -272,7 +272,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     proxyNodeV4.depends('ip_version_split', '1');
     proxyNodeV4.modalonly = true;
     proxyNodeV4.validate = function (sectionId: string, value: string) {
-        if ((this as any).section.formvalue(sectionId, 'ip_version_split') === '1' && !value) {
+        if (this.section.formvalue(sectionId, 'ip_version_split') === '1' && !value) {
             return _('Configure IPv4 Proxy Node First');
         }
         return true;
@@ -284,7 +284,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     proxyNodeV6.depends('ip_version_split', '1');
     proxyNodeV6.modalonly = true;
     proxyNodeV6.validate = function (sectionId: string, value: string) {
-        if ((this as any).section.formvalue(sectionId, 'ip_version_split') === '1' && !value) {
+        if (this.section.formvalue(sectionId, 'ip_version_split') === '1' && !value) {
             return _('Configure IPv6 Proxy Node First');
         }
         return true;
@@ -332,7 +332,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     });
     dnsProxyNode.modalonly = true;
     dnsProxyNode.validate = function (sectionId: string, value: string) {
-        const section = (this as any).section;
+        const section = this.section;
         if (section.formvalue(sectionId, 'ip_version_split') === '1' && !value && hasSplitDnsTarget(section, sectionId)) {
             return _('Configure DNS Exit Node when splitting IPv4/IPv6 exit');
         }
@@ -366,7 +366,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     protocol.value('ntp');
     // protocol.modalonly = true
     protocol.validate = function (_sectionId: string, value: any) {
-        const shuntType = getCurrentShuntValue((this as any).section, 'type');
+        const shuntType = getCurrentShuntValue(this.section, 'type');
         if (shuntType !== CORE_TYPE.XRAY) {
             return true;
         }
@@ -520,7 +520,7 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
     type.default = 'tcp';
     type.rmempty = false;
     type.validate = function (_sectionId: string, value: string) {
-        return value === 'tls' && getCurrentShuntValue((this as any).section, 'type') === CORE_TYPE.XRAY
+        return value === 'tls' && getCurrentShuntValue(this.section, 'type') === CORE_TYPE.XRAY
             ? _('TLS (sing-box only)')
             : true;
     };

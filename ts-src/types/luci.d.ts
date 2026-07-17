@@ -72,6 +72,7 @@ declare namespace LuCI {
             ucisection: string
             validate: function
             width: number | string
+            section: LuCI.form.AbstractSection
 
             cbid(section_id: string): string
 
@@ -104,6 +105,7 @@ declare namespace LuCI {
         }
 
         interface AbstractSection extends LuCI.form.AbstractElement {
+            map: LuCI.form.Map
             parentoption: AbstractValue
 
             prototype?: AbstractSection;
@@ -147,6 +149,8 @@ declare namespace LuCI {
 
         interface Map extends LuCI.form.AbstractElement {
             data: any;
+
+            lookupOption(name: string, section_id?: string, config_name?: string): [LuCI.form.AbstractValue, string] | null;
 
             section<T extends LuCI.form.AbstractSection>(sectionclass: T, ...classargs: any): T
         }

@@ -72,6 +72,9 @@ const ShuntUtils = {
         UciUtils.transFromUci(dnsSection, shuntSection)
 
         uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, function (section) {
+            if (section.enabled === '0') {
+                return;
+            }
             let server = new DnsNode()
             UciUtils.transFromUci(server, section)
             dnsSection.nodes.push(server)

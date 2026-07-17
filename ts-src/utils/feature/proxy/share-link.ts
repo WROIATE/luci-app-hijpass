@@ -548,13 +548,8 @@ function generateShadowTls(section: any): string {
 
 const ProxyShareLinkUtils = {
     canExport: function (section: any): boolean {
-        return [
-            PROXY_TYPE.HYSTERIA2,
-            PROXY_TYPE.SHADOWSOCKS,
-            PROXY_TYPE.TUIC,
-            PROXY_TYPE.SHADOWTLS,
-            PROXY_TYPE.VLESS,
-        ].includes(section?.type);
+        const core = normalizeCoreType(section?.core) as CoreType;
+        return CORE_PROTOCOLS[core]?.includes(section?.type) ?? false;
     },
 
     parse: function (input: string, selectedCore: string): ImportedProxyConfig {

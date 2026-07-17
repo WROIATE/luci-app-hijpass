@@ -211,7 +211,7 @@ const ShuntFormUtils = {
             }
 
             uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, function (section: any) {
-                if (section.tag) {
+                if (section.tag && section.enabled !== '0') {
                     let displayName = section.tag;
                     if (section.server) {
                         displayName += ' (' + section.server + ')';

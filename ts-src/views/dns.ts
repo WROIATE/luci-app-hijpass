@@ -52,6 +52,7 @@ const v = view.extend({
 
         let directDns = s.taboption('basic', form.ListValue, 'direct_dns', _('Direct Domain DNS'),
             _('Select Direct Domain DNS'));
+        directDns.depends('dns_service', 'chinadns-ng');
         directDns.value('system', _('Use System DNS'));
         directDns.value('custom', _('Custom DNS'));
         directDns.default = 'system';
@@ -59,7 +60,7 @@ const v = view.extend({
 
         let directDnsCustom = s.taboption('basic', form.Value, 'direct_dns_custom', _('Custom Direct DNS'),
             _('Direct Domain DNS Server'));
-        directDnsCustom.depends('direct_dns', 'custom');
+        directDnsCustom.depends({ dns_service: 'chinadns-ng', direct_dns: 'custom' });
         directDnsCustom.default = '223.5.5.5#53';
         directDnsCustom.rmempty = false;
 
@@ -76,7 +77,7 @@ const v = view.extend({
         let defaultDnsPort = null;
         if (shuntSections && shuntSections.length > 0) {
             shuntSections.forEach(function (shuntSection) {
-                if (shuntSection.dns_listen_port) {
+                if (shuntSection.enabled !== '0' && shuntSection.dns_listen_port) {
                     let dnsPort = shuntSection.dns_listen_port;
                     proxyDns.value('127.0.0.1#' + dnsPort, _('Shunt DNS Port: %s').format(dnsPort));
                     defaultDnsPort = '127.0.0.1#' + dnsPort;
@@ -89,7 +90,7 @@ const v = view.extend({
 
         let proxyDnsCustom = s.taboption('basic', form.Value, 'proxy_dns_custom', _('Custom Proxy DNS'),
             _('Proxy Domain DNS Server'));
-        proxyDnsCustom.depends('proxy_dns', 'custom');
+        proxyDnsCustom.depends({ dns_service: 'chinadns-ng', proxy_dns: 'custom' });
         proxyDnsCustom.default = '1.1.1.1#53';
         proxyDnsCustom.rmempty = false;
 

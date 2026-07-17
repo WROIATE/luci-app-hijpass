@@ -120,7 +120,7 @@ const FormUtils = {
 
     appendEnabledNodeListenPorts: function (option: LuCI.form.ListValue) {
         uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
-            if (section.listen_port && section.enabled !== '0') {
+            if (section.listen_port && section.enabled === '1') {
                 let displayName = _('Proxy node %s: %s').format(section.name, section.listen_port);
                 option.value(section.listen_port, displayName);
             }
@@ -138,7 +138,7 @@ const FormUtils = {
             }
 
             uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
-                if (section.name && section.enabled !== '0') {
+                if (section.name && section.enabled === '1') {
                     let displayName = section.name;
                     if (section.socks_port) displayName += ' (' + section.socks_port + ')';
                     this.value(section.name, displayName);
@@ -165,7 +165,7 @@ const FormUtils = {
         }
 
         uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
-            if (section.name && section.enabled !== '0') {
+            if (section.name && section.enabled === '1') {
                 let label = section.name;
                 if (section.socks_port) label += ' (' + section.socks_port + ')';
                 options.push({ value: section.name, label });

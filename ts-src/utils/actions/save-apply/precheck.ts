@@ -22,6 +22,11 @@ function isSpecialProxyNode(node: string) {
         || node === ShuntTag.LOAD_BALANCE_OUTBOUND_TAG;
 }
 
+function isTemplateShuntActive() {
+    return uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled') !== '0'
+        && uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') === 'tmpl';
+}
+
 function checkMissingProxyRefs() {
     const existingNodes = new Set<string>();
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
@@ -38,7 +43,11 @@ function checkMissingProxyRefs() {
     }
 
     const defaultNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'default_proxy_node');
-    checkRef(defaultNode, _('Default global exit "%s" does not exist').format(defaultNode));
+    if (!defaultNode) {
+        warnings.push(_('Default global exit is not configured'));
+    } else {
+        checkRef(defaultNode, _('Default global exit "%s" does not exist').format(defaultNode));
+    }
 
     const rulesetNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_out_node');
     checkRef(rulesetNode, _('Rule-set exit "%s" does not exist').format(rulesetNode));
@@ -47,6 +56,9 @@ function checkMissingProxyRefs() {
         .forEach((node) => checkRef(node, _('Load balancing node "%s" does not exist').format(node)));
 
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
+        if (section.enabled !== '1') {
+            return;
+        }
         const ruleName = section.name || section['.name'];
         if (section.ip_version_split === '1') {
             if (!section.proxy_node_v4) {
@@ -62,7 +74,11 @@ function checkMissingProxyRefs() {
             return;
         }
 
-        checkRef(section.proxy_node, _('Route rule "%s" proxy node "%s" does not exist').format(ruleName, section.proxy_node));
+        if (!section.proxy_node) {
+            warnings.push(_('Route rule "%s" proxy node is not configured').format(ruleName));
+        } else {
+            checkRef(section.proxy_node, _('Route rule "%s" proxy node "%s" does not exist').format(ruleName, section.proxy_node));
+        }
     });
 
     if (warnings.length > 0) {
@@ -76,7 +92,7 @@ function checkMissingProxyRefs() {
 function checkDisabledProxyRefs() {
     const disabledNodes = new Set<string>();
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
-        if (section.enabled === '0' && section.name) {
+        if (section.enabled !== '1' && section.name) {
             disabledNodes.add(section.name);
         }
     });
@@ -98,6 +114,9 @@ function checkDisabledProxyRefs() {
     }
 
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
+        if (section.enabled !== '1') {
+            return;
+        }
         const ruleName = section.name || section['.name'];
         if (section.ip_version_split === '1') {
             if (section.proxy_node_v4 && disabledNodes.has(section.proxy_node_v4)) {
@@ -134,7 +153,7 @@ function checkProxyChainRefs() {
     const warnings: string[] = [];
 
     sections.forEach((section: any) => {
-        if (section.enabled === '0' || !section.upstream_proxy_node) {
+        if (section.enabled !== '1' || !section.upstream_proxy_node) {
             return;
         }
 
@@ -146,7 +165,7 @@ function checkProxyChainRefs() {
             warnings.push(_('Proxy node "%s" upstream proxy node "%s" does not exist').format(nodeName, upstreamName));
             return;
         }
-        if (upstreamSection.enabled === '0') {
+        if (upstreamSection.enabled !== '1') {
             warnings.push(_('Proxy node "%s" upstream proxy node "%s" is not enabled').format(nodeName, upstreamName));
         }
         if (!ProxyChainUtils.isPort(upstreamSection.socks_port)) {
@@ -198,15 +217,20 @@ function checkInvalidDnsNodeRefs() {
         }
     }
 
-    checkRef(
-        uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'default_dns_node'),
-        _('Default global DNS')
-    );
+    const defaultDnsNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'default_dns_node');
+    if (!defaultDnsNode) {
+        missingWarnings.push(_('Default global DNS is not configured'));
+    } else {
+        checkRef(defaultDnsNode, _('Default global DNS'));
+    }
     checkRef(
         uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_dns_node'),
         _('Rule-set DNS')
     );
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
+        if (section.enabled !== '1') {
+            return;
+        }
         checkRef(section.dns_node, _('Route rule "%s" DNS node').format(section.name || section['.name']));
     });
 
@@ -232,6 +256,9 @@ function checkMissingDnsExitRefs() {
     const rulesetConvert = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_convert');
     const missingDnsExits: string[] = [];
     ShuntUtils.getRouteSection().rules.forEach(function (section: any) {
+        if (section.enabled !== '1') {
+            return;
+        }
         const dnsExit = section.dnsProxyNode;
         const ruleName = section.name || _('Unnamed Rule');
         if (routeRuleRequiresDnsExit(section, shuntType, rulesetConvert) && !dnsExit) {
@@ -266,20 +293,56 @@ function routeRuleRequiresDnsExit(rule: any, shuntType: string, rulesetConvert: 
         || (rulesetConvert === '1' && ruleDTO.geoSite.length > 0);
 }
 
-function checkDisabledShuntFirewallPort() {
-    const shuntEnabled = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled');
-    if (shuntEnabled !== '0') {
-        return true;
+function checkFirewallPortTargets() {
+    const enabledProxyPorts = new Set<string>();
+    uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
+        if (section.enabled === '1' && section.listen_port) {
+            enabledProxyPorts.add(section.listen_port);
+        }
+    });
+
+    const proxyPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.FIREWALL_SECTION_TYPE, 'proxy_port');
+    const shuntPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.FIREWALL_SECTION_TYPE, 'shunt_port');
+    const shuntEnabled = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled') !== '0';
+    const shuntListenPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_listen_port');
+    const warnings: string[] = [];
+
+    if (proxyPort && !enabledProxyPorts.has(proxyPort)) {
+        warnings.push(_('Firewall proxy port %s does not reference an enabled proxy node').format(proxyPort));
+    }
+    if (shuntPort
+        && !enabledProxyPorts.has(shuntPort)
+        && !(shuntEnabled && shuntListenPort === shuntPort)) {
+        warnings.push(_('Firewall shunt port %s does not reference an enabled proxy node or shunt service').format(shuntPort));
     }
 
-    const shuntListenPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'shunt_listen_port');
-    const fwShuntPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.FIREWALL_SECTION_TYPE, 'shunt_port');
-    if (shuntListenPort && fwShuntPort === shuntListenPort) {
-        NotificationUtils.warning(_('Configuration conflict'), _('Shunt is disabled. Set the firewall default shunt port to disabled first'), 8000);
+    if (warnings.length > 0) {
+        NotificationUtils.warning(_('Configuration conflict'), warnings.join('<br>'), 8000);
         return false;
     }
 
     return true;
+}
+
+function checkDnsProxyTarget() {
+    const dnsService = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'dns_service');
+    const proxyDns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'proxy_dns');
+    if (dnsService !== 'chinadns-ng' || proxyDns === 'system' || proxyDns === 'custom') {
+        return true;
+    }
+
+    const shuntEnabled = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled') !== '0';
+    const shuntDnsPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'dns_listen_port');
+    if (shuntEnabled && shuntDnsPort && proxyDns === '127.0.0.1#' + shuntDnsPort) {
+        return true;
+    }
+
+    NotificationUtils.warning(
+        _('Configuration conflict'),
+        _('Proxy domain DNS must use the current enabled shunt DNS port or a custom DNS server'),
+        8000
+    );
+    return false;
 }
 
 function checkXrayRouteProtocols() {
@@ -290,7 +353,7 @@ function checkXrayRouteProtocols() {
 
     const warnings: string[] = [];
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-        if (section.enabled === '0') {
+        if (section.enabled !== '1') {
             return;
         }
 
@@ -322,6 +385,9 @@ function checkXrayDnsServerTypes() {
 
     const warnings: string[] = [];
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, function (section: any) {
+        if (section.enabled === '0') {
+            return;
+        }
         if (section.type === 'tls') {
             warnings.push(_('DNS node "%s" uses TLS, which is only supported by sing-box').format(section.tag || section['.name']));
         }
@@ -342,7 +408,7 @@ function checkXrayDnsServerTypes() {
 function checkXrayTlsInsecure() {
     const warnings: string[] = [];
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
-        if (section.enabled === '0' || normalizeCoreType(section.core) !== FactoryType.XRAY || section.tls_insecure !== '1') {
+        if (section.enabled !== '1' || normalizeCoreType(section.core) !== FactoryType.XRAY || section.tls_insecure !== '1') {
             return;
         }
         if (XRAY_TLS_PROTOCOLS.indexOf(section.type) !== -1) {
@@ -443,7 +509,7 @@ function confirmSkippedRouteRules() {
     const warnings: string[] = [];
 
     ShuntUtils.getRouteSection().rules.forEach((rule) => {
-        if (rule.enabled === '0') {
+        if (rule.enabled !== '1') {
             return;
         }
 
@@ -464,16 +530,24 @@ function confirmSkippedRouteRules() {
 
 const PrecheckUtils = {
     runSaveApplyPrechecks: async function () {
+        if (!checkProxyChainRefs()
+            || !checkXrayTlsInsecure()
+            || !checkFirewallPortTargets()
+            || !checkDnsProxyTarget()) {
+            return false;
+        }
+
+        if (!isTemplateShuntActive()) {
+            return true;
+        }
+
         return checkMissingProxyRefs()
             && checkDisabledProxyRefs()
-            && checkProxyChainRefs()
             && checkInvalidDnsNodeRefs()
             && checkMissingDnsExitRefs()
             && await confirmSkippedRouteRules()
             && checkXrayRouteProtocols()
-            && checkXrayDnsServerTypes()
-            && checkXrayTlsInsecure()
-            && checkDisabledShuntFirewallPort();
+            && checkXrayDnsServerTypes();
     },
 }
 

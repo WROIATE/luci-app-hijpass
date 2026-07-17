@@ -12,6 +12,13 @@ import uci from 'uci';
 
 const XRAY_ROUTE_PROTOCOLS = ['http', 'tls', 'quic', 'bittorrent'];
 
+function getCurrentShuntValue(section: any, option: string) {
+    const shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
+    const sectionId = shuntSection?.['.name'];
+    const lookup = sectionId ? section.map.lookupOption(option, sectionId) : null;
+    return lookup ? lookup[0].formvalue(lookup[1]) : shuntSection?.[option];
+}
+
 function hasSplitDnsTarget(section: any, sectionId: string) {
     const ruleDTO = ShuntUtils.parseRuleList({
         domainList: section.formvalue(sectionId, 'domain_list') || '',
@@ -21,8 +28,8 @@ function hasSplitDnsTarget(section: any, sectionId: string) {
         port: [],
         portRange: []
     } as any);
-    const shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
-    const rulesetConvert = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_convert');
+    const shuntType = getCurrentShuntValue(section, 'type');
+    const rulesetConvert = getCurrentShuntValue(section, 'ruleset_convert');
 
     if (shuntType === CORE_TYPE.XRAY) {
         return ruleDTO.containDomain() || ruleDTO.geoSite.length > 0;
@@ -91,7 +98,8 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
         _('Select Configuration Type'));
     configType.value('tmpl', _('Template Configuration'));
     configType.value('custom', _('Custom Edit'));
-    configType.rmempty = true;
+    configType.default = 'tmpl';
+    configType.rmempty = false;
 
     // 分流监听端口
     let shuntListenPort = s.taboption('basic', form.Value, 'shunt_listen_port', _('Shunt Listen Port'),
@@ -100,7 +108,7 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     shuntListenPort.datatype = 'port';
     shuntListenPort.rmempty = false;
     shuntListenPort.validate = function (sectionId: string, value: string) {
-        let dns_listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "dns_listen_port");
+        let dns_listen_port = (this as any).section.formvalue(sectionId, 'dns_listen_port');
         if (dns_listen_port === value) {
             return _("Conflicts with DNS Port")
         }
@@ -114,7 +122,7 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     dnsListenPort.datatype = 'port';
     dnsListenPort.rmempty = false;
     dnsListenPort.validate = function (sectionId: string, value: string) {
-        let shunt_listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "shunt_listen_port");
+        let shunt_listen_port = (this as any).section.formvalue(sectionId, 'shunt_listen_port');
         if (shunt_listen_port === value) {
             return _("Conflicts with Shunt Port")
         }
@@ -192,6 +200,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     let rulesetConvert = routeTypeSection.option(form.Flag, 'ruleset_convert',
         _('Use GeoSite Rule-set'), _('Convert Geo Rules'));
     rulesetConvert.rmempty = false;
+    rulesetConvert.depends('type', CORE_TYPE.SING_BOX);
     // 批量替换节点按钮
     let replaceNodeBtn = s.taboption('route', form.Button, '_replace_node', _('Bulk Replace Nodes'));
     replaceNodeBtn.depends({config_type: "tmpl"});
@@ -313,7 +322,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     dnsProxyNode.value('', _('Use Routing Proxy Node'));
     dnsProxyNode.value('hijpass-direct', _('Direct'));
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section) {
-        if (section.name && section.enabled !== '0') {
+        if (section.name && section.enabled === '1') {
             let displayName = section.name;
             if (section.socks_port) {
                 displayName += ' (' + section.socks_port + ')';
@@ -357,7 +366,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     protocol.value('ntp');
     // protocol.modalonly = true
     protocol.validate = function (_sectionId: string, value: any) {
-        const shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
+        const shuntType = getCurrentShuntValue((this as any).section, 'type');
         if (shuntType !== CORE_TYPE.XRAY) {
             return true;
         }
@@ -468,7 +477,7 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
 
     let rulesetDNSNode = dnsTypeSection.option(form.ListValue, 'ruleset_dns_node',
         _('Rule-set DNS'), _('Select Rule-set DNS'));
-    ShuntFormUtils.loadDNSServerOptions(rulesetDNSNode, false);
+    ShuntFormUtils.loadDNSServerOptions(rulesetDNSNode, true);
 
     let defaultStrategy = dnsTypeSection.option(form.ListValue, 'default_strategy', _('Internal DNS Resolution Strategy'),
         _('Select DNS Resolution Strategy'));
@@ -495,6 +504,11 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
         return uci.get(LuciFlied.CONF_NAME, section_id, 'tag') || _('Unnamed');
     };
 
+    let enabled = dnsGridSection.option(form.Flag, 'enabled', _('Enable'));
+    enabled.default = '1';
+    enabled.rmempty = false;
+    enabled.editable = true;
+
     // DNS类型
     let type = dnsGridSection.option(form.ListValue, 'type', _('Type'),
         _('DNS Server Type'));
@@ -505,6 +519,11 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
     type.value('quic', 'QUIC');
     type.default = 'tcp';
     type.rmempty = false;
+    type.validate = function (_sectionId: string, value: string) {
+        return value === 'tls' && getCurrentShuntValue((this as any).section, 'type') === CORE_TYPE.XRAY
+            ? _('TLS (sing-box only)')
+            : true;
+    };
 
     // DNS标签
     let tag = dnsGridSection.option(form.Value, 'tag', _('Tag'),
@@ -532,7 +551,7 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
 // 创建负载均衡选项
 function createSLBOptions(s: LuCI.form.AbstractSection) {
     const lbNodeLoader = function (section: any) {
-        if (section.name && section.enabled !== '0') {
+        if (section.name && section.enabled === '1') {
             let displayName = section.name;
             if (section.socks_port) displayName += ' (' + section.socks_port + ')';
             return {value: section.name, display: displayName};
@@ -617,7 +636,7 @@ function createSLBOptions(s: LuCI.form.AbstractSection) {
         _('Fallback Outbound'));
     xrayFallback.value('', _('None'));
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
-        if (section.name && section.enabled !== '0') xrayFallback.value(section.name, section.name);
+        if (section.name && section.enabled === '1') xrayFallback.value(section.name, section.name);
     });
 
     let xrayProbeUrl = xSs.option(form.Value, 'probe_url', _('Probe URL'),

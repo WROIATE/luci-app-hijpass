@@ -281,6 +281,7 @@ const ProxyFormUtils = {
     },
 
     renderProxyServerInfo: function (section_id: string) {
+        const core = normalizeCoreType(uci.get(LuciFlied.CONF_NAME, section_id, 'core') || CORE_TYPE.CUSTOM);
         let type = uci.get(LuciFlied.CONF_NAME, section_id, 'type') || PROXY_TYPE.CUSTOM;
         let server_name = uci.get(LuciFlied.CONF_NAME, section_id, 'tls_server_name');
         if (!server_name) {
@@ -288,15 +289,16 @@ const ProxyFormUtils = {
         }
         let server_port = uci.get(LuciFlied.CONF_NAME, section_id, 'server_port');
 
-        switch (type) {
-            case PROXY_TYPE.CUSTOM: {
-                let command = uci.get(LuciFlied.CONF_NAME, section_id, 'command');
-                if (command && command.length > 50) {
-                    return renderProxyInfoWithChain(section_id,
-                        E('span', { title: command }, command.substring(0, 47) + '...'));
-                }
-                return renderProxyInfoWithChain(section_id, command || '');
+        if (core === CORE_TYPE.CUSTOM) {
+            const command = uci.get(LuciFlied.CONF_NAME, section_id, 'command');
+            if (command && command.length > 50) {
+                return renderProxyInfoWithChain(section_id,
+                    E('span', { title: command }, command.substring(0, 47) + '...'));
             }
+            return renderProxyInfoWithChain(section_id, command || '');
+        }
+
+        switch (type) {
             case PROXY_TYPE.HYSTERIA2:
                 return renderProxyInfoWithChain(section_id,
                     E('span', {}, server_name ? server_name + ':' + (server_port || '443') : _('Not Configured')));
@@ -400,7 +402,7 @@ const ProxyFormUtils = {
 
         let port = uci.get(LuciFlied.CONF_NAME, section_id, 'socks_port');
         let enabled = uci.get(LuciFlied.CONF_NAME, section_id, 'enabled');
-        if (port && enabled !== '0') {
+        if (port && enabled === '1') {
             btns.push(E('button', {
                 class: 'btn cbi-button',
                 'data-latency': port,
@@ -435,7 +437,19 @@ const ProxyFormUtils = {
     },
 
     forProtocols: function (o: LuCI.form.AbstractValue, types: ProxyType[]): void {
-        types.forEach(t => o.depends('type', t));
+        types.forEach(t => ProxyFormUtils.forProtocolConditions(o, t));
+    },
+
+    forProtocolConditions: function (
+        o: LuCI.form.AbstractValue,
+        type: ProxyType,
+        conditions: Record<string, string | RegExp> = {}
+    ): void {
+        ([CORE_TYPE.XRAY, CORE_TYPE.SING_BOX] as CoreType[]).forEach(core => {
+            if (CORE_PROTOCOLS[core]?.includes(type)) {
+                o.depends({ type, core, ...conditions });
+            }
+        });
     },
 
     forCoreProtocols: function (o: LuCI.form.AbstractValue, core: CoreType, types: ProxyType[]): void {
@@ -458,6 +472,12 @@ const ProxyFormUtils = {
         typeOpt.depends('core', CORE_TYPE.XRAY);
         typeOpt.depends('core', CORE_TYPE.SING_BOX);
         HijpassValues.PROXY_TYPES.forEach(t => typeOpt.value(t.value, _(t.label)));
+        typeOpt.validate = function (sectionId: string, value: ProxyType) {
+            const core = normalizeCoreType((this as any).section.formvalue(sectionId, 'core')) as CoreType;
+            return CORE_PROTOCOLS[core]?.includes(value)
+                ? true
+                : _('Selected core "%s" does not support %s').format(core, value);
+        };
 
         typeOpt.renderWidget = function (section_id: string, option_index: number, cfgvalue: string): Node {
             const widget = form.ListValue.prototype.renderWidget.call(
@@ -498,7 +518,7 @@ const ProxyFormUtils = {
 
                 let label = name;
                 if (section.socks_port) label += ' (' + section.socks_port + ')';
-                if (section.enabled === '0') label += ' - ' + _('Disabled');
+                if (section.enabled !== '1') label += ' - ' + _('Disabled');
                 this.value(name, label);
             });
 
@@ -527,7 +547,7 @@ const ProxyFormUtils = {
         listenPortOpt.rmempty = false;
         listenPortOpt.modalonly = true;
         listenPortOpt.validate = function (sectionId: string, value: string) {
-            let socks_port = uci.get(LuciFlied.CONF_NAME, sectionId, "socks_port");
+            let socks_port = (this as any).section.formvalue(sectionId, 'socks_port');
             if (socks_port === value) {
                 return _("Conflicts with SOCKS Port")
             }
@@ -571,7 +591,7 @@ const ProxyFormUtils = {
         socksPortOpt.rmempty = false;
         socksPortOpt.modalonly = true;
         socksPortOpt.validate = function (sectionId: string, value: string) {
-            let listen_port = uci.get(LuciFlied.CONF_NAME, sectionId, "listen_port");
+            let listen_port = (this as any).section.formvalue(sectionId, 'listen_port');
             if (listen_port === value) {
                 return _("Conflicts with Transparent Proxy Port")
             }

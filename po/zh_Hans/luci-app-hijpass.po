@@ -1868,3 +1868,21 @@ msgstr "tcpdump 接口"
 
 msgid "Verbose Output"
 msgstr "详细输出"
+
+msgid "Default global exit is not configured"
+msgstr "未配置默认全局出口"
+
+msgid "Route rule \"%s\" proxy node is not configured"
+msgstr "路由规则“%s”未配置代理节点"
+
+msgid "Default global DNS is not configured"
+msgstr "未配置默认全局 DNS"
+
+msgid "Firewall proxy port %s does not reference an enabled proxy node"
+msgstr "防火墙代理端口 %s 未指向已启用的代理节点"
+
+msgid "Firewall shunt port %s does not reference an enabled proxy node or shunt service"
+msgstr "防火墙分流端口 %s 未指向已启用的代理节点或分流服务"
+
+msgid "Proxy domain DNS must use the current enabled shunt DNS port or a custom DNS server"
+msgstr "代理域名 DNS 必须使用当前已启用的分流 DNS 端口或自定义 DNS 服务器"

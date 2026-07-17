@@ -56,7 +56,10 @@ async function writeGeneratedProxyConfigs() {
 
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
         const proxyConfig = ProxyUtils.createProxyConfigFromSection(section);
-        if (!proxyConfig || proxyConfig.type === PROXY_TYPE.CUSTOM || proxyConfig.core === FactoryType.CUSTOM) {
+        if (section.enabled !== '1'
+            || !proxyConfig
+            || proxyConfig.type === PROXY_TYPE.CUSTOM
+            || proxyConfig.core === FactoryType.CUSTOM) {
             return;
         }
 

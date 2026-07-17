@@ -61,7 +61,7 @@ function resolveUpstreamProxy(
     if (!upstreamSection) {
         throw new Error('Upstream proxy node not found: ' + upstreamName);
     }
-    if (upstreamSection.enabled === '0') {
+    if (upstreamSection.enabled !== '1') {
         throw new Error('Upstream proxy node disabled: ' + upstreamName);
     }
     if (!isPort(upstreamSection.socks_port)) {

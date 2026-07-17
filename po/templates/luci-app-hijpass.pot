@@ -2498,3 +2498,27 @@ msgstr ""
 #: ts-src/utils/feature/log/panel.ts
 msgid "Verbose Output"
 msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Default global exit is not configured"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Route rule \"%s\" proxy node is not configured"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Default global DNS is not configured"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Firewall proxy port %s does not reference an enabled proxy node"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Firewall shunt port %s does not reference an enabled proxy node or shunt service"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Proxy domain DNS must use the current enabled shunt DNS port or a custom DNS server"
+msgstr ""

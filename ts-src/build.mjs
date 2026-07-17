@@ -90,6 +90,7 @@ async function buildOne(entryPath) {
 
     const bundled = fs.readFileSync(outFile, 'utf-8');
     const requireLines = Array.from(usedModules)
+        .sort()
         .map(name => `'require ${name}';`)
         .join('\n');
 

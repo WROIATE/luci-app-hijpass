@@ -2101,10 +2101,6 @@ msgstr ""
 msgid "View and Manage Logs"
 msgstr ""
 
-#: ts-src/utils/feature/firewall/form.ts:73
-msgid "View Current Firewall"
-msgstr ""
-
 #: ts-src/views/log.ts:20
 msgid "View Logs"
 msgstr ""

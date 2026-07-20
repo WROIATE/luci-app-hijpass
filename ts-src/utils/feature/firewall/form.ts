@@ -48,7 +48,6 @@ const FirewallFormUtils = {
 
     createNftViewOption: function (s: LuCI.form.AbstractSection) {
         let nftViewOpt = s.taboption('nftables', form.TextValue, '_nft_view');
-        nftViewOpt.readonly = true;
         nftViewOpt.rows = 30;
         nftViewOpt.monospace = true;
         nftViewOpt.load = function () { return ''; };
@@ -56,22 +55,48 @@ const FirewallFormUtils = {
         nftViewOpt.renderWidget = function (section_id: string, option_index: number, cfgvalue: any) {
             let widget = form.TextValue.prototype.renderWidget.call(this, section_id, option_index, cfgvalue) as HTMLElement;
             let textarea = widget.querySelector('textarea') as HTMLTextAreaElement;
-            textarea.placeholder = _('Click to View Firewall Rules');
-            let btn = E('button', {
-                class: 'cbi-button cbi-button-action',
-                style: 'float: right;',
-                click: function () {
-                    (btn as HTMLButtonElement).setAttribute('disabled', 'true');
-                    textarea.value = _('Loading');
-                    fs.exec_direct('/usr/lib/hijpass/nft.sh', ['show'], 'text')
-                        .then((res: any) => {
-                            textarea.value = res?.trim() || _('No Rules');
-                        })
-                        .catch(() => { textarea.value = _('Read Failed'); })
-                        .finally(() => { (btn as HTMLButtonElement).removeAttribute('disabled'); });
+            let loaded = false;
+            let loading = false;
+            const loadPrompt = _('Click to View Firewall Rules');
+
+            textarea.readOnly = true;
+            textarea.placeholder = loadPrompt;
+            textarea.setAttribute('aria-label', loadPrompt);
+            textarea.title = loadPrompt;
+            textarea.style.cursor = 'pointer';
+
+            const loadRules = function () {
+                if (loaded || loading) return;
+
+                loading = true;
+                textarea.setAttribute('aria-busy', 'true');
+                textarea.style.cursor = 'progress';
+                textarea.value = _('Loading');
+
+                fs.exec_direct('/usr/lib/hijpass/nft.sh', ['show'], 'text')
+                    .then((res: any) => {
+                        textarea.value = res?.trim() || _('No Rules');
+                        textarea.setAttribute('aria-label', _('Firewall Rules'));
+                        textarea.removeAttribute('title');
+                        loaded = true;
+                    })
+                    .catch(() => { textarea.value = _('Read Failed'); })
+                    .finally(() => {
+                        loading = false;
+                        textarea.removeAttribute('aria-busy');
+                        textarea.style.cursor = loaded ? 'text' : 'pointer';
+                    });
+            };
+
+            textarea.addEventListener('click', loadRules);
+            textarea.addEventListener('keydown', function (event: KeyboardEvent) {
+                if (!loaded && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    loadRules();
                 }
-            }, _('View Current Firewall'));
-            return E('div', {}, [widget, btn,]);
+            });
+
+            return widget;
         };
     },
 }

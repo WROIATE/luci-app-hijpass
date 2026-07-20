@@ -166,7 +166,7 @@ msgid "Click to Test"
 msgstr "点击测试"
 
 msgid "Click to View Firewall Rules"
-msgstr "点击查看按钮获取当前hijpass的防火墙信息"
+msgstr "点击此区域加载当前 hijpass 防火墙信息"
 
 msgid "Close"
 msgstr "关闭"
@@ -1571,9 +1571,6 @@ msgstr "v3"
 
 msgid "View and Manage Logs"
 msgstr "查看和管理 HiJpass 相关日志"
-
-msgid "View Current Firewall"
-msgstr "查看当前防火墙"
 
 msgid "View Logs"
 msgstr "日志查看"

@@ -50,6 +50,12 @@ function makeSelect(id: string, options: { value: string, label: string }[]) {
     return sel;
 }
 
+function getActiveProxyNodeFields(section: any) {
+    return section.ip_version_split === '1'
+        ? ['proxy_node_v4', 'proxy_node_v6']
+        : ['proxy_node'];
+}
+
 const ShuntFormUtils = {
     renderCoreVersionWidget: function () {
         const rows = [
@@ -156,7 +162,9 @@ const ShuntFormUtils = {
     showBulkReplaceModal: function () {
         const usedNodeValues = new Set<string>();
         uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-            if (section.proxy_node) usedNodeValues.add(section.proxy_node);
+            getActiveProxyNodeFields(section).forEach(field => {
+                if (section[field]) usedNodeValues.add(section[field]);
+            });
         });
 
         const allNodeOptions = FormUtils.getEnabledProxyNodeOptions(true);
@@ -184,9 +192,11 @@ const ShuntFormUtils = {
                             return;
                         }
                         uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-                            if (section.proxy_node === fromVal) {
-                                uci.set(LuciFlied.CONF_NAME, section['.name'], 'proxy_node', toVal);
-                            }
+                            getActiveProxyNodeFields(section).forEach(field => {
+                                if (section[field] === fromVal) {
+                                    uci.set(LuciFlied.CONF_NAME, section['.name'], field, toVal);
+                                }
+                            });
                         });
                         await uci.save();
                         ui.hideModal();

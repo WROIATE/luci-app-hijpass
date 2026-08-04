@@ -369,6 +369,9 @@ msgstr "DNS配置"
 msgid "DNS Exit Node"
 msgstr "DNS出口节点"
 
+msgid "DNS exit cannot use Block or Load Balancing"
+msgstr "DNS 出口不能使用“阻止”或“负载均衡”"
+
 msgid "DNS Listen Port"
 msgstr "DNS监听端口"
 

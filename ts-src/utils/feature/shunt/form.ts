@@ -2,7 +2,7 @@ import fs from "fs";
 import form from "form";
 import uci from "uci";
 import ui from "ui";
-import { CORE_TYPE, LuciFlied } from "../../../enum/hijpass";
+import { CORE_TYPE, LuciFlied, ShuntTag } from "../../../enum/hijpass";
 import { FilePathUtils } from "../../base/files/paths";
 import { FormUtils } from "../../base/luci/form";
 import { NotificationUtils } from "../../base/luci/notification";
@@ -50,10 +50,16 @@ function makeSelect(id: string, options: { value: string, label: string }[]) {
     return sel;
 }
 
-function getActiveProxyNodeFields(section: any) {
-    return section.ip_version_split === '1'
+function getReplaceableProxyNodeFields(section: any) {
+    const routeFields = section.ip_version_split === '1'
         ? ['proxy_node_v4', 'proxy_node_v6']
         : ['proxy_node'];
+    return [...routeFields, 'dns_proxy_node'];
+}
+
+function canUseAsDnsExit(node: string) {
+    return node !== ShuntTag.BLOCK_OUTBOUND_TAG
+        && node !== ShuntTag.LOAD_BALANCE_OUTBOUND_TAG;
 }
 
 const ShuntFormUtils = {
@@ -161,8 +167,9 @@ const ShuntFormUtils = {
 
     showBulkReplaceModal: function () {
         const usedNodeValues = new Set<string>();
-        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-            getActiveProxyNodeFields(section).forEach(field => {
+        const routeRules = uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE);
+        routeRules.forEach(function (section: any) {
+            getReplaceableProxyNodeFields(section).forEach(field => {
                 if (section[field]) usedNodeValues.add(section[field]);
             });
         });
@@ -191,8 +198,17 @@ const ShuntFormUtils = {
                             ui.hideModal();
                             return;
                         }
-                        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
-                            getActiveProxyNodeFields(section).forEach(field => {
+                        const replacesDnsExit = routeRules.some((section: any) => section.dns_proxy_node === fromVal);
+                        if (replacesDnsExit && !canUseAsDnsExit(toVal)) {
+                            NotificationUtils.warning(
+                                _('Configuration conflict'),
+                                _('DNS exit cannot use Block or Load Balancing'),
+                                5000
+                            );
+                            return;
+                        }
+                        routeRules.forEach(function (section: any) {
+                            getReplaceableProxyNodeFields(section).forEach(field => {
                                 if (section[field] === fromVal) {
                                     uci.set(LuciFlied.CONF_NAME, section['.name'], field, toVal);
                                 }

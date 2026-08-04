@@ -492,6 +492,10 @@ msgstr ""
 msgid "DNS Exit Node"
 msgstr ""
 
+#: ts-src/utils/feature/shunt/form.ts
+msgid "DNS exit cannot use Block or Load Balancing"
+msgstr ""
+
 #: ts-src/views/shunt.ts:90 ts-src/views/shunt.ts:91
 msgid "DNS Listen Port"
 msgstr ""

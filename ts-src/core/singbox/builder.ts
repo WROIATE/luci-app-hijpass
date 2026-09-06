@@ -6,9 +6,9 @@ import {
     SocksInbound, SocksOutbound, TproxyInbound, URLTest
 } from './models'
 import { ShuntUtils } from '../../utils/feature/shunt/section'
-import { LuciFlied, ShuntTag } from '../../enum/hijpass'
+import { LuciFlied, PROXY_TYPE, ShuntTag } from '../../enum/hijpass'
 import { SingBoxEnum } from '../../enum/singbox'
-import { CoreAdapter, ProxyNode, RuleDTO, RuleSetDTO } from '../../module/luci'
+import { CoreAdapter, LoadBalanceProxyNode, ProxyNode, RuleDTO, RuleSetDTO } from '../../module/luci'
 import { singboxRegistry } from './protocols/protocol'
 import { ProxyChainUtils } from '../../utils/feature/proxy/chain'
 
@@ -48,20 +48,6 @@ function genConf() {
             outbounds.push(new SocksOutbound('127.0.0.1', Number(section.socks_port), section.name))
         }
     })
-
-    if (shuntSection.loadBalance.lbNodeList.length > 0) {
-        const lbConf = shuntSection.loadBalance
-        const testNode = new URLTest(
-            SingBoxEnum.LOAD_BALANCE_OUTBOUND_TAG,
-            lbConf.url || undefined,
-            lbConf.interval || undefined,
-            lbConf.tolerance ? parseInt(lbConf.tolerance, 10) : undefined,
-            lbConf.idleTimeout || undefined,
-            lbConf.interruptExistConnections === '1' ? true : undefined
-        )
-        testNode.outbounds = lbConf.lbNodeList
-        outbounds.push(testNode)
-    }
 
     const inbounds = [
         new TproxyInbound(parseInt(shuntSection.shuntListenPort, 10), SingBoxEnum.TPROXY_INBOUND_TAG),
@@ -158,6 +144,10 @@ function genConf() {
 }
 
 function genProxyConf(proxyNode: ProxyNode): {} {
+    if (proxyNode.type === PROXY_TYPE.LOAD_BALANCE) {
+        return genLoadBalanceProxyConf(proxyNode as LoadBalanceProxyNode)
+    }
+
     const outbound: any = singboxRegistry.build(proxyNode.type, proxyNode)
     const outbounds = [outbound]
     appendProxyChainOutbounds(proxyNode, outbound, outbounds)
@@ -170,6 +160,33 @@ function genProxyConf(proxyNode: ProxyNode): {} {
             new SocksInbound(Number(proxyNode.socks_port), 'socks-in', '127.0.0.1')
         ],
         outbounds
+    }
+}
+
+function genLoadBalanceProxyConf(proxyNode: LoadBalanceProxyNode): {} {
+    const members = ProxyChainUtils.resolveLoadBalanceMembers(proxyNode)
+    const loadBalance = new URLTest(
+        SingBoxEnum.LOAD_BALANCE_OUTBOUND_TAG,
+        proxyNode.url || undefined,
+        proxyNode.interval || undefined,
+        proxyNode.tolerance ? parseInt(proxyNode.tolerance, 10) : undefined,
+        proxyNode.idle_timeout || undefined,
+        proxyNode.interrupt_exist_connections === '1' ? true : undefined
+    )
+    loadBalance.outbounds = members.map(member => member.tag)
+
+    return {
+        log: new Log(proxyNode.log_level),
+        dns: { servers: [{ type: 'local', tag: 'local' }] },
+        inbounds: [
+            new TproxyInbound(Number(proxyNode.listen_port), 'tproxy-in', '127.0.0.1'),
+            new SocksInbound(Number(proxyNode.socks_port), 'socks-in', '127.0.0.1')
+        ],
+        outbounds: [
+            loadBalance,
+            ...members.map(member => new SocksOutbound('127.0.0.1', member.socksPort, member.tag))
+        ],
+        route: { final: SingBoxEnum.LOAD_BALANCE_OUTBOUND_TAG }
     }
 }
 
@@ -249,7 +266,6 @@ function appendSingBoxDnsRule(routeRule: any, ruleName: string, luciRuleDTO: Rul
 function transOutTag(tag: string) {
     if (tag === ShuntTag.BLOCK_OUTBOUND_TAG) return SingBoxEnum.BLOCK_OUTBOUND_TAG
     if (tag === ShuntTag.DIRECT_OUTBOUND_TAG) return SingBoxEnum.DIRECT_OUTBOUND_TAG
-    if (tag === ShuntTag.LOAD_BALANCE_OUTBOUND_TAG) return SingBoxEnum.LOAD_BALANCE_OUTBOUND_TAG
     return tag
 }
 

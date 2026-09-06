@@ -145,13 +145,6 @@ const FormUtils = {
                 }
             }.bind(this));
 
-            if (includeSlb) {
-                const lbList = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
-                if (lbList && lbList.length > 0) {
-                    this.value(ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, _('Load Balancing'));
-                }
-            }
-
             return form.ListValue.prototype.load.apply(this, [section_id]);
         };
     },
@@ -171,13 +164,6 @@ const FormUtils = {
                 options.push({ value: section.name, label });
             }
         });
-
-        if (includeSpecial) {
-            const lbList = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list');
-            if (lbList && lbList.length > 0) {
-                options.push({ value: ShuntTag.LOAD_BALANCE_OUTBOUND_TAG, label: _('Load Balancing') });
-            }
-        }
 
         return options;
     },

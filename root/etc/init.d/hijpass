@@ -39,9 +39,12 @@ start_service() {
   # 启动进程
   config_load $NAME
   log_info "===================== Starting service ======================="
-  log_info "Running proxy..."
-  config_foreach run_proxy proxy_node
+  log_info "Running proxy nodes..."
+  config_foreach run_regular_proxy proxy_node
   sleep 2
+  log_info "Running load balancing proxy nodes..."
+  config_foreach run_load_balance_proxy proxy_node
+  sleep 1
   log_info "Running shunt..."
   config_foreach run_shunt shunt
   sleep 1
@@ -77,6 +80,20 @@ reload_service() {
 boot() {
   [ "$DELAY_TIME" -gt 0 ] && sleep "$DELAY_TIME"
   restart
+}
+
+run_regular_proxy() {
+  local type
+  config_get type "$1" type
+  [ "$type" = "load_balance" ] && return
+  run_proxy "$1"
+}
+
+run_load_balance_proxy() {
+  local type
+  config_get type "$1" type
+  [ "$type" != "load_balance" ] && return
+  run_proxy "$1"
 }
 
 run_proxy() {

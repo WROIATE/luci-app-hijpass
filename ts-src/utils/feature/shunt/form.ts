@@ -58,8 +58,7 @@ function getReplaceableProxyNodeFields(section: any) {
 }
 
 function canUseAsDnsExit(node: string) {
-    return node !== ShuntTag.BLOCK_OUTBOUND_TAG
-        && node !== ShuntTag.LOAD_BALANCE_OUTBOUND_TAG;
+    return node !== ShuntTag.BLOCK_OUTBOUND_TAG;
 }
 
 const ShuntFormUtils = {
@@ -202,7 +201,7 @@ const ShuntFormUtils = {
                         if (replacesDnsExit && !canUseAsDnsExit(toVal)) {
                             NotificationUtils.warning(
                                 _('Configuration conflict'),
-                                _('DNS exit cannot use Block or Load Balancing'),
+                                _('DNS exit cannot use Block'),
                                 5000
                             );
                             return;

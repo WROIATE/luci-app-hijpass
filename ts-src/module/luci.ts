@@ -58,37 +58,6 @@ export class RouteSection {
     }
 }
 
-export class LoadBalanceNode {
-    tag: string;
-    lbNodeList: string[];
-
-    // sing-box urltest 参数
-    url: string;
-    interval: string;
-    tolerance: string;
-    idleTimeout: string;
-    interruptExistConnections: string;
-
-    // xray balancer 策略参数
-    strategy: string;
-    strategyExpected: string;
-    strategyMaxRtt: string;
-    strategyTolerance: string;
-    fallbackTag: string;
-
-    // xray burstObservatory 参数
-    probeUrl: string;
-    probeConnectivity: string;
-    probeInterval: string;
-    probeTimeout: string;
-    probeSampling: string;
-    probeHttpMethod: string;
-
-    constructor() {
-        this.lbNodeList = [];
-    }
-}
-
 export class ShuntSection {
     type: string;
     configType: string;
@@ -98,7 +67,6 @@ export class ShuntSection {
     logPath: string;
     route: RouteSection;
     dns: DnsSection;
-    loadBalance: LoadBalanceNode;
 }
 
 export class RuleDTO {
@@ -202,6 +170,51 @@ export interface ProxyNode {
     procd_env: string[];
     log_level?: string;
     log_path: string;
+}
+
+/**
+ * 负载均衡代理节点。
+ *
+ * 成员节点只通过其本地 SOCKS 端口接入，不复制成员的协议配置。
+ */
+export class LoadBalanceProxyNode implements ProxyNode {
+    name: string;
+    type: 'load_balance' = 'load_balance';
+    core: string = CORE_TYPE.SING_BOX;
+    enabled: string = '1';
+    listen_port: string;
+    socks_port: string;
+    member_node: string[];
+    procd_env: string[];
+    log_level: string;
+    log_path: string;
+
+    // sing-box urltest
+    url: string;
+    interval: string;
+    tolerance: string;
+    idle_timeout: string;
+    interrupt_exist_connections: string;
+
+    // Xray balancer
+    strategy: string;
+    strategy_expected: string;
+    strategy_max_rtt: string;
+    strategy_tolerance: string;
+    fallback_tag: string;
+
+    // Xray burstObservatory
+    probe_url: string;
+    probe_connectivity: string;
+    probe_interval: string;
+    probe_timeout: string;
+    probe_sampling: string;
+    probe_http_method: string;
+
+    constructor() {
+        this.member_node = [];
+        this.procd_env = [];
+    }
 }
 
 /**

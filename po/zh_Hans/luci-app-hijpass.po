@@ -2058,8 +2058,8 @@ msgstr "配置代理节点"
 msgid "Cannot Delete Proxy Node"
 msgstr "无法删除代理节点"
 
-msgid "Proxy node \"%s\" is referenced by load balancing nodes: %s. Remove the references first."
-msgstr "代理节点“%s”正被以下负载均衡节点引用：%s。请先移除引用。"
+msgid "Proxy node \"%s\" is referenced by proxy nodes: %s. Remove the references first."
+msgstr "代理节点“%s”正被以下代理节点引用：%s。请先移除引用。"
 
 msgid "Proxy node \"%s\" listen port %s is referenced by firewall settings: %s. Remove the references first."
 msgstr "代理节点“%s”的监听端口 %s 正被以下防火墙设置引用：%s。请先移除引用。"

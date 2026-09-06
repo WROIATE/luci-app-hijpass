@@ -10,6 +10,7 @@ import { ValidationUtils } from "../../base/luci/validation";
 import { ProxyConfigFileUtils } from "./config-file";
 import { ProxyChainUtils } from "./chain";
 import { ImportedProxyConfig, ProxyShareLinkUtils } from "./share-link";
+import { findProxyDependencyCycleFrom } from "./validation";
 
 const PROTOCOL_CORES: CoreType[] = [CORE_TYPE.XRAY, CORE_TYPE.SING_BOX];
 
@@ -550,8 +551,13 @@ const ProxyFormUtils = {
             if (value === currentName) {
                 return _('Cannot use itself as upstream proxy');
             }
-            const exists = ProxyChainUtils.getProxySections().some((section: any) => ProxyChainUtils.getProxyName(section) === value);
-            return exists ? true : _('Upstream proxy node not found');
+            const sections = ProxyChainUtils.getProxySectionMap();
+            if (!sections.has(value)) return _('Upstream proxy node not found');
+
+            const dependencyCycle = findProxyDependencyCycleFrom(currentName, [value], sections);
+            return dependencyCycle
+                ? _('Proxy node dependency chain has a cycle: %s').format(dependencyCycle.join(' -> '))
+                : true;
         };
     },
 

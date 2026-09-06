@@ -81,7 +81,7 @@ const ServiceUtils = {
 
         switch (type) {
             case 'dns':
-                renderHTML += getColorSpan(_("DNS"), isDnsRunning)
+                renderHTML += getColorSpan(_("Pre-routing DNS"), isDnsRunning)
                 break;
             case 'shunt':
                 renderHTML += getColorSpan(_("Shunt Service"), isShuntRunning)
@@ -95,7 +95,7 @@ const ServiceUtils = {
             default:
                 renderHTML += getColorSpan(_("Proxy Node"), isProxyRunning)
                 renderHTML += getColorSpan(_("Shunt Service"), isShuntRunning)
-                renderHTML += getColorSpan(_("DNS"), isDnsRunning)
+                renderHTML += getColorSpan(_("Pre-routing DNS"), isDnsRunning)
                 renderHTML += getColorSpan(_("Local Server"), isServerRunning)
         }
 

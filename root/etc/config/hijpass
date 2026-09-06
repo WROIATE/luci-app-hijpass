@@ -23,6 +23,7 @@ config hijpass
 config firewall
 	option tproxy_proto 'tcp,udp'
 	option shunt_port '18081'
+	option dns_forward 'none'
 	option use_chnroute '0'
 
 config shunt

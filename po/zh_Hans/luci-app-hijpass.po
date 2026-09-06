@@ -228,8 +228,8 @@ msgstr "配置保存失败"
 msgid "Configuration Type"
 msgstr "配置类型"
 
-msgid "Configure DNS Routing"
-msgstr "配置DNS分流相关设置"
+msgid "Configure direct and proxy DNS resolution before traffic routing; add resolved addresses to firewall sets for subsequent routing decisions."
+msgstr "在流量路由前，将域名查询分配到直连或代理 DNS，并把解析结果写入防火墙集合，供后续流量分流使用。"
 
 msgid "Configure Firewall"
 msgstr "配置nftables相关功能"
@@ -360,8 +360,8 @@ msgstr "不使用"
 msgid "Display Lines"
 msgstr "显示行数"
 
-msgid "DNS"
-msgstr "DNS"
+msgid "Pre-routing DNS"
+msgstr "前置DNS分流"
 
 msgid "DNS Cache"
 msgstr "DNS缓存"
@@ -383,9 +383,6 @@ msgstr "DNS节点配置"
 
 msgid "DNS Resolution Strategy"
 msgstr "DNS解析策略"
-
-msgid "DNS Routing Configuration"
-msgstr "DNS分流设置"
 
 msgid "DNS Server"
 msgstr "DNS服务器"
@@ -1929,8 +1926,8 @@ msgstr "防火墙分流端口 %s 未指向已启用的代理节点或分流服�
 msgid "Proxy domain DNS must use the current enabled shunt DNS port or a custom DNS server"
 msgstr "代理域名 DNS 必须使用当前已启用的分流 DNS 端口或自定义 DNS 服务器"
 
-msgid "Proxy domain DNS is using this shunt DNS port. Change it in the DNS module before disabling shunt."
-msgstr "代理域名 DNS 正在使用此分流 DNS 端口，请先在 DNS 模块中修改，再关闭分流。"
+msgid "Proxy domain DNS is using this shunt DNS port. Change it in the Pre-routing DNS module before disabling shunt."
+msgstr "代理域名 DNS 正在使用此分流 DNS 端口，请先在前置DNS分流模块中修改，再关闭分流。"
 
 msgid "%s member nodes · %s"
 msgstr "%s 个成员节点 · %s"
@@ -2063,3 +2060,45 @@ msgstr "代理节点“%s”正被以下负载均衡节点引用：%s。请先�
 
 msgid "Proxy node \"%s\" listen port %s is referenced by firewall settings: %s. Remove the references first."
 msgstr "代理节点“%s”的监听端口 %s 正被以下防火墙设置引用：%s。请先移除引用。"
+
+msgid "DNS Forwarding"
+msgstr "DNS转发"
+
+msgid "Redirect TCP and UDP DNS queries from clients selected by the firewall ACL to the selected local DNS service"
+msgstr "将防火墙 ACL 选中客户端的 TCP/UDP DNS 查询重定向到所选本地 DNS 服务"
+
+msgid "Networks: %s"
+msgstr "网络：%s"
+
+msgid "Firewall zones: %s"
+msgstr "防火墙区域：%s"
+
+msgid "Proxy client traffic entering through the selected logical network interfaces; WAN interfaces cannot be selected"
+msgstr "代理从所选逻辑网络接口进入的客户端流量；不能选择 WAN 接口"
+
+msgid "Exclude client traffic entering through the selected logical network interfaces; WAN interfaces are always excluded"
+msgstr "排除从所选逻辑网络接口进入的客户端流量；WAN 接口始终排除"
+
+msgid "Do not forward"
+msgstr "不转发"
+
+msgid "Routing Rules DNS"
+msgstr "路由规则 DNS"
+
+msgid "Not available"
+msgstr "不可用"
+
+msgid "Pre-routing DNS is unavailable or has no valid listen port"
+msgstr "前置DNS分流不可用或未配置有效的监听端口"
+
+msgid "Routing Rules DNS is disabled or has no valid listen port"
+msgstr "路由规则 DNS 已关闭或未配置有效的监听端口"
+
+msgid "Unknown DNS forwarding source: %s"
+msgstr "未知的 DNS 转发来源：%s"
+
+msgid "Firewall DNS forwarding is using Pre-routing DNS. Select another forwarding source in Firewall before changing the DNS service."
+msgstr "防火墙 DNS 转发正在使用前置DNS分流，请先在防火墙中选择其他转发来源，再更改 DNS 服务。"
+
+msgid "Firewall DNS forwarding is using Routing Rules DNS. Select another forwarding source in Firewall before disabling routing rules."
+msgstr "防火墙 DNS 转发正在使用路由规则 DNS，请先在防火墙中选择其他转发来源，再关闭路由规则。"

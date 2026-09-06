@@ -6,7 +6,8 @@ import {ServiceUtils} from "../utils/base/luci/service";
 import {FormUtils} from "../utils/base/luci/form";
 import {ValidationUtils} from "../utils/base/luci/validation";
 import {FilePathUtils} from "../utils/base/files/paths";
-import {LuciFlied} from "../enum/hijpass";
+import {FIREWALL_DNS_FORWARD, LuciFlied} from "../enum/hijpass";
+import {FirewallDnsForwardUtils} from "../utils/feature/firewall/dns-forward";
 
 
 const v = view.extend({
@@ -20,7 +21,9 @@ const v = view.extend({
 
     render: function () {
 
-        let m = new form.Map(LuciFlied.CONF_NAME, _('DNS Routing Configuration'), _('Configure DNS Routing'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('Pre-routing DNS'),
+            _('Configure direct and proxy DNS resolution before traffic routing; ' +
+                'add resolved addresses to firewall sets for subsequent routing decisions.'));
         ServiceUtils.createStatusSection(m, 'dns');
 
         let s = m.section(form.TypedSection, LuciFlied.DNS_SECTION_TYPE);
@@ -41,6 +44,13 @@ const v = view.extend({
         dnsService.value('custom', _('Custom'));
         dnsService.default = 'chinadns-ng';
         dnsService.rmempty = false;
+        dnsService.validate = function (_sectionId: string, value: string) {
+            if (value !== 'chinadns-ng'
+                && FirewallDnsForwardUtils.getSource() === FIREWALL_DNS_FORWARD.PRE_ROUTING) {
+                return _('Firewall DNS forwarding is using Pre-routing DNS. Select another forwarding source in Firewall before changing the DNS service.');
+            }
+            return true;
+        };
 
         let chinaDnsPort = s.taboption('basic', form.Value, 'cdg_port', _('Listen Port'),
             _('ChinaDNS-NG Listen Port'));

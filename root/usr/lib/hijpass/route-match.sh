@@ -76,7 +76,7 @@ check_domain_complex_match() {
     if echo "$rule" | grep -q "^regexp:"; then
         local content="${rule#regexp:}"
         # 使用 grep -E 进行扩展正则匹配，-i 忽略大小写
-        if echo "$target" | grep -E -i -q "$content"; then
+        if echo "$target" | grep -E -i -q -e "$content"; then
             return 0
         fi
         return 1
@@ -85,7 +85,7 @@ check_domain_complex_match() {
     # 4. 处理 "纯字符串" (关键字匹配)
     # 语法: baidu (匹配 www.baidu.com, baidu.net)
     # 只要 target 包含 rule 字符串即算命中
-    if echo "$target" | grep -F -i -q "$rule"; then
+    if echo "$target" | grep -F -i -q -e "$rule"; then
         return 0
     fi
 

@@ -552,6 +552,10 @@ msgstr ""
 msgid "Domain: Enter a domain (for example, www.example.com) to query GeoSite tags and local domain rule files."
 msgstr ""
 
+#: ts-src/views/shunt.ts:159
+msgid "Domain → GeoSite tags"
+msgstr ""
+
 #: ts-src/utils/feature/rule/panel.ts:192
 msgid "Domain Query"
 msgstr ""
@@ -801,6 +805,10 @@ msgstr ""
 msgid "Generated %s JSON Configuration"
 msgstr ""
 
+#: ts-src/views/shunt.ts:143
+msgid "Geo Database Query"
+msgstr ""
+
 #: ts-src/views/rule.ts:59
 msgid "GeoIP Database Download URL"
 msgstr ""
@@ -972,6 +980,10 @@ msgstr ""
 
 #: ts-src/utils/feature/rule/panel.ts:169
 msgid "IP address: Enter an IP address (for example, 8.8.8.8) to query GeoIP tags and local IP rule files."
+msgstr ""
+
+#: ts-src/views/shunt.ts:162
+msgid "IP address → GeoIP tags"
 msgstr ""
 
 #: ts-src/views/shunt.ts:352
@@ -1895,6 +1907,14 @@ msgstr ""
 
 #: ts-src/utils/base/luci/validation.ts:20 ts-src/views/shunt.ts:433
 msgid "Tag"
+msgstr ""
+
+#: ts-src/views/shunt.ts:160
+msgid "geosite:tag → domains in tag"
+msgstr ""
+
+#: ts-src/views/shunt.ts:163
+msgid "geoip:tag → networks in tag"
 msgstr ""
 
 #: ts-src/views/shunt.ts:71

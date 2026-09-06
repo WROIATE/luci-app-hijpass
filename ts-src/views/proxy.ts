@@ -10,12 +10,12 @@ import { FilePathUtils } from "../utils/base/files/paths";
 import { UciUtils } from "../utils/base/luci/uci";
 import { ProxyFormUtils } from "../utils/feature/proxy/form";
 import { ProxyChainUtils } from "../utils/feature/proxy/chain";
+import { findProxyDependencyCycleFrom } from "../utils/feature/proxy/validation";
 import { NotificationUtils } from "../utils/base/luci/notification";
 
-function getLoadBalanceReferrers(nodeName: string): string[] {
+function getProxyReferrers(nodeName: string): string[] {
     return ProxyChainUtils.getProxySections()
-        .filter((section: any) => section.type === PROXY_TYPE.LOAD_BALANCE
-            && ProxyChainUtils.normalizeProxyNodeList(section.member_node).includes(nodeName))
+        .filter((section: any) => ProxyChainUtils.getProxyDependencies(section).includes(nodeName))
         .map((section: any) => ProxyChainUtils.getProxyName(section));
 }
 
@@ -70,11 +70,11 @@ const v = view.extend({
                 );
                 return;
             }
-            const referrers = getLoadBalanceReferrers(nodeName);
+            const referrers = getProxyReferrers(nodeName);
             if (referrers.length > 0) {
                 NotificationUtils.warning(
                     _('Cannot Delete Proxy Node'),
-                    _('Proxy node "%s" is referenced by load balancing nodes: %s. Remove the references first.')
+                    _('Proxy node "%s" is referenced by proxy nodes: %s. Remove the references first.')
                         .format(nodeName, referrers.join(', ')),
                     8000
                 );
@@ -232,11 +232,15 @@ function createLoadBalanceOptions(s: LuCI.form.AbstractSection) {
             || sectionId;
         if (value === currentName) return _('Load balancing node cannot include itself');
 
-        const member = ProxyChainUtils.getProxySections()
-            .find((section: any) => ProxyChainUtils.getProxyName(section) === value);
+        const sections = ProxyChainUtils.getProxySectionMap();
+        const member = sections.get(value);
         if (!member) return _('Load balancing member node not found');
         if (member.type === PROXY_TYPE.LOAD_BALANCE) {
             return _('Nested load balancing nodes are not supported');
+        }
+        const dependencyCycle = findProxyDependencyCycleFrom(currentName, [value], sections);
+        if (dependencyCycle) {
+            return _('Proxy node dependency chain has a cycle: %s').format(dependencyCycle.join(' -> '));
         }
         if (member.enabled !== '1') return _('Load balancing member node is not enabled');
         if (!ProxyChainUtils.isPort(member.socks_port)) {

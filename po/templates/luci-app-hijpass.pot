@@ -2759,7 +2759,7 @@ msgid "Cannot Delete Proxy Node"
 msgstr ""
 
 #: ts-src/views/proxy.ts
-msgid "Proxy node \"%s\" is referenced by load balancing nodes: %s. Remove the references first."
+msgid "Proxy node \"%s\" is referenced by proxy nodes: %s. Remove the references first."
 msgstr ""
 
 #: ts-src/views/proxy.ts

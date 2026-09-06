@@ -426,7 +426,7 @@ function hasSplitDnsTarget(section: any, sectionId: string) {
 
 function getShuntDnsDependencyError(section: LuCI.form.AbstractSection, sectionId: string) {
     if (FirewallDnsForwardUtils.getSource() === FIREWALL_DNS_FORWARD.ROUTING) {
-        return _('Firewall DNS forwarding is using Routing Rules DNS. Select another forwarding source in Firewall before disabling routing rules.');
+        return _('Firewall DNS forwarding is using Core DNS. Select another forwarding source in Firewall before disabling proxy routing.');
     }
 
     const dnsService = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'dns_service');
@@ -437,7 +437,7 @@ function getShuntDnsDependencyError(section: LuCI.form.AbstractSection, sectionI
         && dnsListenPort
         && (directDns === '127.0.0.1#' + dnsListenPort
             || proxyDns === '127.0.0.1#' + dnsListenPort)) {
-        return _('Pre-routing DNS is using this Routing Rules DNS port. Change it in the Pre-routing DNS module before disabling routing rules.');
+        return _('Independent DNS is using this Core DNS port. Change it in the Independent DNS module before disabling proxy routing.');
     }
     return null;
 }
@@ -462,8 +462,8 @@ const v = view.extend({
 
     render: function () {
         ensureInlineRuleQueryStyles();
-        let m = new form.Map(LuciFlied.CONF_NAME, _('Routing Rules'),
-            _('Configure routing rules and DNS routing'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('Proxy Routing'),
+            _('Configure proxy core routing, DNS, and rule-set settings'));
         ServiceUtils.createStatusSection(m, 'shunt');
 
         let s = m.section(form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE);
@@ -977,8 +977,8 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
 function createTabs(s: LuCI.form.AbstractSection) {
     s.tab('basic', _('Basic Configuration'));
     s.tab('config', _('Shunt Configuration Editor'));
-    s.tab('route', _('Routing Configuration'));
-    s.tab('dns', _('DNS Server Configuration'));
+    s.tab('route', _('Routing Rules'));
+    s.tab('dns', _('Core DNS'));
     s.tab('ruleset', _('Rule-set'));
 }
 

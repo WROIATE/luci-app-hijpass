@@ -19,7 +19,7 @@ function getRoutingDnsOption(): RoutingDnsOption {
     const target = FirewallDnsForwardUtils.getRoutingTarget();
     return {
         available: target.available,
-        label: FirewallDnsForwardUtils.getTargetLabel(_('Routing Rules DNS'), target),
+        label: FirewallDnsForwardUtils.getTargetLabel(_('Core DNS'), target),
         value: target.port ? '127.0.0.1#' + target.port : FIREWALL_DNS_FORWARD.ROUTING,
     };
 }
@@ -32,7 +32,7 @@ function appendDnsServerOptions(option: LuCI.form.ListValue, routingDns: Routing
         if (value !== routingDns.value || routingDns.available) {
             return true;
         }
-        return _('Routing Rules DNS is disabled or has no valid listen port');
+        return _('Core DNS is disabled or has no valid listen port');
     };
 }
 
@@ -48,9 +48,9 @@ const v = view.extend({
 
     render: function () {
 
-        let m = new form.Map(LuciFlied.CONF_NAME, _('Pre-routing DNS'),
-            _('Configure direct and proxy DNS resolution before traffic routing; ' +
-                'add resolved addresses to firewall sets for subsequent routing decisions.'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('Independent DNS Service'),
+            _('Configure an independently running DNS service. Select upstreams by domain, ' +
+                'populate firewall sets, or extend it with custom configuration and hooks.'));
         ServiceUtils.createStatusSection(m, 'dns');
 
         let s = m.section(form.TypedSection, LuciFlied.DNS_SECTION_TYPE);
@@ -65,7 +65,7 @@ const v = view.extend({
 
         // === DNS分流配置 ===
 
-        let dnsService = s.taboption('basic', form.ListValue, 'dns_service', _('Shunt Service'),
+        let dnsService = s.taboption('basic', form.ListValue, 'dns_service', _('DNS Service Type'),
             _('Select DNS Service Type'));
         dnsService.value('chinadns-ng', 'chinadns-ng');
         dnsService.value('custom', _('Custom'));
@@ -74,7 +74,7 @@ const v = view.extend({
         dnsService.validate = function (_sectionId: string, value: string) {
             if (value !== 'chinadns-ng'
                 && FirewallDnsForwardUtils.getSource() === FIREWALL_DNS_FORWARD.PRE_ROUTING) {
-                return _('Firewall DNS forwarding is using Pre-routing DNS. Select another forwarding source in Firewall before changing the DNS service.');
+                return _('Firewall DNS forwarding is using Independent DNS. Select another forwarding source in Firewall before changing the DNS service.');
             }
             return true;
         };

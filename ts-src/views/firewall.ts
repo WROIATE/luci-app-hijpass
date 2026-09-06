@@ -84,11 +84,11 @@ function createPortOptions(s: LuCI.form.AbstractSection) {
 
     const preRoutingTarget = FirewallDnsForwardUtils.getPreRoutingTarget();
     dnsForward.value(FIREWALL_DNS_FORWARD.PRE_ROUTING,
-        FirewallDnsForwardUtils.getTargetLabel(_('Pre-routing DNS'), preRoutingTarget));
+        FirewallDnsForwardUtils.getTargetLabel(_('Independent DNS'), preRoutingTarget));
 
     const routingTarget = FirewallDnsForwardUtils.getRoutingTarget();
     dnsForward.value(FIREWALL_DNS_FORWARD.ROUTING,
-        FirewallDnsForwardUtils.getTargetLabel(_('Routing Rules DNS'), routingTarget));
+        FirewallDnsForwardUtils.getTargetLabel(_('Core DNS'), routingTarget));
 
     dnsForward.default = FIREWALL_DNS_FORWARD.NONE;
     dnsForward.rmempty = false;

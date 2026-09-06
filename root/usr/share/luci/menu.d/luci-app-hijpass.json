@@ -24,7 +24,7 @@
     }
   },
   "admin/services/hijpass/shunt": {
-    "title": "Routing Rules",
+    "title": "Proxy Routing",
     "order": 3,
     "action": {
       "type": "view",
@@ -48,7 +48,7 @@
     }
   },
   "admin/services/hijpass/dns": {
-    "title": "Pre-routing DNS",
+    "title": "Independent DNS",
     "order": 5,
     "action": {
       "type": "view",

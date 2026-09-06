@@ -25,14 +25,14 @@ case "$DNS_FORWARD_SOURCE" in
         if [ "$DNS_SERVICE" = "chinadns-ng" ]; then
             DNS_FORWARD_PORT=$(uci -q get hijpass.@dns[0].cdg_port || :)
         else
-            log_warn "Pre-routing DNS forwarding target is unavailable"
+            log_warn "Independent DNS forwarding target is unavailable"
         fi
         ;;
     routing)
         if [ "$(uci -q get hijpass.@shunt[0].enabled || :)" != "0" ]; then
             DNS_FORWARD_PORT=$(uci -q get hijpass.@shunt[0].dns_listen_port || :)
         else
-            log_warn "Routing Rules DNS forwarding target is disabled"
+            log_warn "Core DNS forwarding target is disabled"
         fi
         ;;
     *)

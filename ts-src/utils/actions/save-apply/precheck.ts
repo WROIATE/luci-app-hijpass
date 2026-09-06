@@ -378,7 +378,7 @@ function checkDnsRoutingTargets() {
             return;
         }
         if (!routingTarget.available || value !== routingServer) {
-            warnings.push(_('%s references an unavailable Routing Rules DNS port').format(label));
+            warnings.push(_('%s references an unavailable Core DNS port').format(label));
         }
     });
 

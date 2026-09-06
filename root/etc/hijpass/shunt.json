@@ -1,83 +1,11 @@
 {
     "log": {
-        "loglevel": "warning"
-    },
-    "policy": {
-        "levels": {
-            "0": {
-                "statsUserUplink": false,
-                "statsUserDownlink": false
-            }
-        }
-    },
-    "routing": {
-        "domainStrategy": "IPIfNonMatch",
-        "domainMatcher": "hybrid",
-        "rules": [
-            {
-                "type": "field",
-                "outboundTag": "direct"
-            }
-        ]
+        "disabled": false,
+        "level": "warn",
+        "timestamp": true
     },
     "dns": {},
-    "inbounds": [
-        {
-            "port": 1041,
-            "protocol": "dokodemo-door",
-            "streamSettings": {
-                "sockopt": {
-                    "tproxy": "tproxy"
-                }
-            },
-            "sniffing": {
-                "enabled": true,
-                "routeOnly": true,
-                "destOverride": [
-                    "http",
-                    "tls",
-                    "quic"
-                ],
-                "metadataOnly": false
-            },
-            "settings": {
-                "network": "tcp,udp",
-                "followRedirect": true
-            },
-            "tag": "entrance"
-        }
-    ],
-    "outbounds": [
-        {
-            "settings": {
-                "servers": [
-                    {
-                        "password": "",
-                        "port": 2084,
-                        "address": "127.0.0.1"
-                    }
-                ]
-            },
-            "streamSettings": {
-                "network": "tcp",
-                "security": "none"
-            },
-            "mux": {
-                "enabled": false
-            },
-            "protocol": "socks",
-            "tag": "proxy"
-        },
-        {
-            "settings": {
-                "domainStrategy": "UseIP"
-            },
-            "protocol": "freedom",
-            "tag": "direct"
-        },
-        {
-            "tag": "dns-out",
-            "protocol": "dns"
-        }
-    ]
+    "inbounds": [],
+    "outbounds": [],
+    "route": {}
 }

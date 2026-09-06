@@ -2,21 +2,47 @@
 
 . /usr/lib/hijpass/app-logger.sh
 
+. /lib/functions.sh
+
 log_debug "$0"
 
-REDIRECT_PROXY_LOG=$(uci -q get hijpass.@proxy[0].log_redirect || :)
-PROXY_LOG_PATH=$(uci -q get hijpass.@proxy[0].log_path || :)
-REDIRECT_SHUNT_LOG=$(uci -q get hijpass.@shunt[0].log_redirect || :)
-SHUNT_LOG_PATH=$(uci -q get hijpass.@shunt[0].log_path || :)
-
 clean_log() {
-    log_file="$1"
+    local log_file
+    config_get log_file "$1" log_path
+    [ -z "$log_file" ] && return
     if [ -f "$log_file" ]; then
-        tail -n 1000 "$log_file" >"$log_file.tmp" && cat "$log_file.tmp" > "$log_file"
-        log_info "Successfully cleaned log file: $log_file"
+        if tail -n 30000 "$log_file" >"$log_file.tmp" 2>/dev/null && [ -s "$log_file.tmp" ]; then
+            cat "$log_file.tmp" >"$log_file"
+            rm -f "$log_file.tmp"
+            log_debug "Successfully cleaned log file: $log_file"
+        else
+            rm -f "$log_file.tmp"
+            log_warn "Failed to clean log file: $log_file"
+        fi
     fi
 }
 
-[ "$REDIRECT_PROXY_LOG" = "1" ] && clean_log "$PROXY_LOG_PATH"
+case "$1" in
+clean)
+    echo "" >"$2"
+    log_info "Manually trigger log cleanup, log file: $2"
+    ;;
+hijpass)
+    config_load hijpass
+    config_foreach clean_log hijpass
+    config_foreach clean_log proxy_node
+    config_foreach clean_log shunt
+    ;;
+hijserver)
+    config_load hijserver
+    config_foreach clean_log server_node
+    ;;
+  *)
+    config_load hijpass
+    config_foreach clean_log hijpass
+    config_foreach clean_log proxy_node
+    config_foreach clean_log shunt
 
-[ "$REDIRECT_SHUNT_LOG" = "1" ] && clean_log "$SHUNT_LOG_PATH"
+    config_load hijserver
+    config_foreach clean_log server_node
+esac

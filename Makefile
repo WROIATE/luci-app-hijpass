@@ -1,39 +1,113 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-hijpass
-PKG_VERSION:=25.4.6
+PKG_VERSION:=26.9.6
 PKG_RELEASE:=1
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
-LUCI_DEPENDS:= +curl +sing-box +xray-core \
+
+PKG_CONFIG_DEPENDS:= \
+	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria \
+	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_NaiveProxy \
+	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Client \
+	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Server \
+	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Rust_Client \
+	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Rust_Server \
+	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS \
+	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Trojan_Plus \
+	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_tuic_client
+
+LUCI_DEPENDS:= +ca-bundle +curl +file +firewall4 +ip-full +luci-lua-runtime \
+	+sing-box +unzip +xray-core \
 	+kmod-nft-socket +kmod-nft-tproxy +kmod-nft-nat \
-	+v2ray-geosite +v2ray-geoip +geoview +hysteria
+	+v2ray-geosite +v2ray-geoip +geoview +chinadns-ng +jq
+
+define Package/$(PKG_NAME)/config
+menu "Configuration"
+	depends on PACKAGE_$(PKG_NAME)
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria
+	bool "Include Hysteria"
+	select PACKAGE_hysteria
+	default y if aarch64||x86_64
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_NaiveProxy
+	bool "Include NaiveProxy"
+	depends on !(arc||armeb||loongarch64||mips||mips64||powerpc||TARGET_gemini)
+	select PACKAGE_naiveproxy
+	default n
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Client
+	bool "Include Shadowsocks Libev Client"
+	select PACKAGE_shadowsocks-libev-ss-local
+	select PACKAGE_shadowsocks-libev-ss-redir
+	default y
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Server
+	bool "Include Shadowsocks Libev Server"
+	select PACKAGE_shadowsocks-libev-ss-server
+	default y
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Rust_Client
+	bool "Include Shadowsocks Rust Client"
+	depends on !i386
+	select PACKAGE_shadowsocks-rust-sslocal
+	default n
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Rust_Server
+	bool "Include Shadowsocks Rust Server"
+	depends on !i386
+	select PACKAGE_shadowsocks-rust-ssserver
+	default n
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS
+	bool "Include Shadow-TLS"
+	select PACKAGE_shadow-tls
+	depends on aarch64||arm||x86_64
+	default n
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_Trojan_Plus
+	bool "Include Trojan-Plus"
+	select PACKAGE_trojan-plus
+	default y
+
+config PACKAGE_$(PKG_NAME)_INCLUDE_tuic_client
+	bool "Include tuic-client"
+	depends on aarch64||arm||i386||x86_64
+	select PACKAGE_tuic-client
+	default n
+
+endmenu
+endef
 
 define Package/$(PKG_NAME)/conffiles
 /etc/hijpass/fw4-template.nft
-/etc/hijpass/white-v4.conf
-/etc/hijpass/white-v6.conf
+/etc/hijpass/hook/dns-hook.sh
+/etc/hijpass/hook/nft-hook.sh
+/etc/hijpass/rules/chn-list.txt
+/etc/hijpass/rules/chn-route.txt
+/etc/hijpass/rules/chn-route6.txt
+/etc/hijpass/rules/domain-direct.txt
+/etc/hijpass/rules/domain-proxy.txt
+/etc/hijpass/rules/gfw-list.txt
+/etc/hijpass/rules/ip-direct.txt
+/etc/hijpass/rules/ip-proxy.txt
 /etc/hijpass/shunt.json
-/etc/hijpass/proxy.json
+/etc/config/hijpass
+/etc/config/hijserver
 endef
 
-define Package/$(PKG_NAME)/postinst
+define Package/$(PKG_NAME)/prerm
 #!/bin/sh
-if ! grep -q "^hijpass:" /etc/passwd; then
-    if ! grep -q "^hijpass:" /etc/group; then
-        echo "hijpass:x:4396:hijpass" >> /etc/group
-    fi
-    echo "hijpass:x:0:4396:hijpass:/var/run/hijpass:/bin/false" >> /etc/passwd
-    echo "hijpass:x:0:0:99999:7:::" >> /etc/shadow
-fi
+/etc/init.d/hijpass stop
+/etc/init.d/hijserver stop
 exit 0
 endef
 
 define Package/$(PKG_NAME)/postrm
 #!/bin/sh
-rm /etc/hijpass/fw4-rules.nft
 uci -q batch <<-EOF >/dev/null
-	delete firewall.hijapss
+	delete firewall.hijpass
 	commit firewall
 EOF
 exit 0

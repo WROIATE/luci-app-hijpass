@@ -1,34 +1,20 @@
 #!/bin/sh
 
-LOG_FILE="/tmp/log/hijpass.log"
-MAX_SIZE=$((1024 * 1024)) # 1MB
-LOG_LEVEL="info"          # debug, info, warn, error
-
-LOG_LEVELS="debug:1 info:2 warn:3 error:4"
+LOG_FILE=$(uci -q get hijpass.@hijpass[0].log_path || :)
+LOG_LEVEL=$(uci -q get hijpass.@hijpass[0].log_level || echo "INFO") # debug, info, warn, error
+LOG_DIR=$(uci -q get hijpass.@hijpass[0].log_dir || :)
+[ -z "$LOG_DIR" ] && exit 1
+[ -d "$LOG_DIR" ] || mkdir -p "$LOG_DIR"
+LOG_LEVELS="DEBUG:1 INFO:2 WARN:3 ERROR:4"
 
 get_log_level_num() {
-    level=$1
+    local level="$1"
     echo "$LOG_LEVELS" | tr ' ' '\n' | grep "^$level:" | cut -d':' -f2
 }
 
-check_log_size() {
-    if [ -f "$LOG_FILE" ]; then
-        size=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
-        
-        case $size in
-            ''|*[!0-9]*) size=0 ;;
-        esac
-        
-        if [ "$size" -gt "$MAX_SIZE" ]; then
-            tmp_file="${LOG_FILE}.tmp"
-            tail -n 100 "$LOG_FILE" > "$tmp_file" 2>/dev/null
-            mv "$tmp_file" "$LOG_FILE" 2>/dev/null
-        fi
-    fi
-}
-
 log() {
-    level=$1
+    local level level_num min_level_num message datetime
+    level=$(echo "$1" | tr 'a-z' 'A-Z')
     shift
     message=$*
     level_num=$(get_log_level_num "$level")
@@ -36,9 +22,23 @@ log() {
 
     if [ -n "$level_num" ] && [ -n "$min_level_num" ]; then
         if [ "$level_num" -ge "$min_level_num" ]; then
-            check_log_size
             datetime=$(date "+%Y-%m-%d %H:%M:%S")
-            printf "[%s] [%s] %s\n" "$datetime" "${level}" "$message" >>"$LOG_FILE"
+            # 处理多行消息的对齐
+            if [ "$LOG_LEVEL" = "DEBUG" ]; then
+                # DEBUG模式下，第一行包含脚本名和时间戳
+                printf "%s   %-8s%-40s%s\n" "[$datetime]" "${level}" "$0" "$(echo "$message" | head -n1)" >>"$LOG_FILE"
+                # 后续行只保留缩进，不显示时间戳
+                echo "$message" | tail -n +2 | while IFS= read -r line; do
+                    printf "%-23s%-8s%-40s%s\n" "" "" "" "$line" >>"$LOG_FILE"
+                done
+            else
+                # 普通模式下，第一行正常输出
+                printf "%s   %-8s%s\n" "[$datetime]" "${level}" "$(echo "$message" | head -n1)" >>"$LOG_FILE"
+                # 后续行只保留缩进，不显示时间戳
+                echo "$message" | tail -n +2 | while IFS= read -r line; do
+                    printf "%-23s%-8s%s\n" "" "" "$line" >>"$LOG_FILE"
+                done
+            fi
         fi
     fi
 }

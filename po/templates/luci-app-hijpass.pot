@@ -303,8 +303,8 @@ msgstr ""
 msgid "Configuration Type"
 msgstr ""
 
-#: ts-src/views/dns.ts:24
-msgid "Configure direct and proxy DNS resolution before traffic routing; add resolved addresses to firewall sets for subsequent routing decisions."
+#: ts-src/views/dns.ts
+msgid "Configure an independently running DNS service. Select upstreams by domain, populate firewall sets, or extend it with custom configuration and hooks."
 msgstr ""
 
 #: ts-src/views/firewall.ts:22
@@ -480,9 +480,13 @@ msgstr ""
 msgid "Display Lines"
 msgstr ""
 
-#: root/usr/share/luci/menu.d/luci-app-hijpass.json ts-src/utils/base/luci/service.ts:84
-#: ts-src/utils/base/luci/service.ts:98 ts-src/views/dns.ts:23
-msgid "Pre-routing DNS"
+#: root/usr/share/luci/menu.d/luci-app-hijpass.json
+#: ts-src/utils/base/luci/service.ts ts-src/views/firewall.ts
+msgid "Independent DNS"
+msgstr ""
+
+#: ts-src/views/dns.ts
+msgid "Independent DNS Service"
 msgstr ""
 
 #: ts-src/views/shunt.ts:403
@@ -521,8 +525,10 @@ msgstr ""
 msgid "DNS Server Address"
 msgstr ""
 
-#: ts-src/views/shunt.ts:590
-msgid "DNS Server Configuration"
+#: ts-src/views/dns.ts ts-src/views/firewall.ts ts-src/views/shunt.ts
+#: ts-src/utils/actions/save-apply/precheck.ts
+#: ts-src/utils/feature/firewall/dns-forward.ts
+msgid "Core DNS"
 msgstr ""
 
 #: ts-src/views/shunt.ts:449
@@ -1850,8 +1856,8 @@ msgstr ""
 msgid "Shunt Query"
 msgstr ""
 
-#: ts-src/utils/base/luci/service.ts:87 ts-src/utils/base/luci/service.ts:97 ts-src/views/dns.ts:38
-msgid "Shunt Service"
+#: ts-src/views/dns.ts
+msgid "DNS Service Type"
 msgstr ""
 
 #: ts-src/views/shunt.ts:61
@@ -2569,11 +2575,11 @@ msgid "Firewall shunt port %s does not reference an enabled proxy node or shunt 
 msgstr ""
 
 #: ts-src/utils/actions/save-apply/precheck.ts
-msgid "%s references an unavailable Routing Rules DNS port"
+msgid "%s references an unavailable Core DNS port"
 msgstr ""
 
 #: ts-src/views/shunt.ts
-msgid "Pre-routing DNS is using this Routing Rules DNS port. Change it in the Pre-routing DNS module before disabling routing rules."
+msgid "Independent DNS is using this Core DNS port. Change it in the Independent DNS module before disabling proxy routing."
 msgstr ""
 
 #: ts-src/utils/feature/proxy/form.ts
@@ -2702,13 +2708,17 @@ msgstr ""
 msgid "View installed core versions and update runtime components."
 msgstr ""
 
-#: root/usr/share/luci/menu.d/luci-app-hijpass.json
 #: ts-src/views/shunt.ts
 msgid "Routing Rules"
 msgstr ""
 
+#: root/usr/share/luci/menu.d/luci-app-hijpass.json
+#: ts-src/utils/base/luci/service.ts ts-src/views/shunt.ts
+msgid "Proxy Routing"
+msgstr ""
+
 #: ts-src/views/shunt.ts
-msgid "Configure routing rules and DNS routing"
+msgid "Configure proxy core routing, DNS, and rule-set settings"
 msgstr ""
 
 #: ts-src/views/shunt.ts
@@ -2793,19 +2803,15 @@ msgid "Do not forward"
 msgstr ""
 
 #: ts-src/views/firewall.ts
-msgid "Routing Rules DNS"
-msgstr ""
-
-#: ts-src/views/firewall.ts
 msgid "Not available"
 msgstr ""
 
 #: ts-src/utils/feature/firewall/dns-forward.ts
-msgid "Pre-routing DNS is unavailable or has no valid listen port"
+msgid "Independent DNS is unavailable or has no valid listen port"
 msgstr ""
 
 #: ts-src/utils/feature/firewall/dns-forward.ts
-msgid "Routing Rules DNS is disabled or has no valid listen port"
+msgid "Core DNS is disabled or has no valid listen port"
 msgstr ""
 
 #: ts-src/utils/feature/firewall/dns-forward.ts
@@ -2813,9 +2819,9 @@ msgid "Unknown DNS forwarding source: %s"
 msgstr ""
 
 #: ts-src/views/dns.ts
-msgid "Firewall DNS forwarding is using Pre-routing DNS. Select another forwarding source in Firewall before changing the DNS service."
+msgid "Firewall DNS forwarding is using Independent DNS. Select another forwarding source in Firewall before changing the DNS service."
 msgstr ""
 
 #: ts-src/views/shunt.ts
-msgid "Firewall DNS forwarding is using Routing Rules DNS. Select another forwarding source in Firewall before disabling routing rules."
+msgid "Firewall DNS forwarding is using Core DNS. Select another forwarding source in Firewall before disabling proxy routing."
 msgstr ""

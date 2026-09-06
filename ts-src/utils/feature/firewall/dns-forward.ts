@@ -59,12 +59,12 @@ const FirewallDnsForwardUtils = {
         if (source === FIREWALL_DNS_FORWARD.PRE_ROUTING) {
             return getPreRoutingTarget().available
                 ? true
-                : _('Pre-routing DNS is unavailable or has no valid listen port');
+                : _('Independent DNS is unavailable or has no valid listen port');
         }
         if (source === FIREWALL_DNS_FORWARD.ROUTING) {
             return getRoutingTarget().available
                 ? true
-                : _('Routing Rules DNS is disabled or has no valid listen port');
+                : _('Core DNS is disabled or has no valid listen port');
         }
         return _('Unknown DNS forwarding source: %s').format(source);
     },

@@ -6,12 +6,12 @@ import {
     Balancer, BurstObservatory,
     DNS, DnsOutbound, DnsRule, DnsServer,
     Freedom, Inbound, Log, Outbound, Route,
-    RouteRule, Socks, BlockOutbound
+    RouteRule, Rule, Socks, BlockOutbound
 } from './models'
-import {LuciFlied, ShuntTag} from '../../enum/hijpass'
-import { CoreAdapter, ProxyNode, RuleDTO } from '../../module/luci'
+import {LuciFlied, PROXY_TYPE, ShuntTag} from '../../enum/hijpass'
+import { CoreAdapter, LoadBalanceProxyNode, ProxyNode, RuleDTO } from '../../module/luci'
 import {xrayRegistry} from './protocols/protocol'
-import { ProxyChainUtils } from '../../utils/feature/proxy/chain'
+import { LOAD_BALANCE_MEMBER_TAG_PREFIX, ProxyChainUtils } from '../../utils/feature/proxy/chain'
 
 export const XrayUtils: CoreAdapter = {
     genShuntConf: genConf,
@@ -117,33 +117,6 @@ function genConf() {
     route.rules = route.rules.concat(dnsRules)
     route.rules = route.rules.concat(routeRules)
 
-    let burstObservatory = undefined
-    if (shuntSection.loadBalance.lbNodeList.length > 0) {
-        const lbConf = shuntSection.loadBalance
-        const balancer = new Balancer(XrayEnum.LOAD_BALANCE_OUTBOUND_TAG)
-        balancer.selector = lbConf.lbNodeList
-        balancer.fallbackTag = lbConf.fallbackTag || lbConf.lbNodeList[0]
-        const strategy = lbConf.strategy || 'leastLoad'
-        balancer.strategy.type = strategy
-        if (strategy === 'leastLoad') {
-            if (lbConf.strategyExpected) balancer.strategy.settings.expected = parseInt(lbConf.strategyExpected, 10)
-            if (lbConf.strategyMaxRtt) balancer.strategy.settings.maxRTT = lbConf.strategyMaxRtt
-            if (lbConf.strategyTolerance) balancer.strategy.settings.tolerance = parseFloat(lbConf.strategyTolerance)
-        } else {
-            balancer.strategy.settings = undefined
-        }
-        route.balancers.push(balancer)
-        burstObservatory = new BurstObservatory(
-            lbConf.probeUrl || undefined,
-            lbConf.probeConnectivity || undefined,
-            lbConf.probeInterval || undefined,
-            lbConf.probeTimeout || undefined,
-            lbConf.probeSampling ? parseInt(lbConf.probeSampling, 10) : undefined,
-            lbConf.probeHttpMethod || undefined
-        )
-        burstObservatory.subjectSelector = lbConf.lbNodeList
-    }
-
     const log = new Log(shuntSection.logLevel)
 
     return {
@@ -151,17 +124,33 @@ function genConf() {
         inbounds,
         outbounds,
         dns,
-        routing: route,
-        burstObservatory
+        routing: route
     }
 }
 
 function genProxyConf(config: ProxyNode): {} {
+    if (config.type === PROXY_TYPE.LOAD_BALANCE) {
+        return genLoadBalanceProxyConf(config as LoadBalanceProxyNode)
+    }
+
     const outbound = xrayRegistry.build(config.type, config)
     return buildBaseProxyConf(config, outbound)
 }
 
 function buildBaseProxyConf(config: ProxyNode, outbound: Outbound): {} {
+    const inbounds = buildProxyInbounds(config)
+
+    const outbounds = [outbound]
+    appendProxyChainOutbounds(config, outbound, outbounds)
+
+    return {
+        log: new Log(transProxyLogLevel(config.log_level)),
+        inbounds,
+        outbounds
+    }
+}
+
+function buildProxyInbounds(config: ProxyNode): Inbound[] {
     const tproxyInbound = new Inbound('tproxy', Number(config.listen_port), 'tproxy-in')
     tproxyInbound.sniffing = undefined
 
@@ -169,13 +158,48 @@ function buildBaseProxyConf(config: ProxyNode, outbound: Outbound): {} {
     socksInbound.settings = {udp: true}
     socksInbound.protocol = 'socks'
 
-    const outbounds = [outbound]
-    appendProxyChainOutbounds(config, outbound, outbounds)
+    return [tproxyInbound, socksInbound]
+}
+
+function genLoadBalanceProxyConf(config: LoadBalanceProxyNode): {} {
+    const members = ProxyChainUtils.resolveLoadBalanceMembers(config)
+    const route = new Route<Rule>()
+    route.rules.push(new Rule(undefined, ['tproxy-in', 'socks-in'], XrayEnum.LOAD_BALANCE_OUTBOUND_TAG))
+
+    const balancer = new Balancer(XrayEnum.LOAD_BALANCE_OUTBOUND_TAG)
+    balancer.selector = [LOAD_BALANCE_MEMBER_TAG_PREFIX]
+    const fallback = members.find(member => member.name === config.fallback_tag) || members[0]
+    balancer.fallbackTag = fallback.tag
+
+    const strategy = config.strategy || 'leastLoad'
+    balancer.strategy.type = strategy
+    if (strategy === 'leastLoad') {
+        if (config.strategy_expected) balancer.strategy.settings.expected = parseInt(config.strategy_expected, 10)
+        if (config.strategy_max_rtt) balancer.strategy.settings.maxRTT = config.strategy_max_rtt
+        if (config.strategy_tolerance) balancer.strategy.settings.tolerance = parseFloat(config.strategy_tolerance)
+    } else {
+        balancer.strategy.settings = undefined
+    }
+    route.balancers.push(balancer)
+
+    const burstObservatory = new BurstObservatory(
+        config.probe_url || undefined,
+        config.probe_connectivity || undefined,
+        config.probe_interval || undefined,
+        config.probe_timeout || undefined,
+        config.probe_sampling ? parseInt(config.probe_sampling, 10) : undefined,
+        config.probe_http_method || undefined
+    )
+    burstObservatory.subjectSelector = [LOAD_BALANCE_MEMBER_TAG_PREFIX]
+
+    const outbounds = members.map(member => new Socks('127.0.0.1', member.socksPort, member.tag))
 
     return {
         log: new Log(transProxyLogLevel(config.log_level)),
-        inbounds: [tproxyInbound, socksInbound],
-        outbounds
+        inbounds: buildProxyInbounds(config),
+        outbounds,
+        routing: route,
+        burstObservatory
     }
 }
 
@@ -307,7 +331,6 @@ function transXrayIpVersion(ipVersion?: 4 | 6) {
 function transOutTag(tag: string) {
     if (tag === ShuntTag.BLOCK_OUTBOUND_TAG) return XrayEnum.BLOCK_OUTBOUND_TAG
     if (tag === ShuntTag.DIRECT_OUTBOUND_TAG) return XrayEnum.DIRECT_OUTBOUND_TAG
-    if (tag === ShuntTag.LOAD_BALANCE_OUTBOUND_TAG) return XrayEnum.LOAD_BALANCE_OUTBOUND_TAG
     return tag
 }
 

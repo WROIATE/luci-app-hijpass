@@ -20,6 +20,7 @@ export enum LuciFlied {
 
 export const PROXY_TYPE = {
     CUSTOM: 'custom',
+    LOAD_BALANCE: 'load_balance',
     HYSTERIA2: 'hysteria2',
     SHADOWSOCKS: 'shadowsocks',
     TUIC: 'tuic',
@@ -60,6 +61,7 @@ export const HijpassValues = {
     PROXY_LOG_LEVELS: ['info', 'warn', 'error', 'debug'] as const,
     SHUNT_CONF_TYPE: [CORE_TYPE.XRAY, CORE_TYPE.SING_BOX] as const,
     PROXY_TYPES: [
+        {label: 'Load Balancing', value: 'load_balance'},
         {label: 'Shadowsocks', value: 'shadowsocks'},
         {label: 'Hysteria2',   value: 'hysteria2'},
         {label: 'VLESS',       value: 'vless'},
@@ -129,5 +131,4 @@ export const HijpassValues = {
 export enum ShuntTag {
     DIRECT_OUTBOUND_TAG = "hijpass-direct",
     BLOCK_OUTBOUND_TAG = "hijpass-block",
-    LOAD_BALANCE_OUTBOUND_TAG = "hijpass-slb",
 }

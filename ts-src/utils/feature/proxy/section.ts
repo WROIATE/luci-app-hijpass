@@ -2,6 +2,7 @@ import { PROXY_TYPE } from "../../../enum/hijpass";
 import {
     CustomProxyNode,
     Hysteria2Config,
+    LoadBalanceProxyNode,
     ProxyNode,
     ShadowsocksConfig,
     ShadowTLSConfig,
@@ -19,6 +20,9 @@ const ProxyUtils = {
         let config: ProxyNode;
 
         switch (type) {
+            case PROXY_TYPE.LOAD_BALANCE:
+                config = new LoadBalanceProxyNode();
+                break;
             case PROXY_TYPE.HYSTERIA2:
                 config = new Hysteria2Config();
                 break;

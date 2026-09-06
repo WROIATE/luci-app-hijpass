@@ -470,7 +470,6 @@ const v = view.extend({
         createConfigEditor(s);
         createRouteOptions(s);
         createDNSOptions(s);
-        createSLBOptions(s);
         return m.render();
     }
 })
@@ -974,143 +973,12 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
     port.rmempty = true;
 }
 
-// 创建负载均衡选项
-function createSLBOptions(s: LuCI.form.AbstractSection) {
-    const lbNodeLoader = function (section: any) {
-        if (section.name && section.enabled === '1') {
-            let displayName = section.name;
-            if (section.socks_port) displayName += ' (' + section.socks_port + ')';
-            return {value: section.name, display: displayName};
-        }
-        return null;
-    };
-
-    // ── global：节点列表（xray 和 sing-box 都显示）──────────────────────
-    let oGlobal = s.taboption('slb', form.SectionValue, '_slb_global',
-        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, '');
-    oGlobal.depends({config_type: 'tmpl', type: CORE_TYPE.XRAY});
-    oGlobal.depends({config_type: 'tmpl', type: CORE_TYPE.SING_BOX});
-    let gSs = oGlobal.subsection;
-    gSs.anonymous = true;
-    gSs.addremove = false;
-
-    ShuntFormUtils.createValidatedDynamicList(gSs, 'lb_node_list', _('Load Balancing Nodes'),
-        _('Load Balancing Nodes'),
-        LuciFlied.PROXY_NODE_TYPE, lbNodeLoader);
-
-    // ── sing-box：URLTest 参数 ────────────────────────────────────────
-    let oSingBox = s.taboption('slb', form.SectionValue, '_slb_singbox',
-        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('sing-box URLTest'));
-    oSingBox.depends({config_type: 'tmpl', type: CORE_TYPE.SING_BOX});
-    let sbSs = oSingBox.subsection;
-    sbSs.anonymous = true;
-    sbSs.addremove = false;
-
-    let sbUrl = sbSs.option(form.Value, 'url', _('Test URL'),
-        _('Health Check URL'));
-    sbUrl.placeholder = 'https://www.gstatic.com/generate_204';
-
-    let sbInterval = sbSs.option(form.Value, 'interval', _('Test Interval'),
-        _('Health Check Interval'));
-    sbInterval.placeholder = '3m';
-
-    let sbTolerance = sbSs.option(form.Value, 'tolerance', _('Tolerance (ms)'),
-        _('Tolerance'));
-    sbTolerance.placeholder = '50';
-    sbTolerance.datatype = 'uinteger';
-
-    let sbIdleTimeout = sbSs.option(form.Value, 'idle_timeout', _('Idle Timeout'),
-        _('Node Idle Timeout'));
-    sbIdleTimeout.placeholder = '30m';
-
-    sbSs.option(form.Flag, 'interrupt_exist_connections', _('Interrupt Existing Connections'),
-        _('Interrupt on Outbound Change'));
-
-    // ── xray：Balancer + BurstObservatory 参数 ────────────────────────
-    let oXray = s.taboption('slb', form.SectionValue, '_slb_xray',
-        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('Xray Balancer'));
-    oXray.depends({config_type: 'tmpl', type: CORE_TYPE.XRAY});
-    let xSs = oXray.subsection;
-    xSs.anonymous = true;
-    xSs.addremove = false;
-
-    let xrayStrategy = xSs.option(form.ListValue, 'strategy', _('Load Strategy'),
-        _('Load Balancing Strategy'));
-    xrayStrategy.value('random', _('Random'));
-    xrayStrategy.value('roundRobin', _('Round Robin'));
-    xrayStrategy.value('leastPing', _('Lowest Ping'));
-    xrayStrategy.value('leastLoad', _('Lowest Load'));
-    xrayStrategy.default = 'leastLoad';
-
-    let xrayExpected = xSs.option(form.Value, 'strategy_expected', _('Best Nodes'),
-        _('Best Nodes Count'));
-    xrayExpected.placeholder = '1';
-    xrayExpected.datatype = 'uinteger';
-    xrayExpected.depends('strategy', 'leastLoad');
-
-    let xrayMaxRtt = xSs.option(form.Value, 'strategy_max_rtt', _('Max Acceptable RTT'),
-        _('Max Acceptable RTT'));
-    xrayMaxRtt.placeholder = '1s';
-    xrayMaxRtt.depends('strategy', 'leastLoad');
-
-    let xrayTolerance = xSs.option(form.Value, 'strategy_tolerance', _('Failure Rate Tolerance'),
-        _('Failure Rate Tolerance'));
-    xrayTolerance.placeholder = '0.05';
-    xrayTolerance.depends('strategy', 'leastLoad');
-
-    let xrayFallback = xSs.option(form.ListValue, 'fallback_tag', _('Fallback Node'),
-        _('Fallback Outbound'));
-    xrayFallback.value('', _('None'));
-    uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, (section: any) => {
-        if (section.name && section.enabled === '1') xrayFallback.value(section.name, section.name);
-    });
-
-    let xrayProbeUrl = xSs.option(form.Value, 'probe_url', _('Probe URL'),
-        _('Health Check Probe URL'));
-    xrayProbeUrl.placeholder = 'https://connectivitycheck.gstatic.com/generate_204';
-    xrayProbeUrl.depends('strategy', 'leastPing');
-    xrayProbeUrl.depends('strategy', 'leastLoad');
-
-    let xrayProbeConnectivity = xSs.option(form.Value, 'probe_connectivity', _('Local Connectivity Check URL'),
-        _('Local Connectivity Check URL'));
-    xrayProbeConnectivity.depends('strategy', 'leastPing');
-    xrayProbeConnectivity.depends('strategy', 'leastLoad');
-
-    let xrayProbeInterval = xSs.option(form.Value, 'probe_interval', _('Probe Interval'),
-        _('Probe Interval'));
-    xrayProbeInterval.placeholder = '1m';
-    xrayProbeInterval.depends('strategy', 'leastPing');
-    xrayProbeInterval.depends('strategy', 'leastLoad');
-
-    let xrayProbeTimeout = xSs.option(form.Value, 'probe_timeout', _('Probe Timeout'),
-        _('Probe Timeout'));
-    xrayProbeTimeout.placeholder = '5s';
-    xrayProbeTimeout.depends('strategy', 'leastPing');
-    xrayProbeTimeout.depends('strategy', 'leastLoad');
-
-    let xrayProbeSampling = xSs.option(form.Value, 'probe_sampling', _('Results to Retain'),
-        _('Retain Recent Probe Results'));
-    xrayProbeSampling.placeholder = '10';
-    xrayProbeSampling.datatype = 'uinteger';
-    xrayProbeSampling.depends('strategy', 'leastPing');
-    xrayProbeSampling.depends('strategy', 'leastLoad');
-
-    let xrayProbeHttpMethod = xSs.option(form.ListValue, 'probe_http_method', _('Probe HTTP Method'),
-        _('Probe HTTP Method'));
-    xrayProbeHttpMethod.value('', _('Default (HEAD)'));
-    xrayProbeHttpMethod.value('HEAD', 'HEAD');
-    xrayProbeHttpMethod.value('GET', 'GET');
-    xrayProbeHttpMethod.depends('strategy', 'leastPing');
-    xrayProbeHttpMethod.depends('strategy', 'leastLoad');
-}
-
 // 创建所有标签页
 function createTabs(s: LuCI.form.AbstractSection) {
     s.tab('basic', _('Basic Configuration'));
     s.tab('config', _('Shunt Configuration Editor'));
     s.tab('route', _('Routing Configuration'));
     s.tab('dns', _('DNS Server Configuration'));
-    s.tab('slb', _('Load Balancing'));
     s.tab('ruleset', _('Rule-set'));
 }
 

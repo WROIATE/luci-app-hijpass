@@ -1931,3 +1931,66 @@ msgstr "代理域名 DNS 必须使用当前已启用的分流 DNS 端口或自�
 
 msgid "Proxy domain DNS is using this shunt DNS port. Change it in the DNS module before disabling shunt."
 msgstr "代理域名 DNS 正在使用此分流 DNS 端口，请先在 DNS 模块中修改，再关闭分流。"
+
+msgid "%s member nodes · %s"
+msgstr "%s 个成员节点 · %s"
+
+msgid "Configuration contains invalid load balancing nodes"
+msgstr "配置包含无效的负载均衡节点"
+
+msgid "DNS exit cannot use Block"
+msgstr "DNS 出口不能使用阻止节点"
+
+msgid "Fallback node must be a load balancing member"
+msgstr "回退节点必须是负载均衡成员"
+
+msgid "First member node"
+msgstr "第一个成员节点"
+
+msgid "Load balancing member node has no valid SOCKS port configured"
+msgstr "负载均衡成员节点未配置有效的 SOCKS 端口"
+
+msgid "Load balancing member node is not enabled"
+msgstr "负载均衡成员节点未启用"
+
+msgid "Load balancing member node not found"
+msgstr "找不到负载均衡成员节点"
+
+msgid "Load balancing node \"%s\" cannot contain load balancing member \"%s\""
+msgstr "负载均衡节点“%s”不能包含另一个负载均衡节点“%s”"
+
+msgid "Load balancing node \"%s\" cannot include itself"
+msgstr "负载均衡节点“%s”不能包含自身"
+
+msgid "Load balancing node \"%s\" contains duplicate member nodes: %s"
+msgstr "负载均衡节点“%s”包含重复成员：%s"
+
+msgid "Load balancing node \"%s\" fallback node \"%s\" is not a member"
+msgstr "负载均衡节点“%s”的回退节点“%s”不在成员列表中"
+
+msgid "Load balancing node \"%s\" has an unsupported backend core"
+msgstr "负载均衡节点“%s”使用了不支持的后端核心"
+
+msgid "Load balancing node \"%s\" has no member nodes"
+msgstr "负载均衡节点“%s”没有成员节点"
+
+msgid "Load balancing node \"%s\" member node \"%s\" does not exist"
+msgstr "负载均衡节点“%s”的成员节点“%s”不存在"
+
+msgid "Load balancing node \"%s\" member node \"%s\" is not enabled"
+msgstr "负载均衡节点“%s”的成员节点“%s”未启用"
+
+msgid "Load balancing node \"%s\" member node \"%s\" has no valid SOCKS port configured"
+msgstr "负载均衡节点“%s”的成员节点“%s”未配置有效的 SOCKS 端口"
+
+msgid "Load balancing node cannot include itself"
+msgstr "负载均衡节点不能包含自身"
+
+msgid "Nested load balancing nodes are not supported"
+msgstr "暂不支持嵌套负载均衡节点"
+
+msgid "Proxy node dependency chain has a cycle: %s"
+msgstr "代理节点依赖链存在循环：%s"
+
+msgid "Select proxy nodes to connect through their local SOCKS ports"
+msgstr "选择成员节点，并通过其本地 SOCKS 端口连接"

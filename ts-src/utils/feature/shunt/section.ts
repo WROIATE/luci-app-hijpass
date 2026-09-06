@@ -2,7 +2,6 @@ import { LuciFlied } from "../../../enum/hijpass";
 import {
     DnsNode,
     DnsSection,
-    LoadBalanceNode,
     RouteSection,
     RuleDTO,
     ShuntRouteRuleVariant,
@@ -25,7 +24,6 @@ const ShuntUtils = {
         let shuntSection = new ShuntSection();
         let uSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
         UciUtils.transFromUci(shuntSection, uSection)
-        shuntSection.loadBalance = ShuntUtils.getLoadBalanceSection()
         shuntSection.dns = ShuntUtils.getDnsSection()
         shuntSection.route = ShuntUtils.getRouteSection()
         return shuntSection;
@@ -80,13 +78,6 @@ const ShuntUtils = {
             dnsSection.nodes.push(server)
         })
         return dnsSection;
-    },
-
-    getLoadBalanceSection: function () {
-        let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
-        let loadBalanceSection = new LoadBalanceNode();
-        UciUtils.transFromUci(loadBalanceSection, shuntSection)
-        return loadBalanceSection;
     },
 
     /**

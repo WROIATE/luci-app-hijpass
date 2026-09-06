@@ -2582,3 +2582,87 @@ msgstr ""
 #: ts-src/views/shunt.ts
 msgid "Proxy domain DNS is using this shunt DNS port. Change it in the DNS module before disabling shunt."
 msgstr ""
+
+#: ts-src/utils/feature/proxy/form.ts
+msgid "%s member nodes · %s"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Configuration contains invalid load balancing nodes"
+msgstr ""
+
+#: ts-src/utils/feature/shunt/form.ts
+msgid "DNS exit cannot use Block"
+msgstr ""
+
+#: ts-src/views/proxy.ts
+msgid "Fallback node must be a load balancing member"
+msgstr ""
+
+#: ts-src/views/proxy.ts
+msgid "First member node"
+msgstr ""
+
+#: ts-src/views/proxy.ts
+msgid "Load balancing member node has no valid SOCKS port configured"
+msgstr ""
+
+#: ts-src/views/proxy.ts
+msgid "Load balancing member node is not enabled"
+msgstr ""
+
+#: ts-src/views/proxy.ts
+msgid "Load balancing member node not found"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Load balancing node \"%s\" cannot contain load balancing member \"%s\""
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Load balancing node \"%s\" cannot include itself"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Load balancing node \"%s\" contains duplicate member nodes: %s"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Load balancing node \"%s\" fallback node \"%s\" is not a member"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Load balancing node \"%s\" has an unsupported backend core"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Load balancing node \"%s\" has no member nodes"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Load balancing node \"%s\" member node \"%s\" does not exist"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Load balancing node \"%s\" member node \"%s\" is not enabled"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Load balancing node \"%s\" member node \"%s\" has no valid SOCKS port configured"
+msgstr ""
+
+#: ts-src/views/proxy.ts
+msgid "Load balancing node cannot include itself"
+msgstr ""
+
+#: ts-src/views/proxy.ts
+msgid "Nested load balancing nodes are not supported"
+msgstr ""
+
+#: ts-src/utils/actions/save-apply/precheck.ts
+msgid "Proxy node dependency chain has a cycle: %s"
+msgstr ""
+
+#: ts-src/views/proxy.ts
+msgid "Select proxy nodes to connect through their local SOCKS ports"
+msgstr ""

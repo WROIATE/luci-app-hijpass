@@ -1,4 +1,4 @@
-import { LuciFlied, normalizeCoreType, ShuntTag } from "../../../enum/hijpass";
+import { CORE_TYPE, LuciFlied, PROXY_TYPE, normalizeCoreType, ShuntTag } from "../../../enum/hijpass";
 import uci from "uci";
 import ui from "ui";
 import { NotificationUtils } from "../../base/luci/notification";
@@ -18,8 +18,7 @@ function normalizeList(value: any): string[] {
 
 function isSpecialProxyNode(node: string) {
     return node === ShuntTag.DIRECT_OUTBOUND_TAG
-        || node === ShuntTag.BLOCK_OUTBOUND_TAG
-        || node === ShuntTag.LOAD_BALANCE_OUTBOUND_TAG;
+        || node === ShuntTag.BLOCK_OUTBOUND_TAG;
 }
 
 function reportWarnings(title: string, warnings: string[]): boolean {
@@ -60,9 +59,6 @@ function checkMissingProxyRefs() {
 
     const rulesetNode = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_out_node');
     checkRef(rulesetNode, _('Rule-set exit "%s" does not exist').format(rulesetNode));
-
-    normalizeList(uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list'))
-        .forEach((node) => checkRef(node, _('Load balancing node "%s" does not exist').format(node)));
 
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_ROUTE_RULE_TYPE, function (section: any) {
         if (section.enabled !== '1') {
@@ -137,14 +133,67 @@ function checkDisabledProxyRefs() {
         }
     });
 
-    normalizeList(uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'lb_node_list'))
-        .forEach((node) => {
-            if (disabledNodes.has(node)) {
-                warnings.push(_('Load balancing node "%s" is not enabled').format(node));
+    return reportWarnings(_('Configuration contains disabled nodes'), warnings);
+}
+
+function checkLoadBalanceRefs() {
+    const sections = ProxyChainUtils.getProxySectionMap();
+    const warnings: string[] = [];
+
+    sections.forEach((section: any) => {
+        if (section.enabled !== '1' || section.type !== PROXY_TYPE.LOAD_BALANCE) return;
+
+        const nodeName = ProxyChainUtils.getProxyName(section);
+        const core = normalizeCoreType(section.core);
+        if (core !== CORE_TYPE.SING_BOX && core !== CORE_TYPE.XRAY) {
+            warnings.push(_('Load balancing node "%s" has an unsupported backend core').format(nodeName));
+        }
+
+        const members = ProxyChainUtils.normalizeProxyNodeList(section.member_node);
+        if (members.length === 0) {
+            warnings.push(_('Load balancing node "%s" has no member nodes').format(nodeName));
+            return;
+        }
+
+        const duplicateMembers = members.filter((member, index) => members.indexOf(member) !== index);
+        if (duplicateMembers.length > 0) {
+            warnings.push(_('Load balancing node "%s" contains duplicate member nodes: %s')
+                .format(nodeName, Array.from(new Set(duplicateMembers)).join(', ')));
+        }
+
+        members.forEach((memberName) => {
+            if (memberName === nodeName) {
+                warnings.push(_('Load balancing node "%s" cannot include itself').format(nodeName));
+                return;
+            }
+
+            const member = sections.get(memberName);
+            if (!member) {
+                warnings.push(_('Load balancing node "%s" member node "%s" does not exist')
+                    .format(nodeName, memberName));
+                return;
+            }
+            if (member.type === PROXY_TYPE.LOAD_BALANCE) {
+                warnings.push(_('Load balancing node "%s" cannot contain load balancing member "%s"')
+                    .format(nodeName, memberName));
+            }
+            if (member.enabled !== '1') {
+                warnings.push(_('Load balancing node "%s" member node "%s" is not enabled')
+                    .format(nodeName, memberName));
+            }
+            if (!ProxyChainUtils.isPort(member.socks_port)) {
+                warnings.push(_('Load balancing node "%s" member node "%s" has no valid SOCKS port configured')
+                    .format(nodeName, memberName));
             }
         });
 
-    return reportWarnings(_('Configuration contains disabled nodes'), warnings);
+        if (section.fallback_tag && members.indexOf(section.fallback_tag) < 0) {
+            warnings.push(_('Load balancing node "%s" fallback node "%s" is not a member')
+                .format(nodeName, section.fallback_tag));
+        }
+    });
+
+    return reportWarnings(_('Configuration contains invalid load balancing nodes'), warnings);
 }
 
 function checkProxyChainRefs() {
@@ -152,7 +201,9 @@ function checkProxyChainRefs() {
     const warnings: string[] = [];
 
     sections.forEach((section: any) => {
-        if (section.enabled !== '1' || !section.upstream_proxy_node) {
+        if (section.enabled !== '1'
+            || section.type === PROXY_TYPE.LOAD_BALANCE
+            || !section.upstream_proxy_node) {
             return;
         }
 
@@ -172,13 +223,16 @@ function checkProxyChainRefs() {
         }
 
         const result = ProxyChainUtils.collectProxyChain(nodeName, sections);
-        if (result.cycle) {
-            warnings.push(_('Proxy node nesting chain has a cycle: %s').format(result.chain.join(' -> ')));
-        } else if (result.chain.length > MAX_PROXY_CHAIN_NODES) {
+        if (!result.cycle && result.chain.length > MAX_PROXY_CHAIN_NODES) {
             warnings.push(_('Proxy node "%s" nesting chain exceeds %d nodes: %s')
                 .format(nodeName, MAX_PROXY_CHAIN_NODES, result.chain.join(' -> ')));
         }
     });
+
+    const dependencyCycle = ProxyChainUtils.findProxyDependencyCycle(sections);
+    if (dependencyCycle) {
+        warnings.push(_('Proxy node dependency chain has a cycle: %s').format(dependencyCycle.join(' -> ')));
+    }
 
     return reportWarnings(_('Configuration contains invalid upstream proxy nodes'), warnings);
 }
@@ -489,6 +543,7 @@ function confirmSkippedRouteRules() {
 const PrecheckUtils = {
     runSaveApplyPrechecks: async function () {
         if (!checkProxyChainRefs()
+            || !checkLoadBalanceRefs()
             || !checkXrayTlsInsecure()
             || !checkFirewallPortTargets()
             || !checkDnsProxyTarget()) {

@@ -9,6 +9,7 @@ import { ValidationUtils } from "../utils/base/luci/validation";
 import { FilePathUtils } from "../utils/base/files/paths";
 import { UciUtils } from "../utils/base/luci/uci";
 import { ProxyFormUtils } from "../utils/feature/proxy/form";
+import { ProxyChainUtils } from "../utils/feature/proxy/chain";
 
 const v = view.extend({
     load: function () {
@@ -141,6 +142,171 @@ function createProxyEnvironmentOptions(s: LuCI.form.AbstractSection) {
     HijpassValues.PROXY_LOG_LEVELS.forEach(level => logLevelOpt.value(level));
 
     FormUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, undefined)
+}
+
+function addLoadBalanceDepends(o: LuCI.form.AbstractValue, core?: string) {
+    if (core) {
+        o.depends({type: PROXY_TYPE.LOAD_BALANCE, core});
+        return;
+    }
+    o.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.SING_BOX});
+    o.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY});
+}
+
+function createLoadBalanceOptions(s: LuCI.form.AbstractSection) {
+    const members = s.option(form.DynamicList, 'member_node', _('Load Balancing Nodes'),
+        _('Select proxy nodes to connect through their local SOCKS ports'));
+    members.modalonly = true;
+    members.rmempty = false;
+    addLoadBalanceDepends(members);
+    members.load = function (sectionId: string) {
+        delete this.keylist;
+        delete this.vallist;
+
+        const currentName = this.section.formvalue(sectionId, 'name')
+            || uci.get(LuciFlied.CONF_NAME, sectionId, 'name')
+            || sectionId;
+        ProxyChainUtils.getProxySections().forEach((section: any) => {
+            const name = ProxyChainUtils.getProxyName(section);
+            if (!name
+                || name === currentName
+                || section['.name'] === sectionId
+                || section.type === PROXY_TYPE.LOAD_BALANCE) {
+                return;
+            }
+
+            let label = name;
+            if (section.socks_port) label += ' (' + section.socks_port + ')';
+            if (section.enabled !== '1') label += ' - ' + _('Disabled');
+            this.value(name, label);
+        });
+        return form.DynamicList.prototype.load.apply(this, [sectionId]);
+    };
+    members.validate = function (sectionId: string, value: string) {
+        if (!value) return true;
+        const currentName = this.section.formvalue(sectionId, 'name')
+            || uci.get(LuciFlied.CONF_NAME, sectionId, 'name')
+            || sectionId;
+        if (value === currentName) return _('Load balancing node cannot include itself');
+
+        const member = ProxyChainUtils.getProxySections()
+            .find((section: any) => ProxyChainUtils.getProxyName(section) === value);
+        if (!member) return _('Load balancing member node not found');
+        if (member.type === PROXY_TYPE.LOAD_BALANCE) {
+            return _('Nested load balancing nodes are not supported');
+        }
+        if (member.enabled !== '1') return _('Load balancing member node is not enabled');
+        if (!ProxyChainUtils.isPort(member.socks_port)) {
+            return _('Load balancing member node has no valid SOCKS port configured');
+        }
+        return true;
+    };
+
+    const url = s.option(form.Value, 'url', _('Test URL'), _('Health Check URL'));
+    url.modalonly = true;
+    url.default = 'https://www.gstatic.com/generate_204';
+    addLoadBalanceDepends(url, CORE_TYPE.SING_BOX);
+
+    const interval = s.option(form.Value, 'interval', _('Test Interval'), _('Health Check Interval'));
+    interval.modalonly = true;
+    interval.default = '3m';
+    addLoadBalanceDepends(interval, CORE_TYPE.SING_BOX);
+
+    const tolerance = s.option(form.Value, 'tolerance', _('Tolerance (ms)'), _('Tolerance'));
+    tolerance.modalonly = true;
+    tolerance.default = '50';
+    tolerance.datatype = 'uinteger';
+    addLoadBalanceDepends(tolerance, CORE_TYPE.SING_BOX);
+
+    const idleTimeout = s.option(form.Value, 'idle_timeout', _('Idle Timeout'), _('Node Idle Timeout'));
+    idleTimeout.modalonly = true;
+    idleTimeout.default = '30m';
+    addLoadBalanceDepends(idleTimeout, CORE_TYPE.SING_BOX);
+
+    const interrupt = s.option(form.Flag, 'interrupt_exist_connections', _('Interrupt Existing Connections'),
+        _('Interrupt on Outbound Change'));
+    interrupt.modalonly = true;
+    interrupt.default = '0';
+    addLoadBalanceDepends(interrupt, CORE_TYPE.SING_BOX);
+
+    const strategy = s.option(form.ListValue, 'strategy', _('Load Strategy'), _('Load Balancing Strategy'));
+    strategy.modalonly = true;
+    strategy.default = 'leastLoad';
+    strategy.value('random', _('Random'));
+    strategy.value('roundRobin', _('Round Robin'));
+    strategy.value('leastPing', _('Lowest Ping'));
+    strategy.value('leastLoad', _('Lowest Load'));
+    addLoadBalanceDepends(strategy, CORE_TYPE.XRAY);
+
+    const expected = s.option(form.Value, 'strategy_expected', _('Best Nodes'), _('Best Nodes Count'));
+    expected.modalonly = true;
+    expected.default = '1';
+    expected.datatype = 'uinteger';
+    expected.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY, strategy: 'leastLoad'});
+
+    const maxRtt = s.option(form.Value, 'strategy_max_rtt', _('Max Acceptable RTT'), _('Max Acceptable RTT'));
+    maxRtt.modalonly = true;
+    maxRtt.default = '1s';
+    maxRtt.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY, strategy: 'leastLoad'});
+
+    const strategyTolerance = s.option(form.Value, 'strategy_tolerance', _('Failure Rate Tolerance'),
+        _('Failure Rate Tolerance'));
+    strategyTolerance.modalonly = true;
+    strategyTolerance.default = '0.05';
+    strategyTolerance.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY, strategy: 'leastLoad'});
+
+    const fallback = s.option(form.ListValue, 'fallback_tag', _('Fallback Node'), _('Fallback Outbound'));
+    fallback.modalonly = true;
+    fallback.value('', _('First member node'));
+    fallback.load = function (sectionId: string) {
+        delete this.keylist;
+        delete this.vallist;
+        this.value('', _('First member node'));
+        const currentName = this.section.formvalue(sectionId, 'name')
+            || uci.get(LuciFlied.CONF_NAME, sectionId, 'name')
+            || sectionId;
+        ProxyChainUtils.getProxySections().forEach((section: any) => {
+            const name = ProxyChainUtils.getProxyName(section);
+            if (!name || name === currentName || section.type === PROXY_TYPE.LOAD_BALANCE) return;
+            this.value(name, name);
+        });
+        return form.ListValue.prototype.load.apply(this, [sectionId]);
+    };
+    fallback.validate = function (sectionId: string, value: string) {
+        if (!value) return true;
+        const selected = ProxyChainUtils.normalizeProxyNodeList(this.section.formvalue(sectionId, 'member_node'));
+        return selected.indexOf(value) >= 0 ? true : _('Fallback node must be a load balancing member');
+    };
+    addLoadBalanceDepends(fallback, CORE_TYPE.XRAY);
+
+    const probeFields: Array<[string, string, string, string]> = [
+        ['probe_url', _('Probe URL'), _('Health Check Probe URL'), 'https://connectivitycheck.gstatic.com/generate_204'],
+        ['probe_connectivity', _('Local Connectivity Check URL'), _('Local Connectivity Check URL'), ''],
+        ['probe_interval', _('Probe Interval'), _('Probe Interval'), '1m'],
+        ['probe_timeout', _('Probe Timeout'), _('Probe Timeout'), '5s'],
+    ];
+    probeFields.forEach(([name, title, description, defaultValue]) => {
+        const option = s.option(form.Value, name, title, description);
+        option.modalonly = true;
+        if (defaultValue) option.default = defaultValue;
+        option.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY, strategy: 'leastPing'});
+        option.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY, strategy: 'leastLoad'});
+    });
+
+    const sampling = s.option(form.Value, 'probe_sampling', _('Results to Retain'), _('Retain Recent Probe Results'));
+    sampling.modalonly = true;
+    sampling.default = '10';
+    sampling.datatype = 'uinteger';
+    sampling.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY, strategy: 'leastPing'});
+    sampling.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY, strategy: 'leastLoad'});
+
+    const method = s.option(form.ListValue, 'probe_http_method', _('Probe HTTP Method'), _('Probe HTTP Method'));
+    method.modalonly = true;
+    method.value('', _('Default (HEAD)'));
+    method.value('HEAD', 'HEAD');
+    method.value('GET', 'GET');
+    method.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY, strategy: 'leastPing'});
+    method.depends({type: PROXY_TYPE.LOAD_BALANCE, core: CORE_TYPE.XRAY, strategy: 'leastLoad'});
 }
 
 
@@ -664,6 +830,7 @@ function createProxyOptions(s: LuCI.form.AbstractSection, instances: any) {
     createEnabledOption(s);
     ProxyFormUtils.createCoreAndTypeOptions(s);
     ProxyFormUtils.createUpstreamProxyNodeOption(s);
+    createLoadBalanceOptions(s);
 
     // 类型特定的选项 - 服务器地址和端口
     createCommonServerOptions(s);

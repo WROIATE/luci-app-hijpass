@@ -43,7 +43,10 @@ function applyFilter(typeSelect: HTMLSelectElement, core: string): void {
     const normalizedCore = normalizeCoreType(core);
     if (normalizedCore === CORE_TYPE.CUSTOM) return;
     const effectiveCore: CoreType = (normalizedCore === CORE_TYPE.XRAY) ? CORE_TYPE.XRAY : CORE_TYPE.SING_BOX;
-    const valid = CORE_PROTOCOLS[effectiveCore] ?? [];
+    const valid: ProxyType[] = [
+        ...(CORE_PROTOCOLS[effectiveCore] ?? []),
+        PROXY_TYPE.LOAD_BALANCE,
+    ];
     Array.from(typeSelect.options).forEach(
         (o: HTMLOptionElement) => (o.hidden = !valid.includes(o.value as ProxyType))
     );
@@ -301,6 +304,19 @@ const ProxyFormUtils = {
         }
 
         switch (type) {
+            case PROXY_TYPE.LOAD_BALANCE: {
+                const members = ProxyChainUtils.normalizeProxyNodeList(
+                    uci.get(LuciFlied.CONF_NAME, section_id, 'member_node'));
+                const strategy = uci.get(LuciFlied.CONF_NAME, section_id, 'strategy') || 'leastLoad';
+                const strategyLabels: Record<string, string> = {
+                    random: _('Random'),
+                    roundRobin: _('Round Robin'),
+                    leastPing: _('Lowest Ping'),
+                    leastLoad: _('Lowest Load'),
+                };
+                const mode = core === CORE_TYPE.SING_BOX ? 'URLTest' : (strategyLabels[strategy] || strategy);
+                return E('span', {}, _('%s member nodes · %s').format(String(members.length), mode));
+            }
             case PROXY_TYPE.HYSTERIA2:
                 return renderProxyInfoWithChain(section_id,
                     E('span', {}, server_name ? server_name + ':' + (server_port || '443') : _('Not Configured')));
@@ -474,7 +490,7 @@ const ProxyFormUtils = {
         HijpassValues.PROXY_TYPES.forEach(t => typeOpt.value(t.value, _(t.label)));
         typeOpt.validate = function (sectionId: string, value: ProxyType) {
             const core = normalizeCoreType(this.section.formvalue(sectionId, 'core')) as CoreType;
-            return CORE_PROTOCOLS[core]?.includes(value)
+            return value === PROXY_TYPE.LOAD_BALANCE || CORE_PROTOCOLS[core]?.includes(value)
                 ? true
                 : _('Selected core "%s" does not support %s').format(core, value);
         };
@@ -504,8 +520,10 @@ const ProxyFormUtils = {
             _('Use another proxy node as the upstream through its local SOCKS port'));
         upstreamOpt.modalonly = true;
         upstreamOpt.rmempty = true;
-        upstreamOpt.depends('core', CORE_TYPE.XRAY);
-        upstreamOpt.depends('core', CORE_TYPE.SING_BOX);
+        const proxyProtocols = HijpassValues.PROXY_TYPES
+            .map(item => item.value as ProxyType)
+            .filter(type => type !== PROXY_TYPE.LOAD_BALANCE);
+        ProxyFormUtils.forProtocols(upstreamOpt, proxyProtocols);
         upstreamOpt.load = function (sectionId: string) {
             delete this.keylist;
             delete this.vallist;

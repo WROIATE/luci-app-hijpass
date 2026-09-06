@@ -2064,6 +2064,12 @@ msgstr "DNS转发"
 msgid "Redirect TCP and UDP DNS queries from clients selected by the firewall ACL to the selected local DNS service"
 msgstr "将防火墙 ACL 选中客户端的 TCP/UDP DNS 查询重定向到所选本地 DNS 服务"
 
+msgid "Proxy Router Traffic"
+msgstr "代理本机流量"
+
+msgid "Transparently proxy eligible router-originated TCP and UDP traffic"
+msgstr "将符合条件的路由器本机 TCP/UDP 流量纳入透明代理"
+
 msgid "Networks: %s"
 msgstr "网络：%s"
 

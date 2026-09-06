@@ -25,6 +25,8 @@ direct_dns="$(uci -q get hijpass.@dns[0].direct_dns || :)"
 [ "$direct_dns" = "system" ] && uci -q set hijpass.@dns[0].direct_dns='dnsmasq'
 proxy_dns="$(uci -q get hijpass.@dns[0].proxy_dns || :)"
 [ "$proxy_dns" = "system" ] && uci -q set hijpass.@dns[0].proxy_dns='dnsmasq'
+proxy_local="$(uci -q get hijpass.@firewall[0].proxy_local || :)"
+[ -z "$proxy_local" ] && uci -q set hijpass.@firewall[0].proxy_local='0'
 uci -q show hijpass | sed -n "s/^\(hijpass\.[^.]*\)\.core='singbox'$/\1/p" | while read -r section; do
 	uci -q set "$section.core=sing-box"
 done

@@ -139,6 +139,11 @@ function createTabs(s: LuCI.form.AbstractSection) {
 
 // 创建 ACL 访问控制列表配置选项
 async function createAclOptions(s: LuCI.form.AbstractSection) {
+    let proxyLocal = s.taboption('acl', form.Flag, 'proxy_local', _('Proxy Router Traffic'),
+        _('Transparently proxy eligible router-originated TCP and UDP traffic'));
+    proxyLocal.rmempty = false;
+    proxyLocal.default = '1';
+
     // 代理模式开关
     // 关闭（默认）：默认不代理，下方列表为走代理设备
     // 开启：默认全代理，下方列表为不走代理设备

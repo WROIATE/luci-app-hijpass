@@ -27,7 +27,7 @@ function reportWarnings(title: string, warnings: string[]): boolean {
         return true;
     }
 
-    NotificationUtils.warning(title, warnings.join('<br>'), 8000);
+    NotificationUtils.warning(title, warnings.join('\n'), 8000);
     return false;
 }
 
@@ -408,7 +408,7 @@ function checkXrayRouteProtocols() {
     if (warnings.length > 0) {
         NotificationUtils.warning(
             _('Unsupported Xray protocol configuration'),
-            warnings.join('<br>') + '<br>' + _('Xray route protocol only supports: %s').format(XRAY_ROUTE_PROTOCOLS.join(', ')),
+            warnings.join('\n') + '\n' + _('Xray route protocol only supports: %s').format(XRAY_ROUTE_PROTOCOLS.join(', ')),
             8000
         );
         return false;

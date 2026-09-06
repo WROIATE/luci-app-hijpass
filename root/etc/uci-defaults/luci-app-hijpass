@@ -3,6 +3,7 @@
 if ! grep -q "^hijpass:" /etc/group; then
     echo "hijpass:x:4396:hijpass" >>/etc/group
 fi
+# UID 0 用于保留代理核心所需权限；独立 GID 供 nftables 识别代理流量。
 if ! grep -q "^hijpass:" /etc/passwd; then
     echo "hijpass:x:0:4396:hijpass:/var/run/hijpass:/bin/false" >>/etc/passwd
 fi

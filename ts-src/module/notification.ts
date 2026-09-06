@@ -168,8 +168,9 @@ class NotificationManager {
                 font-size: 13px;
                 line-height: 1.4;
                 opacity: 0.9;
+                white-space: pre-line;
             `;
-            contentEl.innerHTML = notificationContent;
+            contentEl.textContent = notificationContent;
             contentContainer.appendChild(contentEl);
         }
 

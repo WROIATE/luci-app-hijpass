@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-hijpass
 PKG_VERSION:=25.12.2
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
 
@@ -17,7 +17,8 @@ PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Trojan_Plus \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_tuic_client
 
-LUCI_DEPENDS:= +curl +file +luci-lua-runtime +sing-box +unzip +xray-core \
+LUCI_DEPENDS:= +ca-bundle +curl +file +firewall4 +ip-full +luci-lua-runtime \
+	+sing-box +unzip +xray-core \
 	+kmod-nft-socket +kmod-nft-tproxy +kmod-nft-nat \
 	+v2ray-geosite +v2ray-geoip +geoview +chinadns-ng +jq
 

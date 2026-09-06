@@ -36,7 +36,11 @@ function updateCore(
         .then((result: any) => {
             if (result?.success) {
                 versionElement.textContent = result.version || _('Updated');
-                NotificationUtils.success(title, _('Updated to %s').format(result.version), 4000);
+                NotificationUtils.success(
+                    title,
+                    _('Updated to %s. Restart affected services to use the new version.').format(result.version),
+                    6000
+                );
                 return;
             }
 

@@ -117,7 +117,7 @@ function genConf() {
     route.rules = route.rules.concat(dnsRules)
     route.rules = route.rules.concat(routeRules)
 
-    const log = new Log(shuntSection.logLevel)
+    const log = new Log(transXrayLogLevel(shuntSection.logLevel))
 
     return {
         log,
@@ -144,7 +144,7 @@ function buildBaseProxyConf(config: ProxyNode, outbound: Outbound): {} {
     appendProxyChainOutbounds(config, outbound, outbounds)
 
     return {
-        log: new Log(transProxyLogLevel(config.log_level)),
+        log: new Log(transXrayLogLevel(config.log_level)),
         inbounds,
         outbounds
     }
@@ -195,7 +195,7 @@ function genLoadBalanceProxyConf(config: LoadBalanceProxyNode): {} {
     const outbounds = members.map(member => new Socks('127.0.0.1', member.socksPort, member.tag))
 
     return {
-        log: new Log(transProxyLogLevel(config.log_level)),
+        log: new Log(transXrayLogLevel(config.log_level)),
         inbounds: buildProxyInbounds(config),
         outbounds,
         routing: route,
@@ -203,7 +203,7 @@ function genLoadBalanceProxyConf(config: LoadBalanceProxyNode): {} {
     }
 }
 
-function transProxyLogLevel(logLevel: string) {
+function transXrayLogLevel(logLevel: string) {
     return logLevel === 'warn' ? 'warning' : logLevel
 }
 

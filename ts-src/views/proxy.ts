@@ -10,6 +10,27 @@ import { FilePathUtils } from "../utils/base/files/paths";
 import { UciUtils } from "../utils/base/luci/uci";
 import { ProxyFormUtils } from "../utils/feature/proxy/form";
 import { ProxyChainUtils } from "../utils/feature/proxy/chain";
+import { NotificationUtils } from "../utils/base/luci/notification";
+
+function getLoadBalanceReferrers(nodeName: string): string[] {
+    return ProxyChainUtils.getProxySections()
+        .filter((section: any) => section.type === PROXY_TYPE.LOAD_BALANCE
+            && ProxyChainUtils.normalizeProxyNodeList(section.member_node).includes(nodeName))
+        .map((section: any) => ProxyChainUtils.getProxyName(section));
+}
+
+function getFirewallReferrers(listenPort: string): string[] {
+    if (!listenPort) return [];
+
+    const referrers: string[] = [];
+    if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.FIREWALL_SECTION_TYPE, 'proxy_port') === listenPort) {
+        referrers.push(_('Proxy Port'));
+    }
+    if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.FIREWALL_SECTION_TYPE, 'shunt_port') === listenPort) {
+        referrers.push(_('Default Shunt Port'));
+    }
+    return referrers;
+}
 
 const v = view.extend({
     load: function () {
@@ -36,8 +57,30 @@ const v = view.extend({
             let sectionId = UciUtils.generateUniqueSectionId(LuciFlied.CONF_NAME);
             return L.bind(form.GridSection.prototype.handleAdd, this, ev, sectionId)();
         };
-        s.handleRemove = function (ev: Event, name?: string) {
-            return form.GridSection.prototype.handleRemove.call(this, ev, name);
+        s.handleRemove = function (sectionId: string, ev: Event) {
+            const nodeName = uci.get(LuciFlied.CONF_NAME, sectionId, 'name') || sectionId;
+            const listenPort = uci.get(LuciFlied.CONF_NAME, sectionId, 'listen_port');
+            const firewallReferrers = getFirewallReferrers(listenPort);
+            if (firewallReferrers.length > 0) {
+                NotificationUtils.warning(
+                    _('Cannot Delete Proxy Node'),
+                    _('Proxy node "%s" listen port %s is referenced by firewall settings: %s. Remove the references first.')
+                        .format(nodeName, listenPort, firewallReferrers.join(', ')),
+                    8000
+                );
+                return;
+            }
+            const referrers = getLoadBalanceReferrers(nodeName);
+            if (referrers.length > 0) {
+                NotificationUtils.warning(
+                    _('Cannot Delete Proxy Node'),
+                    _('Proxy node "%s" is referenced by load balancing nodes: %s. Remove the references first.')
+                        .format(nodeName, referrers.join(', ')),
+                    8000
+                );
+                return;
+            }
+            return form.GridSection.prototype.handleRemove.call(this, sectionId, ev);
         };
         const instances = data[1] ?? {};
         createProxyOptions(s, instances);

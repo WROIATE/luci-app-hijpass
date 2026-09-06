@@ -170,7 +170,7 @@ declare namespace LuCI {
 
             handleAdd?(ev: Event, name?: string): any;
 
-            handleRemove?(ev: Event, name?: string): any;
+            handleRemove?(sectionId: string, ev: Event): any;
         }
 
         interface MultiValue extends LuCI.form.DynamicList {

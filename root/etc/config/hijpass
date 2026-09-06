@@ -31,7 +31,7 @@ config shunt
 	option dns_listen_port '10153'
 	option config_type 'tmpl'
 	option log_path '/tmp/hijpass/log/shunt.log'
-	option log_level 'info'
+	option log_level 'warn'
 	option ruleset_convert '1'
 	option use_cache '1'
 	option shunt_hash '2927059463'
@@ -71,7 +71,7 @@ config shunt_dns_node
 	option type 'https'
 	option tag 'Google'
 	option server '8.8.8.8'
-	option enabled '0'
+	option enabled '1'
 
 config shunt_dns_node
 	option enabled '1'

@@ -24,16 +24,16 @@
     }
   },
   "admin/services/hijpass/shunt": {
-    "title": "Shunt",
-    "order": 2,
+    "title": "Routing Rules",
+    "order": 3,
     "action": {
       "type": "view",
       "path": "hijpass/shunt"
     }
   },
   "admin/services/hijpass/proxy": {
-    "title": "Proxy",
-    "order": 3,
+    "title": "Proxy Nodes",
+    "order": 2,
     "action": {
       "type": "view",
       "path": "hijpass/proxy"
@@ -64,7 +64,7 @@
     }
   },
   "admin/services/hijpass/rule": {
-    "title": "Rule",
+    "title": "Resource Management",
     "order": 7,
     "action": {
       "type": "view",
@@ -72,7 +72,7 @@
     }
   },
   "admin/services/hijpass/log": {
-    "title": "Log",
+    "title": "Diagnostics",
     "order": 8,
     "action": {
       "type": "view",

@@ -2,6 +2,7 @@
 
 # 用法:
 #   core-update.sh version <sing-box|xray>   — 输出本地版本号（JSON）
+#   core-update.sh latest  <sing-box|xray>   — 输出官方最新版本号（JSON）
 #   core-update.sh update  <sing-box|xray>   — 从 GitHub 下载最新版并替换
 
 . /usr/lib/hijpass/app-logger.sh
@@ -18,9 +19,9 @@ json_error() {
 }
 
 case "$ACTION" in
-    version|update) ;;
+    version|latest|update) ;;
     *)
-        echo "Usage: $0 <version|update> <sing-box|xray>" >&2
+        echo "Usage: $0 <version|latest|update> <sing-box|xray>" >&2
         exit 1
         ;;
 esac
@@ -103,6 +104,18 @@ get_latest_version() {
     url="https://api.github.com/repos/${repo}/releases/latest"
     latest=$(curl -sf --max-time 10 "$url" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
     echo "$latest"
+}
+
+get_latest_version_json() {
+    local latest
+    latest=$(get_latest_version)
+
+    if [ -z "$latest" ]; then
+        json_error "fetch latest version failed"
+        exit 1
+    fi
+
+    printf '{"core":"%s","version":"%s"}\n' "$CORE" "$latest"
 }
 
 verify_binary() {
@@ -234,5 +247,6 @@ do_update() {
 # ── 入口 ─────────────────────────────────────────────────────────────
 case "$ACTION" in
     version) get_local_version ;;
+    latest)  get_latest_version_json ;;
     update)  do_update ;;
 esac

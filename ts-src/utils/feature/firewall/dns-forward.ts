@@ -29,6 +29,17 @@ function getRoutingTarget(): DnsForwardTarget {
     };
 }
 
+function getTargetLabel(name: string, target: DnsForwardTarget) {
+    let label = name;
+    if (target.port) {
+        label += ': ' + target.port;
+    }
+    if (!target.available) {
+        label += ' - ' + _('Not available');
+    }
+    return label;
+}
+
 const FirewallDnsForwardUtils = {
     getSource: function (): FirewallDnsForward | string {
         return uci.get_first(LuciFlied.CONF_NAME, LuciFlied.FIREWALL_SECTION_TYPE, 'dns_forward')
@@ -38,6 +49,8 @@ const FirewallDnsForwardUtils = {
     getPreRoutingTarget,
 
     getRoutingTarget,
+
+    getTargetLabel,
 
     validateSource: function (source: FirewallDnsForward | string): true | string {
         if (!source || source === FIREWALL_DNS_FORWARD.NONE) {

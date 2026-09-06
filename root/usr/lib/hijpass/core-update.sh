@@ -39,8 +39,7 @@ esac
 # xray:     linux-64    / linux-arm64-v8a / linux-arm32-v7a / linux-mips32 ...
 detect_arch() {
     local machine="$1"   # core name: sing-box or xray
-    local m
-    m=$(uname -m)
+    local m="$2"
     if [ "$machine" = "xray" ]; then
         case "$m" in
             x86_64)        echo "linux-64" ;;
@@ -51,7 +50,7 @@ detect_arch() {
             mipsle)        echo "linux-mips32le" ;;
             mips64)        echo "linux-mips64" ;;
             mips64le)      echo "linux-mips64le" ;;
-            *)             echo "linux-64" ;;
+            *)             return 1 ;;
         esac
     else
         # sing-box
@@ -64,7 +63,7 @@ detect_arch() {
             mipsle)        echo "linux-mipsle-softfloat" ;;
             mips64)        echo "linux-mips64" ;;
             mips64le)      echo "linux-mips64le" ;;
-            *)             echo "linux-amd64" ;;
+            *)             return 1 ;;
         esac
     fi
 }
@@ -210,8 +209,11 @@ install_verified_binary() {
 
 # ── 下载并安装最新版 ─────────────────────────────────────────────────
 do_update() {
-    local arch latest_tag download_url tmp_dir asset_name
-    arch=$(detect_arch "$CORE")   # 传入 core 名称，映射不同的文件名规则
+    local host_arch arch latest_tag download_url tmp_dir asset_name
+    host_arch=$(uname -m)
+    if ! arch=$(detect_arch "$CORE" "$host_arch"); then
+        fail_update "unsupported architecture: $host_arch"
+    fi
     log_info "Fetching latest $CORE release..."
     latest_tag=$(get_latest_version)
 

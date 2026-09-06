@@ -53,7 +53,7 @@ function genConf() {
 
     const inbounds = [
         new Inbound('tproxy', parseInt(shuntSection.shuntListenPort, 10), XrayEnum.TPROXY_INBOUND_TAG),
-        new Inbound('direct', parseInt(shuntSection.dnsListenPort, 10), XrayEnum.DNS_INBOUND_TAG)
+        new Inbound('direct', parseInt(shuntSection.dnsListenPort, 10), XrayEnum.DNS_INBOUND_TAG, '::')
     ]
 
     const dnsRules = [new DnsRule([XrayEnum.DNS_INBOUND_TAG], XrayEnum.DNS_OUTBOUND_TAG)]

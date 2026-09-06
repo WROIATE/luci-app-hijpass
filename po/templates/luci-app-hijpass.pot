@@ -303,8 +303,8 @@ msgstr ""
 msgid "Configuration Type"
 msgstr ""
 
-#: ts-src/views/dns.ts:23
-msgid "Configure DNS Routing"
+#: ts-src/views/dns.ts:24
+msgid "Configure direct and proxy DNS resolution before traffic routing; add resolved addresses to firewall sets for subsequent routing decisions."
 msgstr ""
 
 #: ts-src/views/firewall.ts:22
@@ -480,8 +480,9 @@ msgstr ""
 msgid "Display Lines"
 msgstr ""
 
-#: ts-src/utils/base/luci/service.ts:84 ts-src/utils/base/luci/service.ts:98
-msgid "DNS"
+#: root/usr/share/luci/menu.d/luci-app-hijpass.json ts-src/utils/base/luci/service.ts:84
+#: ts-src/utils/base/luci/service.ts:98 ts-src/views/dns.ts:23
+msgid "Pre-routing DNS"
 msgstr ""
 
 #: ts-src/views/shunt.ts:403
@@ -510,10 +511,6 @@ msgstr ""
 
 #: ts-src/views/shunt.ts:235
 msgid "DNS Resolution Strategy"
-msgstr ""
-
-#: ts-src/views/dns.ts:23
-msgid "DNS Routing Configuration"
 msgstr ""
 
 #: ts-src/views/shunt.ts:216 ts-src/views/shunt.ts:441
@@ -2580,7 +2577,7 @@ msgid "Proxy domain DNS must use the current enabled shunt DNS port or a custom 
 msgstr ""
 
 #: ts-src/views/shunt.ts
-msgid "Proxy domain DNS is using this shunt DNS port. Change it in the DNS module before disabling shunt."
+msgid "Proxy domain DNS is using this shunt DNS port. Change it in the Pre-routing DNS module before disabling shunt."
 msgstr ""
 
 #: ts-src/utils/feature/proxy/form.ts
@@ -2761,4 +2758,60 @@ msgstr ""
 
 #: ts-src/views/proxy.ts
 msgid "Proxy node \"%s\" listen port %s is referenced by firewall settings: %s. Remove the references first."
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "DNS Forwarding"
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Redirect TCP and UDP DNS queries from clients selected by the firewall ACL to the selected local DNS service"
+msgstr ""
+
+#: ts-src/utils/feature/firewall/form.ts
+msgid "Networks: %s"
+msgstr ""
+
+#: ts-src/utils/feature/firewall/form.ts
+msgid "Firewall zones: %s"
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Proxy client traffic entering through the selected logical network interfaces; WAN interfaces cannot be selected"
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Exclude client traffic entering through the selected logical network interfaces; WAN interfaces are always excluded"
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Do not forward"
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Routing Rules DNS"
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Not available"
+msgstr ""
+
+#: ts-src/utils/feature/firewall/dns-forward.ts
+msgid "Pre-routing DNS is unavailable or has no valid listen port"
+msgstr ""
+
+#: ts-src/utils/feature/firewall/dns-forward.ts
+msgid "Routing Rules DNS is disabled or has no valid listen port"
+msgstr ""
+
+#: ts-src/utils/feature/firewall/dns-forward.ts
+msgid "Unknown DNS forwarding source: %s"
+msgstr ""
+
+#: ts-src/views/dns.ts
+msgid "Firewall DNS forwarding is using Pre-routing DNS. Select another forwarding source in Firewall before changing the DNS service."
+msgstr ""
+
+#: ts-src/views/shunt.ts
+msgid "Firewall DNS forwarding is using Routing Rules DNS. Select another forwarding source in Firewall before disabling routing rules."
 msgstr ""

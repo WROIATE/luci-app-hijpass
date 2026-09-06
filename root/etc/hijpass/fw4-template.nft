@@ -8,6 +8,9 @@ table inet hijpass {
         # 过滤访问本地的请求
         fib daddr type local counter return
 
+        # WAN 入站流量不参与透明代理
+        iifname $WAN_DEV counter return
+
         iif != @proxy_interface_list ether saddr != @proxy_mac_list counter return
         iif @proxy_interface_exclude_list counter return
         ether saddr @proxy_mac_exclude_list counter return
@@ -87,6 +90,19 @@ table inet hijpass {
 
         # 非指定代理请求，仅代理常用TCP端口
         meta l4proto tcp ct mark != $TPROXY_MARK tcp dport != { 22, 25, 53, 143, 465, 587, 853, 993, 995, 80, 443} ct mark set 0 counter return
+    }
+
+    chain dns-forward {
+        type nat hook prerouting priority dstnat - 1; policy accept;
+
+        # WAN 入站流量不参与 DNS 转发
+        iifname $WAN_DEV counter return
+
+        # 仅转发透明代理 ACL 选中的客户端 DNS 查询
+        iif != @proxy_interface_list ether saddr != @proxy_mac_list counter return
+        iif @proxy_interface_exclude_list counter return
+        ether saddr @proxy_mac_exclude_list counter return
+        meta l4proto { tcp, udp } th dport 53 counter redirect to :$DNS_FORWARD_PORT
     }
 
     # chnroute

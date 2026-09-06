@@ -55,7 +55,7 @@ echo "$direct_domain_list" > "$DOMAIN_DIRECT_TEMP_FILE_PATH"
 
 CONF="
 # 监听地址和端口
-bind-addr 0.0.0.0
+bind-addr ::
 bind-port $CDG_PORT
 
 # 国内上游、可信上游

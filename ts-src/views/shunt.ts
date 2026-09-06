@@ -5,7 +5,8 @@ import {ValidationUtils} from "../utils/base/luci/validation";
 import {NotificationUtils} from "../utils/base/luci/notification";
 import {ShuntFormUtils} from "../utils/feature/shunt/form";
 import {ShuntUtils} from "../utils/feature/shunt/section";
-import {CORE_TYPE, HijpassValues, LuciFlied} from "../enum/hijpass";
+import {CORE_TYPE, FIREWALL_DNS_FORWARD, HijpassValues, LuciFlied} from "../enum/hijpass";
+import {FirewallDnsForwardUtils} from "../utils/feature/firewall/dns-forward";
 import form from "form";
 import fs from "fs";
 import view from 'view';
@@ -424,13 +425,17 @@ function hasSplitDnsTarget(section: any, sectionId: string) {
 }
 
 function getShuntDnsDependencyError(section: LuCI.form.AbstractSection, sectionId: string) {
+    if (FirewallDnsForwardUtils.getSource() === FIREWALL_DNS_FORWARD.ROUTING) {
+        return _('Firewall DNS forwarding is using Routing Rules DNS. Select another forwarding source in Firewall before disabling routing rules.');
+    }
+
     const dnsService = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'dns_service');
     const proxyDns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'proxy_dns');
     const dnsListenPort = section.formvalue(sectionId, 'dns_listen_port');
     if (dnsService === 'chinadns-ng'
         && dnsListenPort
         && proxyDns === '127.0.0.1#' + dnsListenPort) {
-        return _('Proxy domain DNS is using this shunt DNS port. Change it in the DNS module before disabling shunt.');
+        return _('Proxy domain DNS is using this shunt DNS port. Change it in the Pre-routing DNS module before disabling shunt.');
     }
     return null;
 }

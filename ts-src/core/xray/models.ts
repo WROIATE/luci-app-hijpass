@@ -258,14 +258,16 @@ export class BurstObservatory {
 export class Inbound {
     protocol: string
     tag: string
+    listen?: string
     port: number
     settings: any
     streamSettings: any
     sniffing: any
 
-    constructor(type: string, port: number, tag: string) {
+    constructor(type: string, port: number, tag: string, listen?: string) {
         this.protocol = 'dokodemo-door'
         this.tag = tag
+        this.listen = listen
         this.port = port
         this.settings = { network: 'tcp,udp', followRedirect: undefined }
         if (type === 'tproxy') {

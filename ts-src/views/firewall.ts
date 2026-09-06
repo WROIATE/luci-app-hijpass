@@ -1,17 +1,19 @@
 import view from "view";
 import uci from "uci";
-import { LuciFlied } from "../enum/hijpass";
+import { FIREWALL_DNS_FORWARD, LuciFlied } from "../enum/hijpass";
 import form from "form";
 import { SaveApplyUtils } from "../utils/actions/save-apply/index";
 import { FormUtils } from "../utils/base/luci/form";
 import { FilePathUtils } from "../utils/base/files/paths";
 import { FirewallFormUtils } from "../utils/feature/firewall/form";
+import { FirewallDnsForwardUtils } from "../utils/feature/firewall/dns-forward";
 
 
 const v = view.extend({
     load: function () {
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME),
+            uci.load('firewall'),
         ]);
     },
 
@@ -75,6 +77,35 @@ function createPortOptions(s: LuCI.form.AbstractSection) {
     shuntPort.value('', _('Disabled'));
     shuntPort.default = '';
     shuntPort.rmempty = true;
+
+    let dnsForward = s.taboption('basic', form.ListValue, 'dns_forward', _('DNS Forwarding'),
+        _('Redirect TCP and UDP DNS queries from clients selected by the firewall ACL to the selected local DNS service'));
+    dnsForward.value(FIREWALL_DNS_FORWARD.NONE, _('Do not forward'));
+
+    const preRoutingTarget = FirewallDnsForwardUtils.getPreRoutingTarget();
+    dnsForward.value(FIREWALL_DNS_FORWARD.PRE_ROUTING,
+        getDnsForwardTargetLabel(_('Pre-routing DNS'), preRoutingTarget));
+
+    const routingTarget = FirewallDnsForwardUtils.getRoutingTarget();
+    dnsForward.value(FIREWALL_DNS_FORWARD.ROUTING,
+        getDnsForwardTargetLabel(_('Routing Rules DNS'), routingTarget));
+
+    dnsForward.default = FIREWALL_DNS_FORWARD.NONE;
+    dnsForward.rmempty = false;
+    dnsForward.validate = function (_sectionId: string, value: string) {
+        return FirewallDnsForwardUtils.validateSource(value);
+    };
+}
+
+function getDnsForwardTargetLabel(name: string, target: { available: boolean, port: string }) {
+    let label = name;
+    if (target.port) {
+        label += ': ' + target.port;
+    }
+    if (!target.available) {
+        label += ' - ' + _('Not available');
+    }
+    return label;
 }
 
 // 创建列表选项
@@ -128,7 +159,7 @@ async function createAclOptions(s: LuCI.form.AbstractSection) {
     aclMode.default = '0';
 
     const aclContext = await FirewallFormUtils.loadAclContext();
-    const ifaceValidate = FirewallFormUtils.createIfaceValidator(aclContext.devices);
+    const ifaceValidate = FirewallFormUtils.createIfaceValidator(aclContext.interfaces);
 
     // 关闭模式：走代理设备（MAC）
     let proxyMacOpt = s.taboption('acl', form.DynamicList, 'proxy_mac_list', _('Proxy Device'),
@@ -140,11 +171,11 @@ async function createAclOptions(s: LuCI.form.AbstractSection) {
 
     // 关闭模式：走代理接口
     let proxyIfaceOpt = s.taboption('acl', form.DynamicList, 'proxy_iface_list', _('Proxy Interface'),
-        _('Proxy Interface'));
+        _('Proxy client traffic entering through the selected logical network interfaces; WAN interfaces cannot be selected'));
     proxyIfaceOpt.rmempty = true;
     proxyIfaceOpt.depends('acl_default_allow', '0');
     proxyIfaceOpt.validate = ifaceValidate;
-    FirewallFormUtils.appendDeviceOptions(proxyIfaceOpt, aclContext.devices);
+    FirewallFormUtils.appendInterfaceOptions(proxyIfaceOpt, aclContext.interfaces);
 
     // 开启模式：不走代理设备（MAC）
     let excludeMacOpt = s.taboption('acl', form.DynamicList, 'proxy_mac_exclude_list', _('Non-Proxy Device'),
@@ -156,11 +187,11 @@ async function createAclOptions(s: LuCI.form.AbstractSection) {
 
     // 开启模式：不走代理接口
     let excludeIfaceOpt = s.taboption('acl', form.DynamicList, 'proxy_iface_exclude_list', _('Non-Proxy Interface'),
-        _('Non-Proxy Interface'));
+        _('Exclude client traffic entering through the selected logical network interfaces; WAN interfaces are always excluded'));
     excludeIfaceOpt.rmempty = true;
     excludeIfaceOpt.depends('acl_default_allow', '1');
     excludeIfaceOpt.validate = ifaceValidate;
-    FirewallFormUtils.appendDeviceOptions(excludeIfaceOpt, aclContext.devices);
+    FirewallFormUtils.appendInterfaceOptions(excludeIfaceOpt, aclContext.interfaces);
 }
 
 export default v;

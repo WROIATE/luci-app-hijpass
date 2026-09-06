@@ -34,6 +34,14 @@ export const CORE_TYPE = {
     CUSTOM: 'custom',
 } as const;
 
+export const FIREWALL_DNS_FORWARD = {
+    NONE: 'none',
+    PRE_ROUTING: 'pre-routing',
+    ROUTING: 'routing',
+} as const;
+
+export type FirewallDnsForward = typeof FIREWALL_DNS_FORWARD[keyof typeof FIREWALL_DNS_FORWARD];
+
 // 'custom' 与 xray/sing-box 平级，是独立的核心类型
 export type CoreType = typeof CORE_TYPE[keyof typeof CORE_TYPE];
 export type ProxyType = typeof PROXY_TYPE[keyof typeof PROXY_TYPE];

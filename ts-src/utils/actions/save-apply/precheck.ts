@@ -5,6 +5,7 @@ import { NotificationUtils } from "../../base/luci/notification";
 import { FactoryType } from "../../../core/adapter";
 import { ShuntUtils } from "../../feature/shunt/section";
 import { MAX_PROXY_CHAIN_NODES, ProxyChainUtils } from "../../feature/proxy/chain";
+import { FirewallDnsForwardUtils } from "../../feature/firewall/dns-forward";
 
 const XRAY_ROUTE_PROTOCOLS = ['http', 'tls', 'quic', 'bittorrent'];
 const XRAY_TLS_PROTOCOLS = ['hysteria2', 'vless'];
@@ -354,6 +355,11 @@ function checkFirewallPortTargets() {
     return reportWarnings(_('Configuration conflict'), warnings);
 }
 
+function checkFirewallDnsForwardTarget() {
+    const error = FirewallDnsForwardUtils.validateSource(FirewallDnsForwardUtils.getSource());
+    return error === true || reportWarnings(_('Configuration conflict'), [error]);
+}
+
 function checkDnsProxyTarget() {
     const dnsService = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'dns_service');
     const proxyDns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'proxy_dns');
@@ -546,6 +552,7 @@ const PrecheckUtils = {
             || !checkLoadBalanceRefs()
             || !checkXrayTlsInsecure()
             || !checkFirewallPortTargets()
+            || !checkFirewallDnsForwardTarget()
             || !checkDnsProxyTarget()) {
             return false;
         }

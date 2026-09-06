@@ -48,7 +48,7 @@
     }
   },
   "admin/services/hijpass/dns": {
-    "title": "DNS",
+    "title": "Pre-routing DNS",
     "order": 5,
     "action": {
       "type": "view",

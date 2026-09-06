@@ -10,6 +10,40 @@ TPROXY_SHUNT_MARK=0x3
 TPROXY_PROTO=$(uci -q get hijpass.@firewall[0].tproxy_proto)
 TPROXY_SHUNT_PORT=$(uci -q get hijpass.@firewall[0].shunt_port)
 TPROXY_PORT=$(uci -q get hijpass.@firewall[0].proxy_port)
+DNS_FORWARD_SOURCE=$(uci -q get hijpass.@firewall[0].dns_forward || :)
+DNS_SERVICE=$(uci -q get hijpass.@dns[0].dns_service || :)
+DNS_FORWARD_PORT=
+
+is_valid_port() {
+    [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null
+}
+
+case "$DNS_FORWARD_SOURCE" in
+    ""|none)
+        ;;
+    pre-routing)
+        if [ "$DNS_SERVICE" = "chinadns-ng" ]; then
+            DNS_FORWARD_PORT=$(uci -q get hijpass.@dns[0].cdg_port || :)
+        else
+            log_warn "Pre-routing DNS forwarding target is unavailable"
+        fi
+        ;;
+    routing)
+        if [ "$(uci -q get hijpass.@shunt[0].enabled || :)" != "0" ]; then
+            DNS_FORWARD_PORT=$(uci -q get hijpass.@shunt[0].dns_listen_port || :)
+        else
+            log_warn "Routing Rules DNS forwarding target is disabled"
+        fi
+        ;;
+    *)
+        log_warn "Unknown DNS forwarding source: $DNS_FORWARD_SOURCE"
+        ;;
+esac
+
+if [ -n "$DNS_FORWARD_PORT" ] && ! is_valid_port "$DNS_FORWARD_PORT"; then
+    log_warn "Invalid DNS forwarding port: $DNS_FORWARD_PORT"
+    DNS_FORWARD_PORT=
+fi
 
 if [ -z "$TPROXY_SHUNT_PORT" ] && [ -z "$TPROXY_PORT" ]; then
     exit 0
@@ -23,7 +57,6 @@ CHN_ROUTE6_FILE=$(uci -q get hijpass.@hijpass[0].chn_route6 || :)
 ENABLE_CHN_ROUTE=$(uci -q get hijpass.@firewall[0].use_chnroute || :)
 ENABLE_GFW_LIST=$(uci -q get hijpass.@dns[0].use_gfw || :)
 ENABLE_CHN_LIST=$(uci -q get hijpass.@dns[0].use_chn || :)
-DNS_SERVICE=$(uci -q get hijpass.@dns[0].dns_service || :)
 PROXY_MAC=$(uci -q get hijpass.@firewall[0].proxy_mac_list || :)
 PROXY_MAC_EXCLUDE=$(uci -q get hijpass.@firewall[0].proxy_mac_exclude_list || :)
 PROXY_INTERFACE=$(uci -q get hijpass.@firewall[0].proxy_iface_list || :)
@@ -40,18 +73,33 @@ network_find_wan6 NET_IF6
 network_get_physdev NET_L2D "${NET_IF}"
 network_get_physdev NET_L2D6 "${NET_IF6}"
 
-INPUT_WAN_L2_DEV=
-if [ "$NET_L2D" != "br-lan" ]; then
-    INPUT_WAN_L2_DEV="$NET_L2D"
-fi
+WAN_DEVICE_NAMES=
+append_wan_device() {
+    local wan_device="$1"
+    [ -z "$wan_device" ] && return
+    case " $WAN_DEVICE_NAMES " in
+        *" $wan_device "*) return ;;
+    esac
+    WAN_DEVICE_NAMES="$WAN_DEVICE_NAMES $wan_device"
+}
 
-if [ "$NET_L2D6" != "br-lan" ]; then
+for wan_device in $(fw4 zone wan 2>/dev/null | sort -u); do
+    append_wan_device "$wan_device"
+done
+for wan_device in $NET_L2D $NET_L2D6; do
+    [ "$wan_device" = "br-lan" ] || append_wan_device "$wan_device"
+done
+
+INPUT_WAN_L2_DEV=
+for wan_device in $WAN_DEVICE_NAMES; do
+    escaped_device=$(printf '%s' "$wan_device" | sed 's/\\/\\\\/g; s/"/\\"/g')
     if [ -n "$INPUT_WAN_L2_DEV" ]; then
-        INPUT_WAN_L2_DEV="$INPUT_WAN_L2_DEV, $NET_L2D6"
-    else
-        INPUT_WAN_L2_DEV="$NET_L2D6"
+        INPUT_WAN_L2_DEV="$INPUT_WAN_L2_DEV, "
     fi
-fi
+    INPUT_WAN_L2_DEV="${INPUT_WAN_L2_DEV}\"${escaped_device}\""
+done
+
+FW4_TEMPLATE=$(cat "$CONF_PATH/fw4-template.nft")
 
 log_debug "Generating fw4 rules with mark:$TPROXY_MARK proxy port:$TPROXY_PORT shunt port:$TPROXY_SHUNT_PORT proto:$TPROXY_PROTO"
 
@@ -88,8 +136,6 @@ $ip"
         log_warn "Invalid IP address: $ip"
     fi
 done
-
-FW4_TEMPLATE=$(cat "$CONF_PATH/fw4-template.nft")
 
 DNS_V4=
 DNS_V6=
@@ -128,8 +174,8 @@ IP6_PROXY_NFT_LIST=$(echo "$IP6_PROXY_LIST" | sort -u | awk 'NF {printf "%s,\n",
 [ -n "$PROXY_MAC" ] && PROXY_MAC="${PROXY_MAC// /,}"
 [ -n "$PROXY_MAC_EXCLUDE" ] && PROXY_MAC_EXCLUDE="${PROXY_MAC_EXCLUDE// /,}"
 
-
 fw_rules="
+define DNS_FORWARD_PORT = $DNS_FORWARD_PORT
 define HIJPASS_USER = $HIJPASS_USER
 define TPROXY_MARK = $TPROXY_MARK
 define TPROXY_PORT = $TPROXY_PORT
@@ -150,6 +196,16 @@ define PROXY_MAC_EXCLUDE = { $PROXY_MAC_EXCLUDE }
 
 $FW4_TEMPLATE
 "
+
+if [ -z "$DNS_FORWARD_PORT" ]; then
+    fw_rules=$(echo "$fw_rules" | grep -v "DNS_FORWARD_")
+    fw_rules=$(echo "$fw_rules" | sed '/^    chain dns-forward {/,/^    }/d')
+fi
+
+if [ -z "$INPUT_WAN_L2_DEV" ]; then
+    fw_rules=$(echo "$fw_rules" | grep -v 'define WAN_DEV =')
+    fw_rules=$(echo "$fw_rules" | grep -v 'iifname $WAN_DEV counter return')
+fi
 
 if [ -z "$TPROXY_SHUNT_PORT" ]; then
     fw_rules=$(echo "$fw_rules" | grep -v "TPROXY_SHUNT_PORT")

@@ -5,12 +5,14 @@ import form from "form";
 import {SaveApplyUtils} from "../utils/actions/save-apply/index";
 import {ServiceUtils} from "../utils/base/luci/service";
 import { OverviewPanelUtils } from "../utils/feature/overview/panel";
+import { FlowPreviewUtils } from "../utils/feature/overview/flow-preview";
 
 const v = view.extend({
     load: function () {
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME),
-            uci.load(LuciFlied.SERVER_CONF_NAME)
+            uci.load(LuciFlied.SERVER_CONF_NAME),
+            uci.load('dhcp')
         ]);
     },
 
@@ -50,6 +52,11 @@ const v = view.extend({
         preview.render = function () {
             return OverviewPanelUtils.createActionButtons();
         };
+
+        let flowPreview = m.section(form.TypedSection, 'configuration_flow_preview');
+        flowPreview.anonymous = true;
+        flowPreview.addremove = false;
+        flowPreview.render = FlowPreviewUtils.createConfigurationFlowPreview;
 
         let sTest = m.section(form.TypedSection, 'connectivity_test_section');
         sTest.anonymous = true;

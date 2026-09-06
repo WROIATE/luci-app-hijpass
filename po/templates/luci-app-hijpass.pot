@@ -2825,3 +2825,271 @@ msgstr ""
 #: ts-src/views/shunt.ts
 msgid "Firewall DNS forwarding is using Core DNS. Select another forwarding source in Firewall before disabling proxy routing."
 msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "%s enabled rules, default DNS: %s"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "%s enabled rules, default exit: %s"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Address rules are evaluated from top to bottom"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "CHN domain list"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "CHN domain set"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "CHN route set"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Client DNS query"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Client traffic"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-preview.ts
+msgid "Configuration flow preview"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Custom core configuration"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Custom direct domain list"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Custom proxy domain list"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "DNS flow"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "DNS routing rules"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "DNS upstream"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Default proxy"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Default proxy, %s exclusions"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Default shunt port"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Default shunt port is disabled"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Direct domain branch"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Disabled or invalid listen port"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Firewall ACL"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Firewall classification"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Forced direct address"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Forced proxy address"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "GFW domain list"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "GFW domain set"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-preview.ts
+msgid "Generated from saved settings. Branches show configured decisions, not a live packet trace."
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Independent DNS unavailable"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Independent DNS: %s"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Internal path cannot be expanded"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Keep the original destination"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Load balancing: %s"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Local port %s"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Members: %s"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "No DNS redirect"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "No address rule matched"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "No enabled node uses this port"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "No member nodes"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "No protocol selected"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "No proxy target"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "No valid listen port"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Node unavailable"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Not configured"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Other marked non-DNS UDP"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Port filter"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Protocol conditions may bypass or reject traffic"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Proxy dependency cycle"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Proxy domain branch"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Proxy node unavailable"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Proxy node: %s"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Proxy port"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Reject"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Router traffic excluded"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Router traffic included"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Routing rules"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Routing service"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "SOCKS port %s"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Selected: %s devices, %s interfaces"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-preview.ts
+msgid "Service disabled; preview shows saved settings"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-preview.ts
+msgid "Service enabled"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "TCP/UDP port 53"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Traffic flow"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Marked UDP port 443"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Unknown DNS forwarding source"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Unmatched non-standard TCP port"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Upstream proxy: %s"
+msgstr ""

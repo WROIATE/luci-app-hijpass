@@ -2108,3 +2108,204 @@ msgstr "防火墙 DNS 转发正在使用独立 DNS，请先在防火墙中选择
 
 msgid "Firewall DNS forwarding is using Core DNS. Select another forwarding source in Firewall before disabling proxy routing."
 msgstr "防火墙 DNS 转发正在使用核心 DNS，请先在防火墙中选择其他转发来源，再关闭代理路由。"
+
+msgid "%s enabled rules, default DNS: %s"
+msgstr "已启用 %s 条规则，默认 DNS：%s"
+
+msgid "%s enabled rules, default exit: %s"
+msgstr "已启用 %s 条规则，默认出口：%s"
+
+msgid "Address rules are evaluated from top to bottom"
+msgstr "地址规则按从上到下顺序判断"
+
+msgid "CHN domain list"
+msgstr "国内域名列表"
+
+msgid "CHN domain set"
+msgstr "国内域名集合"
+
+msgid "CHN route set"
+msgstr "国内路由集合"
+
+msgid "Client DNS query"
+msgstr "客户端 DNS 查询"
+
+msgid "Client traffic"
+msgstr "客户端流量"
+
+msgid "Configuration flow preview"
+msgstr "配置链路预览"
+
+msgid "Custom core configuration"
+msgstr "自定义核心配置"
+
+msgid "Custom direct domain list"
+msgstr "自定义直连域名列表"
+
+msgid "Custom proxy domain list"
+msgstr "自定义代理域名列表"
+
+msgid "DNS flow"
+msgstr "DNS 链路"
+
+msgid "DNS routing rules"
+msgstr "DNS 路由规则"
+
+msgid "DNS upstream"
+msgstr "DNS 上游"
+
+msgid "Default proxy"
+msgstr "默认全部代理"
+
+msgid "Default proxy, %s exclusions"
+msgstr "默认全部代理，排除 %s 项"
+
+msgid "Default shunt port"
+msgstr "默认分流端口"
+
+msgid "Default shunt port is disabled"
+msgstr "默认分流端口已关闭"
+
+msgid "Direct domain branch"
+msgstr "直连域名分支"
+
+msgid "Disabled or invalid listen port"
+msgstr "已关闭或监听端口无效"
+
+msgid "Firewall ACL"
+msgstr "防火墙 ACL"
+
+msgid "Firewall classification"
+msgstr "防火墙分流判断"
+
+msgid "Forced direct address"
+msgstr "强制直连地址"
+
+msgid "Forced proxy address"
+msgstr "强制代理地址"
+
+msgid "GFW domain list"
+msgstr "GFW 域名列表"
+
+msgid "GFW domain set"
+msgstr "GFW 域名集合"
+
+msgid "Generated from saved settings. Branches show configured decisions, not a live packet trace."
+msgstr "根据已保存配置生成。分支表示配置判断，并非实时数据包追踪。"
+
+msgid "Independent DNS unavailable"
+msgstr "独立 DNS 不可用"
+
+msgid "Independent DNS: %s"
+msgstr "独立 DNS：%s"
+
+msgid "Internal path cannot be expanded"
+msgstr "无法展开内部链路"
+
+msgid "Keep the original destination"
+msgstr "保持原目标地址"
+
+msgid "Load balancing: %s"
+msgstr "负载均衡：%s"
+
+msgid "Local port %s"
+msgstr "本地端口 %s"
+
+msgid "Members: %s"
+msgstr "成员：%s"
+
+msgid "No DNS redirect"
+msgstr "不重定向 DNS"
+
+msgid "No address rule matched"
+msgstr "未命中地址规则"
+
+msgid "No enabled node uses this port"
+msgstr "没有启用的节点使用此端口"
+
+msgid "No member nodes"
+msgstr "未配置成员节点"
+
+msgid "No protocol selected"
+msgstr "未选择协议"
+
+msgid "No proxy target"
+msgstr "未配置代理目标"
+
+msgid "No valid listen port"
+msgstr "未配置有效监听端口"
+
+msgid "Node unavailable"
+msgstr "节点不可用"
+
+msgid "Not configured"
+msgstr "未配置"
+
+msgid "Other marked non-DNS UDP"
+msgstr "其他已标记的非 DNS UDP"
+
+msgid "Port filter"
+msgstr "端口过滤"
+
+msgid "Protocol conditions may bypass or reject traffic"
+msgstr "协议条件可能直连或拒绝流量"
+
+msgid "Proxy dependency cycle"
+msgstr "代理节点循环依赖"
+
+msgid "Proxy domain branch"
+msgstr "代理域名分支"
+
+msgid "Proxy node unavailable"
+msgstr "代理节点不可用"
+
+msgid "Proxy node: %s"
+msgstr "代理节点：%s"
+
+msgid "Proxy port"
+msgstr "代理端口"
+
+msgid "Reject"
+msgstr "拒绝"
+
+msgid "Router traffic excluded"
+msgstr "不包含路由器本机流量"
+
+msgid "Router traffic included"
+msgstr "包含路由器本机流量"
+
+msgid "Routing rules"
+msgstr "路由规则"
+
+msgid "Routing service"
+msgstr "路由服务"
+
+msgid "SOCKS port %s"
+msgstr "SOCKS 端口 %s"
+
+msgid "Selected: %s devices, %s interfaces"
+msgstr "已选择 %s 台设备、%s 个接口"
+
+msgid "Service disabled; preview shows saved settings"
+msgstr "服务已关闭；预览仍展示已保存配置"
+
+msgid "Service enabled"
+msgstr "服务已启用"
+
+msgid "TCP/UDP port 53"
+msgstr "TCP/UDP 端口 53"
+
+msgid "Traffic flow"
+msgstr "请求链路"
+
+msgid "Marked UDP port 443"
+msgstr "已标记的 UDP 端口 443"
+
+msgid "Unknown DNS forwarding source"
+msgstr "未知 DNS 转发来源"
+
+msgid "Unmatched non-standard TCP port"
+msgstr "未匹配的非常用 TCP 端口"
+
+msgid "Upstream proxy: %s"
+msgstr "前置代理：%s"

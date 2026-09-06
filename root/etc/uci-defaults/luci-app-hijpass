@@ -21,6 +21,10 @@ EOF
 shunt_type="$(uci -q get hijpass.@shunt[0].type || :)"
 [ -z "$shunt_type" ] && uci -q set hijpass.@shunt[0].type='sing-box'
 [ "$shunt_type" = "singbox" ] && uci -q set hijpass.@shunt[0].type='sing-box'
+direct_dns="$(uci -q get hijpass.@dns[0].direct_dns || :)"
+[ "$direct_dns" = "system" ] && uci -q set hijpass.@dns[0].direct_dns='dnsmasq'
+proxy_dns="$(uci -q get hijpass.@dns[0].proxy_dns || :)"
+[ "$proxy_dns" = "system" ] && uci -q set hijpass.@dns[0].proxy_dns='dnsmasq'
 uci -q show hijpass | sed -n "s/^\(hijpass\.[^.]*\)\.core='singbox'$/\1/p" | while read -r section; do
 	uci -q set "$section.core=sing-box"
 done

@@ -39,6 +39,18 @@ function hasSplitDnsTarget(section: any, sectionId: string) {
         || (rulesetConvert === '1' && ruleDTO.geoSite.length > 0);
 }
 
+function getShuntDnsDependencyError(section: LuCI.form.AbstractSection, sectionId: string) {
+    const dnsService = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'dns_service');
+    const proxyDns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'proxy_dns');
+    const dnsListenPort = section.formvalue(sectionId, 'dns_listen_port');
+    if (dnsService === 'chinadns-ng'
+        && dnsListenPort
+        && proxyDns === '127.0.0.1#' + dnsListenPort) {
+        return _('Proxy domain DNS is using this shunt DNS port. Change it in the DNS module before disabling shunt.');
+    }
+    return null;
+}
+
 const v = view.extend({
     load: function () {
         return Promise.all([
@@ -84,6 +96,33 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     let enabled = s.taboption('basic', form.Flag, 'enabled', _('Enable Shunt'), '');
     enabled.default = '1';
     enabled.rmempty = false;
+    enabled.validate = function (sectionId: string, value: string) {
+        if (value !== '0') {
+            return true;
+        }
+        return getShuntDnsDependencyError(this.section, sectionId) || true;
+    };
+    enabled.renderWidget = function (sectionId: string, optionIndex: number, cfgvalue: string): Node {
+        const widget = form.Flag.prototype.renderWidget.call(
+            this, sectionId, optionIndex, cfgvalue) as HTMLElement;
+        const checkbox = widget.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+        checkbox?.addEventListener('change', (event: Event) => {
+            if (checkbox.checked) {
+                return;
+            }
+
+            const error = getShuntDnsDependencyError(this.section, sectionId);
+            if (!error) {
+                return;
+            }
+
+            checkbox.checked = true;
+            event.stopImmediatePropagation();
+            this.triggerValidation(sectionId);
+            NotificationUtils.warning(_('Configuration conflict'), error, 8000);
+        }, true);
+        return widget;
+    };
 
     // 分流类型
     let serviceType = s.taboption('basic', form.ListValue, 'type', _('Shunt Type'),

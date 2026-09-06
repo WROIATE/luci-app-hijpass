@@ -2073,10 +2073,6 @@ msgstr ""
 msgid "Use Routing Proxy Node"
 msgstr ""
 
-#: ts-src/views/dns.ts:55 ts-src/views/dns.ts:69
-msgid "Use System DNS"
-msgstr ""
-
 #: ts-src/views/proxy.ts:571
 msgid "Use UDP Stream Relay"
 msgstr ""
@@ -2521,4 +2517,8 @@ msgstr ""
 
 #: ts-src/utils/actions/save-apply/precheck.ts
 msgid "Proxy domain DNS must use the current enabled shunt DNS port or a custom DNS server"
+msgstr ""
+
+#: ts-src/views/shunt.ts
+msgid "Proxy domain DNS is using this shunt DNS port. Change it in the DNS module before disabling shunt."
 msgstr ""

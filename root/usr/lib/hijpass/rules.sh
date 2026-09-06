@@ -520,6 +520,26 @@ query_rule() {
     fi
 }
 
+update_rule_files() {
+    local failed=0
+
+    log_info "Update all rule files..."
+    download_gfw_list || failed=1
+    download_chn_list || failed=1
+    download_chn_route_ipv4 || failed=1
+    download_chn_route_ipv6 || failed=1
+    download_geosite || failed=1
+    download_geoip || failed=1
+
+    if [ "$ENABLED" != "1" ]; then
+        log_info "Skip restart hijpass"
+    elif ! /etc/init.d/hijpass restart; then
+        failed=1
+    fi
+
+    return "$failed"
+}
+
 # 主函数
 main() {
     local action="$1"
@@ -549,15 +569,12 @@ main() {
         download_geoip
         ;;
     "update")
-        log_info "Update all rule files..."
-        download_gfw_list
-        download_chn_list
-        download_chn_route_ipv4
-        download_chn_route_ipv6
-        download_geosite
-        download_geoip
-        [ "$ENABLED" != "1" ] && log_info "Skip restart hijpass" && return 0
-        /etc/init.d/hijpass restart
+        if update_rule_files; then
+            printf '{"success":true}\n'
+        else
+            printf '{"success":false}\n'
+            return 1
+        fi
         ;;
     "query")
         if ! is_safe_query_arg "$2"; then

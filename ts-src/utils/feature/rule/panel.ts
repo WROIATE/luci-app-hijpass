@@ -59,8 +59,12 @@ function performQuery(
 
 function queryDomain(keyword: string, outputElement: HTMLTextAreaElement, statusElement: HTMLElement) {
     clearQuery(outputElement)
-    fs.exec('/usr/lib/hijpass/geoview.sh', ['-l', 'geosite', keyword])
-        .then(setOutput(outputElement, statusElement, '# geosite\n'))
+    fs.exec('/usr/bin/lua', ['/usr/lib/hijpass/luci-utils.lua', 'iptype', keyword])
+        .then(function (result) {
+            const geoType = result.code === 0 ? 'geoip' : 'geosite';
+            return fs.exec('/usr/lib/hijpass/geoview.sh', ['-l', geoType, keyword])
+                .then(setOutput(outputElement, statusElement, '# ' + geoType + '\n'));
+        })
         .catch(setError(statusElement))
     fs.exec('/usr/lib/hijpass/rules.sh', ['query', keyword])
         .then(setOutput(outputElement, statusElement, _('# Local Rule Files\n')))
@@ -76,18 +80,24 @@ function queryShunt(keyword: string, outputElement: HTMLTextAreaElement, statusE
 
 function queryGeoTag(keyword: string, geoType: string, outputElement: HTMLTextAreaElement, statusElement: HTMLElement) {
     clearQuery(outputElement)
-    fs.exec_direct('/usr/lib/hijpass/geoview.sh', ['-e', geoType, keyword])
+    fs.exec('/usr/lib/hijpass/geoview.sh', ['-e', geoType, keyword])
         .then(function (result) {
-            if (result) {
+            if (result.code !== 0) {
+                throw new Error(result.stderr || _('Query Failed'));
+            }
+
+            const output = result.stdout || '';
+            if (output.trim()) {
                 if (outputElement.value) {
                     outputElement.value += '\n';
                 }
                 outputElement.value += '# ' + geoType + '\n';
-                outputElement.value += result;
+                outputElement.value += output;
                 statusElement.textContent = _('Query Complete');
                 statusElement.style.color = '#4caf50';
             } else {
-                throw new Error(result.stderr || _('Query Failed'));
+                statusElement.textContent = _('No Matching Results');
+                statusElement.style.color = '#666';
             }
         })
         .catch(setError(statusElement));
@@ -151,18 +161,48 @@ const RulePanelUtils = {
     },
 
     createQueryPanel: function () {
+        const queryGuidance = {
+            domain: {
+                placeholder: _('Enter a domain or IP address'),
+                description: [
+                    _('Domain: Enter a domain (for example, www.example.com) to query GeoSite tags and local domain rule files.'),
+                    _('IP address: Enter an IP address (for example, 8.8.8.8) to query GeoIP tags and local IP rule files.')
+                ]
+            },
+            geosite: {
+                placeholder: _('Enter a GeoSite tag'),
+                description: [
+                    _('Enter a GeoSite tag (for example, cn or google) to list the domain rules included in that tag.')
+                ]
+            },
+            shunt: {
+                placeholder: _('Enter a domain or IP address'),
+                description: [
+                    _('Enter a domain or IP address to show the first matching enabled shunt rule.'),
+                    _('Protocol and port conditions are not evaluated.')
+                ]
+            }
+        };
         const queryTypeSelect = E('select', {
+            'id': 'hijpass-rule-query-type',
             'class': 'cbi-input-select',
-            'style': 'width: 200px; margin-right: 10px;'
+            'style': 'width: 200px; margin-right: 10px;',
+            'aria-describedby': 'hijpass-rule-query-type-description'
         }, [
             E('option', {'value': 'domain'}, _('Domain Query')),
             E('option', {'value': 'geosite'}, _('GeoSite')),
             E('option', {'value': 'shunt'}, _('Shunt Query')),
         ]) as HTMLSelectElement;
+        const queryTypeDescription = E('div', {
+            'id': 'hijpass-rule-query-type-description',
+            'class': 'cbi-section-descr',
+            'style': 'margin-top: 6px;',
+            'aria-live': 'polite'
+        }) as HTMLElement;
         const keywordInput = E('input', {
+            'id': 'hijpass-rule-query-keyword',
             'type': 'text',
             'class': 'cbi-input-text',
-            'placeholder': _('Enter Domain or GeoSite Tag'),
             'style': 'margin-right: 10px;',
             'keydown': function (ev: KeyboardEvent) {
                 if (ev.key === 'Enter') {
@@ -172,22 +212,40 @@ const RulePanelUtils = {
             }
         }) as HTMLInputElement;
         const statusElement = E('span', {
-            'style': 'margin-left: 10px; font-size: 12px; color: #666;'
+            'style': 'margin-left: 10px; font-size: 12px; color: #666;',
+            'role': 'status',
+            'aria-live': 'polite'
         }) as HTMLElement;
         const outputElement = E('textarea', {
+            'id': 'hijpass-rule-query-results',
             'class': 'cbi-input-textarea',
             'readonly': 'readonly',
-            'style': 'width: 100%; height: 300px;'
+            'placeholder': _('Query results will appear here'),
+            'style': 'width: 100%; height: 300px;',
+            'aria-describedby': 'hijpass-rule-query-results-description'
         }) as HTMLTextAreaElement;
+        const updateQueryGuidance = function () {
+            const guidance = queryGuidance[queryTypeSelect.value] || queryGuidance.domain;
+            keywordInput.placeholder = guidance.placeholder;
+            queryTypeDescription.innerHTML = '';
+            guidance.description.forEach(function (line) {
+                queryTypeDescription.appendChild(E('div', {}, line));
+            });
+        };
+
+        queryTypeSelect.addEventListener('change', updateQueryGuidance);
+        updateQueryGuidance();
 
         return E('div', {'class': 'cbi-section'}, [
+            E('div', {'class': 'cbi-section-descr'},
+                _('Query saved rule data without changing configuration. Unsaved form changes are not included.')),
             E('div', {'class': 'cbi-section-node'}, [
                 E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 20px;'}, [
-                    E('label', {'class': 'cbi-value-title'}, _('Query Type')),
-                    E('div', {'class': 'cbi-value-field'}, [queryTypeSelect])
+                    E('label', {'class': 'cbi-value-title', 'for': 'hijpass-rule-query-type'}, _('Query Type')),
+                    E('div', {'class': 'cbi-value-field'}, [queryTypeSelect, queryTypeDescription])
                 ]),
                 E('div', {'class': 'cbi-value', 'style': 'margin-bottom: 20px;'}, [
-                    E('label', {'class': 'cbi-value-title'}, _('Query Keyword')),
+                    E('label', {'class': 'cbi-value-title', 'for': 'hijpass-rule-query-keyword'}, _('Query Keyword')),
                     E('div', {'class': 'cbi-value-field'}, [
                         keywordInput,
                         E('button', {
@@ -203,8 +261,16 @@ const RulePanelUtils = {
                     ])
                 ]),
                 E('div', {'class': 'cbi-value'}, [
-                    E('label', {'class': 'cbi-value-title', 'style': 'visibility: hidden'}, _('Query Results')),
-                    E('div', {'class': 'cbi-value-field'}, [outputElement])
+                    E('label', {'class': 'cbi-value-title', 'for': 'hijpass-rule-query-results'}, _('Query Results')),
+                    E('div', {'class': 'cbi-value-field'}, [
+                        outputElement,
+                        E('div', {
+                            'id': 'hijpass-rule-query-results-description',
+                            'class': 'cbi-section-descr',
+                            'style': 'margin-top: 6px;'
+                        },
+                            _('An empty result means no matching entry was found.'))
+                    ])
                 ])
             ])
         ]);

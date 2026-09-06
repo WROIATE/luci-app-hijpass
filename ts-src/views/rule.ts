@@ -21,8 +21,8 @@ const v = view.extend({
         s.anonymous = true;
         s.addremove = false;
 
-        s.tab("config", _("Configuration"))
         s.tab("query", _("Query"))
+        s.tab("config", _("Configuration"))
 
         let downloadButton = s.taboption('config', form.Button, '_download_all', _('Update All Rules'),
             _('Download All Rules Now'));

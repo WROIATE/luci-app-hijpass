@@ -87,6 +87,10 @@ msgstr ""
 msgid "Allow Public Access"
 msgstr ""
 
+#: ts-src/utils/feature/rule/panel.ts:251
+msgid "An empty result means no matching entry was found."
+msgstr ""
+
 #: ts-src/views/proxy.ts:431
 msgid "Authentication Password"
 msgstr ""
@@ -544,7 +548,11 @@ msgstr ""
 msgid "Domain Proxy List"
 msgstr ""
 
-#: ts-src/utils/feature/rule/panel.ts:158
+#: ts-src/utils/feature/rule/panel.ts:168
+msgid "Domain: Enter a domain (for example, www.example.com) to query GeoSite tags and local domain rule files."
+msgstr ""
+
+#: ts-src/utils/feature/rule/panel.ts:192
 msgid "Domain Query"
 msgstr ""
 
@@ -697,8 +705,20 @@ msgstr ""
 msgid "Encryption Method"
 msgstr ""
 
-#: ts-src/utils/feature/rule/panel.ts:165
-msgid "Enter Domain or GeoSite Tag"
+#: ts-src/utils/feature/rule/panel.ts:173
+msgid "Enter a GeoSite tag"
+msgstr ""
+
+#: ts-src/utils/feature/rule/panel.ts:175
+msgid "Enter a GeoSite tag (for example, cn or google) to list the domain rules included in that tag."
+msgstr ""
+
+#: ts-src/utils/feature/rule/panel.ts:166 ts-src/utils/feature/rule/panel.ts:179
+msgid "Enter a domain or IP address"
+msgstr ""
+
+#: ts-src/utils/feature/rule/panel.ts:181
+msgid "Enter a domain or IP address to show the first matching enabled shunt rule."
 msgstr ""
 
 #: ts-src/utils/feature/rule/panel.ts:36
@@ -789,7 +809,7 @@ msgstr ""
 msgid "GeoIP Database URL"
 msgstr ""
 
-#: ts-src/utils/feature/rule/panel.ts:159
+#: ts-src/utils/feature/rule/panel.ts:193
 msgid "GeoSite"
 msgstr ""
 
@@ -948,6 +968,10 @@ msgstr ""
 
 #: ts-src/views/shunt.ts:352
 msgid "IP Rule List"
+msgstr ""
+
+#: ts-src/utils/feature/rule/panel.ts:169
+msgid "IP address: Enter an IP address (for example, 8.8.8.8) to query GeoIP tags and local IP rule files."
 msgstr ""
 
 #: ts-src/views/shunt.ts:352
@@ -1158,6 +1182,10 @@ msgstr ""
 msgid "No Logs"
 msgstr ""
 
+#: ts-src/utils/feature/rule/panel.ts:99
+msgid "No Matching Results"
+msgstr ""
+
 #: ts-src/utils/feature/firewall/form.ts:68
 msgid "No Rules"
 msgstr ""
@@ -1332,6 +1360,10 @@ msgstr ""
 msgid "Protocol"
 msgstr ""
 
+#: ts-src/utils/feature/rule/panel.ts:182
+msgid "Protocol and port conditions are not evaluated."
+msgstr ""
+
 #: ts-src/views/proxy.ts:591
 msgid "Protocol Version"
 msgstr ""
@@ -1412,7 +1444,7 @@ msgstr ""
 msgid "Proxy Type"
 msgstr ""
 
-#: ts-src/utils/feature/rule/panel.ts:201 ts-src/views/rule.ts:25
+#: ts-src/utils/feature/rule/panel.ts:238 ts-src/views/rule.ts:24
 msgid "Query"
 msgstr ""
 
@@ -1424,15 +1456,23 @@ msgstr ""
 msgid "Query Failed"
 msgstr ""
 
-#: ts-src/utils/feature/rule/panel.ts:190
+#: ts-src/utils/feature/rule/panel.ts:227
 msgid "Query Keyword"
 msgstr ""
 
-#: ts-src/utils/feature/rule/panel.ts:206
+#: ts-src/utils/feature/rule/panel.ts:243
 msgid "Query Results"
 msgstr ""
 
-#: ts-src/utils/feature/rule/panel.ts:186
+#: ts-src/utils/feature/rule/panel.ts:205
+msgid "Query results will appear here"
+msgstr ""
+
+#: ts-src/utils/feature/rule/panel.ts:220
+msgid "Query saved rule data without changing configuration. Unsaved form changes are not included."
+msgstr ""
+
+#: ts-src/utils/feature/rule/panel.ts:223
 msgid "Query Type"
 msgstr ""
 

@@ -150,7 +150,7 @@ install_verified_binary() {
     src="$1"
     dest="$2"
     tmp_dest="${dest}.new.$$"
-    backup_file="${dest}.bak"
+    backup_file="${UPDATE_TMP_DIR}/${CORE}.bak"
 
     verify_binary "$src" || fail_update "binary verification failed"
     cp "$src" "$tmp_dest" || {
@@ -165,13 +165,14 @@ install_verified_binary() {
     if [ -f "$dest" ]; then
         cp "$dest" "$backup_file" || {
             rm -f "$tmp_dest"
+            rm -f "$backup_file"
             fail_update "backup failed"
         }
     fi
 
     if ! mv "$tmp_dest" "$dest"; then
-        [ -f "$backup_file" ] && cp "$backup_file" "$dest"
         rm -f "$tmp_dest"
+        [ -f "$backup_file" ] && cp "$backup_file" "$dest"
         fail_update "install failed"
     fi
     rm -f "$backup_file"
@@ -215,9 +216,11 @@ do_update() {
                 fail_update "download failed"
             fi
             # busybox tar 不支持 --wildcards，先全量解压再 find
-            tar -xzf "$tmp_dir/sing-box.tar.gz" -C "$tmp_dir" 2>/dev/null
+            if ! tar -xzf "$tmp_dir/sing-box.tar.gz" -C "$tmp_dir" 2>/dev/null; then
+                fail_update "archive extraction failed"
+            fi
             local extracted
-            extracted=$(find "$tmp_dir" -name "sing-box" -not -name "*.tar.gz" -type f | head -1)
+            extracted=$(find "$tmp_dir" -type f -name "sing-box" | head -1)
             if [ -z "$extracted" ]; then
                 fail_update "binary not found in archive"
             fi

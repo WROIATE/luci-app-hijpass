@@ -1368,9 +1368,6 @@ msgstr "分流设置"
 msgid "Shunt Configuration Editor"
 msgstr "分流配置编辑器"
 
-msgid "Shunt DNS Port: %s"
-msgstr "分流DNS端口: %s"
-
 msgid "Shunt is disabled. Set the firewall default shunt port to disabled first"
 msgstr "分流已禁用，请先将防火墙默认分流端口切换为不使用"
 
@@ -1923,11 +1920,11 @@ msgstr "防火墙代理端口 %s 未指向已启用的代理节点"
 msgid "Firewall shunt port %s does not reference an enabled proxy node or shunt service"
 msgstr "防火墙分流端口 %s 未指向已启用的代理节点或分流服务"
 
-msgid "Proxy domain DNS must use the current enabled shunt DNS port or a custom DNS server"
-msgstr "代理域名 DNS 必须使用当前已启用的分流 DNS 端口或自定义 DNS 服务器"
+msgid "%s references an unavailable Routing Rules DNS port"
+msgstr "%s 引用了不可用的路由规则 DNS 端口"
 
-msgid "Proxy domain DNS is using this shunt DNS port. Change it in the Pre-routing DNS module before disabling shunt."
-msgstr "代理域名 DNS 正在使用此分流 DNS 端口，请先在前置DNS分流模块中修改，再关闭分流。"
+msgid "Pre-routing DNS is using this Routing Rules DNS port. Change it in the Pre-routing DNS module before disabling routing rules."
+msgstr "前置 DNS 分流正在使用此路由规则 DNS 端口，请先在前置 DNS 分流模块中修改，再关闭路由规则。"
 
 msgid "%s member nodes · %s"
 msgstr "%s 个成员节点 · %s"

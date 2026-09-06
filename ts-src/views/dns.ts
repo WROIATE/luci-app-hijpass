@@ -9,6 +9,33 @@ import {FilePathUtils} from "../utils/base/files/paths";
 import {FIREWALL_DNS_FORWARD, LuciFlied} from "../enum/hijpass";
 import {FirewallDnsForwardUtils} from "../utils/feature/firewall/dns-forward";
 
+type RoutingDnsOption = {
+    available: boolean;
+    label: string;
+    value: string;
+}
+
+function getRoutingDnsOption(): RoutingDnsOption {
+    const target = FirewallDnsForwardUtils.getRoutingTarget();
+    return {
+        available: target.available,
+        label: FirewallDnsForwardUtils.getTargetLabel(_('Routing Rules DNS'), target),
+        value: target.port ? '127.0.0.1#' + target.port : FIREWALL_DNS_FORWARD.ROUTING,
+    };
+}
+
+function appendDnsServerOptions(option: LuCI.form.ListValue, routingDns: RoutingDnsOption) {
+    option.value('dnsmasq', 'dnsmasq');
+    option.value(routingDns.value, routingDns.label);
+    option.value('custom', _('Custom DNS'));
+    option.validate = function (_sectionId: string, value: string) {
+        if (value !== routingDns.value || routingDns.available) {
+            return true;
+        }
+        return _('Routing Rules DNS is disabled or has no valid listen port');
+    };
+}
+
 
 const v = view.extend({
     load: function () {
@@ -63,8 +90,8 @@ const v = view.extend({
         let directDns = s.taboption('basic', form.ListValue, 'direct_dns', _('Direct Domain DNS'),
             _('Select Direct Domain DNS'));
         directDns.depends('dns_service', 'chinadns-ng');
-        directDns.value('dnsmasq', 'dnsmasq');
-        directDns.value('custom', _('Custom DNS'));
+        const routingDns = getRoutingDnsOption();
+        appendDnsServerOptions(directDns, routingDns);
         directDns.default = 'dnsmasq';
         directDns.rmempty = false;
 
@@ -77,25 +104,8 @@ const v = view.extend({
         let proxyDns = s.taboption('basic', form.ListValue, 'proxy_dns', _('Proxy Domain DNS'),
             _('Select Proxy Domain DNS'));
         proxyDns.depends('dns_service', 'chinadns-ng');
-        proxyDns.value('dnsmasq', 'dnsmasq');
-        proxyDns.value('custom', _('Custom DNS'));
-        proxyDns.default = 'dnsmasq';
-        proxyDns.rmempty = false;
-
-        // 动态添加分流DNS监听端口选项
-        let shuntSections = uci.sections('hijpass', 'shunt');
-        let defaultDnsPort = null;
-        if (shuntSections && shuntSections.length > 0) {
-            shuntSections.forEach(function (shuntSection) {
-                if (shuntSection.enabled !== '0' && shuntSection.dns_listen_port) {
-                    let dnsPort = shuntSection.dns_listen_port;
-                    proxyDns.value('127.0.0.1#' + dnsPort, _('Shunt DNS Port: %s').format(dnsPort));
-                    defaultDnsPort = '127.0.0.1#' + dnsPort;
-                }
-            });
-        }
-
-        proxyDns.default = defaultDnsPort || 'custom';
+        appendDnsServerOptions(proxyDns, routingDns);
+        proxyDns.default = routingDns.available ? routingDns.value : 'custom';
         proxyDns.rmempty = false;
 
         let proxyDnsCustom = s.taboption('basic', form.Value, 'proxy_dns_custom', _('Custom Proxy DNS'),

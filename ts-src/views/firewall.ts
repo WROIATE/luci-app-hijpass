@@ -84,28 +84,17 @@ function createPortOptions(s: LuCI.form.AbstractSection) {
 
     const preRoutingTarget = FirewallDnsForwardUtils.getPreRoutingTarget();
     dnsForward.value(FIREWALL_DNS_FORWARD.PRE_ROUTING,
-        getDnsForwardTargetLabel(_('Pre-routing DNS'), preRoutingTarget));
+        FirewallDnsForwardUtils.getTargetLabel(_('Pre-routing DNS'), preRoutingTarget));
 
     const routingTarget = FirewallDnsForwardUtils.getRoutingTarget();
     dnsForward.value(FIREWALL_DNS_FORWARD.ROUTING,
-        getDnsForwardTargetLabel(_('Routing Rules DNS'), routingTarget));
+        FirewallDnsForwardUtils.getTargetLabel(_('Routing Rules DNS'), routingTarget));
 
     dnsForward.default = FIREWALL_DNS_FORWARD.NONE;
     dnsForward.rmempty = false;
     dnsForward.validate = function (_sectionId: string, value: string) {
         return FirewallDnsForwardUtils.validateSource(value);
     };
-}
-
-function getDnsForwardTargetLabel(name: string, target: { available: boolean, port: string }) {
-    let label = name;
-    if (target.port) {
-        label += ': ' + target.port;
-    }
-    if (!target.available) {
-        label += ' - ' + _('Not available');
-    }
-    return label;
 }
 
 // 创建列表选项

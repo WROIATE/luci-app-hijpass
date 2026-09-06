@@ -1830,10 +1830,6 @@ msgstr ""
 msgid "Shunt Configuration Editor"
 msgstr ""
 
-#: ts-src/views/dns.ts:81
-msgid "Shunt DNS Port: %s"
-msgstr ""
-
 #: ts-src/utils/actions/save-apply/precheck.ts:232
 msgid "Shunt is disabled. Set the firewall default shunt port to disabled first"
 msgstr ""
@@ -2573,11 +2569,11 @@ msgid "Firewall shunt port %s does not reference an enabled proxy node or shunt 
 msgstr ""
 
 #: ts-src/utils/actions/save-apply/precheck.ts
-msgid "Proxy domain DNS must use the current enabled shunt DNS port or a custom DNS server"
+msgid "%s references an unavailable Routing Rules DNS port"
 msgstr ""
 
 #: ts-src/views/shunt.ts
-msgid "Proxy domain DNS is using this shunt DNS port. Change it in the Pre-routing DNS module before disabling shunt."
+msgid "Pre-routing DNS is using this Routing Rules DNS port. Change it in the Pre-routing DNS module before disabling routing rules."
 msgstr ""
 
 #: ts-src/utils/feature/proxy/form.ts

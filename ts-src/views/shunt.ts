@@ -430,12 +430,14 @@ function getShuntDnsDependencyError(section: LuCI.form.AbstractSection, sectionI
     }
 
     const dnsService = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'dns_service');
+    const directDns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'direct_dns');
     const proxyDns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'proxy_dns');
     const dnsListenPort = section.formvalue(sectionId, 'dns_listen_port');
     if (dnsService === 'chinadns-ng'
         && dnsListenPort
-        && proxyDns === '127.0.0.1#' + dnsListenPort) {
-        return _('Proxy domain DNS is using this shunt DNS port. Change it in the Pre-routing DNS module before disabling shunt.');
+        && (directDns === '127.0.0.1#' + dnsListenPort
+            || proxyDns === '127.0.0.1#' + dnsListenPort)) {
+        return _('Pre-routing DNS is using this Routing Rules DNS port. Change it in the Pre-routing DNS module before disabling routing rules.');
     }
     return null;
 }

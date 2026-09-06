@@ -360,25 +360,29 @@ function checkFirewallDnsForwardTarget() {
     return error === true || reportWarnings(_('Configuration conflict'), [error]);
 }
 
-function checkDnsProxyTarget() {
+function checkDnsRoutingTargets() {
     const dnsService = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'dns_service');
-    const proxyDns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'proxy_dns');
-    if (dnsService !== 'chinadns-ng' || proxyDns === 'dnsmasq' || proxyDns === 'system' || proxyDns === 'custom') {
+    if (dnsService !== 'chinadns-ng') {
         return true;
     }
 
-    const shuntEnabled = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled') !== '0';
-    const shuntDnsPort = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'dns_listen_port');
-    if (shuntEnabled && shuntDnsPort && proxyDns === '127.0.0.1#' + shuntDnsPort) {
-        return true;
-    }
+    const routingTarget = FirewallDnsForwardUtils.getRoutingTarget();
+    const routingServer = routingTarget.port ? '127.0.0.1#' + routingTarget.port : '';
+    const warnings: string[] = [];
+    [
+        ['direct_dns', _('Direct Domain DNS')],
+        ['proxy_dns', _('Proxy Domain DNS')],
+    ].forEach(([option, label]) => {
+        const value = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, option);
+        if (!value || value === 'dnsmasq' || value === 'system' || value === 'custom') {
+            return;
+        }
+        if (!routingTarget.available || value !== routingServer) {
+            warnings.push(_('%s references an unavailable Routing Rules DNS port').format(label));
+        }
+    });
 
-    NotificationUtils.warning(
-        _('Configuration conflict'),
-        _('Proxy domain DNS must use the current enabled shunt DNS port or a custom DNS server'),
-        8000
-    );
-    return false;
+    return reportWarnings(_('Configuration conflict'), warnings);
 }
 
 function checkXrayRouteProtocols() {
@@ -553,7 +557,7 @@ const PrecheckUtils = {
             || !checkXrayTlsInsecure()
             || !checkFirewallPortTargets()
             || !checkFirewallDnsForwardTarget()
-            || !checkDnsProxyTarget()) {
+            || !checkDnsRoutingTargets()) {
             return false;
         }
 

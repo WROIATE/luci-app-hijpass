@@ -59,6 +59,9 @@
         "/usr/lib/hijpass/rules.sh query [A-Za-z0-9._:/-]*": [
           "exec"
         ],
+        "/usr/bin/lua /usr/lib/hijpass/luci-utils.lua iptype [A-Za-z0-9._:/-]*": [
+          "exec"
+        ],
         "/usr/lib/hijpass/connect.sh https://www.baidu.com [0-9]*": [
           "exec"
         ],

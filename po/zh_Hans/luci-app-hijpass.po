@@ -66,6 +66,9 @@ msgstr "全部"
 msgid "Allow Public Access"
 msgstr "允许公网访问"
 
+msgid "An empty result means no matching entry was found."
+msgstr "空结果表示未找到匹配项。"
+
 msgid "Authentication Password"
 msgstr "认证密码"
 
@@ -408,6 +411,9 @@ msgstr "域名直连列表"
 msgid "Domain Proxy List"
 msgstr "域名代理列表"
 
+msgid "Domain: Enter a domain (for example, www.example.com) to query GeoSite tags and local domain rule files."
+msgstr "域名：输入域名（例如 www.example.com），查询其所属的 GeoSite 标签和本地域名规则文件。"
+
 msgid "Domain Query"
 msgstr "域名查询"
 
@@ -522,8 +528,17 @@ msgstr "启用的网络协议，默认所有"
 msgid "Encryption Method"
 msgstr "加密方法"
 
-msgid "Enter Domain or GeoSite Tag"
-msgstr "输入域名或GeoSite标签"
+msgid "Enter a GeoSite tag"
+msgstr "输入 GeoSite 标签"
+
+msgid "Enter a GeoSite tag (for example, cn or google) to list the domain rules included in that tag."
+msgstr "输入 GeoSite 标签（例如 cn 或 google），列出该标签包含的域名规则。"
+
+msgid "Enter a domain or IP address"
+msgstr "输入域名或 IP 地址"
+
+msgid "Enter a domain or IP address to show the first matching enabled shunt rule."
+msgstr "输入域名或 IP 地址，显示首条命中的已启用分流规则。"
 
 msgid "Enter Query Keyword"
 msgstr "请输入查询关键字"
@@ -711,6 +726,9 @@ msgstr "IP规则数"
 msgid "IP Rule List"
 msgstr "IP规则列表"
 
+msgid "IP address: Enter an IP address (for example, 8.8.8.8) to query GeoIP tags and local IP rule files."
+msgstr "IP 地址：输入 IP 地址（例如 8.8.8.8），查询其命中的 GeoIP 标签和本地 IP 规则文件。"
+
 msgid "IP: e.g. '127.0.0.1'.<br>CIDR: e.g. '10.0.0.0/8'.<br>geoip: e.g. 'geoip:cn'.<br>rule-set: e.g. 'rule-set:local:/path/rulefile' or 'rule-set:remote:https://file'.<br>Comment: starts with #"
 msgstr "IP: 形如'127.0.0.1'。<br>CIDR: 形如'10.0.0.0/8'.<br>geoip: 形如'geoip:cn'。<br>rule-set: 形如'rule-set:local:/path/rulefile'或'rule-set:remote:https://file'。<br>注释: 由 # 开头"
 
@@ -867,6 +885,9 @@ msgstr "new_reno"
 msgid "No Logs"
 msgstr "暂无日志"
 
+msgid "No Matching Results"
+msgstr "未找到匹配结果"
+
 msgid "No Rules"
 msgstr "暂无规则（服务未运行）"
 
@@ -996,6 +1017,9 @@ msgstr "procd环境变量"
 msgid "Protocol"
 msgstr "协议"
 
+msgid "Protocol and port conditions are not evaluated."
+msgstr "协议和端口条件不参与此次查询。"
+
 msgid "Protocol Version"
 msgstr "协议版本"
 
@@ -1070,6 +1094,12 @@ msgstr "查询关键词"
 
 msgid "Query Results"
 msgstr "查询结果"
+
+msgid "Query results will appear here"
+msgstr "查询结果将在此显示"
+
+msgid "Query saved rule data without changing configuration. Unsaved form changes are not included."
+msgstr "查询设备上已保存的规则数据，不会更改配置；表单中尚未保存的修改不会包含在查询结果中。"
 
 msgid "Query Type"
 msgstr "查询类型"

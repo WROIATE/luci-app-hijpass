@@ -114,7 +114,7 @@ function createNodeNameOption(s: LuCI.form.AbstractSection) {
 // 修改运行命令选项为编辑表单专用
 function createCommandOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.Value, 'command', _('Run Command'),
-        _('Server Run Command'));
+        _('Server Run Command. Executed with root privileges.'));
     o.default = '/usr/bin/xray -c {conf_path}';
     o.rmempty = false;
     o.modalonly = true;

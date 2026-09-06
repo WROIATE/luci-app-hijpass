@@ -1777,7 +1777,7 @@ msgid "Server Reality Short ID"
 msgstr ""
 
 #: ts-src/views/server.ts:120
-msgid "Server Run Command"
+msgid "Server Run Command. Executed with root privileges."
 msgstr ""
 
 #: ts-src/utils/feature/overview/panel.ts:157
@@ -2072,8 +2072,8 @@ msgstr ""
 msgid "Updated"
 msgstr ""
 
-#: ts-src/utils/feature/shunt/form.ts:28
-msgid "Updated to %s"
+#: ts-src/utils/feature/rule/runtime.ts:41
+msgid "Updated to %s. Restart affected services to use the new version."
 msgstr ""
 
 #: ts-src/utils/feature/rule/panel.ts:6

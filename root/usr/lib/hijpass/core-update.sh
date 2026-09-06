@@ -94,15 +94,19 @@ get_local_version() {
 }
 
 # ── 获取 GitHub 最新版本号 ────────────────────────────────────────────
+get_release_repo() {
+    case "$CORE" in
+        sing-box) echo "SagerNet/sing-box" ;;
+        xray)     echo "XTLS/Xray-core" ;;
+        *)        return 1 ;;
+    esac
+}
+
 get_latest_version() {
     local repo url latest
-    case "$CORE" in
-        sing-box) repo="SagerNet/sing-box" ;;
-        xray)     repo="XTLS/Xray-core" ;;
-        *)        printf '{"error":"unknown core"}\n'; exit 1 ;;
-    esac
+    repo=$(get_release_repo) || return 1
     url="https://api.github.com/repos/${repo}/releases/latest"
-    latest=$(curl -sf --max-time 10 "$url" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+    latest=$(curl -sf --max-time 10 "$url" | jq -r '.tag_name // empty')
     echo "$latest"
 }
 
@@ -116,6 +120,32 @@ get_latest_version_json() {
     fi
 
     printf '{"core":"%s","version":"%s"}\n' "$CORE" "$latest"
+}
+
+get_asset_sha256() {
+    local tag asset repo digest
+    tag="$1"
+    asset="$2"
+    repo=$(get_release_repo) || return 1
+    digest=$(curl -sf --max-time 10 \
+        "https://api.github.com/repos/${repo}/releases/tags/${tag}" | \
+        jq -r --arg asset "$asset" \
+            '.assets[] | select(.name == $asset and .state == "uploaded") | .digest // empty' | \
+        head -1)
+
+    echo "$digest" | grep -Eq '^sha256:[0-9a-fA-F]{64}$' || return 1
+    echo "${digest#sha256:}" | tr 'A-F' 'a-f'
+}
+
+verify_archive_checksum() {
+    local archive tag asset expected actual
+    archive="$1"
+    tag="$2"
+    asset="$3"
+
+    expected=$(get_asset_sha256 "$tag" "$asset") || return 1
+    actual=$(sha256sum "$archive" 2>/dev/null | awk '{print $1}')
+    [ -n "$actual" ] && [ "$actual" = "$expected" ]
 }
 
 verify_binary() {
@@ -180,7 +210,7 @@ install_verified_binary() {
 
 # ── 下载并安装最新版 ─────────────────────────────────────────────────
 do_update() {
-    local arch latest_tag download_url tmp_dir
+    local arch latest_tag download_url tmp_dir asset_name
     arch=$(detect_arch "$CORE")   # 传入 core 名称，映射不同的文件名规则
     log_info "Fetching latest $CORE release..."
     latest_tag=$(get_latest_version)
@@ -204,7 +234,8 @@ do_update() {
             version_num=$(echo "$latest_tag" | sed 's/^v//')
             downloaded=""
             for candidate_arch in "${arch}-musl" "$arch"; do
-                download_url="https://github.com/SagerNet/sing-box/releases/download/${latest_tag}/sing-box-${version_num}-${candidate_arch}.tar.gz"
+                asset_name="sing-box-${version_num}-${candidate_arch}.tar.gz"
+                download_url="https://github.com/SagerNet/sing-box/releases/download/${latest_tag}/${asset_name}"
                 log_info "Downloading $download_url ..."
                 if curl -sfL --max-time 120 -o "$tmp_dir/sing-box.tar.gz" "$download_url"; then
                     downloaded="1"
@@ -215,6 +246,8 @@ do_update() {
             if [ -z "$downloaded" ]; then
                 fail_update "download failed"
             fi
+            verify_archive_checksum "$tmp_dir/sing-box.tar.gz" "$latest_tag" "$asset_name" || \
+                fail_update "archive checksum verification failed"
             # busybox tar 不支持 --wildcards，先全量解压再 find
             if ! tar -xzf "$tmp_dir/sing-box.tar.gz" -C "$tmp_dir" 2>/dev/null; then
                 fail_update "archive extraction failed"
@@ -227,11 +260,14 @@ do_update() {
             install_verified_binary "$extracted" "$SINGBOX_BIN"
             ;;
         xray)
-            download_url="https://github.com/XTLS/Xray-core/releases/download/${latest_tag}/Xray-${arch}.zip"
+            asset_name="Xray-${arch}.zip"
+            download_url="https://github.com/XTLS/Xray-core/releases/download/${latest_tag}/${asset_name}"
             log_info "Downloading $download_url ..."
             if ! curl -sfL --max-time 120 -o "$tmp_dir/xray.zip" "$download_url"; then
                 fail_update "download failed"
             fi
+            verify_archive_checksum "$tmp_dir/xray.zip" "$latest_tag" "$asset_name" || \
+                fail_update "archive checksum verification failed"
             # xray zip 根目录直接包含 xray 二进制；重定向 stdout 避免污染 JSON 输出
             unzip -o "$tmp_dir/xray.zip" xray -d "$tmp_dir" >/dev/null 2>&1
             if [ ! -f "$tmp_dir/xray" ]; then

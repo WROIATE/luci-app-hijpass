@@ -1329,8 +1329,8 @@ msgstr "服务器的Reality公钥"
 msgid "Server Reality Short ID"
 msgstr "服务器的Reality短ID"
 
-msgid "Server Run Command"
-msgstr "指定服务端程序运行命令"
+msgid "Server Run Command. Executed with root privileges."
+msgstr "指定服务端程序运行命令。该命令以 root 权限执行。"
 
 msgid "Service Control"
 msgstr "服务控制"
@@ -1548,8 +1548,8 @@ msgstr "更新规则文件"
 msgid "Updated"
 msgstr "已更新"
 
-msgid "Updated to %s"
-msgstr "已更新到 %s"
+msgid "Updated to %s. Restart affected services to use the new version."
+msgstr "已更新到 %s。重启受影响的服务后新版本才会生效。"
 
 msgid "Updating Rule Files"
 msgstr "正在更新规则文件..."

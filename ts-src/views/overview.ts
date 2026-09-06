@@ -27,18 +27,21 @@ const v = view.extend({
         s.anonymous = true;
         s.addremove = false;
 
-        let enabled = s.option(form.Flag, 'enabled', _('Enable'),
+        s.tab('configuration', _('Configuration'));
+        s.tab('flow', _('Flow preview'));
+
+        let enabled = s.taboption('configuration', form.Flag, 'enabled', _('Enable'),
             _('Enable or Disable HiJpass'));
         enabled.default = '0';
         enabled.rmempty = false;
 
-        let delayTime = s.option(form.Value, 'delay_time', _('Delay Time'),
+        let delayTime = s.taboption('configuration', form.Value, 'delay_time', _('Delay Time'),
             _('Startup Delay'));
         delayTime.datatype = 'uinteger';
         delayTime.default = '60';
         delayTime.rmempty = false;
 
-        let logLevel = s.option(form.ListValue, 'log_level', _('Log Level'),
+        let logLevel = s.taboption('configuration', form.ListValue, 'log_level', _('Log Level'),
             _('Service Log Level'));
         logLevel.modalonly = true;
         logLevel.value('DEBUG', _('Debug'));
@@ -48,14 +51,12 @@ const v = view.extend({
         logLevel.default = 'INFO';
         logLevel.rmempty = false;
 
-        let preview = s.option(form.Button, '_preview');
+        let preview = s.taboption('configuration', form.Button, '_preview');
         preview.render = function () {
             return OverviewPanelUtils.createActionButtons();
         };
 
-        let flowPreview = m.section(form.TypedSection, 'configuration_flow_preview');
-        flowPreview.anonymous = true;
-        flowPreview.addremove = false;
+        let flowPreview = s.taboption('flow', form.DummyValue, '_flow_preview');
         flowPreview.render = FlowPreviewUtils.createConfigurationFlowPreview;
 
         let sTest = m.section(form.TypedSection, 'connectivity_test_section');

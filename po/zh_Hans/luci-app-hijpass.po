@@ -2118,6 +2118,9 @@ msgstr "已启用 %s 条规则，默认出口：%s"
 msgid "Address rules are evaluated from top to bottom"
 msgstr "地址规则按从上到下顺序判断"
 
+msgid "Bypass mode"
+msgstr "绕过模式"
+
 msgid "CHN domain list"
 msgstr "国内域名列表"
 
@@ -2133,8 +2136,8 @@ msgstr "客户端 DNS 查询"
 msgid "Client traffic"
 msgstr "客户端流量"
 
-msgid "Configuration flow preview"
-msgstr "配置链路预览"
+msgid "Flow preview"
+msgstr "链路预览"
 
 msgid "Custom core configuration"
 msgstr "自定义核心配置"
@@ -2154,12 +2157,6 @@ msgstr "DNS 路由规则"
 msgid "DNS upstream"
 msgstr "DNS 上游"
 
-msgid "Default proxy"
-msgstr "默认全部代理"
-
-msgid "Default proxy, %s exclusions"
-msgstr "默认全部代理，排除 %s 项"
-
 msgid "Default shunt port"
 msgstr "默认分流端口"
 
@@ -2171,6 +2168,9 @@ msgstr "直连域名分支"
 
 msgid "Disabled or invalid listen port"
 msgstr "已关闭或监听端口无效"
+
+msgid "Excluded: %s devices, %s interfaces"
+msgstr "已排除 %s 台设备、%s 个接口"
 
 msgid "Firewall ACL"
 msgstr "防火墙 ACL"
@@ -2259,6 +2259,9 @@ msgstr "代理域名分支"
 msgid "Proxy node unavailable"
 msgstr "代理节点不可用"
 
+msgid "Proxy mode"
+msgstr "代理模式"
+
 msgid "Proxy node: %s"
 msgstr "代理节点：%s"
 
@@ -2285,12 +2288,6 @@ msgstr "SOCKS 端口 %s"
 
 msgid "Selected: %s devices, %s interfaces"
 msgstr "已选择 %s 台设备、%s 个接口"
-
-msgid "Service disabled; preview shows saved settings"
-msgstr "服务已关闭；预览仍展示已保存配置"
-
-msgid "Service enabled"
-msgstr "服务已启用"
 
 msgid "TCP/UDP port 53"
 msgstr "TCP/UDP 端口 53"

@@ -2839,6 +2839,10 @@ msgid "Address rules are evaluated from top to bottom"
 msgstr ""
 
 #: ts-src/utils/feature/overview/flow-model.ts
+msgid "Bypass mode"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
 msgid "CHN domain list"
 msgstr ""
 
@@ -2858,8 +2862,8 @@ msgstr ""
 msgid "Client traffic"
 msgstr ""
 
-#: ts-src/utils/feature/overview/flow-preview.ts
-msgid "Configuration flow preview"
+#: ts-src/views/overview.ts
+msgid "Flow preview"
 msgstr ""
 
 #: ts-src/utils/feature/overview/flow-model.ts
@@ -2887,14 +2891,6 @@ msgid "DNS upstream"
 msgstr ""
 
 #: ts-src/utils/feature/overview/flow-model.ts
-msgid "Default proxy"
-msgstr ""
-
-#: ts-src/utils/feature/overview/flow-model.ts
-msgid "Default proxy, %s exclusions"
-msgstr ""
-
-#: ts-src/utils/feature/overview/flow-model.ts
 msgid "Default shunt port"
 msgstr ""
 
@@ -2908,6 +2904,10 @@ msgstr ""
 
 #: ts-src/utils/feature/overview/flow-model.ts
 msgid "Disabled or invalid listen port"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
+msgid "Excluded: %s devices, %s interfaces"
 msgstr ""
 
 #: ts-src/utils/feature/overview/flow-model.ts
@@ -3027,6 +3027,10 @@ msgid "Proxy node unavailable"
 msgstr ""
 
 #: ts-src/utils/feature/overview/flow-model.ts
+msgid "Proxy mode"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
 msgid "Proxy node: %s"
 msgstr ""
 
@@ -3060,14 +3064,6 @@ msgstr ""
 
 #: ts-src/utils/feature/overview/flow-model.ts
 msgid "Selected: %s devices, %s interfaces"
-msgstr ""
-
-#: ts-src/utils/feature/overview/flow-preview.ts
-msgid "Service disabled; preview shows saved settings"
-msgstr ""
-
-#: ts-src/utils/feature/overview/flow-preview.ts
-msgid "Service enabled"
 msgstr ""
 
 #: ts-src/utils/feature/overview/flow-model.ts

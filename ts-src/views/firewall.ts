@@ -79,7 +79,7 @@ function createPortOptions(s: LuCI.form.AbstractSection) {
     shuntPort.rmempty = true;
 
     let dnsForward = s.taboption('basic', form.ListValue, 'dns_forward', _('DNS Forwarding'),
-        _('Redirect TCP and UDP DNS queries from clients selected by the firewall ACL to the selected local DNS service'));
+        _('Redirect DNS queries from clients selected by the firewall ACL and, when enabled, router system DNS queries to the selected local DNS service'));
     dnsForward.value(FIREWALL_DNS_FORWARD.NONE, _('Do not forward'));
 
     const preRoutingTarget = FirewallDnsForwardUtils.getPreRoutingTarget();

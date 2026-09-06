@@ -201,6 +201,9 @@ $FW4_TEMPLATE
 if [ -z "$DNS_FORWARD_PORT" ]; then
     fw_rules=$(echo "$fw_rules" | grep -v "DNS_FORWARD_")
     fw_rules=$(echo "$fw_rules" | sed '/^    chain dns-forward {/,/^    }/d')
+    fw_rules=$(echo "$fw_rules" | sed '/^    chain dns-forward-output {/,/^    }/d')
+elif [ "$PROXY_LOCAL" != "1" ]; then
+    fw_rules=$(echo "$fw_rules" | sed '/^    chain dns-forward-output {/,/^    }/d')
 fi
 
 if [ "$PROXY_LOCAL" != "1" ]; then

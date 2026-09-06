@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-hijpass
 PKG_VERSION:=25.12.2
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
 
@@ -80,7 +80,18 @@ endmenu
 endef
 
 define Package/$(PKG_NAME)/conffiles
-/etc/hijpass/
+/etc/hijpass/fw4-template.nft
+/etc/hijpass/hook/dns-hook.sh
+/etc/hijpass/hook/nft-hook.sh
+/etc/hijpass/rules/chn-list.txt
+/etc/hijpass/rules/chn-route.txt
+/etc/hijpass/rules/chn-route6.txt
+/etc/hijpass/rules/domain-direct.txt
+/etc/hijpass/rules/domain-proxy.txt
+/etc/hijpass/rules/gfw-list.txt
+/etc/hijpass/rules/ip-direct.txt
+/etc/hijpass/rules/ip-proxy.txt
+/etc/hijpass/shunt.json
 /etc/config/hijpass
 /etc/config/hijserver
 endef

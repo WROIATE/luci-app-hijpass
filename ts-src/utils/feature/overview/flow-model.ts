@@ -171,11 +171,17 @@ function getDnsUpstreamSteps(value: string, customValue: string, shunt: any): Fl
 }
 
 function buildDnsDiagram(global: any, firewall: any, dns: any, shunt: any): FlowDiagram {
+    const source = FirewallDnsForwardUtils.getSource();
+    const aclDetail = source === FIREWALL_DNS_FORWARD.NONE
+        ? getAclDetail(firewall)
+        : [
+            getAclDetail(firewall),
+            firewall.proxy_local === '1' ? _('Router traffic included') : _('Router traffic excluded'),
+        ].join(' · ');
     const steps: FlowStep[] = [
         { title: _('Client DNS query'), detail: _('TCP/UDP port 53') },
-        { title: _('Firewall ACL'), detail: getAclDetail(firewall) },
+        { title: _('Firewall ACL'), detail: aclDetail },
     ];
-    const source = FirewallDnsForwardUtils.getSource();
 
     if (source === FIREWALL_DNS_FORWARD.NONE) {
         steps.push({ title: _('No DNS redirect'), detail: _('Keep the original destination'), tone: 'muted' });

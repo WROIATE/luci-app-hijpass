@@ -2771,7 +2771,7 @@ msgid "DNS Forwarding"
 msgstr ""
 
 #: ts-src/views/firewall.ts
-msgid "Redirect TCP and UDP DNS queries from clients selected by the firewall ACL to the selected local DNS service"
+msgid "Redirect DNS queries from clients selected by the firewall ACL and, when enabled, router system DNS queries to the selected local DNS service"
 msgstr ""
 
 #: ts-src/views/firewall.ts

@@ -2067,8 +2067,8 @@ msgstr "代理节点“%s”的监听端口 %s 正被以下防火墙设置引用
 msgid "DNS Forwarding"
 msgstr "DNS转发"
 
-msgid "Redirect TCP and UDP DNS queries from clients selected by the firewall ACL to the selected local DNS service"
-msgstr "将防火墙 ACL 选中客户端的 TCP/UDP DNS 查询重定向到所选本地 DNS 服务"
+msgid "Redirect DNS queries from clients selected by the firewall ACL and, when enabled, router system DNS queries to the selected local DNS service"
+msgstr "将防火墙 ACL 选中客户端的 DNS 查询，以及启用代理本机流量时路由器的系统 DNS 查询，重定向到所选本地 DNS 服务"
 
 msgid "Proxy Router Traffic"
 msgstr "代理本机流量"

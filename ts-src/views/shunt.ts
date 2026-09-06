@@ -455,8 +455,8 @@ const v = view.extend({
 
     render: function () {
         ensureInlineRuleQueryStyles();
-        let m = new form.Map(LuciFlied.CONF_NAME, _('Shunt Configuration'),
-            _('Configure Shunt Rules'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('Routing Rules'),
+            _('Configure routing rules and DNS routing'));
         ServiceUtils.createStatusSection(m, 'shunt');
 
         let s = m.section(form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE);
@@ -570,24 +570,6 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     previewConfigButton.inputstyle = 'apply';
     previewConfigButton.onclick = ShuntFormUtils.showPreview
 
-    // ── Core 版本显示 & 更新 ──────────────────────────────────────────
-    let coreUpdateSectionValue = s.taboption('basic', form.SectionValue, '_core_update',
-        form.TypedSection, LuciFlied.SHUNT_SECTION_TYPE, _('Core Version'));
-    let coreUpdateSection = coreUpdateSectionValue.subsection;
-    FormUtils.setAnonymousSection(coreUpdateSection);
-
-    let coreVersionOpt = coreUpdateSection.option(form.DummyValue, '_core_versions');
-    coreVersionOpt.render = function () {
-        return E('div', {'class': 'cbi-value'}, [
-            E('label', {
-                'class': 'cbi-value-title',
-                'style': 'visibility:hidden'
-            }, '.'),
-            E('div', {'class': 'cbi-value-field'}, [
-                ShuntFormUtils.renderCoreVersionWidget()
-            ])
-        ]);
-    };
 }
 
 
@@ -624,6 +606,15 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
         _('Use GeoSite Rule-set'), _('Convert Geo Rules'));
     rulesetConvert.rmempty = false;
     rulesetConvert.depends('type', CORE_TYPE.SING_BOX);
+
+    let routeDiagnostics = routeTypeSection.option(form.Button, '_route_diagnostics', _('Shunt Troubleshooting'),
+        _('Trace router or client traffic and inspect routing failures in Diagnostics.'));
+    routeDiagnostics.inputtitle = _('Open Diagnostics');
+    routeDiagnostics.inputstyle = 'action';
+    routeDiagnostics.onclick = function () {
+        window.location.href = L.url('admin/services/hijpass/log') + '?tab=trace';
+    };
+
     // 批量替换节点按钮
     let replaceNodeBtn = s.taboption('route', form.Button, '_replace_node', _('Bulk Replace Nodes'));
     replaceNodeBtn.depends({config_type: "tmpl"});

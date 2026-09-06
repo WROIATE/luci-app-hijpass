@@ -4,6 +4,7 @@ import {LuciFlied} from "../enum/hijpass";
 import form from "form";
 import uci from "uci";
 import { LogPanelUtils } from "../utils/feature/log/panel";
+import { RulePanelUtils } from "../utils/feature/rule/panel";
 
 const v = view.extend({
     load: function () {
@@ -17,15 +18,21 @@ const v = view.extend({
     handleSave: null,
     render: function () {
 
-        let m = new form.Map(LuciFlied.CONF_NAME, _('View Logs'),
-            _('View and Manage Logs'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('Diagnostics'),
+            _('Inspect logs, trace routing behavior, and query rule resources'));
 
         let s = m.section(form.TypedSection, LuciFlied.GLOBAL_SECTION_TYPE);
         s.anonymous = true;
         s.addremove = false;
 
-        s.tab('logs', _('View Logs'));
-        s.tab('trace', _('Trace Diagnostics'));
+        s.tab('logs', _('Logs'));
+        s.tab('trace', _('Routing Diagnostics'));
+        s.tab('rule', _('Rule Diagnostics'));
+
+        const requestedTab = new URLSearchParams(window.location.search).get('tab');
+        if (requestedTab === 'logs' || requestedTab === 'trace' || requestedTab === 'rule') {
+            s.selected_tab = requestedTab;
+        }
 
         let logsTab = s.taboption('logs', form.DummyValue, '_logs_tab');
         logsTab.render = function () {
@@ -105,6 +112,11 @@ const v = view.extend({
             traceStatusElement = panel.statusElement;
             traceOutputElement = panel.outputElement;
             return panel.node;
+        };
+
+        let ruleDiagnosticsTab = s.taboption('rule', form.DummyValue, '_rule_diagnostics_tab');
+        ruleDiagnosticsTab.render = function () {
+            return RulePanelUtils.createQueryPanel();
         };
 
         return m.render();

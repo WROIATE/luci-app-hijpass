@@ -26,6 +26,8 @@ declare namespace LuCI {
         resolveDefault(value: any, defvalue?: any): Promise<any>;
 
         bind(fn: function, self, ...args?): function
+
+        url(...parts: string[]): string
     }
 
     declare namespace form {
@@ -107,6 +109,7 @@ declare namespace LuCI {
         interface AbstractSection extends LuCI.form.AbstractElement {
             map: LuCI.form.Map
             parentoption: AbstractValue
+            selected_tab?: string
 
             prototype?: AbstractSection;
 

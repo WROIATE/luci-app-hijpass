@@ -1994,3 +1994,63 @@ msgstr "代理节点依赖链存在循环：%s"
 
 msgid "Select proxy nodes to connect through their local SOCKS ports"
 msgstr "选择成员节点，并通过其本地 SOCKS 端口连接"
+
+msgid "Diagnostics"
+msgstr "诊断"
+
+msgid "Inspect logs, trace routing behavior, and query rule resources"
+msgstr "查看日志、追踪路由行为并查询规则资源"
+
+msgid "Logs"
+msgstr "日志"
+
+msgid "Routing Diagnostics"
+msgstr "路由诊断"
+
+msgid "Rule Diagnostics"
+msgstr "规则诊断"
+
+msgid "Resource Management"
+msgstr "资源管理"
+
+msgid "Manage downloadable rule resources and runtime components"
+msgstr "管理可下载的规则资源和运行时组件"
+
+msgid "Rule Resources"
+msgstr "规则资源"
+
+msgid "Runtime"
+msgstr "运行时"
+
+msgid "View installed core versions and update runtime components."
+msgstr "查看已安装的核心版本并更新运行时组件。"
+
+msgid "Routing Rules"
+msgstr "路由规则"
+
+msgid "Configure routing rules and DNS routing"
+msgstr "配置路由规则和 DNS 路由"
+
+msgid "Shunt Troubleshooting"
+msgstr "分流排查"
+
+msgid "Trace router or client traffic and inspect routing failures in Diagnostics."
+msgstr "在诊断中追踪路由器或客户端流量并排查路由故障。"
+
+msgid "Open Diagnostics"
+msgstr "打开诊断"
+
+msgid "Current Version"
+msgstr "当前版本"
+
+msgid "Latest Version"
+msgstr "官方最新版本"
+
+msgid "Unavailable"
+msgstr "获取失败"
+
+msgid "Proxy Nodes"
+msgstr "代理节点"
+
+msgid "Configure Proxy Nodes"
+msgstr "配置代理节点"

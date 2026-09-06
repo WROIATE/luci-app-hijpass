@@ -2666,3 +2666,87 @@ msgstr ""
 #: ts-src/views/proxy.ts
 msgid "Select proxy nodes to connect through their local SOCKS ports"
 msgstr ""
+
+#: root/usr/share/luci/menu.d/luci-app-hijpass.json
+#: ts-src/views/log.ts
+msgid "Diagnostics"
+msgstr ""
+
+#: ts-src/views/log.ts
+msgid "Inspect logs, trace routing behavior, and query rule resources"
+msgstr ""
+
+#: ts-src/views/log.ts
+msgid "Logs"
+msgstr ""
+
+#: ts-src/views/log.ts
+msgid "Routing Diagnostics"
+msgstr ""
+
+#: ts-src/views/log.ts
+msgid "Rule Diagnostics"
+msgstr ""
+
+#: root/usr/share/luci/menu.d/luci-app-hijpass.json
+#: ts-src/views/rule.ts
+msgid "Resource Management"
+msgstr ""
+
+#: ts-src/views/rule.ts
+msgid "Manage downloadable rule resources and runtime components"
+msgstr ""
+
+#: ts-src/views/rule.ts
+msgid "Rule Resources"
+msgstr ""
+
+#: ts-src/views/rule.ts
+msgid "Runtime"
+msgstr ""
+
+#: ts-src/utils/feature/rule/runtime.ts
+msgid "View installed core versions and update runtime components."
+msgstr ""
+
+#: root/usr/share/luci/menu.d/luci-app-hijpass.json
+#: ts-src/views/shunt.ts
+msgid "Routing Rules"
+msgstr ""
+
+#: ts-src/views/shunt.ts
+msgid "Configure routing rules and DNS routing"
+msgstr ""
+
+#: ts-src/views/shunt.ts
+msgid "Shunt Troubleshooting"
+msgstr ""
+
+#: ts-src/views/shunt.ts
+msgid "Trace router or client traffic and inspect routing failures in Diagnostics."
+msgstr ""
+
+#: ts-src/views/shunt.ts
+msgid "Open Diagnostics"
+msgstr ""
+
+#: ts-src/utils/feature/rule/runtime.ts
+msgid "Current Version"
+msgstr ""
+
+#: ts-src/utils/feature/rule/runtime.ts
+msgid "Latest Version"
+msgstr ""
+
+#: ts-src/utils/feature/rule/runtime.ts
+msgid "Unavailable"
+msgstr ""
+
+#: root/usr/share/luci/menu.d/luci-app-hijpass.json
+#: ts-src/views/proxy.ts
+msgid "Proxy Nodes"
+msgstr ""
+
+#: ts-src/views/proxy.ts
+msgid "Configure Proxy Nodes"
+msgstr ""

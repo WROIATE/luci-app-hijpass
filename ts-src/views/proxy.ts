@@ -24,8 +24,8 @@ const v = view.extend({
         return view.prototype.handleSave.call(this, ev);
     },
     render: async function (data: any[]) {
-        let m = new form.Map(LuciFlied.CONF_NAME, _('Proxy Settings'),
-            _('Configure Proxy Settings'));
+        let m = new form.Map(LuciFlied.CONF_NAME, _('Proxy Nodes'),
+            _('Configure Proxy Nodes'));
         ProxyFormUtils.createShareLinkImportSection(m);
 
         let s = m.section(form.GridSection, LuciFlied.PROXY_NODE_TYPE)

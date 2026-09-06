@@ -140,6 +140,12 @@
         "/usr/lib/hijpass/core-update.sh version xray": [
           "exec"
         ],
+        "/usr/lib/hijpass/core-update.sh latest sing-box": [
+          "exec"
+        ],
+        "/usr/lib/hijpass/core-update.sh latest xray": [
+          "exec"
+        ],
         "/usr/lib/hijpass/core-update.sh update sing-box": [
           "exec"
         ],

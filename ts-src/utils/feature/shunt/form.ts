@@ -8,37 +8,6 @@ import { FormUtils } from "../../base/luci/form";
 import { NotificationUtils } from "../../base/luci/notification";
 import { ShuntConfigUtils } from "./config-file";
 
-function setCoreVersion(versionEl: HTMLElement, core: string) {
-    fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['version', core], 'json')
-        .then((res: any) => {
-            versionEl.textContent = (res && res.version) ? res.version : _('Unknown');
-        })
-        .catch(() => {
-            versionEl.textContent = _('Unknown');
-        });
-}
-
-function updateCore(core: string, title: string, versionEl: HTMLElement, btn: HTMLButtonElement) {
-    btn.disabled = true;
-    btn.textContent = _('Updating...');
-    fs.exec_direct('/usr/lib/hijpass/core-update.sh', ['update', core], 'json')
-        .then((res: any) => {
-            if (res && res.success) {
-                versionEl.textContent = res.version || _('Updated');
-                NotificationUtils.success(title, _('Updated to %s').format(res.version), 4000);
-            } else {
-                NotificationUtils.error(title, _('Update failed: %s').format((res && res.error) || 'unknown'), 5000);
-            }
-        })
-        .catch((e: any) => {
-            NotificationUtils.error(title, e.message || _('Update failed'), 5000);
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.textContent = _('Update');
-        });
-}
-
 function makeSelect(id: string, options: { value: string, label: string }[]) {
     const sel = E('select', {id, class: 'cbi-input-select', style: 'width:100%'}) as HTMLSelectElement;
     options.forEach(({value, label}) => {
@@ -62,48 +31,6 @@ function canUseAsDnsExit(node: string) {
 }
 
 const ShuntFormUtils = {
-    renderCoreVersionWidget: function () {
-        const rows = [
-            {core: CORE_TYPE.SING_BOX, label: 'sing-box', title: 'sing-box'},
-            {core: CORE_TYPE.XRAY, label: 'Xray', title: 'Xray'}
-        ];
-        const children: HTMLElement[] = [];
-
-        rows.forEach((row) => {
-            const versionEl = E('span', {
-                style: 'display:inline-block;width:5.5em;color:#666;white-space:nowrap'
-            }, _('Loading...')) as HTMLElement;
-            const updateBtn = E('button', {
-                class: 'btn cbi-button',
-                style: 'width:72px;background-color:#1a6a8a;border-color:#1a6a8a',
-                click: function (ev: MouseEvent) {
-                    updateCore(row.core, row.title, versionEl, ev.currentTarget as HTMLButtonElement);
-                }
-            }, _('Update')) as HTMLElement;
-
-            setCoreVersion(versionEl, row.core);
-            children.push(
-                E('span', {
-                    style: 'justify-self:end;white-space:nowrap;font-weight:600'
-                }, row.label) as HTMLElement,
-                versionEl,
-                updateBtn
-            );
-        });
-
-        return E('span', {
-            style: [
-                'display:grid',
-                'grid-template-columns:5em 5.5em 72px',
-                'align-items:center',
-                'column-gap:12px',
-                'row-gap:12px',
-                'width:max-content',
-                'max-width:100%'
-            ].join(';')
-        }, children);
-    },
-
     configureConfigEditor: function (o: LuCI.form.TextValue) {
         o.rows = 30;
         o.monospace = true;

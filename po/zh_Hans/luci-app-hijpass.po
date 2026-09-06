@@ -468,6 +468,12 @@ msgstr "编辑域名代理列表配置，配合chinadns-ng使用"
 msgid "Edit Firewall Rules"
 msgstr "编辑防火墙 nftables 规则"
 
+msgid "Edit the nftables rule template. Intended for users familiar with nftables and HiJpass rule generation. Arbitrary changes may break compatibility with LuCI configuration features and affect network connectivity."
+msgstr "编辑 nftables 规则模板。仅适合熟悉 nftables 及 HiJpass 规则生成机制的用户使用；随意修改可能导致与 LuCI 配置功能不兼容，并影响网络连接。"
+
+msgid "Executed after HiJpass attempts to load its generated nftables rules during firewall start or reload. Runs only when the generated rules file and this script exist; it may also run if loading the rules fails."
+msgstr "防火墙启动或重载时，在 HiJpass 尝试加载生成的 nftables 规则之后调用。仅当生成的规则文件和此脚本均存在时执行；规则加载失败时也可能执行此脚本。"
+
 msgid "Edit IP Direct List"
 msgstr "编辑 IP CIDR 直连列表配置（支持 IPv4 和 IPv6）"
 

@@ -117,13 +117,15 @@ function createTextOptions(s: LuCI.form.AbstractSection) {
         _('Edit IP Proxy List'), FilePathUtils.getFilePath('ip_proxy'));
 
     // 防火墙规则
-    FormUtils.createTextOption(s, 'nftables', 'nft_hash', null, _('Edit Firewall Rules'), FilePathUtils.getFilePath('nft'));
+    FormUtils.createTextOption(s, 'nftables', 'nft_hash', null,
+        _('Edit the nftables rule template. Intended for users familiar with nftables and HiJpass rule generation. Arbitrary changes may break compatibility with LuCI configuration features and affect network connectivity.'),
+        FilePathUtils.getFilePath('nft'));
 
     FirewallFormUtils.createNftViewOption(s);
 
     // 用户自定义启动脚本
     FormUtils.createTextOption(s, 'hook', 'nft_hook_hash', null,
-        _('Custom Hook Script'),
+        _('Executed after HiJpass attempts to load its generated nftables rules during firewall start or reload. Runs only when the generated rules file and this script exist; it may also run if loading the rules fails.'),
         FilePathUtils.getFilePath('nft_hook'));
 }
 

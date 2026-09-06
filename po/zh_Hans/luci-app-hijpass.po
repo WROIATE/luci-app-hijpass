@@ -414,6 +414,9 @@ msgstr "域名代理列表"
 msgid "Domain: Enter a domain (for example, www.example.com) to query GeoSite tags and local domain rule files."
 msgstr "域名：输入域名（例如 www.example.com），查询其所属的 GeoSite 标签和本地域名规则文件。"
 
+msgid "Domain → GeoSite tags"
+msgstr "域名 → GeoSite 标签"
+
 msgid "Domain Query"
 msgstr "域名查询"
 
@@ -600,6 +603,9 @@ msgstr "从节点"
 msgid "Generated %s JSON Configuration"
 msgstr "已生成 %s JSON 配置"
 
+msgid "Geo Database Query"
+msgstr "Geo 数据库查询"
+
 msgid "GeoIP Database Download URL"
 msgstr "Geo IP 下载地址"
 
@@ -728,6 +734,9 @@ msgstr "IP规则列表"
 
 msgid "IP address: Enter an IP address (for example, 8.8.8.8) to query GeoIP tags and local IP rule files."
 msgstr "IP 地址：输入 IP 地址（例如 8.8.8.8），查询其命中的 GeoIP 标签和本地 IP 规则文件。"
+
+msgid "IP address → GeoIP tags"
+msgstr "IP 地址 → GeoIP 标签"
 
 msgid "IP: e.g. '127.0.0.1'.<br>CIDR: e.g. '10.0.0.0/8'.<br>geoip: e.g. 'geoip:cn'.<br>rule-set: e.g. 'rule-set:local:/path/rulefile' or 'rule-set:remote:https://file'.<br>Comment: starts with #"
 msgstr "IP: 形如'127.0.0.1'。<br>CIDR: 形如'10.0.0.0/8'.<br>geoip: 形如'geoip:cn'。<br>rule-set: 形如'rule-set:local:/path/rulefile'或'rule-set:remote:https://file'。<br>注释: 由 # 开头"
@@ -1418,6 +1427,12 @@ msgstr "成功"
 
 msgid "Tag"
 msgstr "标签"
+
+msgid "geosite:tag → domains in tag"
+msgstr "geosite:标签 → 标签内域名"
+
+msgid "geoip:tag → networks in tag"
+msgstr "geoip:标签 → 标签内网段"
 
 msgid "Template Configuration"
 msgstr "模板配置"

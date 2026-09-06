@@ -7,10 +7,394 @@ import {ShuntFormUtils} from "../utils/feature/shunt/form";
 import {ShuntUtils} from "../utils/feature/shunt/section";
 import {CORE_TYPE, HijpassValues, LuciFlied} from "../enum/hijpass";
 import form from "form";
+import fs from "fs";
 import view from 'view';
 import uci from 'uci';
 
 const XRAY_ROUTE_PROTOCOLS = ['http', 'tls', 'quic', 'bittorrent'];
+type GeoRuleQueryType = 'geosite' | 'geoip';
+
+function ensureInlineRuleQueryStyles() {
+    if (document.getElementById('hijpass-inline-rule-query-styles')) {
+        return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'hijpass-inline-rule-query-styles';
+    style.textContent = `
+        .hijpass-rule-editor-query-layout {
+            display: grid;
+            grid-template-columns: auto minmax(14rem, 18rem);
+            gap: 1rem;
+            align-items: start;
+            width: fit-content;
+            max-width: 100%;
+        }
+
+        .cbi-value[data-name="domain_list"],
+        .cbi-value[data-name="ip_list"] {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .cbi-value[data-name="domain_list"] > .cbi-value-field,
+        .cbi-value[data-name="ip_list"] > .cbi-value-field {
+            display: block;
+            flex: 1 1 0;
+            min-width: 0;
+        }
+
+        .hijpass-rule-editor-query-layout > .hijpass-rule-editor,
+        .hijpass-rule-editor-query-layout > .hijpass-inline-rule-query {
+            min-width: 0;
+        }
+
+        .hijpass-rule-editor-query-layout > .hijpass-rule-editor {
+            width: 370px;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        .hijpass-rule-editor-query-layout .hijpass-rule-editor textarea.cbi-input-textarea {
+            box-sizing: border-box;
+            display: block;
+            width: 100%;
+            min-width: 0;
+            max-width: none;
+            max-height: 50vh;
+            resize: both;
+        }
+
+        .hijpass-inline-rule-query {
+            display: flex;
+            flex-direction: column;
+            gap: .375rem;
+            box-sizing: border-box;
+            width: 100%;
+            padding: .5rem;
+            border: 1px solid rgba(127, 127, 127, .35);
+            border-radius: 4px;
+            background: rgba(127, 127, 127, .05);
+        }
+
+        .hijpass-inline-rule-query > .cbi-section-descr {
+            margin: 0;
+        }
+
+        .hijpass-inline-rule-query-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: .5rem;
+            min-width: 0;
+        }
+
+        .hijpass-inline-rule-query-controls {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: .5rem;
+            align-self: stretch;
+            min-width: 0;
+        }
+
+        .hijpass-rule-editor-query-layout .hijpass-inline-rule-query-controls > input.cbi-input-text {
+            box-sizing: border-box;
+            min-width: 0;
+            width: auto;
+            max-width: none;
+        }
+
+        .hijpass-inline-rule-query-controls > .cbi-button {
+            margin: 0;
+            white-space: nowrap;
+        }
+
+        .hijpass-inline-rule-query-status {
+            flex: 0 0 auto;
+            min-height: 0;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .hijpass-inline-rule-query-status[data-state="success"] {
+            color: var(--success-color, #2e7d32);
+        }
+
+        .hijpass-inline-rule-query-status[data-state="error"] {
+            color: var(--danger-color, #c62828);
+        }
+
+        .hijpass-rule-editor-query-layout textarea.hijpass-inline-rule-query-result {
+            box-sizing: border-box;
+            align-self: stretch;
+            width: auto;
+            min-width: 0;
+            max-width: none;
+            height: 5rem;
+            min-height: 4rem;
+            max-height: 50vh;
+            resize: vertical;
+        }
+
+        @media (max-width: 900px) {
+            .cbi-value[data-name="domain_list"],
+            .cbi-value[data-name="ip_list"] {
+                display: block;
+            }
+
+            .cbi-value[data-name="domain_list"] > .cbi-value-title,
+            .cbi-value[data-name="ip_list"] > .cbi-value-title,
+            .cbi-value[data-name="domain_list"] > .cbi-value-field,
+            .cbi-value[data-name="ip_list"] > .cbi-value-field {
+                box-sizing: border-box;
+                display: block;
+                float: none;
+                width: 100%;
+                margin-left: 0;
+                text-align: left;
+            }
+
+            .hijpass-rule-editor-query-layout {
+                grid-template-columns: minmax(0, 1fr);
+                width: 100%;
+            }
+
+            .hijpass-rule-editor-query-layout > .hijpass-rule-editor,
+            .hijpass-rule-editor-query-layout .hijpass-rule-editor textarea.cbi-input-textarea {
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function createGeoRuleQuery(
+    queryType: GeoRuleQueryType,
+    editorId: string
+): HTMLElement {
+    const titleId = editorId + '-query-title';
+    const inputId = editorId + '-query-keyword';
+    const tagPrefix = queryType + ':';
+    const statusElement = E('div', {
+        'class': 'hijpass-inline-rule-query-status',
+        'role': 'status',
+        'aria-live': 'polite'
+    }) as HTMLElement;
+    const resultElement = E('textarea', {
+        'class': 'cbi-input-textarea hijpass-inline-rule-query-result',
+        'readonly': 'readonly',
+        'placeholder': _('Query results will appear here'),
+        'aria-label': _('Query Results')
+    }) as HTMLTextAreaElement;
+    const keywordInput = E('input', {
+        'id': inputId,
+        'class': 'cbi-input-text',
+        'type': 'text',
+        'placeholder': queryType === 'geosite' ? 'www.example.com / geosite:cn' : '1.1.1.1 / geoip:cn',
+        'aria-label': _('Query Keyword')
+    }) as HTMLInputElement;
+    const queryButton = E('button', {
+        'class': 'cbi-button cbi-button-action',
+        'type': 'button'
+    }, _('Query')) as HTMLButtonElement;
+    const panel = E('div', {
+        'class': 'hijpass-inline-rule-query',
+        'role': 'group',
+        'aria-labelledby': titleId
+    }, [
+        E('div', {'class': 'hijpass-inline-rule-query-header'}, [
+            E('strong', {'id': titleId}, _('Geo Database Query')),
+            statusElement
+        ]),
+        E('div', {'class': 'cbi-section-descr'}, queryType === 'geosite' ? [
+            E('div', {}, _('Domain → GeoSite tags')),
+            E('div', {}, _('geosite:tag → domains in tag'))
+        ] : [
+            E('div', {}, _('IP address → GeoIP tags')),
+            E('div', {}, _('geoip:tag → networks in tag'))
+        ]),
+        E('div', {'class': 'hijpass-inline-rule-query-controls'}, [keywordInput, queryButton]),
+        resultElement
+    ]) as HTMLElement;
+
+    const setStatus = function (message: string, state?: 'success' | 'error') {
+        statusElement.textContent = message;
+        if (state) {
+            statusElement.dataset.state = state;
+        } else {
+            delete statusElement.dataset.state;
+        }
+    };
+
+    const runQuery = async function () {
+        if (queryButton.disabled) {
+            return;
+        }
+
+        const keyword = keywordInput.value.trim();
+        if (!keyword) {
+            setStatus(_('Enter Query Keyword'), 'error');
+            keywordInput.focus();
+            return;
+        }
+
+        resultElement.value = '';
+
+        queryButton.disabled = true;
+        panel.setAttribute('aria-busy', 'true');
+        setStatus(_('Querying'));
+        try {
+            const isTagQuery = keyword.toLowerCase().startsWith(tagPrefix);
+            const queryValue = isTagQuery ? keyword.slice(tagPrefix.length).trim() : keyword;
+            if (!queryValue) {
+                setStatus(_('Enter Query Keyword'), 'error');
+                keywordInput.focus();
+                return;
+            }
+
+            const result = await fs.exec('/usr/lib/hijpass/geoview.sh',
+                [isTagQuery ? '-e' : '-l', queryType, queryValue]);
+            if (result.code !== 0) {
+                throw new Error(result.stderr || _('Query Failed'));
+            }
+
+            let output = (result.stdout || '').trim();
+            if (output) {
+                if (!isTagQuery) {
+                    output = output.split(/\r?\n/)
+                        .filter(Boolean)
+                        .map(tag => tagPrefix + tag)
+                        .join('\n');
+                }
+                resultElement.value = output;
+                setStatus(_('Query Complete'), 'success');
+            } else {
+                setStatus(_('No Matching Results'));
+            }
+        } catch (error) {
+            console.log(error);
+            setStatus(_('Query Failed'), 'error');
+        } finally {
+            queryButton.disabled = false;
+            panel.removeAttribute('aria-busy');
+        }
+    };
+
+    queryButton.addEventListener('click', function (event) {
+        event.preventDefault();
+        runQuery();
+    });
+    keywordInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            runQuery();
+        }
+    });
+
+    return panel;
+}
+
+function syncRuleEditorWidth(
+    layout: HTMLElement,
+    editor: HTMLElement,
+    queryPanel: HTMLElement,
+    textarea: HTMLTextAreaElement
+) {
+    if (typeof ResizeObserver === 'undefined') {
+        return;
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 900px)');
+    const initialTextareaWidth = textarea.style.width;
+    let narrowLayout: boolean | null = null;
+    let preferredWidth = 370;
+    let appliedWidth = 0;
+    let wasConnected = false;
+    let observedField: HTMLElement | null = null;
+
+    const updateWidth = function () {
+        if (layout.isConnected) {
+            wasConnected = true;
+        } else if (wasConnected) {
+            observer.disconnect();
+            return;
+        }
+
+        if (mediaQuery.matches) {
+            if (narrowLayout !== true) {
+                editor.style.removeProperty('width');
+                textarea.style.width = initialTextareaWidth;
+            }
+            narrowLayout = true;
+            appliedWidth = 0;
+            return;
+        }
+
+        if (narrowLayout === true) {
+            editor.style.removeProperty('width');
+            textarea.style.width = initialTextareaWidth;
+            preferredWidth = 370;
+        }
+        narrowLayout = false;
+
+        const field = layout.parentElement;
+        if (!field || field.clientWidth === 0) {
+            return;
+        }
+        if (field !== observedField) {
+            observer.observe(field);
+            observedField = field;
+        }
+
+        const currentWidth = textarea.offsetWidth;
+        if (currentWidth > 0 && Math.abs(currentWidth - appliedWidth) > 1) {
+            preferredWidth = currentWidth;
+        }
+
+        const gap = parseFloat(window.getComputedStyle(layout).columnGap) || 0;
+        const availableWidth = field.clientWidth - queryPanel.offsetWidth - gap;
+        if (availableWidth <= 0) {
+            return;
+        }
+
+        const nextWidth = Math.min(preferredWidth, availableWidth);
+        const width = nextWidth + 'px';
+        appliedWidth = nextWidth;
+        if (textarea.style.width !== width) {
+            textarea.style.width = width;
+        }
+        if (editor.style.width !== width) {
+            editor.style.width = width;
+        }
+    };
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(textarea);
+    observer.observe(queryPanel);
+    window.requestAnimationFrame(function () {
+        updateWidth();
+    });
+}
+
+function configureGeoRuleQuery(option: any, queryType: GeoRuleQueryType) {
+    option.renderWidget = function (sectionId: string, optionIndex: number, cfgvalue: string): Node {
+        const widget = form.TextValue.prototype.renderWidget.call(
+            this, sectionId, optionIndex, cfgvalue) as HTMLElement;
+        const editor = E('div', {'class': 'hijpass-rule-editor'}, [widget]) as HTMLElement;
+        const queryPanel = createGeoRuleQuery(queryType, this.cbid(sectionId));
+        const layout = E('div', {'class': 'hijpass-rule-editor-query-layout'}, [
+            editor,
+            queryPanel
+        ]) as HTMLElement;
+        const textarea = widget.querySelector('textarea.cbi-input-textarea') as HTMLTextAreaElement;
+        if (textarea) {
+            syncRuleEditorWidth(layout, editor, queryPanel, textarea);
+        }
+        return layout;
+    };
+}
 
 function getCurrentShuntValue(section: LuCI.form.AbstractSection, option: string) {
     const shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
@@ -70,6 +454,7 @@ const v = view.extend({
     handleSaveApply: SaveApplyUtils.genHandleSaveApply(),
 
     render: function () {
+        ensureInlineRuleQueryStyles();
         let m = new form.Map(LuciFlied.CONF_NAME, _('Shunt Configuration'),
             _('Configure Shunt Rules'));
         ServiceUtils.createStatusSection(m, 'shunt');
@@ -463,6 +848,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     domainList.rows = 4;
     domainList.monospace = true;
     domainList.modalonly = true
+    configureGeoRuleQuery(domainList, 'geosite');
 
     let domainListView = routeGridSection.option(form.TextValue, '_domain_list_view', _('Domain Rule Count'))
     domainListView.textvalue = function (sectionId) {
@@ -482,6 +868,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     ipList.rows = 4;
     ipList.monospace = true;
     ipList.modalonly = true
+    configureGeoRuleQuery(ipList, 'geoip');
 
     let ipListView = routeGridSection.option(form.TextValue, '_ip_list_view', _('IP Rule Count'))
     ipListView.textvalue = function (sectionId) {

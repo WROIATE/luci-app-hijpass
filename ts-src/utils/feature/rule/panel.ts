@@ -1,19 +1,24 @@
 import fs from "fs";
 
 type RuleUpdateStatus = 'success' | 'error' | 'neutral';
+type RuleUpdateResult = { success?: boolean };
 
-function updateRuleFile(statusElement: HTMLElement) {
+function updateRuleFile(statusElement: HTMLElement, updateButton: HTMLButtonElement) {
+    updateButton.disabled = true;
     updateUpdateStatus(statusElement, _('Updating Rule Files'), 'neutral');
-    fs.exec('/usr/lib/hijpass/rules.sh', ['update'])
-        .then(function (result) {
-            if (result.code === 0) {
+    fs.exec_direct('/usr/lib/hijpass/rules.sh', ['update'], 'json')
+        .then(function (result: RuleUpdateResult) {
+            if (result?.success) {
                 updateUpdateStatus(statusElement, _('Rule Files Updated'), 'success');
             } else {
-                updateUpdateStatus(statusElement, _('Rule File Update Failed: %s').format(result.stderr || result.stdout), 'error');
+                updateUpdateStatus(statusElement, _('Rule File Update Failed: %s').format(_('Update failed')), 'error');
             }
         })
         .catch(function (error) {
             updateUpdateStatus(statusElement, _('Error occurred while updating: %s').format(error.message), 'error');
+        })
+        .finally(function () {
+            updateButton.disabled = false;
         });
 }
 
@@ -138,21 +143,22 @@ const RulePanelUtils = {
         const statusElement = E('span', {
             'style': 'margin-left: 10px; font-size: 12px; color: #666;'
         }) as HTMLElement;
+        const updateButton = E('button', {
+            'class': 'cbi-button cbi-button-neutral',
+            'style': 'margin-right: 10px;',
+            'type': 'button',
+            'click': function (ev: Event) {
+                ev.preventDefault();
+                updateRuleFile(statusElement, updateButton);
+            }
+        }, _('Update Rule Files')) as HTMLButtonElement;
 
         return E('div', {'class': 'cbi-section'}, [
             E('div', {'class': 'cbi-section-node'}, [
                 E('div', {'class': 'cbi-value'}, [
                     E('label', {'class': 'cbi-value-title'}, _('Rule Update')),
                     E('div', {'class': 'cbi-value-field'}, [
-                        E('button', {
-                            'class': 'cbi-button cbi-button-neutral',
-                            'style': 'margin-right: 10px;',
-                            'type': 'button',
-                            'click': function (ev: Event) {
-                                ev.preventDefault();
-                                updateRuleFile(statusElement);
-                            }
-                        }, _('Update Rule Files')),
+                        updateButton,
                         statusElement
                     ])
                 ])

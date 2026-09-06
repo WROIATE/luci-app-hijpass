@@ -2,6 +2,9 @@
   "luci-app-hijpass": {
     "description": "Grant access to hijpass configurations",
     "read": {
+      "cgi-io": [
+        "exec"
+      ],
       "uci": [
         "hijpass",
         "hijserver"

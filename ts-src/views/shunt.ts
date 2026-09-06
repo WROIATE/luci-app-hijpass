@@ -411,7 +411,7 @@ function hasSplitDnsTarget(section: any, sectionId: string) {
         protocol: [],
         port: [],
         portRange: []
-    } as any);
+    });
     const shuntType = getCurrentShuntValue(section, 'type');
     const rulesetConvert = getCurrentShuntValue(section, 'ruleset_convert');
 
@@ -560,6 +560,8 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     HijpassValues.SHUNT_LOG_LEVELS.forEach(function (level) {
         logLevel.value(level);
     })
+    logLevel.default = 'warn';
+    logLevel.rmempty = false;
     logLevel.depends('log_enabled', '1');
 
     // 预览配置按钮
@@ -616,7 +618,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
     };
 
     // 批量替换节点按钮
-    let replaceNodeBtn = s.taboption('route', form.Button, '_replace_node', _('Bulk Replace Nodes'));
+    let replaceNodeBtn = routeTypeSection.option(form.Button, '_replace_node', _('Bulk Replace Nodes'));
     replaceNodeBtn.depends({config_type: "tmpl"});
     replaceNodeBtn.inputtitle = _('Bulk Replace Nodes');
     replaceNodeBtn.inputstyle = 'apply';

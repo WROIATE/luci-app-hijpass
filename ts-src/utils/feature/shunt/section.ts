@@ -11,6 +11,9 @@ import {
 import uci from "uci";
 import { UciUtils } from "../../base/luci/uci";
 
+type RuleListSource = Pick<ShuntRouteRule, 'domainList' | 'ipList'>
+    & Partial<Pick<ShuntRouteRule, 'network' | 'protocol' | 'port' | 'portRange'>>;
+
 function parseRuleSetPath(line: string, type: string) {
     let pathOrUrl = line.substring(type === 'remote' ? 16 : 15);
     let filename = pathOrUrl.split('/').pop();
@@ -84,7 +87,7 @@ const ShuntUtils = {
      * 解析规则列表，根据前缀分类
      * @returns {RuleDTO} 包含不同类型规则的对象
      */
-    parseRuleList: function (rule: ShuntRouteRule): RuleDTO {
+    parseRuleList: function (rule: RuleListSource): RuleDTO {
         // 初始化结果对象
         let result = new RuleDTO();
         let domainRules = rule.domainList

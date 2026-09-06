@@ -48,7 +48,7 @@ const ProxyUtils = {
         // 从 UCI 配置复制所有字段
         Object.keys(section).forEach((key) => {
             if (key !== '.type' && key !== '.name' && key !== '.anonymous') {
-                (config as any)[key] = section[key];
+                Reflect.set(config, key, section[key]);
             }
         });
         config.cfgid = section['.name'];

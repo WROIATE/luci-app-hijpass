@@ -43,9 +43,6 @@ const v = view.extend({
             let sectionId = UciUtils.generateUniqueSectionId(LuciFlied.SERVER_CONF_NAME);
             return L.bind(form.GridSection.prototype.handleAdd, this, ev, sectionId)();
         };
-        s.handleRemove = function (ev: Event, name?: string) {
-            return form.GridSection.prototype.handleRemove.call(this, ev, name);
-        };
         const instances = data[2] ?? {};
         createProxyOptions(s, instances);
 

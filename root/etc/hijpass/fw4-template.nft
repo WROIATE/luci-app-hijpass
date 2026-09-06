@@ -1,4 +1,5 @@
 table inet hijpass {
+    # 防火墙配置不建议轻度用户修改，否则容易引发网络故障
     chain pre-filter {
         type filter hook prerouting priority filter - 50; policy accept;
 
@@ -27,7 +28,7 @@ table inet hijpass {
         # 未标记连接，返回原链
         ct mark != { $TPROXY_MARK, $TPROXY_SHUNT_MARK } counter return
 
-        # 过滤代理端口
+        # 仅代理常用端口
         counter jump proxy-port-filter
 
         # 代理标记，通过代理节点进行透明代理
@@ -114,6 +115,10 @@ table inet hijpass {
         # 仅转发路由器发往本机 53 端口的系统 DNS 查询
         fib daddr type local meta l4proto { tcp, udp } th dport 53 counter redirect to :$DNS_FORWARD_PORT
     }
+
+    ######################
+    # 以下配置请勿随意修改 #
+    ######################
 
     # chnroute
     set chnroute4list {

@@ -27,7 +27,6 @@ export type FlowDiagram = {
 }
 
 export type ConfigurationFlowPreview = {
-    serviceEnabled: boolean;
     diagrams: FlowDiagram[];
 }
 
@@ -55,13 +54,19 @@ function formatExit(value: string): string {
     return value || _('Not configured');
 }
 
+function getAclMode(firewall: any): string {
+    return firewall.acl_default_allow === '1' ? _('Bypass mode') : _('Proxy mode');
+}
+
+function getAclTitle(firewall: any): string {
+    return _('Firewall ACL') + ' · ' + getAclMode(firewall);
+}
+
 function getAclDetail(firewall: any): string {
     if (firewall.acl_default_allow === '1') {
-        const exclusions = normalizeList(firewall.proxy_mac_exclude_list).length
-            + normalizeList(firewall.proxy_iface_exclude_list).length;
-        return exclusions > 0
-            ? _('Default proxy, %s exclusions').format(String(exclusions))
-            : _('Default proxy');
+        const devices = normalizeList(firewall.proxy_mac_exclude_list).length;
+        const interfaces = normalizeList(firewall.proxy_iface_exclude_list).length;
+        return _('Excluded: %s devices, %s interfaces').format(String(devices), String(interfaces));
     }
 
     const devices = normalizeList(firewall.proxy_mac_list).length;
@@ -177,10 +182,10 @@ function buildDnsDiagram(global: any, firewall: any, dns: any, shunt: any): Flow
         : [
             getAclDetail(firewall),
             firewall.proxy_local === '1' ? _('Router traffic included') : _('Router traffic excluded'),
-        ].join(' · ');
+        ].join('\n');
     const steps: FlowStep[] = [
         { title: _('Client DNS query'), detail: _('TCP/UDP port 53') },
-        { title: _('Firewall ACL'), detail: aclDetail },
+        { title: getAclTitle(firewall), detail: aclDetail },
     ];
 
     if (source === FIREWALL_DNS_FORWARD.NONE) {
@@ -247,11 +252,11 @@ function buildTrafficDiagram(global: any, firewall: any, dns: any, shunt: any): 
         detail: protocols.join(' + ') || _('No protocol selected'),
     };
     const aclStep: FlowStep = {
-        title: _('Firewall ACL'),
+        title: getAclTitle(firewall),
         detail: [
             getAclDetail(firewall),
             firewall.proxy_local === '1' ? _('Router traffic included') : _('Router traffic excluded'),
-        ].join(' · '),
+        ].join('\n'),
     };
     const hasProxyPort = isPort(firewall.proxy_port);
     const hasShuntPort = isPort(firewall.shunt_port);
@@ -298,7 +303,6 @@ function buildConfigurationFlowPreview(): ConfigurationFlowPreview {
     const dns = getFirstSection(LuciFlied.DNS_SECTION_TYPE);
     const shunt = getFirstSection(LuciFlied.SHUNT_SECTION_TYPE);
     return {
-        serviceEnabled: global.enabled === '1',
         diagrams: [buildDnsDiagram(global, firewall, dns, shunt), buildTrafficDiagram(global, firewall, dns, shunt)],
     };
 }

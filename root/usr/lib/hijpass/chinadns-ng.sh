@@ -22,13 +22,16 @@ touch "$DOMAIN_DIRECT_TEMP_FILE_PATH"
 if [ "$DIRECT_DNS" = "custom" ]; then
     DIRECT_DNS="$(uci -q get hijpass.@dns[0].direct_dns_custom)"
 fi
-if [ "$DIRECT_DNS" = "system" ]; then
-    DIRECT_DNS=""
-    dnsmasq_port=$(uci -q get dhcp.@dnsmasq[0].port || :)
-    [ -n "$dnsmasq_port" ] && DIRECT_DNS="127.0.0.1#$dnsmasq_port"
+if [ "$DIRECT_DNS" = "dnsmasq" ] || [ "$DIRECT_DNS" = "system" ]; then
+    dnsmasq_port=$(uci -q get dhcp.@dnsmasq[0].port || echo "53")
+    DIRECT_DNS="127.0.0.1#${dnsmasq_port:-53}"
 fi
 if [ "$PROXY_DNS" = "custom" ]; then
     PROXY_DNS="$(uci -q get hijpass.@dns[0].proxy_dns_custom)"
+fi
+if [ "$PROXY_DNS" = "dnsmasq" ] || [ "$PROXY_DNS" = "system" ]; then
+    dnsmasq_port=$(uci -q get dhcp.@dnsmasq[0].port || echo "53")
+    PROXY_DNS="127.0.0.1#${dnsmasq_port:-53}"
 fi
 proxy_domain_list="$([ -f "$DOMAIN_PROXY_FILE_PATH" ] && cat "$DOMAIN_PROXY_FILE_PATH" || :)"
 geosite_proxy_lines=$(echo "$proxy_domain_list" | grep '^geosite:' | sed 's/^geosite://' | tr '\n' ',')
@@ -81,8 +84,8 @@ add-tagchn-ip inet@hijpass@chn4list,inet@hijpass@chn6list
 add-taggfw-ip inet@hijpass@gfw4list,inet@hijpass@gfw6list
 
 # 测试 tag:none 域名的 IP (针对国内上游)
-$([ "$ENABLE_CHN" = "1" ] && [ "$ENABLE_GFW" = "1" ] && echo "ipset-name4 inet@hijpass@chnroute4list
-ipset-name6 inet@hijpass@chnroute6list")
+ipset-name4 inet@hijpass@chnroute4list
+ipset-name6 inet@hijpass@chnroute6list
 
 # dns 缓存
 # cache 4096

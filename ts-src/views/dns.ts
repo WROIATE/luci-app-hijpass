@@ -53,9 +53,9 @@ const v = view.extend({
         let directDns = s.taboption('basic', form.ListValue, 'direct_dns', _('Direct Domain DNS'),
             _('Select Direct Domain DNS'));
         directDns.depends('dns_service', 'chinadns-ng');
-        directDns.value('system', _('Use System DNS'));
+        directDns.value('dnsmasq', 'dnsmasq');
         directDns.value('custom', _('Custom DNS'));
-        directDns.default = 'system';
+        directDns.default = 'dnsmasq';
         directDns.rmempty = false;
 
         let directDnsCustom = s.taboption('basic', form.Value, 'direct_dns_custom', _('Custom Direct DNS'),
@@ -67,9 +67,9 @@ const v = view.extend({
         let proxyDns = s.taboption('basic', form.ListValue, 'proxy_dns', _('Proxy Domain DNS'),
             _('Select Proxy Domain DNS'));
         proxyDns.depends('dns_service', 'chinadns-ng');
-        proxyDns.value('system', _('Use System DNS'));
+        proxyDns.value('dnsmasq', 'dnsmasq');
         proxyDns.value('custom', _('Custom DNS'));
-        proxyDns.default = 'system';
+        proxyDns.default = 'dnsmasq';
         proxyDns.rmempty = false;
 
         // 动态添加分流DNS监听端口选项

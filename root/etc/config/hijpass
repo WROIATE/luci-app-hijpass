@@ -43,7 +43,7 @@ config shunt
 
 config dns
 	option dns_service 'chinadns-ng'
-	option direct_dns 'system'
+	option direct_dns 'dnsmasq'
 	option proxy_dns '127.0.0.1#10153'
 	option cdg_port '53653'
 	option domain_proxy_hash ''
@@ -84,4 +84,3 @@ config shunt_dns_node
 	option type 'https'
 	option tag 'Quad9'
 	option server '9.9.9.9'
-

@@ -1551,9 +1551,6 @@ msgstr "使用全局默认解析策略"
 msgid "Use Routing Proxy Node"
 msgstr "使用路由代理节点"
 
-msgid "Use System DNS"
-msgstr "使用系统DNS"
-
 msgid "Use UDP Stream Relay"
 msgstr "使用流式UDP中继"
 
@@ -1886,3 +1883,6 @@ msgstr "防火墙分流端口 %s 未指向已启用的代理节点或分流服�
 
 msgid "Proxy domain DNS must use the current enabled shunt DNS port or a custom DNS server"
 msgstr "代理域名 DNS 必须使用当前已启用的分流 DNS 端口或自定义 DNS 服务器"
+
+msgid "Proxy domain DNS is using this shunt DNS port. Change it in the DNS module before disabling shunt."
+msgstr "代理域名 DNS 正在使用此分流 DNS 端口，请先在 DNS 模块中修改，再关闭分流。"

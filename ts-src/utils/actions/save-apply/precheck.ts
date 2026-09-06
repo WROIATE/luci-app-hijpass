@@ -303,7 +303,7 @@ function checkFirewallPortTargets() {
 function checkDnsProxyTarget() {
     const dnsService = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'dns_service');
     const proxyDns = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, 'proxy_dns');
-    if (dnsService !== 'chinadns-ng' || proxyDns === 'system' || proxyDns === 'custom') {
+    if (dnsService !== 'chinadns-ng' || proxyDns === 'dnsmasq' || proxyDns === 'system' || proxyDns === 'custom') {
         return true;
     }
 

@@ -62,6 +62,7 @@ PROXY_MAC_EXCLUDE=$(uci -q get hijpass.@firewall[0].proxy_mac_exclude_list || :)
 PROXY_INTERFACE=$(uci -q get hijpass.@firewall[0].proxy_iface_list || :)
 PROXY_INTERFACE_EXCLUDE=$(uci -q get hijpass.@firewall[0].proxy_iface_exclude_list || :)
 ACL_DEFAULT_ALLOW=$(uci -q get hijpass.@firewall[0].acl_default_allow || :)
+PROXY_LOCAL=$(uci -q get hijpass.@firewall[0].proxy_local || :)
 
 LUA_SCRIPT="/usr/lib/hijpass/luci-utils.lua"
 CONF_PATH="/etc/hijpass"
@@ -200,6 +201,10 @@ $FW4_TEMPLATE
 if [ -z "$DNS_FORWARD_PORT" ]; then
     fw_rules=$(echo "$fw_rules" | grep -v "DNS_FORWARD_")
     fw_rules=$(echo "$fw_rules" | sed '/^    chain dns-forward {/,/^    }/d')
+fi
+
+if [ "$PROXY_LOCAL" != "1" ]; then
+    fw_rules=$(echo "$fw_rules" | sed '/^    chain out-route {/,/^    }/d')
 fi
 
 if [ -z "$INPUT_WAN_L2_DEV" ]; then

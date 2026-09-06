@@ -2764,6 +2764,14 @@ msgstr ""
 msgid "Redirect TCP and UDP DNS queries from clients selected by the firewall ACL to the selected local DNS service"
 msgstr ""
 
+#: ts-src/views/firewall.ts
+msgid "Proxy Router Traffic"
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Transparently proxy eligible router-originated TCP and UDP traffic"
+msgstr ""
+
 #: ts-src/utils/feature/firewall/form.ts
 msgid "Networks: %s"
 msgstr ""

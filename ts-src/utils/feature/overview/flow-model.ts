@@ -68,7 +68,7 @@ function getAclDetail(firewall: any): string {
     return _('Selected: %s devices, %s interfaces').format(String(devices), String(interfaces));
 }
 
-function getProxyTarget(port: string, portLabel: string, expand = true): FlowStep[] {
+function getProxyTarget(port: string, portLabel: string): FlowStep[] {
     if (!isPort(port)) {
         return [{ title: portLabel, detail: _('No valid listen port'), tone: 'warning' }];
     }
@@ -80,12 +80,6 @@ function getProxyTarget(port: string, portLabel: string, expand = true): FlowSte
 
     if (!proxy) {
         steps.push({ title: _('Proxy node unavailable'), detail: _('No enabled node uses this port'), tone: 'warning' });
-        return steps;
-    }
-
-    if (!expand) {
-        const core = ProxyChainUtils.getProxyCore(proxy);
-        steps[0].detail = core === 'xray' ? 'Xray' : core;
         return steps;
     }
 
@@ -127,14 +121,19 @@ function getRoutingSteps(shunt: any, path: 'dns' | 'traffic'): FlowStep[] {
         return [{ title, detail: _('Disabled or invalid listen port'), tone: 'warning' }];
     }
 
+    // Show the routing resource, not its condition-dependent outbound nodes.
+    if (path === 'traffic') {
+        return [
+            { title: title + ': ' + port, tone: 'proxy' },
+            { title: _('Default shunt'), detail: shunt.type === 'xray' ? 'Xray' : shunt.type || '', tone: 'proxy' },
+        ];
+    }
+
     const steps: FlowStep[] = [{
         title: title + ': ' + port,
         detail: shunt.type === 'xray' ? 'Xray' : shunt.type || '',
         tone: 'proxy',
     }];
-
-    // The routing core chooses the final outbound; the overview stops at its listener.
-    if (path === 'traffic') return steps;
 
     if (shunt.config_type === 'custom') {
         steps.push({ title: _('Custom core configuration'), detail: _('Internal path cannot be expanded'), tone: 'muted' });
@@ -230,7 +229,7 @@ function getDefaultTrafficTarget(firewall: any, shunt: any): FlowStep[] {
     const port = firewall.shunt_port || '';
     if (!isPort(port)) return [{ title: _('Direct'), detail: _('Default shunt port is disabled'), tone: 'direct' }];
     if (port === shunt.shunt_listen_port) return getRoutingSteps(shunt, 'traffic');
-    return getProxyTarget(port, _('Default shunt port'), false);
+    return getProxyTarget(port, _('Default shunt port'));
 }
 
 function getProxyTrafficTarget(firewall: any, shunt: any): FlowStep[] {

@@ -2163,6 +2163,9 @@ msgstr "DNS 路由规则"
 msgid "DNS upstream"
 msgstr "DNS 上游"
 
+msgid "Default shunt"
+msgstr "默认分流"
+
 msgid "Default shunt port"
 msgstr "默认分流端口"
 

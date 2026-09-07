@@ -42,6 +42,8 @@ for (const type of ['sing-box', 'xray']) {
                 assert.equal(branch.steps[0].title, 'Default shunt port: 18081');
                 assert.equal(branch.steps[0].detail, undefined);
                 assert.equal(branch.steps[1].title, 'Default shunt');
+                assert.equal(branch.steps[0].page, 'firewall');
+                assert.equal(branch.steps[1].page, 'shunt');
                 assert.equal(branch.steps[1].detail, type === 'xray' ? 'Xray' : type);
             }
         });
@@ -57,6 +59,8 @@ test('both default and proxy ports show the actual node resource', () => {
     for (const branch of diagram.branches) {
         assert.equal(branch.steps.length, 2);
         assert.equal(branch.steps[1].title, 'Proxy node: node');
+        assert.equal(branch.steps[0].page, 'firewall');
+        assert.equal(branch.steps[1].page, 'proxy');
         assert.equal(branch.steps[1].detail, 'sing-box');
     }
 });

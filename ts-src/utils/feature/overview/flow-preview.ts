@@ -1,6 +1,24 @@
-import { buildConfigurationFlowPreview, type FlowBranch, type FlowDiagram, type FlowStep } from "./flow-model";
+import { buildConfigurationFlowPreview, type FlowBranch, type FlowDiagram, type FlowStep, type FlowPage } from "./flow-model";
 
 const FLOW_STYLE = `
+    a.hijpass-flow-step,
+    a.hijpass-flow-branch__condition {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    a.hijpass-flow-step:hover,
+    a.hijpass-flow-branch__condition:hover {
+        border-color: var(--primary-color, #4b6cb7);
+    }
+
+    a.hijpass-flow-step:focus-visible,
+    a.hijpass-flow-branch__condition:focus-visible {
+        outline: 2px solid var(--primary-color, #4b6cb7);
+        outline-offset: 2px;
+    }
+
     .hijpass-flow-card h3 {
         margin: 0;
     }
@@ -287,8 +305,13 @@ function ensureFlowPreviewStyles() {
     document.head.appendChild(style);
 }
 
+function pageUrl(page: FlowPage): string {
+    return L.url(page === 'dhcp' ? 'admin/network/dhcp' : 'admin/services/hijpass/' + page);
+}
+
 function renderStep(step: FlowStep) {
-    return E('div', {
+    return E(step.page ? 'a' : 'div', {
+        ...(step.page ? { href: pageUrl(step.page) } : {}),
         'class': 'hijpass-flow-step',
         'data-tone': step.tone || 'normal',
     }, [
@@ -311,7 +334,7 @@ function renderChain(steps: FlowStep[]) {
 function renderParallelBranch(branch: FlowBranch) {
     return E('li', { 'class': 'hijpass-flow-branch hijpass-flow-branch--parallel' }, [
         E('span', { 'class': 'hijpass-flow-branch__joint', 'aria-hidden': 'true' }, '→'),
-        E('div', { 'class': 'hijpass-flow-branch__condition' }, [
+        E(branch.page ? 'a' : 'div', { 'class': 'hijpass-flow-branch__condition', ...(branch.page ? { href: pageUrl(branch.page) } : {}) }, [
             E('strong', {}, branch.condition),
             branch.detail ? E('span', { 'class': 'hijpass-flow-branch__detail' }, branch.detail) : '',
         ]),
@@ -322,7 +345,7 @@ function renderParallelBranch(branch: FlowBranch) {
 
 function renderOrderedBranch(branch: FlowBranch) {
     return E('li', { 'class': 'hijpass-flow-branch hijpass-flow-branch--ordered' }, [
-        E('div', { 'class': 'hijpass-flow-branch__condition' }, [
+        E(branch.page ? 'a' : 'div', { 'class': 'hijpass-flow-branch__condition', ...(branch.page ? { href: pageUrl(branch.page) } : {}) }, [
             E('strong', {}, branch.condition),
             branch.detail ? E('span', { 'class': 'hijpass-flow-branch__detail' }, branch.detail) : '',
         ]),

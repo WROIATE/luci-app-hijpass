@@ -2891,6 +2891,10 @@ msgid "DNS upstream"
 msgstr ""
 
 #: ts-src/utils/feature/overview/flow-model.ts
+msgid "Default shunt"
+msgstr ""
+
+#: ts-src/utils/feature/overview/flow-model.ts
 msgid "Default shunt port"
 msgstr ""
 

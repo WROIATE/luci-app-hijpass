@@ -35,23 +35,30 @@ function preview(shunt, firewall, nodes = []) {
 
 for (const type of ['sing-box', 'xray']) {
     for (const config_type of ['tmpl', 'custom']) {
-        test(`${type} ${config_type}: stop at routing listener, including proxy fallback`, () => {
+        test(`${type} ${config_type}: show port and routing resource without internal outbounds`, () => {
             const diagram = preview({ enabled: '1', shunt_listen_port: '18081', type, config_type }, { shunt_port: '18081' });
             for (const branch of diagram.branches) {
-                assert.equal(branch.steps.length, 1);
+                assert.equal(branch.steps.length, 2);
                 assert.equal(branch.steps[0].title, 'Default shunt port: 18081');
-                assert.equal(branch.steps[0].detail, type === 'xray' ? 'Xray' : type);
+                assert.equal(branch.steps[0].detail, undefined);
+                assert.equal(branch.steps[1].title, 'Default shunt');
+                assert.equal(branch.steps[1].detail, type === 'xray' ? 'Xray' : type);
             }
         });
     }
 }
 
-test('default node target is compact but explicit proxy target still expands', () => {
+test('both default and proxy ports show the actual node resource', () => {
     const diagram = preview({ shunt_listen_port: '18081' }, { shunt_port: '7890', proxy_port: '7890' },
         [{ enabled: '1', name: 'node', listen_port: '7890', core: 'sing-box' }]);
     assert.equal(diagram.branches[0].steps.length, 2);
-    assert.equal(diagram.branches.at(-1).steps.length, 1);
-    assert.equal(diagram.branches.at(-1).steps[0].detail, 'sing-box');
+    assert.equal(diagram.branches[0].steps[0].title, 'Proxy port: 7890');
+    assert.equal(diagram.branches.at(-1).steps[0].title, 'Default shunt port: 7890');
+    for (const branch of diagram.branches) {
+        assert.equal(branch.steps.length, 2);
+        assert.equal(branch.steps[1].title, 'Proxy node: node');
+        assert.equal(branch.steps[1].detail, 'sing-box');
+    }
 });
 
 test('disabled routing service retains warning', () => {

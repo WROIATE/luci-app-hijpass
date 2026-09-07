@@ -121,7 +121,8 @@ const ServiceUtils = {
             poll.add(refresh);
             window.setTimeout(refresh, 0);
 
-            return E('div', { class: 'cbi-map' },
+            // Only actual form maps may use cbi-map: LuCI saves every matching node.
+            return E('div', { class: 'hijpass-service-status' },
                 E('fieldset', { class: 'cbi-section' }, [
                     E('p', { id: getStatusElementId(type), style: 'display: flex; gap: 1rem;' },
                         _('Fetching Status...'))

@@ -2315,3 +2315,39 @@ msgstr "未匹配的非常用 TCP 端口"
 
 msgid "Upstream proxy: %s"
 msgstr "前置代理：%s"
+
+msgid "Observe traffic from this client during the capture window. Generate requests on the client after capture starts."
+msgstr "采集指定时间内此客户端的流量。采集开始后，请在客户端发起请求。"
+
+msgid "Destination Port"
+msgstr "目标端口"
+
+msgid "Optional TCP/UDP destination port. Leave empty to capture all ports."
+msgstr "可选 TCP/UDP 目标端口，留空采集所有端口。"
+
+msgid "All ports"
+msgstr "所有端口"
+
+msgid "Capture Duration (seconds)"
+msgstr "采集时长（秒）"
+
+msgid "Please select a valid transport protocol"
+msgstr "请选择有效的传输协议"
+
+msgid "Please enter a valid destination port"
+msgstr "请输入有效的目标端口"
+
+msgid "Please select a valid request method"
+msgstr "请选择有效的请求方法"
+
+msgid "Invalid trace task ID"
+msgstr "诊断任务 ID 无效"
+
+msgid "Preparing capture"
+msgstr "正在准备采集"
+
+msgid "Capture is active. Generate requests on the selected client now."
+msgstr "采集已开始，请立即在所选客户端发起请求。"
+
+msgid "Timed out waiting for trace results"
+msgstr "等待诊断结果超时"

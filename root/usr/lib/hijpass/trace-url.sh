@@ -4,6 +4,8 @@ SCRIPT_NAME="${0##*/}"
 
 TIMEOUT=8
 CLIENT_IP=
+PROTOCOL=all
+CLIENT_PORT=all
 METHOD=HEAD
 KEEP_TMP=0
 VERBOSE=0
@@ -14,21 +16,23 @@ usage() {
     cat <<EOF
 Usage:
   $SCRIPT_NAME [-t seconds] [-X HEAD|GET] [-p] [-i iface] [-v] [-K] <url>
-  $SCRIPT_NAME -c <client_ip> [-t seconds] [-p] [-i iface] [-v] [-K] <url>
+  $SCRIPT_NAME -c <client_ip> [-t seconds] [-n all|tcp|udp] [-P port|all] [-p] [-i iface] [-v] [-K]
 
 Modes:
   default        Run curl on this router and trace hijpass out-route.
-  -c client_ip  Trace hijpass pre-filter for a real request from the client.
+  -c client_ip  Trace client traffic from prerouting before NAT during the capture window.
 
 Examples:
   $SCRIPT_NAME https://www.gstatic.com/generate_204
   $SCRIPT_NAME -p https://www.gstatic.com/generate_204
   $SCRIPT_NAME -p -i pppoe-wan https://www.gstatic.com/generate_204
-  $SCRIPT_NAME -c 192.168.1.100 https://www.gstatic.com/generate_204
+  $SCRIPT_NAME -c 192.168.1.100 -t 30
+  $SCRIPT_NAME -c 192.168.1.100 -t 30 -n udp -P 443 -p
 
 Notes:
-  The default request is TCP HEAD. For transparent LAN traffic, use -c and
-  run a matching curl request from the client during the trace window.
+  Router mode sends a TCP HEAD request by default. Client mode sends no requests
+  and takes no URL or HTTP method. Generate traffic on the client during capture.
+  Client mode defaults to all IP protocols and ports. A port filter limits it to TCP/UDP.
   Use -p to enable tcpdump packet capture. The default tcpdump interface is any.
   Use -v to print raw trace and log lines.
 EOF
@@ -70,6 +74,9 @@ is_ipv4() {
 
 is_ipv6() {
     case "$1" in
+        *[!A-Fa-f0-9:.]*) return 1 ;;
+    esac
+    case "$1" in
         *:*) return 0 ;;
         *) return 1 ;;
     esac
@@ -89,11 +96,13 @@ upper() {
     printf '%s' "$1" | tr '[:lower:]' '[:upper:]'
 }
 
-while getopts 'c:t:X:i:Kpvh' opt; do
+while getopts 'c:t:X:n:P:i:Kpvh' opt; do
     case "$opt" in
         c) CLIENT_IP="$OPTARG" ;;
         t) TIMEOUT="$OPTARG" ;;
         X) METHOD="$(upper "$OPTARG")" ;;
+        n) PROTOCOL="$OPTARG" ;;
+        P) CLIENT_PORT="$OPTARG" ;;
         i) TCPDUMP_IFACE="$OPTARG" ;;
         K) KEEP_TMP=1 ;;
         p) ENABLE_TCPDUMP=1 ;;
@@ -110,14 +119,15 @@ while getopts 'c:t:X:i:Kpvh' opt; do
 done
 shift $((OPTIND - 1))
 
-[ "$#" -eq 1 ] || {
-    usage >&2
-    exit 2
-}
-
-URL="$1"
+URL=
 MODE=router
 [ -n "$CLIENT_IP" ] && MODE=client
+if [ "$MODE" = "router" ]; then
+    [ "$#" -eq 1 ] || die "router mode requires one URL"
+    URL="$1"
+else
+    [ "$#" -eq 0 ] || die "client mode does not take a URL; use -n and -P to filter traffic"
+fi
 
 case "$METHOD" in
     HEAD|GET) ;;
@@ -126,6 +136,12 @@ esac
 
 is_number "$TIMEOUT" || die "timeout must be an integer"
 [ "$TIMEOUT" -ge 1 ] 2>/dev/null || die "timeout must be >= 1"
+[ "$TIMEOUT" -le 120 ] 2>/dev/null || die "timeout must be <= 120"
+case "$PROTOCOL" in
+    all|tcp|udp) ;;
+    *) die "protocol must be all, tcp or udp" ;;
+esac
+[ "$CLIENT_PORT" = "all" ] || is_port "$CLIENT_PORT" || die "invalid destination port"
 
 if [ -n "$CLIENT_IP" ]; then
     ip_family "$CLIENT_IP" >/dev/null || die "invalid client IP: $CLIENT_IP"
@@ -137,7 +153,9 @@ case "$TCPDUMP_IFACE" in
 esac
 
 has_cmd awk || die "awk is required"
-has_cmd curl || die "curl is required"
+if [ "$MODE" = "router" ]; then
+    has_cmd curl || die "curl is required"
+fi
 has_cmd nft || die "nft is required"
 if [ "$ENABLE_TCPDUMP" -eq 1 ]; then
     has_cmd tcpdump || die "tcpdump is required when -p is used"
@@ -225,7 +243,7 @@ resolve_host() {
     '
 }
 
-parse_url
+[ "$MODE" = "client" ] || parse_url
 
 TARGET_IPS=
 
@@ -242,6 +260,7 @@ TCPDUMP_LOG="$TMP_DIR/tcpdump.log"
 TCPDUMP_ERR="$TMP_DIR/tcpdump.err"
 TCPDUMP_FILTER=
 TRACE_COMMENT="hijpass-trace-$$"
+TRACE_CHAIN="trace-$$"
 NFT_PID=
 LOG_PID=
 TCPDUMP_PID=
@@ -260,6 +279,11 @@ mkdir -p "$TMP_DIR" || die "failed to create $TMP_DIR"
 : >"$TCPDUMP_ERR"
 
 delete_trace_rules() {
+    if [ "$MODE" = "client" ]; then
+        nft flush chain inet hijpass "$TRACE_CHAIN" >/dev/null 2>&1
+        nft delete chain inet hijpass "$TRACE_CHAIN" >/dev/null 2>&1
+        return
+    fi
     for chain in pre-filter out-route; do
         nft -a list chain inet hijpass "$chain" 2>/dev/null |
             awk -v c="$TRACE_COMMENT" '
@@ -341,11 +365,20 @@ add_router_trace_rules() {
 add_client_trace_rules() {
     client_expr="$(client_expr_family "$CLIENT_IP" || true)"
     [ -n "$client_expr" ] || return 1
-    set -- $client_expr "$CLIENT_IP" tcp dport "$PORT"
-
-    # Keep one broad client+port rule so the trace still works when the
-    # client resolves the host to a different address than the router.
-    add_nft_rule pre-filter "$@" || return 1
+    # Trace the original destination before DNS redirect/DNAT changes its port.
+    nft add chain inet hijpass "$TRACE_CHAIN" \
+        '{ type filter hook prerouting priority -301; policy accept; }' \
+        >>"$NFT_SETUP_LOG" 2>&1 || return 1
+    set -- $client_expr "$CLIENT_IP"
+    if [ "$PROTOCOL" != "all" ]; then
+        set -- "$@" meta l4proto "$PROTOCOL"
+    elif [ "$CLIENT_PORT" != "all" ]; then
+        set -- "$@" meta l4proto '{ tcp, udp }'
+    fi
+    if [ "$CLIENT_PORT" != "all" ]; then
+        set -- "$@" th dport "$CLIENT_PORT"
+    fi
+    add_nft_rule "$TRACE_CHAIN" "$@" || return 1
 }
 
 collect_log_paths() {
@@ -398,6 +431,22 @@ stop_monitors() {
 }
 
 tcpdump_filter() {
+    if [ "$MODE" = "client" ]; then
+        # Include replies as well as requests; proxy outbound has a different source.
+        if [ "$CLIENT_PORT" = "all" ]; then
+            printf 'host %s' "$CLIENT_IP"
+        else
+            printf '((src host %s and dst port %s) or (dst host %s and src port %s))' \
+                "$CLIENT_IP" "$CLIENT_PORT" "$CLIENT_IP" "$CLIENT_PORT"
+        fi
+        if [ "$PROTOCOL" != "all" ]; then
+            printf ' and %s' "$PROTOCOL"
+        elif [ "$CLIENT_PORT" != "all" ]; then
+            printf ' and (tcp or udp)'
+        fi
+        printf '\n'
+        return
+    fi
     # Keep capture broad enough to include proxy outbound traffic using the
     # same destination port. Output is filtered later to keep the report short.
     printf 'tcp and port %s\n' "$PORT"
@@ -461,8 +510,7 @@ time_total=%{time_total}
 
 wait_for_client_request() {
     printf 'Trace is active for %s seconds.\n' "$TIMEOUT"
-    printf 'Run this from client %s now:\n' "$CLIENT_IP"
-    printf '  curl -I -k %s\n' "$URL"
+    printf 'Generate traffic from client %s now (protocol=%s, destination_port=%s).\n' "$CLIENT_IP" "$PROTOCOL" "$CLIENT_PORT"
     sleep "$TIMEOUT"
 }
 
@@ -503,17 +551,15 @@ limit_unique_lines() {
 print_request_summary() {
     print_section "Trace summary"
     if [ "$MODE" = "client" ]; then
-        printf 'mode: client pre-filter, client=%s\n' "$CLIENT_IP"
+        printf 'mode: client prerouting (before NAT), client=%s\n' "$CLIENT_IP"
+        printf 'capture: duration=%ss protocol=%s destination_port=%s\n' "$TIMEOUT" "$PROTOCOL" "$CLIENT_PORT"
+        printf 'requests: generated by the client; no URL or HTTP method filter\n'
+        return
     else
         printf 'mode: router out-route\n'
     fi
     printf 'request: %s %s\n' "$METHOD" "$URL"
     printf 'target: %s:%s (%s)\n' "$HOST" "$PORT" "$(format_target_ips)"
-
-    if [ "$MODE" = "client" ]; then
-        printf 'curl: not run by this script in client mode\n'
-        return
-    fi
 
     curl_exit="$(cat "$TMP_DIR/curl.exit" 2>/dev/null || printf '?')"
     http_code="$(get_curl_value http_code)"
@@ -613,13 +659,22 @@ print_nft_summary() {
     if [ "$line_count" -eq 0 ]; then
         printf 'decision: no nft trace captured\n'
         printf 'check:\n'
-        printf '  - request did not match TCP port %s\n' "$PORT"
+        if [ "$MODE" = "client" ]; then
+            printf '  - traffic did not match client=%s protocol=%s destination_port=%s\n' "$CLIENT_IP" "$PROTOCOL" "$CLIENT_PORT"
+        else
+            printf '  - request did not match TCP port %s\n' "$PORT"
+        fi
         printf '  - client mode was used but no matching client request arrived\n'
         printf '  - traffic was not handled by table inet hijpass\n'
         return
     fi
 
-    printf 'decision: %s\n' "$(firewall_decision)"
+    if [ "$MODE" = "client" ]; then
+        printf 'note: aggregate trace of multiple flows; inspect each trace ID for individual decisions\n'
+        print_client_flows
+    else
+        printf 'decision: %s\n' "$(firewall_decision)"
+    fi
     printf 'path: %s\n' "$(trace_path)"
     printf 'key_rules:\n'
     print_trace_steps
@@ -632,12 +687,55 @@ print_nft_summary() {
     fi
 }
 
+print_client_flows() {
+    awk -v chain="$TRACE_CHAIN" '
+        $4 == "inet" && $5 == "hijpass" && $6 == chain && $7 == "packet:" {
+            src = dst = ""
+            sport = dport = "-"
+            proto = "IP"
+            for (i = 1; i < NF; i++) {
+                if ($i == "saddr") src = $(i + 1)
+                if ($i == "daddr") dst = $(i + 1)
+                if ($i == "sport") { sport = $(i + 1); proto = $(i - 1) }
+                if ($i == "dport") dport = $(i + 1)
+                if ($i == "icmp" || $i == "icmpv6") proto = $i
+            }
+            if (src == "" || dst == "") next
+            key = src SUBSEP sport SUBSEP dst SUBSEP dport SUBSEP proto
+            if (!seen[key]++) {
+                count++
+                if (count == 1) print "client_flows (first 40 unique tuples):"
+                if (count <= 40) printf "  trace=%s %s [%s]:%s -> [%s]:%s\n", $3, proto, src, sport, dst, dport
+            }
+        }
+        END { printf "client_flows_total: %d\n", count + 0 }
+    ' "$NFT_LOG"
+}
+
+filter_client_trace() {
+    # This private chain has exactly one rule. Also handle monitors which report
+    # "unknown rule handle" instead of rendering the rule and its comment.
+    awk -v chain="$TRACE_CHAIN" '
+        NR == FNR {
+            if ($4 == "inet" && $5 == "hijpass" && $6 == chain &&
+                ($7 == "rule" || ($7 == "unknown" && $8 == "rule"))) ids[$3] = 1
+            next
+        }
+        $3 in ids
+    ' "$NFT_LOG" "$NFT_LOG" >"$NFT_LOG.filtered"
+    mv "$NFT_LOG.filtered" "$NFT_LOG"
+}
+
 remote_ip_from_curl() {
     get_curl_value remote_ip
 }
 
 tcpdump_related_lines() {
     [ -s "$TCPDUMP_LOG" ] || return 1
+    if [ "$MODE" = "client" ]; then
+        cat "$TCPDUMP_LOG"
+        return
+    fi
 
     remote_ip="$(remote_ip_from_curl)"
     {
@@ -682,7 +780,8 @@ print_tcpdump_line_summary() {
             if ($0 ~ /Flags \[S\.\]/) syn_ack++
             if ($0 ~ /Flags \[F/) fin++
             if ($0 ~ /Flags \[R/) rst++
-            if (match($0, /length [0-9]+/)) {
+            if ($0 ~ / UDP,/) udp++
+            if ($0 ~ /Flags / && match($0, /length [0-9]+/)) {
                 len = substr($0, RSTART + 7, RLENGTH - 7) + 0
                 if (len > 0) {
                     payload_packets++
@@ -698,6 +797,7 @@ print_tcpdump_line_summary() {
 
             printf "target_summary:\n"
             printf "  tcp: syn=%d syn_ack=%d fin=%d rst=%d payload_packets=%d payload_bytes=%d\n", syn + 0, syn_ack + 0, fin + 0, rst + 0, payload_packets + 0, payload_bytes + 0
+            printf "  udp: packets=%d\n", udp + 0
 
             printf "  interfaces:\n"
             for (key in iface_count) {
@@ -765,6 +865,7 @@ log_seed_lines() {
 
     remote_ip="$(remote_ip_from_curl)"
     {
+        [ -n "$CLIENT_IP" ] && grep -F "$CLIENT_IP" "$log_file" 2>/dev/null
         [ -n "$HOST" ] && grep -F "$HOST" "$log_file" 2>/dev/null
         for target_ip in $TARGET_IPS $remote_ip; do
             [ -n "$target_ip" ] && grep -F "$target_ip" "$log_file" 2>/dev/null
@@ -867,16 +968,24 @@ print_core_logs() {
 }
 
 snapshot_log_positions
-start_monitors
-sleep 1
 
-TARGET_IPS="$(resolve_host)"
+[ "$MODE" = "client" ] || TARGET_IPS="$(resolve_host)"
 
 if [ "$MODE" = "client" ]; then
-    add_client_trace_rules || die "failed to insert nft trace rule; see $NFT_SETUP_LOG"
+    add_client_trace_rules || {
+        cat "$NFT_SETUP_LOG" >&2
+        die "failed to install client trace rules"
+    }
 else
-    add_router_trace_rules || die "failed to insert nft trace rule; see $NFT_SETUP_LOG"
+    add_router_trace_rules || {
+        cat "$NFT_SETUP_LOG" >&2
+        die "failed to install router trace rules"
+    }
 fi
+
+# Start after rule installation so nft can cache and render the trace rules.
+start_monitors
+sleep 1
 
 if [ "$ENABLE_TCPDUMP" -eq 1 ]; then
     start_tcpdump || die "failed to start tcpdump on $TCPDUMP_IFACE; see $TCPDUMP_ERR"
@@ -891,6 +1000,7 @@ fi
 sleep 1
 stop_tcpdump
 stop_monitors
+[ "$MODE" = "router" ] || filter_client_trace
 
 print_request_summary
 print_nft_summary

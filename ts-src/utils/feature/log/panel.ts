@@ -241,6 +241,8 @@ type TraceDiagnosticsValues = {
     url: string;
     mode: string;
     clientIp: string;
+    protocol: string;
+    port: string;
     method: string;
     timeout: string;
     tcpdump: boolean;
@@ -265,16 +267,11 @@ function buildTraceArgs(values: TraceDiagnosticsValues) {
     const method = values.method || 'HEAD';
     const args = [];
 
-    if (!/^https?:\/\/[A-Za-z0-9_.:\-/?#%=&+~[\]]+$/.test(url)) {
-        throw new Error(_('Please enter a valid HTTP or HTTPS URL'));
-    }
-
     if (!/^[0-9]+$/.test(timeout) || parseInt(timeout, 10) < 1 || parseInt(timeout, 10) > 120) {
         throw new Error(_('Timeout must be an integer between 1 and 120'));
     }
 
     args.push('-t', timeout);
-    args.push('-X', method);
 
     if (values.mode === 'client') {
         const clientIp = values.clientIp.trim();
@@ -282,6 +279,23 @@ function buildTraceArgs(values: TraceDiagnosticsValues) {
             throw new Error(_('Please enter a valid client IP address'));
         }
         args.push('-c', clientIp);
+        const protocol = values.protocol || 'all';
+        const port = values.port.trim();
+        if (!['all', 'tcp', 'udp'].includes(protocol)) {
+            throw new Error(_('Please select a valid transport protocol'));
+        }
+        if (port && (!/^[0-9]+$/.test(port) || Number(port) < 1 || Number(port) > 65535)) {
+            throw new Error(_('Please enter a valid destination port'));
+        }
+        args.push('-n', protocol, '-P', port || 'all');
+    } else {
+        if (!/^https?:\/\/[A-Za-z0-9_.:\-/?#%=&+~[\]]+$/.test(url)) {
+            throw new Error(_('Please enter a valid HTTP or HTTPS URL'));
+        }
+        if (!['HEAD', 'GET'].includes(method)) {
+            throw new Error(_('Please select a valid request method'));
+        }
+        args.push('-X', method);
     }
 
     if (values.tcpdump) {
@@ -297,11 +311,11 @@ function buildTraceArgs(values: TraceDiagnosticsValues) {
         args.push('-v');
     }
 
-    args.push(url);
+    if (values.mode !== 'client') args.push(url);
     return args;
 }
 
-function runTraceDiagnostics(
+async function runTraceDiagnostics(
     values: TraceDiagnosticsValues,
     statusElement: HTMLElement,
     outputElement: HTMLElement,
@@ -320,26 +334,44 @@ function runTraceDiagnostics(
     runButton.disabled = true;
     setTraceStatus(statusElement, _('Running Trace Diagnostics'));
 
-    fs.exec('/usr/lib/hijpass/trace-url.sh', args).then(function (result) {
-        const stdout = result.stdout || '';
-        const stderr = result.stderr || '';
-        setTraceOutput(outputElement, stdout || stderr || _('No Output'));
-
-        if (result.code === 0) {
-            setTraceStatus(statusElement, _('Trace Completed') + ' - ' + new Date().toLocaleTimeString());
-        } else {
-            setTraceStatus(statusElement, _('Trace Failed') + ' - ' + (stderr || _('Exit Code') + ': ' + result.code), '#b00020');
+    const command = '/usr/lib/hijpass/trace-task.sh';
+    let taskId: string | undefined;
+    let completed = false;
+    try {
+        // Keep each request short: capture runs independently of the RPC timeout.
+        const start = await fs.exec(command, ['start', ...args]);
+        if (start.code !== 0) throw new Error(start.stderr || _('Trace Failed'));
+        taskId = start.stdout.trim();
+        if (!/^[A-Za-z0-9]{8}$/.test(taskId)) throw new Error(_('Invalid trace task ID'));
+        const deadline = Date.now() + (Number(values.timeout) + 60) * 1000;
+        while (true) {
+            const result = await fs.exec_direct(command, ['status', taskId], 'json');
+            setTraceOutput(outputElement, [result.stdout, result.stderr].filter(Boolean).join('\n') || _('Preparing capture'));
+            if (!result.running) {
+                completed = true;
+                if (result.code !== 0) throw new Error(result.stderr || _('Exit Code') + ': ' + result.code);
+                setTraceStatus(statusElement, _('Trace Completed') + ' - ' + new Date().toLocaleTimeString());
+                break;
+            }
+            if (values.mode === 'client' && result.stdout.includes('Trace is active')) {
+                setTraceStatus(statusElement, _('Capture is active. Generate requests on the selected client now.'));
+            }
+            if (Date.now() > deadline) throw new Error(_('Timed out waiting for trace results'));
+            await new Promise(resolve => window.setTimeout(resolve, 1000));
         }
-    }).catch(function (error) {
-        setTraceOutput(outputElement, error.message || String(error));
+    } catch (error) {
         setTraceStatus(statusElement, _('Trace Failed') + ' - ' + error.message, '#b00020');
-    }).finally(function () {
+    } finally {
         runButton.disabled = false;
-    });
+        if (taskId && completed) {
+            await fs.exec(command, ['release', taskId]).catch(console.error);
+        }
+    }
 }
 
 function createTraceOutputPanel() {
     const statusElement = E('div', {
+        'role': 'status', 'aria-live': 'polite',
         'style': 'display: none; font-size: 12px; color: #666; margin-bottom: 6px;'
     }) as HTMLElement;
     const outputElement = E('pre', {

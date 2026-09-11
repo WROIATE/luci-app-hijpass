@@ -3093,3 +3093,39 @@ msgstr ""
 #: ts-src/utils/feature/overview/flow-model.ts
 msgid "Upstream proxy: %s"
 msgstr ""
+
+msgid "Observe traffic from this client during the capture window. Generate requests on the client after capture starts."
+msgstr ""
+
+msgid "Destination Port"
+msgstr ""
+
+msgid "Optional TCP/UDP destination port. Leave empty to capture all ports."
+msgstr ""
+
+msgid "All ports"
+msgstr ""
+
+msgid "Capture Duration (seconds)"
+msgstr ""
+
+msgid "Please select a valid transport protocol"
+msgstr ""
+
+msgid "Please enter a valid destination port"
+msgstr ""
+
+msgid "Please select a valid request method"
+msgstr ""
+
+msgid "Invalid trace task ID"
+msgstr ""
+
+msgid "Preparing capture"
+msgstr ""
+
+msgid "Capture is active. Generate requests on the selected client now."
+msgstr ""
+
+msgid "Timed out waiting for trace results"
+msgstr ""

@@ -160,7 +160,9 @@ test('detached worker returns immediately, reports a real 30s capture, and clean
     const f = fixture(t);
     f.env.TRACE_REAL_SLEEP = '1';
     const startTime = Date.now();
-    const id = execFileSync(f.task, ['start', '-c', '192.168.1.100', '-t', '30'], { env: f.env, encoding: 'utf8', timeout: 3000 }).trim();
+    // Emulate an inherited duplicate RPC pipe, as encountered with BusyBox ash.
+    const id = execFileSync('/bin/sh', ['-c', 'exec 3>&1; exec "$@"', 'test', f.task,
+        'start', '-c', '192.168.1.100', '-t', '30'], { env: f.env, encoding: 'utf8', timeout: 3000 }).trim();
     assert.match(id, /^[A-Za-z0-9]{8}$/);
     const taskDir = `/tmp/hijpass-trace-tasks/${id}`;
     t.after(() => rmSync(taskDir, { recursive: true, force: true }));

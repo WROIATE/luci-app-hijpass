@@ -20,9 +20,12 @@ if [ "$action" = "start" ]; then
     task_id="${task_dir##*/}"
     : >"$task_dir/stdout"
     : >"$task_dir/stderr"
-    # Close every RPC pipe before detaching, otherwise file.exec keeps waiting.
-    "$0" run "$task_id" "$@" </dev/null >/dev/null 2>&1 &
-    printf '%s\n' "$!" >"$task_dir/pid"
+    # BusyBox ash may retain saved RPC descriptors beyond stdin/stdout/stderr.
+    # Daemonize with all inherited descriptors closed, not just redirected stdio.
+    start-stop-daemon -S -b -m -p "$task_dir/pid" -x "$0" -- run "$task_id" "$@" || {
+        rm -rf "$task_dir"
+        fail "Cannot start trace worker"
+    }
     printf '%s\n' "$task_id"
     exit 0
 fi

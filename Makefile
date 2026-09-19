@@ -9,12 +9,9 @@ LUCI_PKGARCH:=all
 PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_NaiveProxy \
-	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Client \
-	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Server \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Rust_Client \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Rust_Server \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS \
-	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Trojan_Plus \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_tuic_client
 
 LUCI_DEPENDS:= +ca-bundle +curl +file +firewall4 +ip-full +luci-lua-runtime \
@@ -37,17 +34,6 @@ config PACKAGE_$(PKG_NAME)_INCLUDE_NaiveProxy
 	select PACKAGE_naiveproxy
 	default n
 
-config PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Client
-	bool "Include Shadowsocks Libev Client"
-	select PACKAGE_shadowsocks-libev-ss-local
-	select PACKAGE_shadowsocks-libev-ss-redir
-	default y
-
-config PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Libev_Server
-	bool "Include Shadowsocks Libev Server"
-	select PACKAGE_shadowsocks-libev-ss-server
-	default y
-
 config PACKAGE_$(PKG_NAME)_INCLUDE_Shadowsocks_Rust_Client
 	bool "Include Shadowsocks Rust Client"
 	depends on !i386
@@ -65,11 +51,6 @@ config PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS
 	select PACKAGE_shadow-tls
 	depends on aarch64||arm||x86_64
 	default n
-
-config PACKAGE_$(PKG_NAME)_INCLUDE_Trojan_Plus
-	bool "Include Trojan-Plus"
-	select PACKAGE_trojan-plus
-	default y
 
 config PACKAGE_$(PKG_NAME)_INCLUDE_tuic_client
 	bool "Include tuic-client"

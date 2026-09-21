@@ -15,8 +15,8 @@ import (
 const maxInput = 4 << 20
 
 type generated struct {
-	Nodes map[string]object `json:"nodes"`
-	Shunt object            `json:"shunt,omitempty"`
+	Nodes map[string]*coreConfig `json:"nodes"`
+	Shunt *coreConfig            `json:"shunt,omitempty"`
 }
 
 func decodeInput(r io.Reader, v any) error {
@@ -62,7 +62,7 @@ func validateInput(c config) error {
 	return nil
 }
 func render(c config) (generated, error) {
-	out := generated{Nodes: map[string]object{}}
+	out := generated{Nodes: map[string]*coreConfig{}}
 	if err := validateInput(c); err != nil {
 		return out, err
 	}
@@ -131,7 +131,7 @@ func rpc(method string) any {
 		Sections string `json:"sections"`
 		Target   string `json:"target"`
 	}
-	fail := func(err error) any { return object{"error": err.Error()} }
+	fail := func(err error) any { return rpcResponse{Error: err.Error()} }
 	if method != "render" && method != "validate" {
 		return fail(errors.New("unknown method"))
 	}
@@ -146,10 +146,10 @@ func rpc(method string) any {
 		return fail(err)
 	}
 	if method == "validate" && c.first("hijpass").str("enabled") == "0" {
-		return object{"ok": true}
+		return rpcResponse{OK: true}
 	}
 	if method == "render" && req.Target != "" {
-		var o object
+		var o *coreConfig
 		var err error
 		if req.Target == "shunt" {
 			o, err = c.shunt()
@@ -169,31 +169,31 @@ func rpc(method string) any {
 		if err != nil {
 			return fail(err)
 		}
-		return object{"config": clean(o)}
+		return rpcResponse{Config: o}
 	}
 	out, err := render(c)
 	if err != nil {
 		return fail(err)
 	}
 	if method == "validate" {
-		return object{"ok": true}
+		return rpcResponse{OK: true}
 	}
-	return object{"nodes": cleanNodes(out.Nodes), "shunt": clean(out.Shunt)}
+	return out
 }
-func cleanNodes(nodes map[string]object) object {
-	o := object{}
-	for k, v := range nodes {
-		o[k] = clean(v)
-	}
-	return o
+
+type rpcResponse struct {
+	Error  string      `json:"error,omitempty"`
+	OK     bool        `json:"ok,omitempty"`
+	Config *coreConfig `json:"config,omitempty"`
 }
+
 func run() error {
 	if len(os.Args) < 2 {
 		return errors.New("usage: hijpass-config generate | render (JSON sections on stdin) | list | call METHOD")
 	}
 	switch os.Args[1] {
 	case "list":
-		return json.NewEncoder(os.Stdout).Encode(object{"render": object{"sections": "", "target": ""}, "validate": object{"sections": ""}})
+		return json.NewEncoder(os.Stdout).Encode(map[string]map[string]string{"render": {"sections": "", "target": ""}, "validate": {"sections": ""}})
 	case "call":
 		if len(os.Args) != 3 {
 			return errors.New("missing RPC method")
@@ -208,7 +208,7 @@ func run() error {
 		if e != nil {
 			return e
 		}
-		return json.NewEncoder(os.Stdout).Encode(object{"nodes": cleanNodes(out.Nodes), "shunt": clean(out.Shunt)})
+		return json.NewEncoder(os.Stdout).Encode(out)
 	case "generate":
 		return generate()
 	default:

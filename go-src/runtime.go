@@ -47,11 +47,8 @@ func resolveServers(c config, g generated) error {
 		}
 		// Substitute only the dial address after building TLS/Reality settings,
 		// exactly as the former browser generator did. Never change SNI/security.
-		out := o["outbounds"].([]object)[0]
-		if core(s) == "xray" {
-			out["settings"].(object)["address"] = v.Address
-		} else {
-			out["server"] = v.Address
+		if err := o.replaceServer(v.Address); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -62,7 +59,7 @@ func outputFiles(c config, g generated) ([]outputFile, error) {
 	dir := global.val("client_dir", "/etc/hijpass/client")
 	var files []outputFile
 	used := map[string]bool{}
-	add := func(path string, o object, co string) error {
+	add := func(path string, o *coreConfig, co string) error {
 		if !filepath.IsAbs(path) || filepath.Clean(path) != path {
 			return fmt.Errorf("invalid absolute output path %q", path)
 		}
@@ -225,7 +222,7 @@ func generate() error {
 	defer os.RemoveAll(stage)
 	// Convert Geo resources before core validation. The check-only JSON references
 	// staged resources; the published JSON keeps the stable runtime paths.
-	geo := object{"geosite": []string{}, "geoip": []string{}}
+	geo := geoRules{GeoSite: []string{}, GeoIP: []string{}}
 	replacements := map[string]string{}
 	shunt := c.first("shunt")
 	if shunt.str("enabled") != "0" && (shunt.str("type") == "sing-box" || shunt.str("type") == "singbox") && shunt.str("ruleset_convert") == "1" {
@@ -244,7 +241,11 @@ func generate() error {
 				if !safeGeo.MatchString(tag) {
 					return fmt.Errorf("invalid Geo tag %q", tag)
 				}
-				geo[typ] = append(geo[typ].([]string), tag)
+				if typ == "geosite" {
+					geo.GeoSite = append(geo.GeoSite, tag)
+				} else {
+					geo.GeoIP = append(geo.GeoIP, tag)
+				}
 				name := typ + "-" + tag + ".srs"
 				dest := "/etc/hijpass/ruleset/" + name
 				tmp := filepath.Join(stage, name)
@@ -288,4 +289,9 @@ func generate() error {
 		}
 	}
 	return publishGenerated(c, files)
+}
+
+type geoRules struct {
+	GeoSite []string `json:"geosite"`
+	GeoIP   []string `json:"geoip"`
 }

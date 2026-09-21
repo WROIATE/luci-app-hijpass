@@ -101,89 +101,17 @@ func (c config) validateDependencies() error {
 	}
 	return nil
 }
-func (c config) proxy(raw section) (object, error) {
-	s := defaults(raw)
-	co := core(s)
-	o := object{"log": logConfig(co, s.str("log_level")), "inbounds": []object{inbound(co, "tproxy", "tproxy-in", s.num("listen_port"), false), inbound(co, "socks", "socks-in", s.num("socks_port"), false)}}
-	if co == "sing-box" {
-		o["dns"] = object{"servers": []object{{"type": "local", "tag": "local"}}}
-	} else if co != "xray" {
-		return nil, fmt.Errorf("unsupported core %q", co)
-	}
-	if s.str("type") == "load_balance" {
-		var outs []object
-		var tags []string
-		fallback := "lb-member-0"
-		for i, name := range s.list("member_node") {
-			m, e := c.node(name)
-			if e != nil {
-				return nil, e
-			}
-			tag := fmt.Sprintf("lb-member-%d", i)
-			tags = append(tags, tag)
-			outs = append(outs, socks(co, tag, m.num("socks_port")))
-			if name == s.str("fallback_tag") {
-				fallback = tag
-			}
-		}
-		if co == "sing-box" {
-			lb := object{"type": "urltest", "tag": "slb", "outbounds": tags}
-			fields(lb, s, "", "url", "interval", "idle_timeout")
-			numbers(lb, s, "", "tolerance")
-			flags(lb, s, "", "interrupt_exist_connections")
-			o["outbounds"] = append([]object{lb}, outs...)
-			o["route"] = object{"final": "slb"}
-		} else {
-			strategy := object{"type": s.val("strategy", "leastLoad")}
-			if strategy["type"] == "leastLoad" {
-				settings := object{"expected": 1, "maxRTT": s.val("strategy_max_rtt", "1s"), "tolerance": 0.05}
-				if s.str("strategy_expected") != "" {
-					settings["expected"] = s.num("strategy_expected")
-				}
-				if s.str("strategy_tolerance") != "" {
-					settings["tolerance"] = s.num("strategy_tolerance")
-				}
-				strategy["settings"] = settings
-			}
-			ping := object{"destination": s.val("probe_url", "https://connectivitycheck.gstatic.com/generate_204"), "connectivity": s.str("probe_connectivity"), "interval": s.val("probe_interval", "60s"), "timeout": s.val("probe_timeout", "2s"), "sampling": 3, "httpMethod": s.str("probe_http_method")}
-			if s.num("probe_sampling") != 0 {
-				ping["sampling"] = s.num("probe_sampling")
-			}
-			o["outbounds"] = outs
-			o["routing"] = object{"domainStrategy": "AsIs", "rules": []object{{"inboundTag": []string{"tproxy-in", "socks-in"}, "balancerTag": "slb"}}, "balancers": []object{{"tag": "slb", "selector": []string{"lb-member-"}, "fallbackTag": fallback, "strategy": strategy}}}
-			o["burstObservatory"] = object{"subjectSelector": []string{"lb-member-"}, "pingConfig": ping}
-		}
-		return o, nil
-	}
-	if err := port(s, "server_port"); err != nil {
+func (c config) proxy(raw section) (*coreConfig, error) {
+	n, err := parseNode(raw)
+	if err != nil {
 		return nil, err
 	}
-	if s.str("server") == "" {
-		return nil, fmt.Errorf("node %q has no server", s.str("name"))
+	switch n.Core {
+	case "sing-box":
+		return c.singboxProxy(n)
+	case "xray":
+		return c.xrayProxy(n)
+	default:
+		return nil, fmt.Errorf("unsupported core %q", n.Core)
 	}
-	out, e := protocol(s)
-	if e != nil {
-		return nil, e
-	}
-	outs := []object{out}
-	if name := s.str("upstream_proxy_node"); name != "" {
-		up, e := c.node(name)
-		if e != nil {
-			return nil, e
-		}
-		tag := "upstream-" + name
-		if co == "sing-box" {
-			out["detour"] = tag
-		} else {
-			st, ok := out["streamSettings"].(object)
-			if !ok {
-				st = object{}
-				out["streamSettings"] = st
-			}
-			st["sockopt"] = object{"dialerProxy": tag, "domainStrategy": "UseIP"}
-		}
-		outs = append(outs, socks(co, tag, up.num("socks_port")))
-	}
-	o["outbounds"] = outs
-	return o, nil
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	sb "github.com/sagernet/sing-box/option"
 	"path"
 	"strconv"
 	"strings"
@@ -9,7 +10,7 @@ import (
 type rule struct {
 	domain, suffix, keyword, regex, ip, geoIP, geoSite, network, protocol, ranges []string
 	ports                                                                         []int
-	sets                                                                          []object
+	sets                                                                          []sb.RuleSet
 }
 
 func parseRule(s section) rule {
@@ -42,11 +43,11 @@ func parseRule(s section) rule {
 				if strings.HasSuffix(p, "srs") {
 					format = "binary"
 				}
-				rs := object{"tag": tag, "type": typ, "format": format}
+				rs := sb.RuleSet{Tag: []string{tag}, Type: typ, Format: format}
 				if typ == "remote" {
-					rs["url"] = p
+					rs.RemoteOptions.URL = p
 				} else {
-					rs["path"] = p
+					rs.LocalOptions.Path = p
 				}
 				r.sets = append(r.sets, rs)
 				continue
@@ -85,12 +86,22 @@ func (r rule) empty(geo bool) bool {
 	}
 	return !r.hasDomain() && n == 0
 }
-func (r rule) sbDomain() object {
-	var tags []string
-	for _, s := range r.sets {
-		tags = append(tags, s["tag"].(string))
+func (r rule) sbMatch() sb.RawDefaultRule {
+	m := sb.RawDefaultRule{Domain: r.domain, DomainSuffix: r.suffix, DomainKeyword: r.keyword, DomainRegex: r.regex, IPCIDR: r.ip, Network: r.network, Protocol: r.protocol, PortRange: r.ranges}
+	for _, p := range r.ports {
+		m.Port = append(m.Port, uint16(p))
 	}
-	return object{"domain": r.domain, "domain_suffix": r.suffix, "domain_keyword": r.keyword, "domain_regex": r.regex, "rule_set": tags}
+	for _, s := range r.sets {
+		m.RuleSet = append(m.RuleSet, s.Tag...)
+	}
+	return m
+}
+func (r rule) sbDNSMatch() sb.RawDefaultDNSRule {
+	m := sb.RawDefaultDNSRule{Domain: r.domain, DomainSuffix: r.suffix, DomainKeyword: r.keyword, DomainRegex: r.regex}
+	for _, s := range r.sets {
+		m.RuleSet = append(m.RuleSet, s.Tag...)
+	}
+	return m
 }
 func (r rule) xrDomain() []string {
 	var out []string
@@ -102,19 +113,35 @@ func (r rule) xrDomain() []string {
 	return out
 }
 func (r *rule) convertGeo() {
-	r.sets = nil
 	for _, v := range append(append([]string{}, r.geoSite...), r.geoIP...) {
 		tag := strings.Replace(v, ":", "-", 1)
-		r.sets = append(r.sets, object{"tag": tag, "type": "local", "format": "binary", "path": "/etc/hijpass/ruleset/" + tag + ".srs"})
+		r.sets = append(r.sets, sb.RuleSet{Tag: []string{tag}, Type: "local", Format: "binary", LocalOptions: sb.LocalRuleSet{Path: "/etc/hijpass/ruleset/" + tag + ".srs"}})
 	}
 }
-func (r rule) xrRules(name, out string, version int) []object {
-	base := object{"ruleTag": name, "inboundTag": []string{"tproxy-in"}, "outboundTag": out, "network": r.network, "protocol": r.protocol}
+
+// Xray's field rule is private in infra/conf/router.go.
+type xrayRouteRule struct {
+	RuleTag     string   `json:"ruleTag,omitempty"`
+	InboundTag  []string `json:"inboundTag,omitempty"`
+	OutboundTag string   `json:"outboundTag,omitempty"`
+	BalancerTag string   `json:"balancerTag,omitempty"`
+	Network     []string `json:"network,omitempty"`
+	Protocol    []string `json:"protocol,omitempty"`
+	Port        string   `json:"port,omitempty"`
+	Domain      []string `json:"domain,omitempty"`
+	IP          []string `json:"ip,omitempty"`
+}
+
+func (r rule) xrRules(name, out string, version int) []xrayRouteRule {
+	base := xrayRouteRule{RuleTag: name, InboundTag: []string{"tproxy-in"}, OutboundTag: out, Network: r.network, Protocol: r.protocol}
 	var ports []string
 	for _, p := range r.ports {
 		ports = append(ports, strconv.Itoa(p))
 	}
-	base["port"] = strings.Join(append(ports, r.ranges...), ",")
+	for _, p := range r.ranges {
+		ports = append(ports, strings.Replace(p, ":", "-", 1))
+	}
+	base.Port = strings.Join(ports, ",")
 	domains := r.xrDomain()
 	var ips []string
 	for _, ip := range r.ip {
@@ -131,23 +158,23 @@ func (r rule) xrRules(name, out string, version int) []object {
 	if version == 6 {
 		ipRange = "::/0"
 	}
-	var rules []object
+	var rules []xrayRouteRule
 	if len(domains) > 0 {
-		d := copyObj(base)
-		d["domain"] = domains
+		d := base
+		d.Domain = domains
 		if ipRange != "" {
-			d["ip"] = []string{ipRange}
+			d.IP = []string{ipRange}
 		}
 		rules = append(rules, d)
 	}
 	if len(ips) > 0 {
-		i := copyObj(base)
-		i["ip"] = ips
+		i := base
+		i.IP = ips
 		rules = append(rules, i)
 	}
 	if len(domains)+len(ips) == 0 {
 		if ipRange != "" {
-			base["ip"] = []string{ipRange}
+			base.IP = []string{ipRange}
 		}
 		rules = append(rules, base)
 	}

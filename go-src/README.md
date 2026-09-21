@@ -1,7 +1,52 @@
 # Hijpass configuration generator
 
-This directory replaces the former TypeScript core builders. It uses only the Go
-standard library (Go 1.23 or newer). It runs on demand; it is not a daemon.
+This directory replaces the former TypeScript core builders. It uses native core
+configuration structs and requires Go 1.26 or newer. It runs on demand; it is not
+a daemon.
+
+## Pinned upstream schemas
+
+The latest stable releases checked on 2026-09-21 are pinned in `go.mod`/`go.sum`:
+
+- [Xray v26.3.27](https://github.com/XTLS/Xray-core/releases/tag/v26.3.27):
+  `github.com/xtls/xray-core v1.260327.0` (the Go module version for the release
+  commit `d2758a023cd7f4174a5a5fa4ff66e487d4342ba0`). Builders use
+  [`infra/conf`](https://github.com/XTLS/Xray-core/tree/v26.3.27/infra/conf).
+- [sing-box v1.14.1](https://github.com/SagerNet/sing-box/releases/tag/v1.14.1):
+  `github.com/sagernet/sing-box v1.14.1`. Builders use
+  [`option`](https://github.com/SagerNet/sing-box/tree/v1.14.1/option) and the
+  context-aware `sing/common/json` serializer for polymorphic options.
+
+`proxyNode` decodes UCI strings into typed fields once. Core output, DNS, routing,
+transports and protocol settings use upstream structs. Xray exposes protocol
+settings and routing rules as `json.RawMessage`; typed settings are serialized
+only at these boundaries. Its private field-rule, least-load and health-check
+structs have small local wire adapters. The health-check adapter is decoded into
+native `BurstObservatoryConfig` before output. Maps remain for raw UCI sections,
+section/tag indexes and keyed RPC method descriptions, not core schemas.
+
+Native imports bring transitive core dependencies and a larger generator binary;
+this is no longer a standard-library-only build. Stripped static smoke builds
+were approximately 30 MiB (ARM64) and 34 MiB (MIPSLE), before package compression.
+The SDK must supply Go 1.26+.
+The installed runtime cores should match these pinned releases; older-core
+compatibility is not promised. Core binaries still perform final validation.
+
+Schema corrections relative to the former browser generator:
+
+- sing-box uses reject rule actions instead of its removed block outbound,
+  supplies a local default domain resolver for proxy nodes, and supplies uTLS
+  when Reality is enabled. See the upstream
+  [migration guide](https://sing-box.sagernet.org/migration/).
+- Xray DNS outbound uses the release's `nonIPQuery: "reject"`, and route port
+  ranges use `-`. See the pinned
+  [DNS options](https://github.com/XTLS/Xray-core/blob/v26.3.27/infra/conf/dns_proxy.go)
+  and [routing parser](https://github.com/XTLS/Xray-core/blob/v26.3.27/infra/conf/router.go).
+- Geo conversion preserves explicit rule-set references alongside derived Geo
+  rule-sets. Typed numbers reject overflow and invalid UCI numeric values.
+
+Native serializers can omit default values, collapse single-item lists and
+normalize durations. JSON formatting/shape differences do not imply lost options.
 
 ## Responsibilities
 
@@ -79,9 +124,20 @@ ts-src/node_modules/.bin/tsc --project ts-src/tsconfig.json
 (cd ts-src && npm run build)
 ```
 
-`testdata/compatibility.json` contains 49 output comparisons captured from the
+`testdata/compatibility.json` contains 49 immutable output samples captured from the
 former browser generator at commit
 `bca34e5285fd8edd7da6cb2fd23e499e68c9f502`. Fixtures use synthetic credentials.
+Tests apply the explicitly listed schema migrations to those old samples, then
+use native parsers/serializers to compare both sides. They also exercise Xray's
+native `Build`, numeric bounds, TLS preservation during address replacement,
+Geo rule-set preservation and removed outbound handling.
+
+During this refactor, official Linux AMD64 binaries for the pinned releases also
+accepted 45 generated configurations covering default protocols, VLESS transports,
+load balancing, chains and shunt/DNS rules. These were configuration checks, not
+live connectivity tests. The all-options fixtures contain intentionally synthetic
+Reality keys and incompatible option combinations; Geo/remote rule-set fixtures
+need external resources and were excluded from that binary smoke check.
 To reproduce them with that commit available in Git history:
 
 ```sh

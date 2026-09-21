@@ -27,17 +27,7 @@ func TestCompatibility(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			b, e := json.Marshal(object{"nodes": cleanNodes(g.Nodes), "shunt": clean(g.Shunt)})
-			if e != nil {
-				t.Fatal(e)
-			}
-			var actual any
-			json.Unmarshal(b, &actual)
-			if !reflect.DeepEqual(actual, tc.Expected) {
-				want, _ := json.MarshalIndent(tc.Expected, "", "  ")
-				got, _ := json.MarshalIndent(actual, "", "  ")
-				t.Errorf("output differs from TypeScript baseline\nwant: %s\ngot: %s", want, got)
-			}
+			compareBaseline(t, g, tc.Sections, tc.Expected)
 		})
 	}
 }
@@ -136,4 +126,12 @@ func TestPublishRejectsDuplicatePaths(t *testing.T) {
 	if _, e := os.Stat(p); !os.IsNotExist(e) {
 		t.Fatal("duplicate output wrote a file")
 	}
+}
+
+func clone(s section) section {
+	o := section{}
+	for k, v := range s {
+		o[k] = v
+	}
+	return o
 }

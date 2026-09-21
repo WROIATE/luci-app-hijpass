@@ -30,7 +30,12 @@ test('rpcd advertises only read-only snapshot operations', () => {
 test('RPC renders the submitted snapshot and validates references', () => {
     const fixture = fixtures.find(f => f.name === 'sing-box-chain');
     const sections = JSON.stringify(fixture.sections);
-    assert.deepEqual(rpc('render', { sections, target: 'downstream' }).config, fixture.expected.nodes.downstream);
+    const expected = structuredClone(fixture.expected.nodes.downstream);
+    // Native serializers omit false/zero defaults and add the required resolver.
+    expected.route = { default_domain_resolver: 'local' };
+    delete expected.log.disabled;
+    if (expected.outbounds[0].tls) delete expected.outbounds[0].tls.insecure;
+    assert.deepEqual(rpc('render', { sections, target: 'downstream' }).config, expected);
     assert.deepEqual(rpc('validate', { sections }), { ok: true });
     const broken = structuredClone(fixture.sections);
     broken.at(-1).upstream_proxy_node = 'missing';

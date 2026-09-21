@@ -13,15 +13,16 @@ NFT_SCRIPT="$LIB_PATH/nft.sh"
 ROUTE_SCRIPT="$LIB_PATH/route.sh"
 RULE_UPDATE_SCRIPT="$LIB_PATH/rules.sh"
 CHINANDS_NG_SCRIPT="$LIB_PATH/chinadns-ng.sh"
-GEOVIEW_SCRIPT="$LIB_PATH/geoview.sh"
 
 CONF_PATH="/etc/$NAME"
-SHUNT_CONF="$CONF_PATH/shunt.json"
+SHUNT_CONF=$(uci -q get hijpass.@hijpass[0].shunt_conf || :)
+SHUNT_CONF=${SHUNT_CONF:-"$CONF_PATH/shunt.json"}
 
 # Global
 ENABLED=$(uci -q get hijpass.@hijpass[0].enabled || :)
 DELAY_TIME=$(uci -q get hijpass.@hijpass[0].delay_time || :)
 CLIENT_DIR=$(uci -q get hijpass.@hijpass[0].client_dir || :)
+CLIENT_DIR=${CLIENT_DIR:-/etc/hijpass/client}
 
 # RuleDTO
 CRON_CONF=$(uci -q get hijpass.@rule[0].update_schedule || :)
@@ -34,8 +35,19 @@ DNS_SERVICE=$(uci -q get hijpass.@dns[0].dns_service || :)
 DNS_HOOK=$(uci -q get hijpass.@hijpass[0].dns_hook || :)
 CHINADNS_NG_CONF="$CONF_PATH/chinadns-ng.conf"
 
+generate_config() {
+  local error
+  error=$(/usr/bin/hijpass-config generate 2>&1) || {
+    log_error "Configuration generation failed: $error"
+    return 1
+  }
+}
+
 start_service() {
   [ "$ENABLED" != "1" ] && return
+  if [ "$HIJPASS_CONFIG_READY" != "1" ]; then
+    generate_config || exit 1
+  fi
   # 启动进程
   config_load $NAME
   log_info "===================== Starting service ======================="
@@ -73,8 +85,19 @@ service_triggers() {
   procd_add_interface_trigger "interface.*.up" "*" /etc/init.d/$NAME restart
 }
 
+# Generate and validate before stopping working instances. start_service reuses
+# this batch within the same rc.common invocation.
+restart() {
+  if [ "$ENABLED" = "1" ]; then
+    generate_config || return 1
+  fi
+  HIJPASS_CONFIG_READY=1
+  stop
+  start
+}
+
 reload_service() {
-  /etc/init.d/$NAME restart
+  restart
 }
 
 boot() {
@@ -97,7 +120,7 @@ run_load_balance_proxy() {
 }
 
 run_proxy() {
-  local command log_path name enabled nest_proxy core
+  local command log_path name enabled nest_proxy core type
   local enable_std_log="1"
   config_get enabled "$1" enabled
   [ "$enabled" != "1" ] && return
@@ -106,6 +129,15 @@ run_proxy() {
   config_get name "$1" name
   config_get nest_proxy "$1" nest_proxy
   config_get core "$1" core
+  config_get type "$1" type
+  if [ -z "$core" ]; then
+    case "$type" in
+      vless) core=xray ;;
+      custom) core=custom ;;
+      *) core=sing-box ;;
+    esac
+  fi
+  [ "$core" = "singbox" ] && core=sing-box
 
   local conf_path="$CLIENT_DIR/$name-$1.json"
 
@@ -128,17 +160,16 @@ run_proxy() {
 }
 
 run_shunt() {
-  local type log_path enabled ruleset_convert
+  local type log_path enabled
   config_get enabled "$1" enabled
   [ "$enabled" = "0" ] && log_info "Shunt disabled, skipping" && return
   config_get type "$1" type
+  [ "$type" = "singbox" ] && type=sing-box
   [ -z "$type" ] && log_error "Shunt type not set" && return
   config_get log_path "$1" log_path
-  config_get ruleset_convert "$1" ruleset_convert
 
   local shunt_command="$type -c $SHUNT_CONF"
   [ "$type" = "sing-box" ] && shunt_command="$type run -c $SHUNT_CONF"
-  [ "$type" = "sing-box" ] && [ "$ruleset_convert" = "1" ] && $GEOVIEW_SCRIPT -t
 
   local enable_std_log="0"
   if [ -n "$log_path" ]; then

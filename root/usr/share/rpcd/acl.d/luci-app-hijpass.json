@@ -162,6 +162,12 @@
         "/usr/lib/hijpass/trace-task.sh release [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]": [
           "exec"
         ]
+      },
+      "ubus": {
+        "hijpass-config": [
+          "render",
+          "validate"
+        ]
       }
     }
   }

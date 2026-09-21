@@ -6,8 +6,9 @@ log_debug "$0"
 GEO_SITE_PATH=/usr/share/v2ray/geosite.dat
 GEO_IP_PATH=/usr/share/v2ray/geoip.dat
 RULESET_PATH=/etc/hijpass/ruleset
-GEOSITE_TAG_LIST="$(uci -q get hijpass.@shunt[0].geosite_ruleset)"
-GEOIP_TAG_LIST="$(uci -q get hijpass.@shunt[0].geoip_ruleset)"
+# Derived metadata is produced by the backend, without modifying user UCI.
+GEOSITE_TAG_LIST="$(jq -r '.geosite // [] | .[]' /etc/hijpass/generated-georules.json 2>/dev/null)"
+GEOIP_TAG_LIST="$(jq -r '.geoip // [] | .[]' /etc/hijpass/generated-georules.json 2>/dev/null)"
 
 is_geo_type() {
   [ "$1" = "geosite" ] || [ "$1" = "geoip" ]

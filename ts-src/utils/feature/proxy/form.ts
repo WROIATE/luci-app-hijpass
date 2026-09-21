@@ -7,7 +7,7 @@ import { JsonUtils } from "../../base/files/json";
 import { NotificationUtils } from "../../base/luci/notification";
 import { UciUtils } from "../../base/luci/uci";
 import { ValidationUtils } from "../../base/luci/validation";
-import { ProxyConfigFileUtils } from "./config-file";
+import { GeneratedConfigUtils } from "../config/backend";
 import { ProxyChainUtils } from "./chain";
 import { ImportedProxyConfig, ProxyShareLinkUtils } from "./share-link";
 import { findProxyDependencyCycleFrom } from "./validation";
@@ -372,13 +372,13 @@ const ProxyFormUtils = {
             btns.push(E('button', {
                 class: 'btn cbi-button',
                 style: 'background-color:#5a4a8a;border-color:#5a4a8a',
-                click: function () {
+                click: async function () {
                     let section = uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE)
                         .find((s: any) => s['.name'] === section_id);
                     if (!section) return;
                     let conf: {};
                     try {
-                        conf = ProxyConfigFileUtils.generateProxyConfigFromSection(section)
+                        conf = await GeneratedConfigUtils.preview(section['.name'])
                             || { error: _('Invalid proxy config') };
                     } catch (e: any) {
                         conf = { error: e.message };

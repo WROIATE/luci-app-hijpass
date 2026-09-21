@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-hijpass
 PKG_VERSION:=26.9.6
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
 
@@ -14,7 +14,7 @@ PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_tuic_client
 
-LUCI_DEPENDS:= +ca-bundle +curl +file +firewall4 +ip-full +luci-lua-runtime \
+LUCI_DEPENDS:= +hijpass-config +ca-bundle +curl +file +firewall4 +ip-full +luci-lua-runtime \
 	+sing-box +unzip +xray-core \
 	+kmod-nft-socket +kmod-nft-tproxy +kmod-nft-nat \
 	+v2ray-geosite +v2ray-geoip +geoview +chinadns-ng +jq
@@ -94,6 +94,39 @@ EOF
 exit 0
 endef
 
+# Build one architecture-specific backend alongside the architecture-neutral UI.
+PKG_BUILD_DEPENDS+=golang/host
+PKG_BUILD_FLAGS+=no-mips16
+GO_PKG:=hijpass/config
+GO_PKG_BUILD_PKG:=hijpass/config
+GO_PKG_TAGS:=netgo osusergo
+include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
+
+define Package/hijpass-config
+  SECTION:=net
+  CATEGORY:=Network
+  TITLE:=Hijpass configuration generator
+  DEPENDS:=$(GO_ARCH_DEPENDS) +rpcd +ubus
+endef
+
+define Build/Prepare/$(notdir $(CURDIR))
+	$(CP) ./go-src/*.go ./go-src/go.mod $(PKG_BUILD_DIR)/
+endef
+
+define HijpassConfig/Compile
+	$(call GoPackage/Build/Configure)
+	$(call GoPackage/Build/Compile)
+endef
+Hooks/Compile/Post:=$(filter-out Go/CacheCleanup,$(Hooks/Compile/Post)) HijpassConfig/Compile Go/CacheCleanup
+Build/InstallDev:=
+
+define Package/hijpass-config/install
+	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/libexec/rpcd
+	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/config $(1)/usr/bin/hijpass-config
+	$(LN) /usr/bin/hijpass-config $(1)/usr/libexec/rpcd/hijpass-config
+endef
+
 include $(TOPDIR)/feeds/luci/luci.mk
+$(eval $(call BuildPackage,hijpass-config))
 
 # call BuildPackage - OpenWrt buildroot signature

@@ -2,7 +2,6 @@ import { CORE_TYPE, LuciFlied, PROXY_TYPE, normalizeCoreType, ShuntTag } from ".
 import uci from "uci";
 import ui from "ui";
 import { NotificationUtils } from "../../base/luci/notification";
-import { FactoryType } from "../../../core/adapter";
 import { ShuntUtils } from "../../feature/shunt/section";
 import { MAX_PROXY_CHAIN_NODES, ProxyChainUtils } from "../../feature/proxy/chain";
 import { FirewallDnsForwardUtils } from "../../feature/firewall/dns-forward";
@@ -320,7 +319,7 @@ function routeRuleRequiresDnsExit(rule: any, shuntType: string, rulesetConvert: 
     }
 
     const ruleDTO = ShuntUtils.parseRuleList(rule);
-    if (shuntType === FactoryType.XRAY) {
+    if (shuntType === CORE_TYPE.XRAY) {
         return ruleDTO.containDomain() || ruleDTO.geoSite.length > 0;
     }
 
@@ -387,7 +386,7 @@ function checkDnsRoutingTargets() {
 
 function checkXrayRouteProtocols() {
     const shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
-    if (shuntType !== FactoryType.XRAY) {
+    if (shuntType !== CORE_TYPE.XRAY) {
         return true;
     }
 
@@ -419,7 +418,7 @@ function checkXrayRouteProtocols() {
 
 function checkXrayDnsServerTypes() {
     const shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
-    if (shuntType !== FactoryType.XRAY) {
+    if (shuntType !== CORE_TYPE.XRAY) {
         return true;
     }
 
@@ -439,7 +438,7 @@ function checkXrayDnsServerTypes() {
 function checkXrayTlsInsecure() {
     const warnings: string[] = [];
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
-        if (section.enabled !== '1' || normalizeCoreType(section.core) !== FactoryType.XRAY || section.tls_insecure !== '1') {
+        if (section.enabled !== '1' || normalizeCoreType(section.core) !== CORE_TYPE.XRAY || section.tls_insecure !== '1') {
             return;
         }
         if (XRAY_TLS_PROTOCOLS.indexOf(section.type) !== -1) {
@@ -496,7 +495,7 @@ function getSkippedRouteRuleMessage(rule: any, shuntType: string, rulesetConvert
     const ruleName = rule.name || rule['.name'] || _('Unnamed Rule');
     const canConvertGeoRule = rulesetConvert === '1';
 
-    if (shuntType === FactoryType.XRAY) {
+    if (shuntType === CORE_TYPE.XRAY) {
         if (ruleDTO.isEmpty('geo')) {
             return _('Route rule "%s" has no valid match conditions for Xray').format(ruleName);
         }
@@ -509,7 +508,7 @@ function getSkippedRouteRuleMessage(rule: any, shuntType: string, rulesetConvert
         return null;
     }
 
-    if (shuntType === FactoryType.SING_BOX) {
+    if (shuntType === CORE_TYPE.SING_BOX) {
         if (!canConvertGeoRule && ruleDTO.containGeo()) {
             ruleDTO.geoSite = [];
             ruleDTO.geoIp = [];

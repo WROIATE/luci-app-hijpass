@@ -6,7 +6,7 @@ import { CORE_TYPE, LuciFlied, ShuntTag } from "../../../enum/hijpass";
 import { FilePathUtils } from "../../base/files/paths";
 import { FormUtils } from "../../base/luci/form";
 import { NotificationUtils } from "../../base/luci/notification";
-import { ShuntConfigUtils } from "./config-file";
+import { GeneratedConfigUtils } from "../config/backend";
 
 function makeSelect(id: string, options: { value: string, label: string }[]) {
     const sel = E('select', {id, class: 'cbi-input-select', style: 'width:100%'}) as HTMLSelectElement;
@@ -51,9 +51,9 @@ const ShuntFormUtils = {
         o.rmempty = false;
     },
 
-    showPreview: function () {
+    showPreview: async function () {
         try {
-            let configJson = ShuntConfigUtils.getShuntConfData()
+            let configJson = JSON.stringify(await GeneratedConfigUtils.preview('shunt'), null, 2)
             let shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') || CORE_TYPE.XRAY
             ui.showModal(_('Preview Configuration'), [
                 E('div', {'class': 'cbi-section'}, [

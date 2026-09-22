@@ -56,7 +56,7 @@ func xrInbound(typ, tag string, port uint16, shunt bool) (xr.InboundDetourConfig
 		o.Settings, e = rawSettings(d)
 	}
 	if shunt && typ == "tproxy" {
-		o.SniffingConfig = &xr.SniffingConfig{Enabled: true, DestOverride: ptr(xr.StringList{"http", "tls", "quic"}), RouteOnly: true}
+		o.SniffingConfig = &xr.SniffingConfig{Enabled: true, DestOverride: xr.StringList{"http", "tls", "quic"}, RouteOnly: true}
 	}
 	return o, e
 }
@@ -69,7 +69,10 @@ func xrProtocol(n proxyNode) (xr.OutboundDetourConfig, error) {
 	var e error
 	switch n.Type {
 	case "shadowsocks":
-		o.Settings, e = rawSettings(xr.ShadowsocksClientConfig{Address: xrAddress(n.Server), Port: uint16(n.ServerPort), Cipher: n.Method, Password: n.Password, UoT: bool(n.UDPOverTCP)})
+		if n.UDPOverTCP {
+			return o, fmt.Errorf("Xray main no longer supports Shadowsocks udp_over_tcp; disable it or select sing-box")
+		}
+		o.Settings, e = rawSettings(xr.ShadowsocksClientConfig{Address: xrAddress(n.Server), Port: uint16(n.ServerPort), Cipher: n.Method, Password: n.Password})
 	case "hysteria2":
 		o.Protocol = "hysteria"
 		o.Settings, e = rawSettings(xr.HysteriaClientConfig{Version: 2, Address: xrAddress(n.Server), Port: uint16(n.ServerPort)})

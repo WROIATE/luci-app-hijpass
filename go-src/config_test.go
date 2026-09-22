@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -24,6 +25,17 @@ func TestCompatibility(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			g, e := render(tc.Sections)
+			if tc.Name == "xray-shadowsocks-options" {
+				if e == nil || !strings.Contains(e.Error(), "no longer supports Shadowsocks udp_over_tcp") {
+					t.Fatalf("expected explicit removed-UoT error, got %v", e)
+				}
+				// Still compare every supported option after the user disables
+				// the removed setting; do not discard this regression sample.
+				for _, s := range tc.Sections.of("proxy_node") {
+					s["udp_over_tcp"] = "0"
+				}
+				g, e = render(tc.Sections)
+			}
 			if e != nil {
 				t.Fatal(e)
 			}

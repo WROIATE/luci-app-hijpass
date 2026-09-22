@@ -218,17 +218,20 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 				}
 			}
 		}
-		settings, e := rawSettings(xr.FreedomConfig{DomainStrategy: "UseIP"})
+		settings, e := rawSettings(xr.FreedomConfig{})
 		if e != nil {
 			return nil, e
 		}
-		direct := xr.OutboundDetourConfig{Protocol: "freedom", Tag: "direct-out", Settings: settings}
+		direct := xr.OutboundDetourConfig{Protocol: "freedom", Tag: "direct-out", Settings: settings, StreamSetting: &xr.StreamConfig{SocketSettings: &xr.SocketConfig{DomainStrategy: "UseIP"}}}
 		if final == "direct-out" {
 			x.OutboundConfigs = append([]xr.OutboundDetourConfig{direct}, x.OutboundConfigs...)
 		} else {
 			x.OutboundConfigs = append(x.OutboundConfigs, direct)
 		}
-		dnsSettings, e := rawSettings(xr.DNSOutboundConfig{NonIPQuery: "reject"})
+		dnsSettings, e := rawSettings(xr.DNSOutboundConfig{Rules: []*xr.DNSOutboundRuleConfig{
+			{Action: "hijack", QType: &xr.PortList{Range: []xr.PortRange{{From: 1, To: 1}, {From: 28, To: 28}}}},
+			{Action: "return", RCode: 5},
+		}})
 		if e != nil {
 			return nil, e
 		}

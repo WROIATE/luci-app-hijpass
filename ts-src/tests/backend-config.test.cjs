@@ -12,7 +12,7 @@ after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const binary = path.join(dir, 'hijpass-config');
 const build = spawnSync('go', ['build', '-o', binary, '.'], {
     cwd: path.join(root, 'go-src'), encoding: 'utf8',
-    env: { ...process.env, GOCACHE: path.join(os.tmpdir(), 'hijpass-go-cache') }
+    env: { ...process.env, GOCACHE: process.env.GOCACHE || path.join(os.tmpdir(), 'hijpass-go-cache') }
 });
 assert.equal(build.status, 0, build.stderr);
 const fixtures = JSON.parse(fs.readFileSync(path.join(root, 'go-src/testdata/compatibility.json')));

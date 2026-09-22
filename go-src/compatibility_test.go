@@ -140,8 +140,11 @@ func migrateBaseline(raw map[string]any, co string, shunt bool) {
 	} else {
 		for _, v := range raw["outbounds"].([]any) {
 			out := v.(map[string]any)
-			if out["protocol"] == "dns" {
-				out["settings"] = map[string]any{"nonIPQuery": "reject"}
+			if out["protocol"] == "freedom" {
+				settings := out["settings"].(map[string]any)
+				strategy := settings["domainStrategy"]
+				delete(settings, "domainStrategy")
+				out["streamSettings"] = map[string]any{"sockopt": map[string]any{"domainStrategy": strategy}}
 			}
 		}
 		if route, ok := raw["routing"].(map[string]any); ok {

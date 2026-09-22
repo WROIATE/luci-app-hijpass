@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	sb "github.com/sagernet/sing-box/option"
 	xr "github.com/xtls/xray-core/infra/conf"
+	dnsproxy "github.com/xtls/xray-core/proxy/dns"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -112,7 +114,12 @@ func TestXrayNativeBuild(t *testing.T) {
 				if e = json.Unmarshal(data, &decoded); e != nil {
 					t.Fatal(e)
 				}
-				if _, e = decoded.Build(); e != nil {
+				_, e = decoded.Build()
+				if name == "xray-vless-defaults" {
+					if e == nil || !strings.Contains(e.Error(), "vless without TLS or other encryption is prohibited") {
+						t.Fatalf("expected upstream public plaintext rejection, got %v", e)
+					}
+				} else if e != nil {
 					t.Fatal(e)
 				}
 			}
@@ -135,8 +142,27 @@ func TestPinnedSchemaMigrations(t *testing.T) {
 					t.Fatal("removed block outbound or missing reject rule")
 				}
 			} else {
-				if !strings.Contains(string(data), `"nonIPQuery":"reject"`) {
-					t.Fatal("missing native DNS non-IP handling")
+				var settings xr.DNSOutboundConfig
+				found := false
+				for _, out := range g.Shunt.Xray.OutboundConfigs {
+					if out.Tag != "dns-out" {
+						continue
+					}
+					found = true
+					if e := json.Unmarshal(*out.Settings, &settings); e != nil {
+						t.Fatal(e)
+					}
+				}
+				if !found || settings.NonIPQuery != nil || settings.BlockTypes != nil || len(settings.Rules) != 2 {
+					t.Fatal("expected native DNS rules without legacy policy")
+				}
+				built, e := settings.Build()
+				if e != nil {
+					t.Fatal(e)
+				}
+				rules := built.(*dnsproxy.Config).Rule
+				if rules[0].Action != dnsproxy.RuleAction_Hijack || !reflect.DeepEqual(rules[0].QType, []int32{1, 28}) || rules[1].Action != dnsproxy.RuleAction_Return || rules[1].RCode != 5 || len(rules[1].QType) != 0 {
+					t.Fatal("DNS policy must hijack A/AAAA and refuse other queries")
 				}
 			}
 		})

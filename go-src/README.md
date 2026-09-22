@@ -1,17 +1,21 @@
 # Hijpass configuration generator
 
 This directory replaces the former TypeScript core builders. It uses native core
-configuration structs and requires Go 1.26 or newer. It runs on demand; it is not
+configuration structs and requires Go 1.27 or newer. It runs on demand; it is not
 a daemon.
 
 ## Pinned upstream schemas
 
-The latest stable releases checked on 2026-09-21 are pinned in `go.mod`/`go.sum`:
+The dependency policy is Xray's current `main` source and sing-box's stable
+release, both pinned in `go.mod`/`go.sum` for reproducible builds:
 
-- [Xray v26.3.27](https://github.com/XTLS/Xray-core/releases/tag/v26.3.27):
-  `github.com/xtls/xray-core v1.260327.0` (the Go module version for the release
-  commit `d2758a023cd7f4174a5a5fa4ff66e487d4342ba0`). Builders use
-  [`infra/conf`](https://github.com/XTLS/Xray-core/tree/v26.3.27/infra/conf).
+- [Xray main at `d562d8947d31`](https://github.com/XTLS/Xray-core/commit/d562d8947d3175db86b4fa849742433a9876cb63):
+  checked on 2026-09-22; upstream commit dated 2026-09-20.
+  `github.com/xtls/xray-core v1.260327.1-0.20260920225103-d562d8947d31` is the
+  Go pseudo-version for this commit, **not the March release**. Builders use
+  [`infra/conf`](https://github.com/XTLS/Xray-core/tree/d562d8947d3175db86b4fa849742433a9876cb63/infra/conf).
+  Future updates should resolve `main` again and commit the resulting exact
+  version together with schema adaptations and test results.
 - [sing-box v1.14.1](https://github.com/SagerNet/sing-box/releases/tag/v1.14.1):
   `github.com/sagernet/sing-box v1.14.1`. Builders use
   [`option`](https://github.com/SagerNet/sing-box/tree/v1.14.1/option) and the
@@ -26,10 +30,11 @@ native `BurstObservatoryConfig` before output. Maps remain for raw UCI sections,
 section/tag indexes and keyed RPC method descriptions, not core schemas.
 
 Native imports bring transitive core dependencies and a larger generator binary;
-this is no longer a standard-library-only build. Stripped static smoke builds
-were approximately 30 MiB (ARM64) and 34 MiB (MIPSLE), before package compression.
-The SDK must supply Go 1.26+.
-The installed runtime cores should match these pinned releases; older-core
+this is no longer a standard-library-only build. Stripped static smoke builds for
+this revision are approximately 32 MiB (ARM64) and 36 MiB (MIPSLE), before package
+compression; exact sizes vary by upstream revision.
+The SDK must supply Go 1.27+.
+The installed runtime cores should match these pinned revisions; older-core
 compatibility is not promised. Core binaries still perform final validation.
 
 Schema corrections relative to the former browser generator:
@@ -38,10 +43,19 @@ Schema corrections relative to the former browser generator:
   supplies a local default domain resolver for proxy nodes, and supplies uTLS
   when Reality is enabled. See the upstream
   [migration guide](https://sing-box.sagernet.org/migration/).
-- Xray DNS outbound uses the release's `nonIPQuery: "reject"`, and route port
-  ranges use `-`. See the pinned
-  [DNS options](https://github.com/XTLS/Xray-core/blob/v26.3.27/infra/conf/dns_proxy.go)
-  and [routing parser](https://github.com/XTLS/Xray-core/blob/v26.3.27/infra/conf/router.go).
+- Xray DNS outbound uses native `rules`: hijack A/AAAA (types 1 and 28), then
+  return REFUSED (rcode 5) for other queries. Deprecated `nonIPQuery`/`blockTypes`
+  are unset. Route port ranges use `-`. See the pinned
+  [DNS options](https://github.com/XTLS/Xray-core/blob/d562d8947d3175db86b4fa849742433a9876cb63/infra/conf/dns_proxy.go)
+  and [routing parser](https://github.com/XTLS/Xray-core/blob/d562d8947d3175db86b4fa849742433a9876cb63/infra/conf/router.go).
+- Xray main no longer has Shadowsocks `uot`/`uotVersion`. An enabled UCI
+  `udp_over_tcp` on Xray Shadowsocks produces an explicit error; disable it or
+  use sing-box. See the pinned
+  [Shadowsocks schema](https://github.com/XTLS/Xray-core/blob/d562d8947d3175db86b4fa849742433a9876cb63/infra/conf/shadowsocks.go).
+- Xray's native build now rejects public-address VLESS without TLS or encryption.
+  The generator keeps the requested security settings; final core validation
+  enforces that upstream restriction. Freedom's domain strategy is generated as
+  `streamSettings.sockopt.domainStrategy`, replacing its deprecated settings field.
 - Geo conversion preserves explicit rule-set references alongside derived Geo
   rule-sets. Typed numbers reject overflow and invalid UCI numeric values.
 
@@ -127,17 +141,22 @@ ts-src/node_modules/.bin/tsc --project ts-src/tsconfig.json
 `testdata/compatibility.json` contains 49 immutable output samples captured from the
 former browser generator at commit
 `bca34e5285fd8edd7da6cb2fd23e499e68c9f502`. Fixtures use synthetic credentials.
-Tests apply the explicitly listed schema migrations to those old samples, then
+The Xray Shadowsocks UoT sample must first return an explicit error; its remaining
+options are then compared with UoT disabled. For all 49 samples, tests apply the
+explicitly listed schema migrations, then
 use native parsers/serializers to compare both sides. They also exercise Xray's
 native `Build`, numeric bounds, TLS preservation during address replacement,
-Geo rule-set preservation and removed outbound handling.
+Geo rule-set preservation and removed outbound handling. Native tests also check
+Xray main's public plaintext VLESS rejection and DNS rules after protobuf build.
 
-During this refactor, official Linux AMD64 binaries for the pinned releases also
-accepted 45 generated configurations covering default protocols, VLESS transports,
-load balancing, chains and shunt/DNS rules. These were configuration checks, not
-live connectivity tests. The all-options fixtures contain intentionally synthetic
-Reality keys and incompatible option combinations; Geo/remote rule-set fixtures
-need external resources and were excluded from that binary smoke check.
+The current Xray revision is checked through its native configuration parser and
+`Build` implementation, including the DNS rules' resulting protobuf policy.
+Go race tests, `go vet`, the five backend/LuCI integration tests and static
+ARM64/MIPSLE cross-compilation passed with Go 1.27.1.
+All-options fixtures contain synthetic Reality keys and incompatible option
+combinations, so schema comparisons alone do not certify runtime connectivity.
+Geo and remote rule-set configurations also require external resource files.
+
 To reproduce them with that commit available in Git history:
 
 ```sh

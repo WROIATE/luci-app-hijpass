@@ -1,11 +1,7 @@
-// Package protocol defines protocol-specific proxy nodes and decodes their flat
-// UCI representation. Core configuration generation belongs to the caller.
+// Package protocol defines input-independent proxy models, defaults and validation.
 package protocol
 
-import (
-	"encoding/json"
-	"fmt"
-)
+import "fmt"
 
 // Node exposes common metadata and protocol-specific validation.
 type Node interface {
@@ -22,9 +18,8 @@ type RemoteNode interface {
 func (n *BaseOptions) Base() *BaseOptions         { return n }
 func (n *ServerOptions) Endpoint() *ServerOptions { return n }
 
-// Decode selects a concrete node and validates only its applicable fields.
-// Defaults are applied before decoding so explicit UCI values take precedence.
-func Decode(kind string, data []byte) (Node, error) {
+// New creates a protocol node with its defaults. Call protocol.Validate after filling its fields.
+func New(kind string) (Node, error) {
 	var n Node
 	switch kind {
 	case "shadowsocks":
@@ -42,23 +37,23 @@ func Decode(kind string, data []byte) (Node, error) {
 	default:
 		return nil, fmt.Errorf("unsupported proxy type %q", kind)
 	}
+	n.Base().Type = kind
 	n.Base().LogLevel = "info"
-	if err := json.Unmarshal(data, n); err != nil {
-		return nil, err
-	}
-	if n.Base().Type != kind {
-		return nil, fmt.Errorf("proxy type does not match %q", kind)
-	}
+	return n, nil
+}
+
+// Validate checks common options and the concrete protocol's constraints.
+func Validate(n Node) error {
 	if err := n.Base().validateBase(); err != nil {
-		return nil, err
+		return err
 	}
 	if remote, ok := n.(RemoteNode); ok {
 		if err := remote.Endpoint().validateServer(); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	if err := n.Validate(); err != nil {
-		return nil, err
+		return err
 	}
-	return n, nil
+	return nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"hijpass/config/protocol"
+	"hijpass/config/uci"
 )
 
 // Adapt raw UCI sections to the protocol package without coupling its models to
@@ -12,7 +13,7 @@ func parseNode(s section) (protocol.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	n, err := protocol.Decode(s.str("type"), data)
+	n, err := uci.DecodeNode(data)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +26,7 @@ func fallback(s, defaultValue string) string {
 	}
 	return s
 }
-func intValue(v *protocol.Int) int {
+func intValue(v *int64) int {
 	if v == nil {
 		return 0
 	}

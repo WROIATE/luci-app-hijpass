@@ -147,7 +147,7 @@ func xrProtocol(node protocol.RemoteNode) (xr.OutboundDetourConfig, error) {
 	}
 	return o, e
 }
-func xrBandwidth(v *protocol.Int) xr.Bandwidth {
+func xrBandwidth(v *int64) xr.Bandwidth {
 	if v == nil {
 		return ""
 	}
@@ -161,7 +161,7 @@ func (c config) xrayProxy(node protocol.Node) (*coreConfig, error) {
 	x := &xr.Config{LogConfig: xrLog(base.LogLevel)}
 	for _, p := range []struct {
 		typ, tag string
-		port     protocol.Int
+		port     int64
 	}{{"tproxy", "tproxy-in", base.ListenPort}, {"socks", "socks-in", base.SocksPort}} {
 		in, e := xrInbound(p.typ, p.tag, uint16(p.port), false)
 		if e != nil {

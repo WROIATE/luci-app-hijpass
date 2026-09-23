@@ -1,4 +1,4 @@
-package protocol
+package uci
 
 import (
 	"encoding/json"
@@ -10,9 +10,9 @@ import (
 
 // UCI's numeric/boolean options are strings on the wire. Decode them once at the
 // boundary so builders operate on typed fields and cannot silently truncate ports.
-type Int int64
+type integer int64
 
-func (v *Int) UnmarshalJSON(b []byte) error {
+func (v *integer) UnmarshalJSON(b []byte) error {
 	var s string
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
@@ -25,13 +25,13 @@ func (v *Int) UnmarshalJSON(b []byte) error {
 	if e != nil || n < 0 {
 		return fmt.Errorf("invalid nonnegative integer %q", s)
 	}
-	*v = Int(n)
+	*v = integer(n)
 	return nil
 }
 
-type Bool bool
+type boolean bool
 
-func (v *Bool) UnmarshalJSON(b []byte) error {
+func (v *boolean) UnmarshalJSON(b []byte) error {
 	var s string
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
@@ -43,9 +43,9 @@ func (v *Bool) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type Duration time.Duration
+type duration time.Duration
 
-func (v *Duration) UnmarshalJSON(b []byte) error {
+func (v *duration) UnmarshalJSON(b []byte) error {
 	var s string
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
@@ -58,13 +58,13 @@ func (v *Duration) UnmarshalJSON(b []byte) error {
 	if e != nil || d < 0 {
 		return fmt.Errorf("invalid duration %q", s)
 	}
-	*v = Duration(d)
+	*v = duration(d)
 	return nil
 }
 
-type Float float64
+type number float64
 
-func (v *Float) UnmarshalJSON(b []byte) error {
+func (v *number) UnmarshalJSON(b []byte) error {
 	var s string
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
@@ -77,13 +77,13 @@ func (v *Float) UnmarshalJSON(b []byte) error {
 	if e != nil || n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
 		return fmt.Errorf("invalid number %q", s)
 	}
-	*v = Float(n)
+	*v = number(n)
 	return nil
 }
 
-type StringList []string
+type stringList []string
 
-func (v *StringList) UnmarshalJSON(b []byte) error {
+func (v *stringList) UnmarshalJSON(b []byte) error {
 	var s string
 	if json.Unmarshal(b, &s) == nil {
 		if s != "" {

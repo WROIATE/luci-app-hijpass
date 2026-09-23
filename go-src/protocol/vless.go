@@ -10,10 +10,10 @@ type VLESS struct {
 	RealityOptions
 	MultiplexOptions
 	TransportOptions
-	UUID           string `json:"uuid"`
-	Network        string `json:"network"`
-	Flow           string `json:"flow"`
-	PacketEncoding string `json:"packet_encoding"`
+	UUID           string
+	Network        string
+	Flow           string
+	PacketEncoding string
 }
 
 func (n *VLESS) Validate() error {
@@ -26,6 +26,6 @@ func (n *VLESS) Validate() error {
 func newVLESS() *VLESS {
 	return &VLESS{
 		Network: "tcp", MultiplexOptions: MultiplexOptions{MultiplexProtocol: "h2mux"},
-		TransportOptions: TransportOptions{HTTPIdle: Duration(15 * time.Second), HTTPPing: Duration(15 * time.Second), GRPCIdle: Duration(15 * time.Second), GRPCPing: Duration(15 * time.Second)},
+		TransportOptions: TransportOptions{HTTPIdle: 15 * time.Second, HTTPPing: 15 * time.Second, GRPCIdle: 15 * time.Second, GRPCPing: 15 * time.Second},
 	}
 }

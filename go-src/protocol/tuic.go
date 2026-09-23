@@ -7,16 +7,16 @@ type TUIC struct {
 	BaseOptions
 	ServerOptions
 	TLSOptions
-	Password          string   `json:"password"`
-	UUID              string   `json:"uuid"`
-	Network           string   `json:"network"`
-	CongestionControl string   `json:"congestion_control"`
-	UDPRelayMode      string   `json:"udp_relay_mode"`
-	UDPOverStream     Bool     `json:"udp_over_stream"`
-	ZeroRTT           Bool     `json:"zero_rtt_handshake"`
-	Heartbeat         Duration `json:"heartbeat"`
+	Password          string
+	UUID              string
+	Network           string
+	CongestionControl string
+	UDPRelayMode      string
+	UDPOverStream     bool
+	ZeroRTT           bool
+	Heartbeat         time.Duration
 }
 
 func (n *TUIC) Validate() error { return nil }
 
-func newTUIC() *TUIC { return &TUIC{CongestionControl: "cubic", Heartbeat: Duration(10 * time.Second)} }
+func newTUIC() *TUIC { return &TUIC{CongestionControl: "cubic", Heartbeat: 10 * time.Second} }

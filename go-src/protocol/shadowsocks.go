@@ -5,12 +5,12 @@ type Shadowsocks struct {
 	BaseOptions
 	ServerOptions
 	MultiplexOptions
-	Password      string `json:"password"`
-	Network       string `json:"network"`
-	Method        string `json:"method"`
-	Plugin        string `json:"plugin"`
-	PluginOptions string `json:"plugin_opts"`
-	UDPOverTCP    Bool   `json:"udp_over_tcp"`
+	Password      string
+	Network       string
+	Method        string
+	Plugin        string
+	PluginOptions string
+	UDPOverTCP    bool
 }
 
 func (n *Shadowsocks) Validate() error { return n.validateMultiplex() }

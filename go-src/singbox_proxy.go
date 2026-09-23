@@ -12,7 +12,7 @@ import (
 func sbListen(port uint16, address string) sb.ListenOptions {
 	return sb.ListenOptions{Listen: ptr(badoption.Addr(netip.MustParseAddr(address))), ListenPort: port}
 }
-func sbInbounds(n proxyNode) []sb.Inbound {
+func sbInbounds(n nodeBase) []sb.Inbound {
 	return []sb.Inbound{
 		{Type: "tproxy", Tag: "tproxy-in", Options: &sb.TProxyInboundOptions{ListenOptions: sbListen(uint16(n.ListenPort), "127.0.0.1")}},
 		{Type: "socks", Tag: "socks-in", Options: &sb.SocksInboundOptions{ListenOptions: sbListen(uint16(n.SocksPort), "127.0.0.1")}},
@@ -21,7 +21,7 @@ func sbInbounds(n proxyNode) []sb.Inbound {
 func sbSocks(tag string, port uint16) sb.Outbound {
 	return sb.Outbound{Type: "socks", Tag: tag, Options: &sb.SOCKSOutboundOptions{ServerOptions: sb.ServerOptions{Server: "127.0.0.1", ServerPort: port}, Version: "5"}}
 }
-func sbMultiplex(n proxyNode) *sb.OutboundMultiplexOptions {
+func sbMultiplex(n multiplexOptions) *sb.OutboundMultiplexOptions {
 	if !n.MultiplexEnabled {
 		return nil
 	}
@@ -31,7 +31,7 @@ func sbMultiplex(n proxyNode) *sb.OutboundMultiplexOptions {
 	}
 	return m
 }
-func sbTransport(n proxyNode) (*sb.V2RayTransportOptions, error) {
+func sbTransport(n transportOptions) (*sb.V2RayTransportOptions, error) {
 	t := &sb.V2RayTransportOptions{Type: n.Transport}
 	switch n.Transport {
 	case "":
@@ -62,7 +62,7 @@ func sbProtocol(n proxyNode) (sb.Outbound, error) {
 	network := sb.NetworkList(n.Network)
 	switch n.Type {
 	case "shadowsocks":
-		p := &sb.ShadowsocksOutboundOptions{ServerOptions: server, Method: n.Method, Password: n.Password, Network: network, Plugin: n.Plugin, PluginOptions: n.PluginOptions, Multiplex: sbMultiplex(n)}
+		p := &sb.ShadowsocksOutboundOptions{ServerOptions: server, Method: n.Method, Password: n.Password, Network: network, Plugin: n.Plugin, PluginOptions: n.PluginOptions, Multiplex: sbMultiplex(n.multiplexOptions)}
 		if n.UDPOverTCP {
 			p.UDPOverTCP = &sb.UDPOverTCPOptions{Enabled: true}
 		}
@@ -100,7 +100,7 @@ func sbProtocol(n proxyNode) (sb.Outbound, error) {
 	case "shadowtls":
 		o.Options = &sb.ShadowTLSOutboundOptions{ServerOptions: server, Version: int(n.ShadowTLSVersion), Password: n.Password, OutboundTLSOptionsContainer: tls}
 	case "vless":
-		tr, e := sbTransport(n)
+		tr, e := sbTransport(n.transportOptions)
 		if e != nil {
 			return o, e
 		}
@@ -111,7 +111,7 @@ func sbProtocol(n proxyNode) (sb.Outbound, error) {
 			tls.TLS.Reality = &sb.OutboundRealityOptions{Enabled: true, PublicKey: n.RealityPublicKey, ShortID: n.RealityShortID}
 			tls.TLS.UTLS = &sb.OutboundUTLSOptions{Enabled: true, Fingerprint: "chrome"}
 		}
-		p := &sb.VLESSOutboundOptions{ServerOptions: server, UUID: n.UUID, Flow: n.Flow, Network: network, OutboundTLSOptionsContainer: tls, Transport: tr, Multiplex: sbMultiplex(n)}
+		p := &sb.VLESSOutboundOptions{ServerOptions: server, UUID: n.UUID, Flow: n.Flow, Network: network, OutboundTLSOptionsContainer: tls, Transport: tr, Multiplex: sbMultiplex(n.multiplexOptions)}
 		if n.PacketEncoding != "" {
 			p.PacketEncoding = ptr(n.PacketEncoding)
 		}
@@ -127,7 +127,7 @@ func (c config) singboxProxy(n proxyNode) (*coreConfig, error) {
 			Level:     fallback(n.LogLevel, "info"),
 			Timestamp: true,
 		},
-		Inbounds: sbInbounds(n),
+		Inbounds: sbInbounds(n.nodeBase),
 		DNS: &sb.DNSOptions{
 			RawDNSOptions: sb.RawDNSOptions{
 				Servers: []sb.DNSServerOptions{

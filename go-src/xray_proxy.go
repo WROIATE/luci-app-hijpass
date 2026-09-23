@@ -5,6 +5,7 @@ import (
 	"fmt"
 	xn "github.com/xtls/xray-core/common/net"
 	xr "github.com/xtls/xray-core/infra/conf"
+	"hijpass/config/protocol"
 	"net/url"
 	"strings"
 	"time"
@@ -64,16 +65,16 @@ func xrSocks(tag string, port uint16) (xr.OutboundDetourConfig, error) {
 	s, e := rawSettings(xr.SocksClientConfig{Address: xrAddress("127.0.0.1"), Port: port})
 	return xr.OutboundDetourConfig{Protocol: "socks", Tag: tag, Settings: s}, e
 }
-func xrProtocol(node remoteProxyNode) (xr.OutboundDetourConfig, error) {
-	o := xr.OutboundDetourConfig{Protocol: node.base().Type, Tag: node.base().Name}
+func xrProtocol(node protocol.RemoteNode) (xr.OutboundDetourConfig, error) {
+	o := xr.OutboundDetourConfig{Protocol: node.Base().Type, Tag: node.Base().Name}
 	var e error
 	switch n := node.(type) {
-	case *shadowsocksNode:
+	case *protocol.Shadowsocks:
 		if n.UDPOverTCP {
 			return o, fmt.Errorf("Xray main no longer supports Shadowsocks udp_over_tcp; disable it or select sing-box")
 		}
 		o.Settings, e = rawSettings(xr.ShadowsocksClientConfig{Address: xrAddress(n.Server), Port: uint16(n.ServerPort), Cipher: n.Method, Password: n.Password})
-	case *hysteria2Node:
+	case *protocol.Hysteria2:
 		o.Protocol = "hysteria"
 		o.Settings, e = rawSettings(xr.HysteriaClientConfig{Version: 2, Address: xrAddress(n.Server), Port: uint16(n.ServerPort)})
 		o.StreamSetting = &xr.StreamConfig{
@@ -93,7 +94,7 @@ func xrProtocol(node remoteProxyNode) (xr.OutboundDetourConfig, error) {
 		if n.UpMbps != nil || n.DownMbps != nil {
 			o.StreamSetting.FinalMask = &xr.FinalMask{QuicParams: &xr.QuicParamsConfig{BrutalUp: xrBandwidth(n.UpMbps), BrutalDown: xrBandwidth(n.DownMbps)}}
 		}
-	case *vlessNode:
+	case *protocol.VLESS:
 		o.Settings, e = rawSettings(xr.VLessOutboundConfig{Address: xrAddress(n.Server), Port: uint16(n.ServerPort), Id: n.UUID, Encryption: "none", Flow: n.Flow})
 		st := &xr.StreamConfig{Network: ptr(xr.TransportProtocol("raw")), Security: "none"}
 		o.StreamSetting = st
@@ -142,11 +143,11 @@ func xrProtocol(node remoteProxyNode) (xr.OutboundDetourConfig, error) {
 			return o, fmt.Errorf("unsupported Xray transport %q", n.Transport)
 		}
 	default:
-		return o, fmt.Errorf("unsupported Xray protocol %q", node.base().Type)
+		return o, fmt.Errorf("unsupported Xray protocol %q", node.Base().Type)
 	}
 	return o, e
 }
-func xrBandwidth(v *uciInt) xr.Bandwidth {
+func xrBandwidth(v *protocol.Int) xr.Bandwidth {
 	if v == nil {
 		return ""
 	}
@@ -155,12 +156,12 @@ func xrBandwidth(v *uciInt) xr.Bandwidth {
 	}
 	return xr.Bandwidth(fmt.Sprintf("%d mbps", *v))
 }
-func (c config) xrayProxy(node proxyNode) (*coreConfig, error) {
-	base := node.base()
+func (c config) xrayProxy(node protocol.Node) (*coreConfig, error) {
+	base := node.Base()
 	x := &xr.Config{LogConfig: xrLog(base.LogLevel)}
 	for _, p := range []struct {
 		typ, tag string
-		port     uciInt
+		port     protocol.Int
 	}{{"tproxy", "tproxy-in", base.ListenPort}, {"socks", "socks-in", base.SocksPort}} {
 		in, e := xrInbound(p.typ, p.tag, uint16(p.port), false)
 		if e != nil {
@@ -168,7 +169,7 @@ func (c config) xrayProxy(node proxyNode) (*coreConfig, error) {
 		}
 		x.InboundConfigs = append(x.InboundConfigs, in)
 	}
-	if n, ok := node.(*loadBalanceNode); ok {
+	if n, ok := node.(*protocol.LoadBalance); ok {
 		fb := "lb-member-0"
 		for i, name := range n.Members {
 			s, e := c.node(name)
@@ -218,12 +219,12 @@ func (c config) xrayProxy(node proxyNode) (*coreConfig, error) {
 			return nil, e
 		}
 	} else {
-		remote, ok := node.(remoteProxyNode)
+		remote, ok := node.(protocol.RemoteNode)
 		if !ok {
 			return nil, fmt.Errorf("unsupported remote proxy %T", node)
 		}
 		out, e := xrProtocol(remote)
-		endpoint := remote.endpoint()
+		endpoint := remote.Endpoint()
 		if e != nil {
 			return nil, e
 		}

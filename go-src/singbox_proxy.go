@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"hijpass/config/protocol"
 	"net/netip"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 func sbListen(port uint16, address string) sb.ListenOptions {
 	return sb.ListenOptions{Listen: ptr(badoption.Addr(netip.MustParseAddr(address))), ListenPort: port}
 }
-func sbInbounds(n nodeBase) []sb.Inbound {
+func sbInbounds(n protocol.BaseOptions) []sb.Inbound {
 	return []sb.Inbound{
 		{Type: "tproxy", Tag: "tproxy-in", Options: &sb.TProxyInboundOptions{ListenOptions: sbListen(uint16(n.ListenPort), "127.0.0.1")}},
 		{Type: "socks", Tag: "socks-in", Options: &sb.SocksInboundOptions{ListenOptions: sbListen(uint16(n.SocksPort), "127.0.0.1")}},
@@ -21,7 +22,7 @@ func sbInbounds(n nodeBase) []sb.Inbound {
 func sbSocks(tag string, port uint16) sb.Outbound {
 	return sb.Outbound{Type: "socks", Tag: tag, Options: &sb.SOCKSOutboundOptions{ServerOptions: sb.ServerOptions{Server: "127.0.0.1", ServerPort: port}, Version: "5"}}
 }
-func sbMultiplex(n multiplexOptions) *sb.OutboundMultiplexOptions {
+func sbMultiplex(n protocol.MultiplexOptions) *sb.OutboundMultiplexOptions {
 	if !n.MultiplexEnabled {
 		return nil
 	}
@@ -31,7 +32,7 @@ func sbMultiplex(n multiplexOptions) *sb.OutboundMultiplexOptions {
 	}
 	return m
 }
-func sbTransport(n transportOptions) (*sb.V2RayTransportOptions, error) {
+func sbTransport(n protocol.TransportOptions) (*sb.V2RayTransportOptions, error) {
 	t := &sb.V2RayTransportOptions{Type: n.Transport}
 	switch n.Transport {
 	case "":
@@ -55,21 +56,21 @@ func sbTransport(n transportOptions) (*sb.V2RayTransportOptions, error) {
 	}
 	return t, nil
 }
-func sbProtocol(node remoteProxyNode) (sb.Outbound, error) {
-	o := sb.Outbound{Type: node.base().Type, Tag: node.base().Name}
-	endpoint := node.endpoint()
+func sbProtocol(node protocol.RemoteNode) (sb.Outbound, error) {
+	o := sb.Outbound{Type: node.Base().Type, Tag: node.Base().Name}
+	endpoint := node.Endpoint()
 	server := sb.ServerOptions{Server: endpoint.Server, ServerPort: uint16(endpoint.ServerPort)}
 	switch n := node.(type) {
-	case *shadowsocksNode:
+	case *protocol.Shadowsocks:
 		network := sb.NetworkList(n.Network)
-		p := &sb.ShadowsocksOutboundOptions{ServerOptions: server, Method: n.Method, Password: n.Password, Network: network, Plugin: n.Plugin, PluginOptions: n.PluginOptions, Multiplex: sbMultiplex(n.multiplexOptions)}
+		p := &sb.ShadowsocksOutboundOptions{ServerOptions: server, Method: n.Method, Password: n.Password, Network: network, Plugin: n.Plugin, PluginOptions: n.PluginOptions, Multiplex: sbMultiplex(n.MultiplexOptions)}
 		if n.UDPOverTCP {
 			p.UDPOverTCP = &sb.UDPOverTCPOptions{Enabled: true}
 		}
 		o.Options = p
-	case *hysteria2Node:
+	case *protocol.Hysteria2:
 		network := sb.NetworkList(n.Network)
-		tls := sbTLS(n.tlsOptions, n.Server)
+		tls := sbTLS(n.TLSOptions, n.Server)
 		p := &sb.Hysteria2OutboundOptions{
 			ServerOptions:               server,
 			Password:                    n.Password,
@@ -86,9 +87,9 @@ func sbProtocol(node remoteProxyNode) (sb.Outbound, error) {
 			p.Obfs = &sb.Hysteria2Obfs{Type: "salamander", Password: n.ObfsPassword}
 		}
 		o.Options = p
-	case *tuicNode:
+	case *protocol.TUIC:
 		network := sb.NetworkList(n.Network)
-		tls := sbTLS(n.tlsOptions, n.Server)
+		tls := sbTLS(n.TLSOptions, n.Server)
 		o.Options = &sb.TUICOutboundOptions{
 			ServerOptions:               server,
 			UUID:                        n.UUID,
@@ -101,13 +102,13 @@ func sbProtocol(node remoteProxyNode) (sb.Outbound, error) {
 			Network:                     network,
 			OutboundTLSOptionsContainer: tls,
 		}
-	case *shadowTLSNode:
-		tls := sbTLS(n.tlsOptions, n.Server)
+	case *protocol.ShadowTLS:
+		tls := sbTLS(n.TLSOptions, n.Server)
 		o.Options = &sb.ShadowTLSOutboundOptions{ServerOptions: server, Version: int(n.ShadowTLSVersion), Password: n.Password, OutboundTLSOptionsContainer: tls}
-	case *vlessNode:
+	case *protocol.VLESS:
 		network := sb.NetworkList(n.Network)
-		tls := sbTLS(n.tlsOptions, n.Server)
-		tr, e := sbTransport(n.transportOptions)
+		tls := sbTLS(n.TLSOptions, n.Server)
+		tr, e := sbTransport(n.TransportOptions)
 		if e != nil {
 			return o, e
 		}
@@ -118,18 +119,18 @@ func sbProtocol(node remoteProxyNode) (sb.Outbound, error) {
 			tls.TLS.Reality = &sb.OutboundRealityOptions{Enabled: true, PublicKey: n.RealityPublicKey, ShortID: n.RealityShortID}
 			tls.TLS.UTLS = &sb.OutboundUTLSOptions{Enabled: true, Fingerprint: "chrome"}
 		}
-		p := &sb.VLESSOutboundOptions{ServerOptions: server, UUID: n.UUID, Flow: n.Flow, Network: network, OutboundTLSOptionsContainer: tls, Transport: tr, Multiplex: sbMultiplex(n.multiplexOptions)}
+		p := &sb.VLESSOutboundOptions{ServerOptions: server, UUID: n.UUID, Flow: n.Flow, Network: network, OutboundTLSOptionsContainer: tls, Transport: tr, Multiplex: sbMultiplex(n.MultiplexOptions)}
 		if n.PacketEncoding != "" {
 			p.PacketEncoding = ptr(n.PacketEncoding)
 		}
 		o.Options = p
 	default:
-		return o, fmt.Errorf("unsupported sing-box protocol %q", node.base().Type)
+		return o, fmt.Errorf("unsupported sing-box protocol %q", node.Base().Type)
 	}
 	return o, nil
 }
-func (c config) singboxProxy(node proxyNode) (*coreConfig, error) {
-	base := node.base()
+func (c config) singboxProxy(node protocol.Node) (*coreConfig, error) {
+	base := node.Base()
 	options := &sb.Options{
 		Log: &sb.LogOptions{
 			Level:     fallback(base.LogLevel, "info"),
@@ -151,7 +152,7 @@ func (c config) singboxProxy(node proxyNode) (*coreConfig, error) {
 			DefaultDomainResolver: &sb.DomainResolveOptions{Server: "local"},
 		},
 	}
-	if n, ok := node.(*loadBalanceNode); ok {
+	if n, ok := node.(*protocol.LoadBalance); ok {
 		lb := &sb.URLTestOutboundOptions{URL: n.URL, Interval: badoption.Duration(n.Interval), Tolerance: uint16(n.Tolerance), IdleTimeout: badoption.Duration(n.IdleTimeout), InterruptExistConnections: bool(n.InterruptConnections)}
 		options.Outbounds = append(options.Outbounds, sb.Outbound{Type: "urltest", Tag: "slb", Options: lb})
 		for i, name := range n.Members {
@@ -165,12 +166,12 @@ func (c config) singboxProxy(node proxyNode) (*coreConfig, error) {
 		}
 		options.Route.Final = "slb"
 	} else {
-		remote, ok := node.(remoteProxyNode)
+		remote, ok := node.(protocol.RemoteNode)
 		if !ok {
 			return nil, fmt.Errorf("unsupported remote proxy %T", node)
 		}
 		out, e := sbProtocol(remote)
-		endpoint := remote.endpoint()
+		endpoint := remote.Endpoint()
 		if e != nil {
 			return nil, e
 		}
@@ -191,6 +192,6 @@ func (c config) singboxProxy(node proxyNode) (*coreConfig, error) {
 	return &coreConfig{SingBox: options}, nil
 }
 
-func sbTLS(options tlsOptions, server string) sb.OutboundTLSOptionsContainer {
+func sbTLS(options protocol.TLSOptions, server string) sb.OutboundTLSOptionsContainer {
 	return sb.OutboundTLSOptionsContainer{TLS: &sb.OutboundTLSOptions{Enabled: true, ServerName: fallback(options.TLSServerName, server), Insecure: bool(options.TLSInsecure)}}
 }

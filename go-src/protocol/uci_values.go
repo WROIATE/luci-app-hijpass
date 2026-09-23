@@ -1,4 +1,4 @@
-package main
+package protocol
 
 import (
 	"encoding/json"
@@ -10,9 +10,9 @@ import (
 
 // UCI's numeric/boolean options are strings on the wire. Decode them once at the
 // boundary so builders operate on typed fields and cannot silently truncate ports.
-type uciInt int64
+type Int int64
 
-func (v *uciInt) UnmarshalJSON(b []byte) error {
+func (v *Int) UnmarshalJSON(b []byte) error {
 	var s string
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
@@ -25,13 +25,13 @@ func (v *uciInt) UnmarshalJSON(b []byte) error {
 	if e != nil || n < 0 {
 		return fmt.Errorf("invalid nonnegative integer %q", s)
 	}
-	*v = uciInt(n)
+	*v = Int(n)
 	return nil
 }
 
-type uciBool bool
+type Bool bool
 
-func (v *uciBool) UnmarshalJSON(b []byte) error {
+func (v *Bool) UnmarshalJSON(b []byte) error {
 	var s string
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
@@ -43,9 +43,9 @@ func (v *uciBool) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type uciDuration time.Duration
+type Duration time.Duration
 
-func (v *uciDuration) UnmarshalJSON(b []byte) error {
+func (v *Duration) UnmarshalJSON(b []byte) error {
 	var s string
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
@@ -58,13 +58,13 @@ func (v *uciDuration) UnmarshalJSON(b []byte) error {
 	if e != nil || d < 0 {
 		return fmt.Errorf("invalid duration %q", s)
 	}
-	*v = uciDuration(d)
+	*v = Duration(d)
 	return nil
 }
 
-type uciFloat float64
+type Float float64
 
-func (v *uciFloat) UnmarshalJSON(b []byte) error {
+func (v *Float) UnmarshalJSON(b []byte) error {
 	var s string
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
@@ -77,13 +77,13 @@ func (v *uciFloat) UnmarshalJSON(b []byte) error {
 	if e != nil || n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
 		return fmt.Errorf("invalid number %q", s)
 	}
-	*v = uciFloat(n)
+	*v = Float(n)
 	return nil
 }
 
-type stringList []string
+type StringList []string
 
-func (v *stringList) UnmarshalJSON(b []byte) error {
+func (v *StringList) UnmarshalJSON(b []byte) error {
 	var s string
 	if json.Unmarshal(b, &s) == nil {
 		if s != "" {

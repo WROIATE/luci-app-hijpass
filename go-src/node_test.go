@@ -1,6 +1,7 @@
 package main
 
 import (
+	"hijpass/config/protocol"
 	"reflect"
 	"testing"
 )
@@ -8,15 +9,15 @@ import (
 func TestProtocolSpecificDecoding(t *testing.T) {
 	cases := []struct {
 		protocol string
-		want     proxyNode
+		want     protocol.Node
 		stale    section
 	}{
-		{"shadowsocks", &shadowsocksNode{}, section{"tls_insecure": "invalid", "transport_ws_max_early_data": "invalid", "strategy_expected": "invalid"}},
-		{"hysteria2", &hysteria2Node{}, section{"multiplex_max_connections": "invalid", "tls_reality_enabled": "invalid", "version": "invalid"}},
-		{"tuic", &tuicNode{}, section{"hop_interval": "invalid", "udp_over_tcp": "invalid", "tls_reality_enabled": "invalid"}},
-		{"shadowtls", &shadowTLSNode{}, section{"multiplex_enabled": "invalid", "tls_reality_enabled": "invalid", "heartbeat": "invalid"}},
-		{"vless", &vlessNode{}, section{"udp_over_tcp": "invalid", "up_mbps": "invalid", "strategy_tolerance": "invalid", "version": "invalid"}},
-		{"load_balance", &loadBalanceNode{}, section{"server_port": "invalid", "tls_insecure": "invalid", "multiplex_enabled": "invalid"}},
+		{"shadowsocks", &protocol.Shadowsocks{}, section{"tls_insecure": "invalid", "transport_ws_max_early_data": "invalid", "strategy_expected": "invalid"}},
+		{"hysteria2", &protocol.Hysteria2{}, section{"multiplex_max_connections": "invalid", "tls_reality_enabled": "invalid", "version": "invalid"}},
+		{"tuic", &protocol.TUIC{}, section{"hop_interval": "invalid", "udp_over_tcp": "invalid", "tls_reality_enabled": "invalid"}},
+		{"shadowtls", &protocol.ShadowTLS{}, section{"multiplex_enabled": "invalid", "tls_reality_enabled": "invalid", "heartbeat": "invalid"}},
+		{"vless", &protocol.VLESS{}, section{"udp_over_tcp": "invalid", "up_mbps": "invalid", "strategy_tolerance": "invalid", "version": "invalid"}},
+		{"load_balance", &protocol.LoadBalance{}, section{"server_port": "invalid", "tls_insecure": "invalid", "multiplex_enabled": "invalid"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.protocol, func(t *testing.T) {
@@ -38,7 +39,7 @@ func TestProtocolSpecificDecoding(t *testing.T) {
 			if !reflect.DeepEqual(before, after) {
 				t.Fatal("unrelated protocol fields changed the typed node")
 			}
-			_, remote := after.(remoteProxyNode)
+			_, remote := after.(protocol.RemoteNode)
 			if remote != (tc.protocol != "load_balance") {
 				t.Fatal("only remote proxies should expose an endpoint")
 			}

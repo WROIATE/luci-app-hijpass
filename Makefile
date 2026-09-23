@@ -111,6 +111,7 @@ endef
 
 define Build/Prepare/$(notdir $(CURDIR))
 	$(CP) ./go-src/*.go ./go-src/go.mod ./go-src/go.sum $(PKG_BUILD_DIR)/
+	$(CP) ./go-src/protocol $(PKG_BUILD_DIR)/
 endef
 
 define HijpassConfig/Compile

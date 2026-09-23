@@ -21,11 +21,12 @@ release, both pinned in `go.mod`/`go.sum` for reproducible builds:
   [`option`](https://github.com/SagerNet/sing-box/tree/v1.14.1/option) and the
   context-aware `sing/common/json` serializer for polymorphic options.
 
-`proxyNode` is an interface for common node metadata and protocol validation.
-`parseNode` selects one concrete model from UCI `type`: `shadowsocksNode`,
-`hysteria2Node`, `tuicNode`, `shadowTLSNode`, `vlessNode` or `loadBalanceNode`.
+`protocol.Node` is an interface for common node metadata and protocol validation.
+`parseNode` selects one concrete model from UCI `type`: `protocol.Shadowsocks`,
+`protocol.Hysteria2`, `protocol.TUIC`, `protocol.ShadowTLS`, `protocol.VLESS` or
+`protocol.LoadBalance`.
 Each model defines only its protocol's fields and applicable shared capabilities.
-Only remote proxies implement `remoteProxyNode`, which exposes a server and
+Only remote proxies implement `protocol.RemoteNode`, which exposes a server and
 upstream; load balancers carry member/strategy/probe options instead. Reality
 belongs only to VLESS, and credentials are declared by each protocol as needed.
 
@@ -33,8 +34,12 @@ Core builders dispatch on these concrete types, keeping Xray and sing-box's
 native return types. Decoding and validation apply only to the selected protocol;
 stale UCI fields left by a protocol switch do not populate or invalidate its
 model. Existing flat JSON keys are preserved through embedded capability structs.
-UCI scalar conversion lives in `uci_values.go`, and protocol validation lives in
-`node_validation.go`. See Go's [interfaces](https://go.dev/ref/spec#Interface_types),
+Protocol models live in the `protocol/` package, with one file per protocol:
+`shadowsocks.go`, `hysteria2.go`, `tuic.go`, `shadowtls.go`, `vless.go` and
+`load_balance.go`. Each file owns its fields, defaults and protocol validation.
+`protocol/node.go` defines interfaces and decoding; `options.go`, `validation.go`
+and `uci_values.go` contain shared capabilities and UCI scalar conversion.
+The application-level `node.go` only adapts UCI sections and normalizes core names. See Go's [interfaces](https://go.dev/ref/spec#Interface_types),
 [struct embedding](https://go.dev/ref/spec#Struct_types) and standard
 [JSON field rules](https://pkg.go.dev/encoding/json#Unmarshal).
 

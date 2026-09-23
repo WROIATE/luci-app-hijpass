@@ -33,7 +33,7 @@ func newVLESS() *VLESS {
 	}
 }
 
-func init() { register("vless", func() Node { return newVLESS() }) }
+func init() { register("vless", func() Config { return newVLESS() }) }
 
 // DecodeUCI reads only options supported by VLESS.
 func (n *VLESS) DecodeUCI(d *uci.Decoder) error {

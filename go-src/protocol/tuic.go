@@ -24,7 +24,7 @@ func (n *TUIC) Validate() error { return nil }
 
 func newTUIC() *TUIC { return &TUIC{CongestionControl: "cubic", Heartbeat: 10 * time.Second} }
 
-func init() { register("tuic", func() Node { return newTUIC() }) }
+func init() { register("tuic", func() Config { return newTUIC() }) }
 
 // DecodeUCI reads only options supported by TUIC.
 func (n *TUIC) DecodeUCI(d *uci.Decoder) error {

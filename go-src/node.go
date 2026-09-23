@@ -7,7 +7,7 @@ import (
 
 // Adapt raw UCI sections to the protocol package without coupling its models to
 // the application's section lookup or core-name normalization.
-func parseNode(s section) (protocol.Node, error) {
+func parseNode(s section) (protocol.Config, error) {
 	data, err := json.Marshal(s)
 	if err != nil {
 		return nil, err

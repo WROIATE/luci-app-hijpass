@@ -65,7 +65,7 @@ func xrSocks(tag string, port uint16) (xr.OutboundDetourConfig, error) {
 	s, e := rawSettings(xr.SocksClientConfig{Address: xrAddress("127.0.0.1"), Port: port})
 	return xr.OutboundDetourConfig{Protocol: "socks", Tag: tag, Settings: s}, e
 }
-func xrProtocol(node protocol.RemoteNode) (xr.OutboundDetourConfig, error) {
+func xrProtocol(node protocol.RemoteConfig) (xr.OutboundDetourConfig, error) {
 	o := xr.OutboundDetourConfig{Protocol: node.Base().Type, Tag: node.Base().Name}
 	var e error
 	switch n := node.(type) {
@@ -156,7 +156,7 @@ func xrBandwidth(v *int64) xr.Bandwidth {
 	}
 	return xr.Bandwidth(fmt.Sprintf("%d mbps", *v))
 }
-func (c config) xrayProxy(node protocol.Node) (*coreConfig, error) {
+func (c config) xrayProxy(node protocol.Config) (*coreConfig, error) {
 	base := node.Base()
 	x := &xr.Config{LogConfig: xrLog(base.LogLevel)}
 	for _, p := range []struct {
@@ -219,7 +219,7 @@ func (c config) xrayProxy(node protocol.Node) (*coreConfig, error) {
 			return nil, e
 		}
 	} else {
-		remote, ok := node.(protocol.RemoteNode)
+		remote, ok := node.(protocol.RemoteConfig)
 		if !ok {
 			return nil, fmt.Errorf("unsupported remote proxy %T", node)
 		}

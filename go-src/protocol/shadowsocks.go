@@ -21,7 +21,7 @@ func newShadowsocks() *Shadowsocks {
 	return &Shadowsocks{MultiplexOptions: MultiplexOptions{MultiplexProtocol: "h2mux"}}
 }
 
-func init() { register("shadowsocks", func() Node { return newShadowsocks() }) }
+func init() { register("shadowsocks", func() Config { return newShadowsocks() }) }
 
 // DecodeUCI reads only options supported by Shadowsocks.
 func (n *Shadowsocks) DecodeUCI(d *uci.Decoder) error {

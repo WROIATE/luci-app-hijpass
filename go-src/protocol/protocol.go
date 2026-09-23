@@ -6,24 +6,24 @@ import (
 	"hijpass/config/uci"
 )
 
-// Node exposes common metadata, UCI conversion and protocol-specific validation.
-type Node interface {
+// Config exposes common metadata, UCI conversion and protocol-specific validation.
+type Config interface {
 	Base() *BaseOptions
 	DecodeUCI(*uci.Decoder) error
 	Validate() error
 }
 
-// RemoteNode has a server and optional upstream. LoadBalance is not remote.
-type RemoteNode interface {
-	Node
+// RemoteConfig has a server and optional upstream. LoadBalance is not remote.
+type RemoteConfig interface {
+	Config
 	Endpoint() *ServerOptions
 }
 
 func (n *BaseOptions) Base() *BaseOptions         { return n }
 func (n *ServerOptions) Endpoint() *ServerOptions { return n }
 
-// New creates a protocol node with its defaults. Call protocol.Validate after filling its fields.
-func New(kind string) (Node, error) {
+// New creates a protocol configuration with its defaults. Call protocol.Validate after filling its fields.
+func New(kind string) (Config, error) {
 	factory, ok := factories[kind]
 	if !ok {
 		return nil, fmt.Errorf("unsupported proxy type %q", kind)
@@ -35,11 +35,11 @@ func New(kind string) (Node, error) {
 }
 
 // Validate checks common options and the concrete protocol's constraints.
-func Validate(n Node) error {
+func Validate(n Config) error {
 	if err := n.Base().validateBase(); err != nil {
 		return err
 	}
-	if remote, ok := n.(RemoteNode); ok {
+	if remote, ok := n.(RemoteConfig); ok {
 		if err := remote.Endpoint().validateServer(); err != nil {
 			return err
 		}
@@ -52,9 +52,9 @@ func Validate(n Node) error {
 
 // Each protocol registers its constructor in its own file during initialization.
 // The registry is read-only after package initialization.
-var factories = map[string]func() Node{}
+var factories = map[string]func() Config{}
 
-func register(kind string, factory func() Node) {
+func register(kind string, factory func() Config) {
 	if kind == "" || factory == nil {
 		panic("invalid protocol registration")
 	}
@@ -65,7 +65,7 @@ func register(kind string, factory func() Node) {
 }
 
 // Decode selects a registered protocol and delegates field conversion to it.
-func Decode(data []byte) (Node, error) {
+func Decode(data []byte) (Config, error) {
 	d, err := uci.NewDecoder(data)
 	if err != nil {
 		return nil, err

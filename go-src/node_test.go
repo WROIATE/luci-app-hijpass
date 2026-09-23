@@ -9,7 +9,7 @@ import (
 func TestProtocolSpecificDecoding(t *testing.T) {
 	cases := []struct {
 		protocol string
-		want     protocol.Node
+		want     protocol.Config
 		stale    section
 	}{
 		{"shadowsocks", &protocol.Shadowsocks{}, section{"tls_insecure": "invalid", "transport_ws_max_early_data": "invalid", "strategy_expected": "invalid"}},
@@ -39,7 +39,7 @@ func TestProtocolSpecificDecoding(t *testing.T) {
 			if !reflect.DeepEqual(before, after) {
 				t.Fatal("unrelated protocol fields changed the typed node")
 			}
-			_, remote := after.(protocol.RemoteNode)
+			_, remote := after.(protocol.RemoteConfig)
 			if remote != (tc.protocol != "load_balance") {
 				t.Fatal("only remote proxies should expose an endpoint")
 			}

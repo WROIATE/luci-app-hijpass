@@ -23,7 +23,12 @@ release, both pinned in `go.mod`/`go.sum` for reproducible builds:
 
 ## Package boundaries
 
-- `protocol/` owns the `Node` / `RemoteNode` interfaces and each protocol's
+Protocol interfaces live in `protocol/protocol.go`: `protocol.Config` describes
+a protocol configuration, while application-level `node.go` adapts UCI nodes.
+Ordinary source filenames use lowercase words without underscores; test files
+retain the Go toolchain-required `_test.go` suffix.
+
+- `protocol/` owns the `Config` / `RemoteConfig` interfaces and each protocol's
   fields, defaults, UCI conversion and validation. Each protocol implements
   `DecodeUCI(*uci.Decoder) error` in its own file, alongside its model.
 - `uci/` supplies generic typed reads for strings, integers, booleans, durations
@@ -46,7 +51,7 @@ and a local `init` registration, following an existing protocol file:
 
 ```go
 func init() {
-    register("my-protocol", func() Node { return newMyProtocol() })
+    register("my-protocol", func() Config { return newMyProtocol() })
 }
 ```
 

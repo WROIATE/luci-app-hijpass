@@ -56,7 +56,7 @@ func sbTransport(n protocol.TransportOptions) (*sb.V2RayTransportOptions, error)
 	}
 	return t, nil
 }
-func sbProtocol(node protocol.RemoteNode) (sb.Outbound, error) {
+func sbProtocol(node protocol.RemoteConfig) (sb.Outbound, error) {
 	o := sb.Outbound{Type: node.Base().Type, Tag: node.Base().Name}
 	endpoint := node.Endpoint()
 	server := sb.ServerOptions{Server: endpoint.Server, ServerPort: uint16(endpoint.ServerPort)}
@@ -129,7 +129,7 @@ func sbProtocol(node protocol.RemoteNode) (sb.Outbound, error) {
 	}
 	return o, nil
 }
-func (c config) singboxProxy(node protocol.Node) (*coreConfig, error) {
+func (c config) singboxProxy(node protocol.Config) (*coreConfig, error) {
 	base := node.Base()
 	options := &sb.Options{
 		Log: &sb.LogOptions{
@@ -166,7 +166,7 @@ func (c config) singboxProxy(node protocol.Node) (*coreConfig, error) {
 		}
 		options.Route.Final = "slb"
 	} else {
-		remote, ok := node.(protocol.RemoteNode)
+		remote, ok := node.(protocol.RemoteConfig)
 		if !ok {
 			return nil, fmt.Errorf("unsupported remote proxy %T", node)
 		}

@@ -10,7 +10,7 @@ import (
 	"hijpass/config/protocol"
 )
 
-func decode(t *testing.T, kind string, options map[string]any) (protocol.Node, error) {
+func decode(t *testing.T, kind string, options map[string]any) (protocol.Config, error) {
 	t.Helper()
 	fields := map[string]any{"type": kind, "listen_port": "11001", "socks_port": "12001", "server": "example.org", "server_port": "443"}
 	for k, v := range options {

@@ -3,93 +3,77 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"time"
 )
 
-// proxyNode is the UCI decode boundary, assembled from focused option groups.
-// Shared server and credential fields appear only once to avoid ambiguous JSON
-// tags when protocols use the same UCI key.
-type proxyNode struct {
-	nodeBase
-	nodeServer
-	nodeCredentials
-	shadowsocksOptions
-	hysteriaOptions
-	tuicOptions
-	shadowTLSOptions
-	vlessOptions
-	tlsOptions
-	multiplexOptions
-	transportOptions
-	loadBalanceOptions
-	probeOptions
+// proxyNode describes behavior, not a union of every protocol's fields.
+// Only concrete protocol types implement protocol validation.
+type proxyNode interface {
+	base() *nodeBase
+	validate() error
 }
 
+// Only remote proxies have an endpoint and an upstream; load balancers do not.
+type remoteProxyNode interface {
+	proxyNode
+	endpoint() *nodeServer
+}
+
+func (n *nodeBase) base() *nodeBase         { return n }
+func (n *nodeServer) endpoint() *nodeServer { return n }
+
 func parseNode(s section) (proxyNode, error) {
-	n := proxyNode{
-		nodeBase:         nodeBase{Core: core(s), LogLevel: "info"},
-		multiplexOptions: multiplexOptions{MultiplexProtocol: "h2mux"},
-		loadBalanceOptions: loadBalanceOptions{
+	var n proxyNode
+	switch s.str("type") {
+	case "shadowsocks":
+		n = &shadowsocksNode{multiplexOptions: multiplexOptions{MultiplexProtocol: "h2mux"}}
+	case "hysteria2":
+		n = &hysteria2Node{}
+	case "tuic":
+		n = &tuicNode{CongestionControl: "cubic", Heartbeat: uciDuration(10 * time.Second)}
+	case "shadowtls":
+		n = &shadowTLSNode{ShadowTLSVersion: 1}
+	case "vless":
+		n = &vlessNode{
+			Network:          "tcp",
+			multiplexOptions: multiplexOptions{MultiplexProtocol: "h2mux"},
+			transportOptions: transportOptions{
+				HTTPIdle: uciDuration(15 * time.Second), HTTPPing: uciDuration(15 * time.Second),
+				GRPCIdle: uciDuration(15 * time.Second), GRPCPing: uciDuration(15 * time.Second),
+			},
+		}
+	case "load_balance":
+		n = &loadBalanceNode{
 			Strategy: "leastLoad", StrategyExpected: 1,
 			StrategyMaxRTT: uciDuration(time.Second), StrategyTolerance: 0.05,
-		},
-		probeOptions: probeOptions{
 			ProbeURL:      "https://connectivitycheck.gstatic.com/generate_204",
 			ProbeInterval: uciDuration(time.Minute),
 			ProbeTimeout:  uciDuration(2 * time.Second), ProbeSampling: 3,
-		},
+		}
+	default:
+		return nil, fmt.Errorf("unsupported proxy type %q", s.str("type"))
 	}
-	switch s.str("type") {
-	case "vless":
-		n.Network = "tcp"
-		n.HTTPIdle = uciDuration(15 * time.Second)
-		n.HTTPPing = n.HTTPIdle
-		n.GRPCIdle = n.HTTPIdle
-		n.GRPCPing = n.HTTPIdle
-	case "tuic":
-		n.CongestionControl = "cubic"
-		n.Heartbeat = uciDuration(10 * time.Second)
-	case "shadowtls":
-		n.ShadowTLSVersion = 1
+	n.base().LogLevel = "info"
+	data, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
 	}
-	b, e := json.Marshal(s)
-	if e != nil {
-		return n, e
+	// Decode into the selected concrete type. Stale fields from a different UCI
+	// protocol are ignored rather than becoming part of this node's model.
+	if err = json.Unmarshal(data, n); err != nil {
+		return nil, err
 	}
-	if e = json.Unmarshal(b, &n); e != nil {
-		return n, e
+	n.base().Core = core(s)
+	if err = n.base().validateBase(); err != nil {
+		return nil, err
 	}
-	n.Core = core(s)
-	for _, p := range []struct {
-		name  string
-		value uciInt
-	}{{"listen_port", n.ListenPort}, {"socks_port", n.SocksPort}} {
-		if p.value < 1 || p.value > 65535 {
-			return n, fmt.Errorf("invalid %s", p.name)
+	if remote, ok := n.(remoteProxyNode); ok {
+		if err = remote.endpoint().validateServer(); err != nil {
+			return nil, err
 		}
 	}
-	if n.Type != "load_balance" && (n.Server == "" || n.ServerPort < 1 || n.ServerPort > 65535) {
-		return n, fmt.Errorf("invalid server or server_port")
-	}
-	if n.Tolerance > 65535 || uint64(n.WSEarlyData) > 4294967295 {
-		return n, fmt.Errorf("numeric option out of range")
-	}
-	// The same UCI must have the same interpretation on 32- and 64-bit routers.
-	for _, value := range []uciInt{n.MaxConnections, n.MinStreams, n.MaxStreams, n.BrutalUp, n.BrutalDown, n.ShadowTLSVersion, n.StrategyExpected, n.ProbeSampling} {
-		if value > math.MaxInt32 {
-			return n, fmt.Errorf("integer option exceeds 32-bit range")
-		}
-	}
-	for _, value := range []*uciInt{n.UpMbps, n.DownMbps} {
-		if value != nil && *value > math.MaxInt32 {
-			return n, fmt.Errorf("bandwidth exceeds 32-bit range")
-		}
-	}
-	for _, value := range []uciDuration{n.GRPCIdle, n.GRPCPing} {
-		if time.Duration(value)/time.Second > math.MaxInt32 {
-			return n, fmt.Errorf("gRPC timeout exceeds 32-bit range")
-		}
+	if err = n.validate(); err != nil {
+		return nil, err
 	}
 	return n, nil
 }
@@ -99,7 +83,6 @@ func fallback(s, defaultValue string) string {
 	}
 	return s
 }
-
 func intValue(v *uciInt) int {
 	if v == nil {
 		return 0

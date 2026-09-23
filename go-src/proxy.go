@@ -106,12 +106,12 @@ func (c config) proxy(raw section) (*coreConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	switch n.Core {
+	switch n.base().Core {
 	case "sing-box":
 		return c.singboxProxy(n)
 	case "xray":
 		return c.xrayProxy(n)
 	default:
-		return nil, fmt.Errorf("unsupported core %q", n.Core)
+		return nil, fmt.Errorf("unsupported core %q", n.base().Core)
 	}
 }

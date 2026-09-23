@@ -21,15 +21,22 @@ release, both pinned in `go.mod`/`go.sum` for reproducible builds:
   [`option`](https://github.com/SagerNet/sing-box/tree/v1.14.1/option) and the
   context-aware `sing/common/json` serializer for polymorphic options.
 
-`proxyNode` composes focused value structs for base metadata, server settings,
-credentials, protocol options, TLS, transport, multiplexing, load balancing and
-probes. Anonymous embedding preserves the flat UCI JSON keys; shared fields
-(e.g. password and UUID) are defined once to avoid ambiguous tags. UCI scalar
-conversion lives in `uci_values.go`; transport, multiplexing and inbound helpers
-accept their specific option groups. There is no interface for field storage:
-interfaces can be introduced when interchangeable behavior is needed. This uses
-Go's [struct embedding](https://go.dev/ref/spec#Struct_types) and the standard
-[JSON embedded-field rules](https://pkg.go.dev/encoding/json#Marshal).
+`proxyNode` is an interface for common node metadata and protocol validation.
+`parseNode` selects one concrete model from UCI `type`: `shadowsocksNode`,
+`hysteria2Node`, `tuicNode`, `shadowTLSNode`, `vlessNode` or `loadBalanceNode`.
+Each model defines only its protocol's fields and applicable shared capabilities.
+Only remote proxies implement `remoteProxyNode`, which exposes a server and
+upstream; load balancers carry member/strategy/probe options instead. Reality
+belongs only to VLESS, and credentials are declared by each protocol as needed.
+
+Core builders dispatch on these concrete types, keeping Xray and sing-box's
+native return types. Decoding and validation apply only to the selected protocol;
+stale UCI fields left by a protocol switch do not populate or invalidate its
+model. Existing flat JSON keys are preserved through embedded capability structs.
+UCI scalar conversion lives in `uci_values.go`, and protocol validation lives in
+`node_validation.go`. See Go's [interfaces](https://go.dev/ref/spec#Interface_types),
+[struct embedding](https://go.dev/ref/spec#Struct_types) and standard
+[JSON field rules](https://pkg.go.dev/encoding/json#Unmarshal).
 
 UCI strings are decoded into typed fields once. Core output, DNS, routing,
 transports and protocol settings use upstream structs. Xray exposes protocol

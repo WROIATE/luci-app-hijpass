@@ -35,8 +35,23 @@ func fixtureConfig(t *testing.T, name string) config {
 func TestTypedNumericValidation(t *testing.T) {
 	for _, tc := range []struct{ key, value string }{{"server_port", "65536"}, {"server_port", "443.5"}, {"multiplex_max_connections", "2147483648"}, {"strategy_tolerance", "NaN"}, {"strategy_tolerance", "+Inf"}, {"transport_ws_max_early_data", "4294967296"}, {"transport_grpc_idle_timeout", "-1s"}, {"transport_grpc_idle_timeout", "2147483648s"}, {"udp_over_tcp", "true"}} {
 		t.Run(tc.key+"/"+tc.value, func(t *testing.T) {
-			c := fixtureConfig(t, "sing-box-vless-defaults")
-			c[1][tc.key] = tc.value
+			fixture := "sing-box-vless-defaults"
+			if tc.key == "strategy_tolerance" {
+				fixture = "sing-box-load-balance"
+			}
+			if tc.key == "udp_over_tcp" {
+				fixture = "sing-box-shadowsocks-defaults"
+			}
+			c := fixtureConfig(t, fixture)
+			target := c[1]
+			if tc.key == "strategy_tolerance" {
+				for _, s := range c.of("proxy_node") {
+					if s.str("type") == "load_balance" {
+						target = s
+					}
+				}
+			}
+			target[tc.key] = tc.value
 			if _, e := render(c); e == nil {
 				t.Fatal("invalid typed input accepted")
 			}

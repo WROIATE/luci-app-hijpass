@@ -64,16 +64,16 @@ func xrSocks(tag string, port uint16) (xr.OutboundDetourConfig, error) {
 	s, e := rawSettings(xr.SocksClientConfig{Address: xrAddress("127.0.0.1"), Port: port})
 	return xr.OutboundDetourConfig{Protocol: "socks", Tag: tag, Settings: s}, e
 }
-func xrProtocol(n proxyNode) (xr.OutboundDetourConfig, error) {
-	o := xr.OutboundDetourConfig{Protocol: n.Type, Tag: n.Name}
+func xrProtocol(node remoteProxyNode) (xr.OutboundDetourConfig, error) {
+	o := xr.OutboundDetourConfig{Protocol: node.base().Type, Tag: node.base().Name}
 	var e error
-	switch n.Type {
-	case "shadowsocks":
+	switch n := node.(type) {
+	case *shadowsocksNode:
 		if n.UDPOverTCP {
 			return o, fmt.Errorf("Xray main no longer supports Shadowsocks udp_over_tcp; disable it or select sing-box")
 		}
 		o.Settings, e = rawSettings(xr.ShadowsocksClientConfig{Address: xrAddress(n.Server), Port: uint16(n.ServerPort), Cipher: n.Method, Password: n.Password})
-	case "hysteria2":
+	case *hysteria2Node:
 		o.Protocol = "hysteria"
 		o.Settings, e = rawSettings(xr.HysteriaClientConfig{Version: 2, Address: xrAddress(n.Server), Port: uint16(n.ServerPort)})
 		o.StreamSetting = &xr.StreamConfig{
@@ -93,7 +93,7 @@ func xrProtocol(n proxyNode) (xr.OutboundDetourConfig, error) {
 		if n.UpMbps != nil || n.DownMbps != nil {
 			o.StreamSetting.FinalMask = &xr.FinalMask{QuicParams: &xr.QuicParamsConfig{BrutalUp: xrBandwidth(n.UpMbps), BrutalDown: xrBandwidth(n.DownMbps)}}
 		}
-	case "vless":
+	case *vlessNode:
 		o.Settings, e = rawSettings(xr.VLessOutboundConfig{Address: xrAddress(n.Server), Port: uint16(n.ServerPort), Id: n.UUID, Encryption: "none", Flow: n.Flow})
 		st := &xr.StreamConfig{Network: ptr(xr.TransportProtocol("raw")), Security: "none"}
 		o.StreamSetting = st
@@ -142,7 +142,7 @@ func xrProtocol(n proxyNode) (xr.OutboundDetourConfig, error) {
 			return o, fmt.Errorf("unsupported Xray transport %q", n.Transport)
 		}
 	default:
-		return o, fmt.Errorf("unsupported Xray protocol %q", n.Type)
+		return o, fmt.Errorf("unsupported Xray protocol %q", node.base().Type)
 	}
 	return o, e
 }
@@ -155,19 +155,20 @@ func xrBandwidth(v *uciInt) xr.Bandwidth {
 	}
 	return xr.Bandwidth(fmt.Sprintf("%d mbps", *v))
 }
-func (c config) xrayProxy(n proxyNode) (*coreConfig, error) {
-	x := &xr.Config{LogConfig: xrLog(n.LogLevel)}
+func (c config) xrayProxy(node proxyNode) (*coreConfig, error) {
+	base := node.base()
+	x := &xr.Config{LogConfig: xrLog(base.LogLevel)}
 	for _, p := range []struct {
 		typ, tag string
 		port     uciInt
-	}{{"tproxy", "tproxy-in", n.ListenPort}, {"socks", "socks-in", n.SocksPort}} {
+	}{{"tproxy", "tproxy-in", base.ListenPort}, {"socks", "socks-in", base.SocksPort}} {
 		in, e := xrInbound(p.typ, p.tag, uint16(p.port), false)
 		if e != nil {
 			return nil, e
 		}
 		x.InboundConfigs = append(x.InboundConfigs, in)
 	}
-	if n.Type == "load_balance" {
+	if n, ok := node.(*loadBalanceNode); ok {
 		fb := "lb-member-0"
 		for i, name := range n.Members {
 			s, e := c.node(name)
@@ -217,16 +218,21 @@ func (c config) xrayProxy(n proxyNode) (*coreConfig, error) {
 			return nil, e
 		}
 	} else {
-		out, e := xrProtocol(n)
+		remote, ok := node.(remoteProxyNode)
+		if !ok {
+			return nil, fmt.Errorf("unsupported remote proxy %T", node)
+		}
+		out, e := xrProtocol(remote)
+		endpoint := remote.endpoint()
 		if e != nil {
 			return nil, e
 		}
-		if n.Upstream != "" {
-			up, e := c.node(n.Upstream)
+		if endpoint.Upstream != "" {
+			up, e := c.node(endpoint.Upstream)
 			if e != nil {
 				return nil, e
 			}
-			tag := "upstream-" + n.Upstream
+			tag := "upstream-" + endpoint.Upstream
 			if out.StreamSetting == nil {
 				out.StreamSetting = &xr.StreamConfig{}
 			}

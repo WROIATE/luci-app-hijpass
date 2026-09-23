@@ -1,7 +1,6 @@
 package main
 
-// These value structs describe the flat UCI input. Anonymous embedding keeps
-// existing JSON keys and lets each builder accept only its relevant options.
+// Shared capabilities are embedded only by protocols that support them.
 type nodeBase struct {
 	ID         string `json:".name"`
 	Name       string `json:"name"`
@@ -9,58 +8,21 @@ type nodeBase struct {
 	Core       string `json:"core"`
 	ListenPort uciInt `json:"listen_port"`
 	SocksPort  uciInt `json:"socks_port"`
-	Upstream   string `json:"upstream_proxy_node"`
 	LogLevel   string `json:"log_level"`
 }
 
 type nodeServer struct {
 	Server     string `json:"server"`
 	ServerPort uciInt `json:"server_port"`
-	Network    string `json:"network"`
-}
-
-type nodeCredentials struct {
-	Password string `json:"password"`
-	UUID     string `json:"uuid"`
-}
-
-type shadowsocksOptions struct {
-	Method        string  `json:"method"`
-	Plugin        string  `json:"plugin"`
-	PluginOptions string  `json:"plugin_opts"`
-	UDPOverTCP    uciBool `json:"udp_over_tcp"`
-}
-
-type hysteriaOptions struct {
-	UpMbps         *uciInt     `json:"up_mbps"`
-	DownMbps       *uciInt     `json:"down_mbps"`
-	UDPIdleTimeout uciInt      `json:"udp_idle_timeout"`
-	ServerPorts    stringList  `json:"server_ports"`
-	HopInterval    uciDuration `json:"hop_interval"`
-	ObfsType       string      `json:"obfs_type"`
-	ObfsPassword   string      `json:"obfs_password"`
-}
-
-type tuicOptions struct {
-	CongestionControl string      `json:"congestion_control"`
-	UDPRelayMode      string      `json:"udp_relay_mode"`
-	UDPOverStream     uciBool     `json:"udp_over_stream"`
-	ZeroRTT           uciBool     `json:"zero_rtt_handshake"`
-	Heartbeat         uciDuration `json:"heartbeat"`
-}
-
-type shadowTLSOptions struct {
-	ShadowTLSVersion uciInt `json:"version"`
-}
-
-type vlessOptions struct {
-	Flow           string `json:"flow"`
-	PacketEncoding string `json:"packet_encoding"`
+	Upstream   string `json:"upstream_proxy_node"`
 }
 
 type tlsOptions struct {
-	TLSServerName    string  `json:"tls_server_name"`
-	TLSInsecure      uciBool `json:"tls_insecure"`
+	TLSServerName string  `json:"tls_server_name"`
+	TLSInsecure   uciBool `json:"tls_insecure"`
+}
+
+type realityOptions struct {
 	RealityEnabled   uciBool `json:"tls_reality_enabled"`
 	RealityPublicKey string  `json:"tls_reality_public_key"`
 	RealityShortID   string  `json:"tls_reality_short_id"`
@@ -97,27 +59,4 @@ type transportOptions struct {
 	XHTTPHost     string      `json:"transport_xhttp_host"`
 	XHTTPPath     string      `json:"transport_xhttp_path"`
 	XHTTPMode     string      `json:"transport_xhttp_mode"`
-}
-
-type loadBalanceOptions struct {
-	Members              stringList  `json:"member_node"`
-	URL                  string      `json:"url"`
-	Interval             uciDuration `json:"interval"`
-	Tolerance            uciInt      `json:"tolerance"`
-	IdleTimeout          uciDuration `json:"idle_timeout"`
-	InterruptConnections uciBool     `json:"interrupt_exist_connections"`
-	Strategy             string      `json:"strategy"`
-	StrategyExpected     uciInt      `json:"strategy_expected"`
-	StrategyMaxRTT       uciDuration `json:"strategy_max_rtt"`
-	StrategyTolerance    uciFloat    `json:"strategy_tolerance"`
-	Fallback             string      `json:"fallback_tag"`
-}
-
-type probeOptions struct {
-	ProbeURL          string      `json:"probe_url"`
-	ProbeConnectivity string      `json:"probe_connectivity"`
-	ProbeInterval     uciDuration `json:"probe_interval"`
-	ProbeTimeout      uciDuration `json:"probe_timeout"`
-	ProbeSampling     uciInt      `json:"probe_sampling"`
-	ProbeMethod       string      `json:"probe_http_method"`
 }

@@ -23,33 +23,41 @@ release, both pinned in `go.mod`/`go.sum` for reproducible builds:
 
 ## Package boundaries
 
-- `protocol/` owns the `Node` / `RemoteNode` interfaces, concrete models,
-  defaults and value constraints. Fields use `int64`, `bool`, `float64`,
-  `time.Duration`, `[]string` and optional pointers. It has no UCI field mappings,
-  JSON tags, JSON decoding methods or dependency on input adapters or cores.
-  `protocol.New` creates a concrete node with defaults; `protocol.Validate`
-  checks common and protocol-specific constraints after fields are filled.
-- `uci/` is the input adapter. `DecodeNode` selects the model using UCI `type`,
-  maps flat option names to model fields, and converts UCI strings and lists.
-  Its private wire types never escape into protocol models. Missing fields keep
-  defaults; explicit zero/false values override defaults; stale fields belonging
-  to other protocols are ignored. Conversion errors identify the UCI option.
-- The application coordinates section lookup and core-name normalization in
-  `node.go`; `xray_proxy.go` and `singbox_proxy.go` convert protocol models into
-  the corresponding upstream configuration structs.
+- `protocol/` owns the `Node` / `RemoteNode` interfaces and each protocol's
+  fields, defaults, UCI conversion and validation. Each protocol implements
+  `DecodeUCI(*uci.Decoder) error` in its own file, alongside its model.
+- `uci/` supplies generic typed reads for strings, integers, booleans, durations
+  and lists. It never imports or selects protocols. Missing options preserve
+  defaults; conversion errors identify the offending UCI key.
+- `protocol/options.go` shares conversion of base, server, TLS, Reality,
+  multiplex and transport fields. Each protocol explicitly selects the groups
+  it supports, so stale fields from another protocol remain ignored.
+- `protocol.Decode` creates a registered node, calls its conversion method and
+  validates it. Application-level `node.go` adapts sections and normalizes core
+  names. Xray and sing-box builders retain their existing output logic.
 
-Dependencies point from `uci` and core builders **to** `protocol`; the protocol
-package can be used without either input format or core implementation.
-Each protocol retains its own file (`shadowsocks.go`, `hysteria2.go`, `tuic.go`,
-`shadowtls.go`, `vless.go`, `load_balance.go`). Shared capabilities are embedded
-only where supported: Reality belongs to VLESS; load balancers do not implement
-`RemoteNode` or carry server/TLS credentials.
+The dependency direction is `application -> protocol -> uci`. Protocol fields
+still use ordinary Go types, without UCI scalar wrappers or JSON tags.
 
-This separation is a project design choice. References: Go's
-[package organization](https://go.dev/doc/modules/layout),
-[interfaces](https://go.dev/ref/spec#Interface_types), and
-[RawMessage](https://pkg.go.dev/encoding/json#RawMessage), which lets the input
-adapter delay decoding until the relevant protocol is known.
+### Adding a protocol
+
+Add a file in `protocol/` containing the model, defaults, `DecodeUCI`, `Validate`
+and a local `init` registration, following an existing protocol file:
+
+```go
+func init() {
+    register("my-protocol", func() Node { return newMyProtocol() })
+}
+```
+
+There is no central constructor or decoding switch to edit. Registration rejects
+empty names, nil factories and duplicate names; each constructor returns a fresh
+node. All registrations run during package initialization, before decoding.
+This automates model/decoder discovery only: support for a new protocol's native
+Xray or sing-box output still requires the corresponding core builder changes.
+
+References: Go's [package initialization](https://go.dev/ref/spec#Package_initialization)
+and [interfaces](https://go.dev/ref/spec#Interface_types).
 
 UCI strings are decoded into typed fields once. Core output, DNS, routing,
 transports and protocol settings use upstream structs. Xray exposes protocol

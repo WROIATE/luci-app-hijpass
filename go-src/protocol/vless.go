@@ -1,6 +1,9 @@
 package protocol
 
-import "time"
+import (
+	"hijpass/config/uci"
+	"time"
+)
 
 // VLESS contains only the options supported by this proxy type.
 type VLESS struct {
@@ -28,4 +31,22 @@ func newVLESS() *VLESS {
 		Network: "tcp", MultiplexOptions: MultiplexOptions{MultiplexProtocol: "h2mux"},
 		TransportOptions: TransportOptions{HTTPIdle: 15 * time.Second, HTTPPing: 15 * time.Second, GRPCIdle: 15 * time.Second, GRPCPing: 15 * time.Second},
 	}
+}
+
+func init() { register("vless", func() Node { return newVLESS() }) }
+
+// DecodeUCI reads only options supported by VLESS.
+func (n *VLESS) DecodeUCI(d *uci.Decoder) error {
+	n.BaseOptions.decodeUCI(d)
+	n.ServerOptions.decodeUCI(d)
+
+	n.TLSOptions.decodeUCI(d)
+	n.RealityOptions.decodeUCI(d)
+	n.MultiplexOptions.decodeUCI(d)
+	n.TransportOptions.decodeUCI(d)
+	d.Text("uuid", &n.UUID)
+	d.Text("network", &n.Network)
+	d.Text("flow", &n.Flow)
+	d.Text("packet_encoding", &n.PacketEncoding)
+	return d.Err()
 }

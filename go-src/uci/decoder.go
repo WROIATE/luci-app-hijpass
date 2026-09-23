@@ -1,3 +1,4 @@
+// Package uci provides generic readers for flat UCI JSON options.
 package uci
 
 import (
@@ -8,12 +9,12 @@ import (
 
 // Keep the first conversion error, including its UCI key, while mapping fields.
 // Missing keys must not overwrite protocol defaults.
-type decoder struct {
+type Decoder struct {
 	fields map[string]json.RawMessage
 	err    error
 }
 
-func (d *decoder) read(key string, target any) {
+func (d *Decoder) read(key string, target any) {
 	if d.err != nil {
 		return
 	}
@@ -23,13 +24,13 @@ func (d *decoder) read(key string, target any) {
 		}
 	}
 }
-func (d *decoder) text(key string, v *string)            { d.read(key, v) }
-func (d *decoder) integer(key string, v *int64)          { d.read(key, (*integer)(v)) }
-func (d *decoder) boolean(key string, v *bool)           { d.read(key, (*boolean)(v)) }
-func (d *decoder) duration(key string, v *time.Duration) { d.read(key, (*duration)(v)) }
-func (d *decoder) number(key string, v *float64)         { d.read(key, (*number)(v)) }
-func (d *decoder) list(key string, v *[]string)          { d.read(key, (*stringList)(v)) }
-func (d *decoder) optionalInteger(key string, v **int64) {
+func (d *Decoder) Text(key string, v *string)            { d.read(key, v) }
+func (d *Decoder) Integer(key string, v *int64)          { d.read(key, (*integer)(v)) }
+func (d *Decoder) Boolean(key string, v *bool)           { d.read(key, (*boolean)(v)) }
+func (d *Decoder) Duration(key string, v *time.Duration) { d.read(key, (*duration)(v)) }
+func (d *Decoder) Number(key string, v *float64)         { d.read(key, (*number)(v)) }
+func (d *Decoder) List(key string, v *[]string)          { d.read(key, (*stringList)(v)) }
+func (d *Decoder) OptionalInteger(key string, v **int64) {
 	if _, ok := d.fields[key]; !ok {
 		return
 	}
@@ -37,3 +38,15 @@ func (d *decoder) optionalInteger(key string, v **int64) {
 	d.read(key, &value)
 	*v = (*int64)(value)
 }
+
+// NewDecoder parses a UCI section. Missing options leave destination defaults intact.
+func NewDecoder(data []byte) (*Decoder, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
+	return &Decoder{fields: fields}, nil
+}
+
+// Err returns the first conversion error, annotated with its UCI option name.
+func (d *Decoder) Err() error { return d.err }

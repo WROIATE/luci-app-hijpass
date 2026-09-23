@@ -1,4 +1,4 @@
-package uci_test
+package protocol_test
 
 import (
 	"encoding/json"
@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"hijpass/config/protocol"
-	"hijpass/config/uci"
 )
 
 func decode(t *testing.T, kind string, options map[string]any) (protocol.Node, error) {
@@ -21,7 +20,7 @@ func decode(t *testing.T, kind string, options map[string]any) (protocol.Node, e
 	if err != nil {
 		t.Fatal(err)
 	}
-	return uci.DecodeNode(data)
+	return protocol.Decode(data)
 }
 
 func TestDefaultsAndExplicitZero(t *testing.T) {

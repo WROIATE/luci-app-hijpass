@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"hijpass/config/uci"
 	"math"
 	"time"
 )
@@ -29,4 +30,24 @@ func (n *Hysteria2) Validate() error {
 		}
 	}
 	return nil
+}
+
+func init() { register("hysteria2", func() Node { return &Hysteria2{} }) }
+
+// DecodeUCI reads only options supported by Hysteria2.
+func (n *Hysteria2) DecodeUCI(d *uci.Decoder) error {
+	n.BaseOptions.decodeUCI(d)
+	n.ServerOptions.decodeUCI(d)
+
+	n.TLSOptions.decodeUCI(d)
+	d.Text("password", &n.Password)
+	d.Text("network", &n.Network)
+	d.OptionalInteger("up_mbps", &n.UpMbps)
+	d.OptionalInteger("down_mbps", &n.DownMbps)
+	d.Integer("udp_idle_timeout", &n.UDPIdleTimeout)
+	d.List("server_ports", &n.ServerPorts)
+	d.Duration("hop_interval", &n.HopInterval)
+	d.Text("obfs_type", &n.ObfsType)
+	d.Text("obfs_password", &n.ObfsPassword)
+	return d.Err()
 }

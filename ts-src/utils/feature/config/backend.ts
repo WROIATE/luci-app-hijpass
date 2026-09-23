@@ -21,6 +21,11 @@ async function preview(target: string) {
 
 const GeneratedConfigUtils = {
     preview,
+    render: async function () {
+        const result = await renderConfig(snapshot(), '');
+        if (result.error) throw new Error(result.error);
+        return result as { nodes: Record<string, any>; shunt?: any };
+    },
     validate: async function () {
         const result = await validateConfig(snapshot());
         if (result.error) throw new Error(result.error);

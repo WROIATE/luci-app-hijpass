@@ -1,13 +1,14 @@
-package main
+package feature
 
 import (
 	"encoding/json"
 	"hijpass/config/protocol"
+	"hijpass/config/uci"
 )
 
 // Adapt raw UCI sections to the protocol package without coupling its models to
 // the application's section lookup or core-name normalization.
-func parseNode(s section) (protocol.Config, error) {
+func parseNode(s uci.Section) (protocol.Config, error) {
 	data, err := json.Marshal(s)
 	if err != nil {
 		return nil, err
@@ -16,18 +17,6 @@ func parseNode(s section) (protocol.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	n.Base().Core = core(s)
+	n.Base().Core = CoreName(s)
 	return n, nil
-}
-func fallback(s, defaultValue string) string {
-	if s == "" {
-		return defaultValue
-	}
-	return s
-}
-func intValue(v *int64) int {
-	if v == nil {
-		return 0
-	}
-	return int(*v)
 }

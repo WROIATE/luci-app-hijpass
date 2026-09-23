@@ -1,10 +1,11 @@
-package main
+package xray
 
 import (
 	"encoding/json"
 	"fmt"
 	xn "github.com/xtls/xray-core/common/net"
 	xr "github.com/xtls/xray-core/infra/conf"
+	"hijpass/config/core"
 	"hijpass/config/protocol"
 	"net/url"
 	"strings"
@@ -31,38 +32,38 @@ type xrayLeastLoad struct {
 	Tolerance float64 `json:"tolerance"`
 }
 
-func xrAddress(host string) *xr.Address { return &xr.Address{Address: xn.ParseAddress(host)} }
-func xrLog(level string) *xr.LogConfig {
+func Address(host string) *xr.Address { return &xr.Address{Address: xn.ParseAddress(host)} }
+func Log(level string) *xr.LogConfig {
 	if level == "warn" {
 		level = "warning"
 	}
-	return &xr.LogConfig{LogLevel: fallback(level, "info")}
+	return &xr.LogConfig{LogLevel: core.Fallback(level, "info")}
 }
-func xrInbound(typ, tag string, port uint16, shunt bool) (xr.InboundDetourConfig, error) {
+func Inbound(typ, tag string, port uint16, shunt bool) (xr.InboundDetourConfig, error) {
 
 	o := xr.InboundDetourConfig{Tag: tag, PortList: &xr.PortList{Range: []xr.PortRange{{From: uint32(port), To: uint32(port)}}}}
 	var e error
 	if typ == "socks" {
 		o.Protocol = "socks"
-		o.Settings, e = rawSettings(xr.SocksServerConfig{UDP: true})
+		o.Settings, e = core.RawSettings(xr.SocksServerConfig{UDP: true})
 	} else {
 		o.Protocol = "dokodemo-door"
-		d := xr.DokodemoConfig{Network: ptr(xr.NetworkList{"tcp", "udp"})}
+		d := xr.DokodemoConfig{Network: core.Ptr(xr.NetworkList{"tcp", "udp"})}
 		if typ == "tproxy" {
 			d.FollowRedirect = true
 			o.StreamSetting = &xr.StreamConfig{SocketSettings: &xr.SocketConfig{TProxy: "tproxy"}}
 		} else {
-			o.ListenOn = xrAddress("::")
+			o.ListenOn = Address("::")
 		}
-		o.Settings, e = rawSettings(d)
+		o.Settings, e = core.RawSettings(d)
 	}
 	if shunt && typ == "tproxy" {
 		o.SniffingConfig = &xr.SniffingConfig{Enabled: true, DestOverride: xr.StringList{"http", "tls", "quic"}, RouteOnly: true}
 	}
 	return o, e
 }
-func xrSocks(tag string, port uint16) (xr.OutboundDetourConfig, error) {
-	s, e := rawSettings(xr.SocksClientConfig{Address: xrAddress("127.0.0.1"), Port: port})
+func Socks(tag string, port uint16) (xr.OutboundDetourConfig, error) {
+	s, e := core.RawSettings(xr.SocksClientConfig{Address: Address("127.0.0.1"), Port: port})
 	return xr.OutboundDetourConfig{Protocol: "socks", Tag: tag, Settings: s}, e
 }
 func xrProtocol(node protocol.RemoteConfig) (xr.OutboundDetourConfig, error) {
@@ -73,17 +74,17 @@ func xrProtocol(node protocol.RemoteConfig) (xr.OutboundDetourConfig, error) {
 		if n.UDPOverTCP {
 			return o, fmt.Errorf("Xray main no longer supports Shadowsocks udp_over_tcp; disable it or select sing-box")
 		}
-		o.Settings, e = rawSettings(xr.ShadowsocksClientConfig{Address: xrAddress(n.Server), Port: uint16(n.ServerPort), Cipher: n.Method, Password: n.Password})
+		o.Settings, e = core.RawSettings(xr.ShadowsocksClientConfig{Address: Address(n.Server), Port: uint16(n.ServerPort), Cipher: n.Method, Password: n.Password})
 	case *protocol.Hysteria2:
 		o.Protocol = "hysteria"
-		o.Settings, e = rawSettings(xr.HysteriaClientConfig{Version: 2, Address: xrAddress(n.Server), Port: uint16(n.ServerPort)})
+		o.Settings, e = core.RawSettings(xr.HysteriaClientConfig{Version: 2, Address: Address(n.Server), Port: uint16(n.ServerPort)})
 		o.StreamSetting = &xr.StreamConfig{
-			Network:  ptr(xr.TransportProtocol("hysteria")),
+			Network:  core.Ptr(xr.TransportProtocol("hysteria")),
 			Security: "tls",
 			TLSSettings: &xr.TLSConfig{
-				ServerName: fallback(n.TLSServerName,
+				ServerName: core.Fallback(n.TLSServerName,
 					n.Server),
-				ALPN: ptr(xr.StringList{"h3"}),
+				ALPN: core.Ptr(xr.StringList{"h3"}),
 			},
 			HysteriaSettings: &xr.HysteriaConfig{
 				Version:        2,
@@ -95,29 +96,29 @@ func xrProtocol(node protocol.RemoteConfig) (xr.OutboundDetourConfig, error) {
 			o.StreamSetting.FinalMask = &xr.FinalMask{QuicParams: &xr.QuicParamsConfig{BrutalUp: xrBandwidth(n.UpMbps), BrutalDown: xrBandwidth(n.DownMbps)}}
 		}
 	case *protocol.VLESS:
-		o.Settings, e = rawSettings(xr.VLessOutboundConfig{Address: xrAddress(n.Server), Port: uint16(n.ServerPort), Id: n.UUID, Encryption: "none", Flow: n.Flow})
-		st := &xr.StreamConfig{Network: ptr(xr.TransportProtocol("raw")), Security: "none"}
+		o.Settings, e = core.RawSettings(xr.VLessOutboundConfig{Address: Address(n.Server), Port: uint16(n.ServerPort), Id: n.UUID, Encryption: "none", Flow: n.Flow})
+		st := &xr.StreamConfig{Network: core.Ptr(xr.TransportProtocol("raw")), Security: "none"}
 		o.StreamSetting = st
 		if n.RealityEnabled {
 			st.Security = "reality"
-			st.REALITYSettings = &xr.REALITYConfig{Fingerprint: "chrome", ServerName: fallback(n.TLSServerName, n.Server), Password: n.RealityPublicKey, ShortId: n.RealityShortID}
+			st.REALITYSettings = &xr.REALITYConfig{Fingerprint: "chrome", ServerName: core.Fallback(n.TLSServerName, n.Server), Password: n.RealityPublicKey, ShortId: n.RealityShortID}
 		} else if n.TLSServerName != "" {
 			st.Security = "tls"
-			st.TLSSettings = &xr.TLSConfig{ServerName: n.TLSServerName, ALPN: ptr(xr.StringList{"h2", "http/1.1"})}
+			st.TLSSettings = &xr.TLSConfig{ServerName: n.TLSServerName, ALPN: core.Ptr(xr.StringList{"h2", "http/1.1"})}
 		}
 		switch n.Transport {
 		case "":
 		case "xhttp":
-			st.Network = ptr(xr.TransportProtocol("xhttp"))
-			st.XHTTPSettings = &xr.SplitHTTPConfig{Host: n.XHTTPHost, Path: fallback(n.XHTTPPath, "/"), Mode: fallback(n.XHTTPMode, "auto")}
+			st.Network = core.Ptr(xr.TransportProtocol("xhttp"))
+			st.XHTTPSettings = &xr.SplitHTTPConfig{Host: n.XHTTPHost, Path: core.Fallback(n.XHTTPPath, "/"), Mode: core.Fallback(n.XHTTPMode, "auto")}
 		case "http":
-			st.Network = ptr(xr.TransportProtocol("xhttp"))
-			st.XHTTPSettings = &xr.SplitHTTPConfig{Host: n.HTTPHost, Path: fallback(n.HTTPPath, "/"), Mode: "stream-one", UplinkHTTPMethod: n.HTTPMethod}
+			st.Network = core.Ptr(xr.TransportProtocol("xhttp"))
+			st.XHTTPSettings = &xr.SplitHTTPConfig{Host: n.HTTPHost, Path: core.Fallback(n.HTTPPath, "/"), Mode: "stream-one", UplinkHTTPMethod: n.HTTPMethod}
 		case "httpupgrade":
-			st.Network = ptr(xr.TransportProtocol("httpupgrade"))
-			st.HTTPUPGRADESettings = &xr.HttpUpgradeConfig{Host: n.UpgradeHost, Path: fallback(n.UpgradePath, "/")}
+			st.Network = core.Ptr(xr.TransportProtocol("httpupgrade"))
+			st.HTTPUPGRADESettings = &xr.HttpUpgradeConfig{Host: n.UpgradeHost, Path: core.Fallback(n.UpgradePath, "/")}
 		case "ws":
-			p := fallback(n.WSPath, "/")
+			p := core.Fallback(n.WSPath, "/")
 			if n.WSEarlyData > 0 {
 				base, hash, hasHash := strings.Cut(p, "#")
 				sep := "?"
@@ -129,12 +130,12 @@ func xrProtocol(node protocol.RemoteConfig) (xr.OutboundDetourConfig, error) {
 					p += "#" + hash
 				}
 			}
-			st.Network = ptr(xr.TransportProtocol("websocket"))
+			st.Network = core.Ptr(xr.TransportProtocol("websocket"))
 			st.WSSettings = &xr.WebSocketConfig{Host: n.WSHost, Path: p}
 		case "grpc":
-			st.Network = ptr(xr.TransportProtocol("grpc"))
+			st.Network = core.Ptr(xr.TransportProtocol("grpc"))
 			st.GRPCSettings = &xr.GRPCConfig{
-				ServiceName:         fallback(n.GRPCService, "TunService"),
+				ServiceName:         core.Fallback(n.GRPCService, "TunService"),
 				IdleTimeout:         int32(time.Duration(n.GRPCIdle) / time.Second),
 				HealthCheckTimeout:  int32(time.Duration(n.GRPCPing) / time.Second),
 				PermitWithoutStream: bool(n.GRPCPermit),
@@ -156,14 +157,14 @@ func xrBandwidth(v *int64) xr.Bandwidth {
 	}
 	return xr.Bandwidth(fmt.Sprintf("%d mbps", *v))
 }
-func (c config) xrayProxy(node protocol.Config) (*coreConfig, error) {
+func Build(node protocol.Config, resolvePort func(string) (uint16, error)) (*core.Config, error) {
 	base := node.Base()
-	x := &xr.Config{LogConfig: xrLog(base.LogLevel)}
+	x := &xr.Config{LogConfig: Log(base.LogLevel)}
 	for _, p := range []struct {
 		typ, tag string
 		port     int64
 	}{{"tproxy", "tproxy-in", base.ListenPort}, {"socks", "socks-in", base.SocksPort}} {
-		in, e := xrInbound(p.typ, p.tag, uint16(p.port), false)
+		in, e := Inbound(p.typ, p.tag, uint16(p.port), false)
 		if e != nil {
 			return nil, e
 		}
@@ -172,7 +173,7 @@ func (c config) xrayProxy(node protocol.Config) (*coreConfig, error) {
 	if n, ok := node.(*protocol.LoadBalance); ok {
 		fb := "lb-member-0"
 		for i, name := range n.Members {
-			s, e := c.node(name)
+			port, e := resolvePort(name)
 			if e != nil {
 				return nil, e
 			}
@@ -180,7 +181,7 @@ func (c config) xrayProxy(node protocol.Config) (*coreConfig, error) {
 			if name == n.Fallback {
 				fb = tag
 			}
-			o, e := xrSocks(tag, uint16(s.num("socks_port")))
+			o, e := Socks(tag, port)
 			if e != nil {
 				return nil, e
 			}
@@ -188,17 +189,17 @@ func (c config) xrayProxy(node protocol.Config) (*coreConfig, error) {
 		}
 		strategy := xr.StrategyConfig{Type: n.Strategy}
 		if n.Strategy == "leastLoad" {
-			s, e := rawSettings(xrayLeastLoad{int(n.StrategyExpected), time.Duration(n.StrategyMaxRTT).String(), float64(n.StrategyTolerance)})
+			s, e := core.RawSettings(xrayLeastLoad{int(n.StrategyExpected), time.Duration(n.StrategyMaxRTT).String(), float64(n.StrategyTolerance)})
 			if e != nil {
 				return nil, e
 			}
 			strategy.Settings = s
 		}
-		rr, e := json.Marshal(xrayRouteRule{InboundTag: []string{"tproxy-in", "socks-in"}, BalancerTag: "slb"})
+		rr, e := json.Marshal(core.XrayRouteRule{InboundTag: []string{"tproxy-in", "socks-in"}, BalancerTag: "slb"})
 		if e != nil {
 			return nil, e
 		}
-		x.RouterConfig = &xr.RouterConfig{DomainStrategy: ptr("AsIs"), RuleList: []json.RawMessage{rr}, Balancers: []*xr.BalancingRule{{Tag: "slb", Selectors: xr.StringList{"lb-member-"}, FallbackTag: fb, Strategy: strategy}}}
+		x.RouterConfig = &xr.RouterConfig{DomainStrategy: core.Ptr("AsIs"), RuleList: []json.RawMessage{rr}, Balancers: []*xr.BalancingRule{{Tag: "slb", Selectors: xr.StringList{"lb-member-"}, FallbackTag: fb, Strategy: strategy}}}
 		burst := xrayBurstOptions{
 			SubjectSelector: []string{"lb-member-"},
 			PingConfig: xrayPing{
@@ -229,7 +230,7 @@ func (c config) xrayProxy(node protocol.Config) (*coreConfig, error) {
 			return nil, e
 		}
 		if endpoint.Upstream != "" {
-			up, e := c.node(endpoint.Upstream)
+			port, e := resolvePort(endpoint.Upstream)
 			if e != nil {
 				return nil, e
 			}
@@ -238,7 +239,7 @@ func (c config) xrayProxy(node protocol.Config) (*coreConfig, error) {
 				out.StreamSetting = &xr.StreamConfig{}
 			}
 			out.StreamSetting.SocketSettings = &xr.SocketConfig{DialerProxy: tag, DomainStrategy: "UseIP"}
-			socks, e := xrSocks(tag, uint16(up.num("socks_port")))
+			socks, e := Socks(tag, port)
 			if e != nil {
 				return nil, e
 			}
@@ -247,5 +248,5 @@ func (c config) xrayProxy(node protocol.Config) (*coreConfig, error) {
 			x.OutboundConfigs = []xr.OutboundDetourConfig{out}
 		}
 	}
-	return &coreConfig{Xray: x}, nil
+	return &core.Config{Xray: x}, nil
 }

@@ -1,10 +1,16 @@
-package main
+package feature
 
-import "fmt"
+import (
+	"fmt"
+	"hijpass/config/core"
+	"hijpass/config/core/singbox"
+	"hijpass/config/core/xray"
+	"hijpass/config/uci"
+)
 
-func (c config) node(name string) (section, error) {
-	for _, s := range c.of("proxy_node") {
-		if s.val("name", s.str(".name")) == name && s.str("enabled") == "1" {
+func (c Config) node(name string) (uci.Section, error) {
+	for _, s := range c.Of("proxy_node") {
+		if s.Value("name", s.String(".name")) == name && s.String("enabled") == "1" {
 			if err := port(s, "socks_port"); err != nil {
 				return nil, err
 			}
@@ -13,7 +19,7 @@ func (c config) node(name string) (section, error) {
 	}
 	return nil, fmt.Errorf("proxy node %q missing or disabled", name)
 }
-func (c config) validateDependencies() error {
+func (c Config) validateDependencies() error {
 	seen := map[string]bool{}
 	active := map[string]bool{}
 	var visit func(string, int) error
@@ -32,12 +38,12 @@ func (c config) validateDependencies() error {
 			return e
 		}
 		active[name] = true
-		deps := s.list("upstream_proxy_node")
-		if s.str("type") == "load_balance" {
+		deps := s.List("upstream_proxy_node")
+		if s.String("type") == "load_balance" {
 			if len(deps) > 0 {
 				return fmt.Errorf("load balancing node cannot have an upstream: %s", name)
 			}
-			deps = s.list("member_node")
+			deps = s.List("member_node")
 			unique := map[string]bool{}
 			for _, member := range deps {
 				if unique[member] {
@@ -45,7 +51,7 @@ func (c config) validateDependencies() error {
 				}
 				unique[member] = true
 			}
-			if fallback := s.str("fallback_tag"); fallback != "" && !unique[fallback] {
+			if fallback := s.String("fallback_tag"); fallback != "" && !unique[fallback] {
 				return fmt.Errorf("fallback %q is not a load balancing member", fallback)
 			}
 			if len(deps) == 0 {
@@ -57,11 +63,11 @@ func (c config) validateDependencies() error {
 			if e != nil {
 				return e
 			}
-			if s.str("type") == "load_balance" && m.str("type") == "load_balance" {
+			if s.String("type") == "load_balance" && m.String("type") == "load_balance" {
 				return fmt.Errorf("nested load balancing member %q", d)
 			}
 			nextDepth := depth + 1
-			if s.str("type") == "load_balance" {
+			if s.String("type") == "load_balance" {
 				nextDepth = 1
 			}
 			if e = visit(d, nextDepth); e != nil {
@@ -74,11 +80,11 @@ func (c config) validateDependencies() error {
 	}
 	names := map[string]bool{}
 	ports := map[string]string{}
-	for _, s := range c.of("proxy_node") {
-		if s.str("enabled") != "1" {
+	for _, s := range c.Of("proxy_node") {
+		if s.String("enabled") != "1" {
 			continue
 		}
-		name := s.val("name", s.str(".name"))
+		name := s.Value("name", s.String(".name"))
 		if names[name] {
 			return fmt.Errorf("duplicate proxy name %q", name)
 		}
@@ -87,7 +93,7 @@ func (c config) validateDependencies() error {
 			if err := port(s, k); err != nil {
 				return err
 			}
-			p := s.str(k)
+			p := s.String(k)
 			if owner, ok := ports[p]; ok {
 				return fmt.Errorf("port %s is shared by %s and %s", p, owner, name)
 			}
@@ -101,17 +107,25 @@ func (c config) validateDependencies() error {
 	}
 	return nil
 }
-func (c config) proxy(raw section) (*coreConfig, error) {
+func (c Config) Proxy(raw uci.Section) (*core.Config, error) {
 	n, err := parseNode(raw)
 	if err != nil {
 		return nil, err
 	}
 	switch n.Base().Core {
 	case "sing-box":
-		return c.singboxProxy(n)
+		return singbox.Build(n, c.nodePort)
 	case "xray":
-		return c.xrayProxy(n)
+		return xray.Build(n, c.nodePort)
 	default:
 		return nil, fmt.Errorf("unsupported core %q", n.Base().Core)
 	}
+}
+
+func (c Config) nodePort(name string) (uint16, error) {
+	s, err := c.node(name)
+	if err != nil {
+		return 0, err
+	}
+	return uint16(s.Number("socks_port")), nil
 }

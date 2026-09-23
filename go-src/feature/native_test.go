@@ -1,25 +1,26 @@
-package main
+package feature
 
 import (
 	"encoding/json"
 	sb "github.com/sagernet/sing-box/option"
 	xr "github.com/xtls/xray-core/infra/conf"
 	dnsproxy "github.com/xtls/xray-core/proxy/dns"
+	"hijpass/config/core"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 )
 
-func fixtureConfig(t *testing.T, name string) config {
+func fixtureConfig(t *testing.T, name string) Config {
 	t.Helper()
-	data, e := os.ReadFile("testdata/compatibility.json")
+	data, e := os.ReadFile("../testdata/compatibility.json")
 	if e != nil {
 		t.Fatal(e)
 	}
 	var fixtures []struct {
 		Name     string
-		Sections config
+		Sections Config
 	}
 	if e = json.Unmarshal(data, &fixtures); e != nil {
 		t.Fatal(e)
@@ -45,14 +46,14 @@ func TestTypedNumericValidation(t *testing.T) {
 			c := fixtureConfig(t, fixture)
 			target := c[1]
 			if tc.key == "strategy_tolerance" {
-				for _, s := range c.of("proxy_node") {
-					if s.str("type") == "load_balance" {
+				for _, s := range c.Of("proxy_node") {
+					if s.String("type") == "load_balance" {
 						target = s
 					}
 				}
 			}
 			target[tc.key] = tc.value
-			if _, e := render(c); e == nil {
+			if _, e := Render(c); e == nil {
 				t.Fatal("invalid typed input accepted")
 			}
 		})
@@ -62,12 +63,12 @@ func TestResolvedAddressPreservesTLS(t *testing.T) {
 	for _, co := range []string{"sing-box", "xray"} {
 		t.Run(co, func(t *testing.T) {
 			c := fixtureConfig(t, co+"-vless-options")
-			g, e := render(c)
+			g, e := Render(c)
 			if e != nil {
 				t.Fatal(e)
 			}
 			o := g.Nodes["node"]
-			if e = o.replaceServer("192.0.2.10"); e != nil {
+			if e = o.ReplaceServer("192.0.2.10"); e != nil {
 				t.Fatal(e)
 			}
 			if co == "sing-box" {
@@ -90,10 +91,10 @@ func TestResolvedAddressPreservesTLS(t *testing.T) {
 }
 func TestGeoConversionRetainsExplicitRuleSets(t *testing.T) {
 	c := fixtureConfig(t, "sing-box-shunt-geo")
-	for _, s := range c.of("shunt_route_rule") {
-		s["domain_list"] = s.str("domain_list") + "\nrule-set:remote:https://example.org/custom.srs"
+	for _, s := range c.Of("shunt_route_rule") {
+		s["domain_list"] = s.String("domain_list") + "\nrule-set:remote:https://example.org/custom.srs"
 	}
-	g, e := render(c)
+	g, e := Render(c)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -109,11 +110,11 @@ func TestXrayNativeBuild(t *testing.T) {
 	for _, name := range []string{"xray-shadowsocks-defaults", "xray-hysteria2-defaults", "xray-vless-defaults", "xray-load-balance", "xray-load-balance-options", "xray-shunt-rules", "xray-shunt-split"} {
 		t.Run(name, func(t *testing.T) {
 			c := fixtureConfig(t, name)
-			g, e := render(c)
+			g, e := Render(c)
 			if e != nil {
 				t.Fatal(e)
 			}
-			configs := []*coreConfig{}
+			configs := []*core.Config{}
 			for _, o := range g.Nodes {
 				configs = append(configs, o)
 			}
@@ -144,7 +145,7 @@ func TestXrayNativeBuild(t *testing.T) {
 func TestPinnedSchemaMigrations(t *testing.T) {
 	for _, co := range []string{"sing-box", "xray"} {
 		t.Run(co, func(t *testing.T) {
-			g, e := render(fixtureConfig(t, co+"-shunt-block"))
+			g, e := Render(fixtureConfig(t, co+"-shunt-block"))
 			if e != nil {
 				t.Fatal(e)
 			}

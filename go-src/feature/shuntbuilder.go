@@ -1,4 +1,4 @@
-package main
+package feature
 
 import (
 	"encoding/json"
@@ -6,16 +6,20 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
 	xr "github.com/xtls/xray-core/infra/conf"
+	"hijpass/config/core"
+	"hijpass/config/core/singbox"
+	"hijpass/config/core/xray"
+	"hijpass/config/uci"
 	"net"
 	"strconv"
 )
 
 type shuntBuilder struct {
-	config    *coreConfig
-	settings  section
-	dnsNodes  map[string]section
+	config    *core.Config
+	settings  uci.Section
+	dnsNodes  map[string]uci.Section
 	resolver  string
-	xrRoutes  []xrayRouteRule
+	xrRoutes  []core.XrayRouteRule
 	dnsExits  map[string][]string
 	exitOrder []string
 	setIndex  map[string]int
@@ -35,17 +39,17 @@ func sbStrategy(s string) sb.DomainStrategy {
 		return sb.DomainStrategy(C.DomainStrategyAsIS)
 	}
 }
-func sbDNSServer(s section, tag, detour string) (sb.DNSServerOptions, error) {
-	o := sb.DNSServerOptions{Type: s.str("type"), Tag: tag}
+func sbDNSServer(s uci.Section, tag, detour string) (sb.DNSServerOptions, error) {
+	o := sb.DNSServerOptions{Type: s.String("type"), Tag: tag}
 	if s == nil {
 		return o, fmt.Errorf("DNS node for %q does not exist", tag)
 	}
-	if s.str("port") != "" {
+	if s.String("port") != "" {
 		if e := port(s, "port"); e != nil {
 			return o, e
 		}
 	}
-	remote := sb.RemoteDNSServerOptions{DNSServerAddressOptions: sb.DNSServerAddressOptions{Server: s.str("server"), ServerPort: uint16(s.num("port"))}}
+	remote := sb.RemoteDNSServerOptions{DNSServerAddressOptions: sb.DNSServerAddressOptions{Server: s.String("server"), ServerPort: uint16(s.Number("port"))}}
 	if detour != "direct-out" {
 		remote.Detour = detour
 	}
@@ -63,41 +67,41 @@ func sbDNSServer(s section, tag, detour string) (sb.DNSServerOptions, error) {
 	}
 	return o, nil
 }
-func xrDNSServer(s section, tag string) (*xr.NameServerConfig, error) {
+func xrDNSServer(s uci.Section, tag string) (*xr.NameServerConfig, error) {
 	if s == nil {
 		return nil, fmt.Errorf("DNS node for %q does not exist", tag)
 	}
-	if s.str("port") != "" {
+	if s.String("port") != "" {
 		if e := port(s, "port"); e != nil {
 			return nil, e
 		}
 	}
-	addr := s.str("server")
+	addr := s.String("server")
 	o := &xr.NameServerConfig{Tag: tag, SkipFallback: true}
-	switch s.str("type") {
+	switch s.String("type") {
 	case "tcp", "quic":
-		addr = s.str("type") + "://" + addr
-		o.Port = uint16(s.num("port"))
+		addr = s.String("type") + "://" + addr
+		o.Port = uint16(s.Number("port"))
 	case "https":
-		if s.str("port") != "" {
-			addr = net.JoinHostPort(addr, s.str("port"))
+		if s.String("port") != "" {
+			addr = net.JoinHostPort(addr, s.String("port"))
 		} else if net.ParseIP(addr) != nil && net.ParseIP(addr).To4() == nil {
 			addr = "[" + addr + "]"
 		}
 		addr = "https://" + addr + "/dns-query"
 	case "udp":
-		o.Port = uint16(s.num("port"))
+		o.Port = uint16(s.Number("port"))
 	default:
-		return nil, fmt.Errorf("invalid Xray DNS type %q", s.str("type"))
+		return nil, fmt.Errorf("invalid Xray DNS type %q", s.String("type"))
 	}
-	o.Address = xrAddress(addr)
+	o.Address = xray.Address(addr)
 	return o, nil
 }
-func newShunt(c config, s section, co, final, resolver string, dnsNodes map[string]section) (*shuntBuilder, error) {
-	b := &shuntBuilder{config: &coreConfig{}, settings: s, resolver: resolver, dnsNodes: dnsNodes, dnsExits: map[string][]string{}, setIndex: map[string]int{}}
-	cache := s.str("use_cache") == "1"
+func newShunt(c Config, s uci.Section, co, final, resolver string, dnsNodes map[string]uci.Section) (*shuntBuilder, error) {
+	b := &shuntBuilder{config: &core.Config{}, settings: s, resolver: resolver, dnsNodes: dnsNodes, dnsExits: map[string][]string{}, setIndex: map[string]int{}}
+	cache := s.String("use_cache") == "1"
 	if co == "sing-box" {
-		dns := &sb.DNSOptions{RawDNSOptions: sb.RawDNSOptions{Final: resolver, DNSClientOptions: sb.DNSClientOptions{Strategy: sbStrategy(s.val("default_strategy", "64")), DisableCache: !cache, DisableExpire: !cache}}}
+		dns := &sb.DNSOptions{RawDNSOptions: sb.RawDNSOptions{Final: resolver, DNSClientOptions: sb.DNSClientOptions{Strategy: sbStrategy(s.Value("default_strategy", "64")), DisableCache: !cache, DisableExpire: !cache}}}
 		route := &sb.RouteOptions{
 			Final:                 final,
 			DefaultDomainResolver: &sb.DomainResolveOptions{Server: resolver},
@@ -121,7 +125,7 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 		}
 		o := &sb.Options{
 			Log: &sb.LogOptions{
-				Level:     s.val("log_level", "info"),
+				Level:     s.Value("log_level", "info"),
 				Timestamp: true,
 			},
 			DNS:   dns,
@@ -130,12 +134,12 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 				{
 					Type:    "tproxy",
 					Tag:     "tproxy-in",
-					Options: &sb.TProxyInboundOptions{ListenOptions: sbListen(uint16(s.num("shunt_listen_port")), "::")},
+					Options: &sb.TProxyInboundOptions{ListenOptions: singbox.Listen(uint16(s.Number("shunt_listen_port")), "::")},
 				},
 				{
 					Type:    "direct",
 					Tag:     "dns-in",
-					Options: &sb.DirectInboundOptions{ListenOptions: sbListen(uint16(s.num("dns_listen_port")), "::")},
+					Options: &sb.DirectInboundOptions{ListenOptions: singbox.Listen(uint16(s.Number("dns_listen_port")), "::")},
 				},
 			},
 			Outbounds: []sb.Outbound{
@@ -147,9 +151,9 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 			},
 		}
 		b.config.SingBox = o
-		for _, n := range c.of("proxy_node") {
-			if n.str("enabled") == "1" {
-				o.Outbounds = append(o.Outbounds, sbSocks(n.str("name"), uint16(n.num("socks_port"))))
+		for _, n := range c.Of("proxy_node") {
+			if n.String("enabled") == "1" {
+				o.Outbounds = append(o.Outbounds, singbox.Socks(n.String("name"), uint16(n.Number("socks_port"))))
 			}
 		}
 		d, e := sbDNSServer(dnsNodes[resolver], resolver, final)
@@ -157,7 +161,7 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 			return nil, e
 		}
 		dns.Servers = append(dns.Servers, d)
-		if name := s.str("ruleset_out_node"); name != "" {
+		if name := s.String("ruleset_out_node"); name != "" {
 			if name == "hijpass-block" {
 				return nil, fmt.Errorf("rule-set download exit cannot be Block")
 			}
@@ -169,9 +173,9 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 				if e != nil {
 					return nil, e
 				}
-				out = sbSocks("ruleset-out", uint16(node.num("socks_port")))
+				out = singbox.Socks("ruleset-out", uint16(node.Number("socks_port")))
 			}
-			if r := s.str("ruleset_dns_node"); r != "" {
+			if r := s.String("ruleset_dns_node"); r != "" {
 				dialer := out.Options.(sb.DialerOptionsWrapper)
 				d := dialer.TakeDialerOptions()
 				d.DomainResolver = &sb.DomainResolveOptions{Server: "ruleset-dns-resolver"}
@@ -186,11 +190,11 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 		}
 	} else {
 		x := &xr.Config{
-			LogConfig:    xrLog(s.str("log_level")),
-			RouterConfig: &xr.RouterConfig{DomainStrategy: ptr("AsIs")},
+			LogConfig:    xray.Log(s.String("log_level")),
+			RouterConfig: &xr.RouterConfig{DomainStrategy: core.Ptr("AsIs")},
 			DNSConfig: &xr.DNSConfig{
-				QueryStrategy: fallback(dnsStrategy(co,
-					s.str("default_strategy")), "UseIP"),
+				QueryStrategy: core.Fallback(dnsStrategy(co,
+					s.String("default_strategy")), "UseIP"),
 				DisableCache:           !cache,
 				ServeStale:             !cache,
 				ServeExpiredTTL:        3600,
@@ -199,15 +203,15 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 		}
 		b.config.Xray = x
 		for _, p := range []struct{ typ, tag, key string }{{"tproxy", "tproxy-in", "shunt_listen_port"}, {"direct", "dns-in", "dns_listen_port"}} {
-			in, e := xrInbound(p.typ, p.tag, uint16(s.num(p.key)), true)
+			in, e := xray.Inbound(p.typ, p.tag, uint16(s.Number(p.key)), true)
 			if e != nil {
 				return nil, e
 			}
 			x.InboundConfigs = append(x.InboundConfigs, in)
 		}
-		for _, n := range c.of("proxy_node") {
-			if n.str("enabled") == "1" {
-				out, e := xrSocks(n.str("name"), uint16(n.num("socks_port")))
+		for _, n := range c.Of("proxy_node") {
+			if n.String("enabled") == "1" {
+				out, e := xray.Socks(n.String("name"), uint16(n.Number("socks_port")))
 				if e != nil {
 					return nil, e
 				}
@@ -218,7 +222,7 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 				}
 			}
 		}
-		settings, e := rawSettings(xr.FreedomConfig{})
+		settings, e := core.RawSettings(xr.FreedomConfig{})
 		if e != nil {
 			return nil, e
 		}
@@ -228,7 +232,7 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 		} else {
 			x.OutboundConfigs = append(x.OutboundConfigs, direct)
 		}
-		dnsSettings, e := rawSettings(xr.DNSOutboundConfig{Rules: []*xr.DNSOutboundRuleConfig{
+		dnsSettings, e := core.RawSettings(xr.DNSOutboundConfig{Rules: []*xr.DNSOutboundRuleConfig{
 			{Action: "hijack", QType: &xr.PortList{Range: []xr.PortRange{{From: 1, To: 1}, {From: 28, To: 28}}}},
 			{Action: "return", RCode: 5},
 		}})
@@ -240,7 +244,7 @@ func newShunt(c config, s section, co, final, resolver string, dnsNodes map[stri
 	return b, nil
 }
 func (b *shuntBuilder) addSet(set sb.RuleSet) {
-	if set.Type == "remote" && b.settings.str("ruleset_out_node") != "" {
+	if set.Type == "remote" && b.settings.String("ruleset_out_node") != "" {
 		set.RemoteOptions.HTTPClient = &sb.HTTPClientOptions{DialerOptions: sb.DialerOptions{Detour: "ruleset-out"}}
 	}
 	tag := set.Tag[0]
@@ -261,12 +265,12 @@ func (b *shuntBuilder) addSingBoxRule(r rule, out string, version int) {
 	}
 	b.config.SingBox.Route.Rules = append(b.config.SingBox.Route.Rules, sb.Rule{Type: "default", DefaultOptions: sb.DefaultRule{RawDefaultRule: match, RuleAction: action}})
 }
-func (b *shuntBuilder) addDNS(s section, name, out string, r rule) error {
+func (b *shuntBuilder) addDNS(s uci.Section, name, out string, r rule) error {
 	if out == "block" {
 		return fmt.Errorf("rule %q DNS exit cannot be Block", name)
 	}
 	tag := name + "-dns"
-	node := b.dnsNodes[s.val("dns_node", b.resolver)]
+	node := b.dnsNodes[s.Value("dns_node", b.resolver)]
 	if b.config.SingBox != nil {
 		d, e := sbDNSServer(node, tag, out)
 		if e != nil {
@@ -283,7 +287,7 @@ func (b *shuntBuilder) addDNS(s section, name, out string, r rule) error {
 					RouteOptions: sb.DNSRouteActionOptions{
 						Server: tag,
 						AbstractDNSRouteActionOptions: sb.AbstractDNSRouteActionOptions{
-							Strategy:     sbStrategy(s.str("dns_strategy")),
+							Strategy:     sbStrategy(s.String("dns_strategy")),
 							DisableCache: true,
 						},
 					},
@@ -296,7 +300,7 @@ func (b *shuntBuilder) addDNS(s section, name, out string, r rule) error {
 			return e
 		}
 		d.Domains = r.xrDomain()
-		d.QueryStrategy = dnsStrategy("xray", s.str("dns_strategy"))
+		d.QueryStrategy = dnsStrategy("xray", s.String("dns_strategy"))
 		b.config.Xray.DNSConfig.Servers = append(b.config.Xray.DNSConfig.Servers, d)
 		if _, ok := b.dnsExits[out]; !ok {
 			b.exitOrder = append(b.exitOrder, out)
@@ -305,7 +309,7 @@ func (b *shuntBuilder) addDNS(s section, name, out string, r rule) error {
 	}
 	return nil
 }
-func (b *shuntBuilder) finish() (*coreConfig, error) {
+func (b *shuntBuilder) finish() (*core.Config, error) {
 	if x := b.config.Xray; x != nil {
 		d, e := xrDNSServer(b.dnsNodes[b.resolver], "default-dns")
 		if e != nil {
@@ -313,9 +317,9 @@ func (b *shuntBuilder) finish() (*coreConfig, error) {
 		}
 		d.SkipFallback = false
 		x.DNSConfig.Servers = append(x.DNSConfig.Servers, d)
-		routes := []xrayRouteRule{{InboundTag: []string{"dns-in"}, OutboundTag: "dns-out"}}
+		routes := []core.XrayRouteRule{{InboundTag: []string{"dns-in"}, OutboundTag: "dns-out"}}
 		for _, out := range b.exitOrder {
-			routes = append(routes, xrayRouteRule{InboundTag: b.dnsExits[out], OutboundTag: out})
+			routes = append(routes, core.XrayRouteRule{InboundTag: b.dnsExits[out], OutboundTag: out})
 		}
 		for _, r := range append(routes, b.xrRoutes...) {
 			data, e := json.Marshal(r)
@@ -329,8 +333,8 @@ func (b *shuntBuilder) finish() (*coreConfig, error) {
 }
 
 // Reject invalid ports before conversion to the native uint16 representation.
-func validateRulePorts(s section) error {
-	for _, p := range s.list("port") {
+func validateRulePorts(s uci.Section) error {
+	for _, p := range s.List("port") {
 		n, e := strconv.Atoi(p)
 		if e != nil || n < 1 || n > 65535 {
 			return fmt.Errorf("invalid rule port %q", p)

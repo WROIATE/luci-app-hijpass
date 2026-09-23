@@ -4,6 +4,8 @@ import ui from "ui";
 import { NodeFileCleanupUtils } from "./node-file-cleanup";
 import { NotificationUtils } from "../../base/luci/notification";
 import { GeneratedConfigUtils } from "../../feature/config/backend";
+import { ConfigFileUtils } from "../../feature/config/files";
+import { GeoRuleUtils } from "../../feature/shunt/georules";
 import { PrecheckUtils } from "./precheck";
 
 function isGlobalServiceDisabled() {
@@ -26,7 +28,9 @@ const SaveApplyUtils = {
                     return;
                 }
 
-                await GeneratedConfigUtils.validate();
+                const generated = await GeneratedConfigUtils.render();
+                await ConfigFileUtils.writeGeneratedConfigs(generated);
+                GeoRuleUtils.updateGeoRules();
 
                 await uci.save();
                 let changes = await uci.changes()

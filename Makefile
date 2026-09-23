@@ -106,12 +106,12 @@ define Package/hijpass-config
   SECTION:=net
   CATEGORY:=Network
   TITLE:=Hijpass configuration generator
-  DEPENDS:=$(GO_ARCH_DEPENDS) +rpcd +ubus
+  DEPENDS:=$(GO_ARCH_DEPENDS) +rpcd
 endef
 
 define Build/Prepare/$(notdir $(CURDIR))
 	$(CP) ./go-src/*.go ./go-src/go.mod ./go-src/go.sum $(PKG_BUILD_DIR)/
-	$(CP) ./go-src/protocol ./go-src/uci $(PKG_BUILD_DIR)/
+	$(CP) ./go-src/core ./go-src/feature ./go-src/protocol ./go-src/uci $(PKG_BUILD_DIR)/
 endef
 
 define HijpassConfig/Compile

@@ -1,25 +1,25 @@
-package main
+package singbox
 
 import (
 	"fmt"
+	sb "github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing/common/json/badoption"
+	"hijpass/config/core"
 	"hijpass/config/protocol"
 	"net/netip"
 	"strings"
-
-	sb "github.com/sagernet/sing-box/option"
-	"github.com/sagernet/sing/common/json/badoption"
 )
 
-func sbListen(port uint16, address string) sb.ListenOptions {
-	return sb.ListenOptions{Listen: ptr(badoption.Addr(netip.MustParseAddr(address))), ListenPort: port}
+func Listen(port uint16, address string) sb.ListenOptions {
+	return sb.ListenOptions{Listen: core.Ptr(badoption.Addr(netip.MustParseAddr(address))), ListenPort: port}
 }
 func sbInbounds(n protocol.BaseOptions) []sb.Inbound {
 	return []sb.Inbound{
-		{Type: "tproxy", Tag: "tproxy-in", Options: &sb.TProxyInboundOptions{ListenOptions: sbListen(uint16(n.ListenPort), "127.0.0.1")}},
-		{Type: "socks", Tag: "socks-in", Options: &sb.SocksInboundOptions{ListenOptions: sbListen(uint16(n.SocksPort), "127.0.0.1")}},
+		{Type: "tproxy", Tag: "tproxy-in", Options: &sb.TProxyInboundOptions{ListenOptions: Listen(uint16(n.ListenPort), "127.0.0.1")}},
+		{Type: "socks", Tag: "socks-in", Options: &sb.SocksInboundOptions{ListenOptions: Listen(uint16(n.SocksPort), "127.0.0.1")}},
 	}
 }
-func sbSocks(tag string, port uint16) sb.Outbound {
+func Socks(tag string, port uint16) sb.Outbound {
 	return sb.Outbound{Type: "socks", Tag: tag, Options: &sb.SOCKSOutboundOptions{ServerOptions: sb.ServerOptions{Server: "127.0.0.1", ServerPort: port}, Version: "5"}}
 }
 func sbMultiplex(n protocol.MultiplexOptions) *sb.OutboundMultiplexOptions {
@@ -74,8 +74,8 @@ func sbProtocol(node protocol.RemoteConfig) (sb.Outbound, error) {
 		p := &sb.Hysteria2OutboundOptions{
 			ServerOptions:               server,
 			Password:                    n.Password,
-			UpMbps:                      intValue(n.UpMbps),
-			DownMbps:                    intValue(n.DownMbps),
+			UpMbps:                      core.IntValue(n.UpMbps),
+			DownMbps:                    core.IntValue(n.DownMbps),
 			HopInterval:                 badoption.Duration(n.HopInterval),
 			Network:                     network,
 			OutboundTLSOptionsContainer: tls,
@@ -121,7 +121,7 @@ func sbProtocol(node protocol.RemoteConfig) (sb.Outbound, error) {
 		}
 		p := &sb.VLESSOutboundOptions{ServerOptions: server, UUID: n.UUID, Flow: n.Flow, Network: network, OutboundTLSOptionsContainer: tls, Transport: tr, Multiplex: sbMultiplex(n.MultiplexOptions)}
 		if n.PacketEncoding != "" {
-			p.PacketEncoding = ptr(n.PacketEncoding)
+			p.PacketEncoding = core.Ptr(n.PacketEncoding)
 		}
 		o.Options = p
 	default:
@@ -129,11 +129,11 @@ func sbProtocol(node protocol.RemoteConfig) (sb.Outbound, error) {
 	}
 	return o, nil
 }
-func (c config) singboxProxy(node protocol.Config) (*coreConfig, error) {
+func Build(node protocol.Config, resolvePort func(string) (uint16, error)) (*core.Config, error) {
 	base := node.Base()
 	options := &sb.Options{
 		Log: &sb.LogOptions{
-			Level:     fallback(base.LogLevel, "info"),
+			Level:     core.Fallback(base.LogLevel, "info"),
 			Timestamp: true,
 		},
 		Inbounds: sbInbounds(*base),
@@ -156,13 +156,13 @@ func (c config) singboxProxy(node protocol.Config) (*coreConfig, error) {
 		lb := &sb.URLTestOutboundOptions{URL: n.URL, Interval: badoption.Duration(n.Interval), Tolerance: uint16(n.Tolerance), IdleTimeout: badoption.Duration(n.IdleTimeout), InterruptExistConnections: bool(n.InterruptConnections)}
 		options.Outbounds = append(options.Outbounds, sb.Outbound{Type: "urltest", Tag: "slb", Options: lb})
 		for i, name := range n.Members {
-			s, e := c.node(name)
+			port, e := resolvePort(name)
 			if e != nil {
 				return nil, e
 			}
 			tag := fmt.Sprintf("lb-member-%d", i)
 			lb.Outbounds = append(lb.Outbounds, tag)
-			options.Outbounds = append(options.Outbounds, sbSocks(tag, uint16(s.num("socks_port"))))
+			options.Outbounds = append(options.Outbounds, Socks(tag, port))
 		}
 		options.Route.Final = "slb"
 	} else {
@@ -177,7 +177,7 @@ func (c config) singboxProxy(node protocol.Config) (*coreConfig, error) {
 		}
 		options.Outbounds = append(options.Outbounds, out)
 		if endpoint.Upstream != "" {
-			up, e := c.node(endpoint.Upstream)
+			port, e := resolvePort(endpoint.Upstream)
 			if e != nil {
 				return nil, e
 			}
@@ -186,12 +186,12 @@ func (c config) singboxProxy(node protocol.Config) (*coreConfig, error) {
 			d := dialer.TakeDialerOptions()
 			d.Detour = tag
 			dialer.ReplaceDialerOptions(d)
-			options.Outbounds = append(options.Outbounds, sbSocks(tag, uint16(up.num("socks_port"))))
+			options.Outbounds = append(options.Outbounds, Socks(tag, port))
 		}
 	}
-	return &coreConfig{SingBox: options}, nil
+	return &core.Config{SingBox: options}, nil
 }
 
 func sbTLS(options protocol.TLSOptions, server string) sb.OutboundTLSOptionsContainer {
-	return sb.OutboundTLSOptionsContainer{TLS: &sb.OutboundTLSOptions{Enabled: true, ServerName: fallback(options.TLSServerName, server), Insecure: bool(options.TLSInsecure)}}
+	return sb.OutboundTLSOptionsContainer{TLS: &sb.OutboundTLSOptions{Enabled: true, ServerName: core.Fallback(options.TLSServerName, server), Insecure: bool(options.TLSInsecure)}}
 }

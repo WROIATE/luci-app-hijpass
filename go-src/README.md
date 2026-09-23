@@ -23,26 +23,50 @@ release, both pinned in `go.mod`/`go.sum` for reproducible builds:
 
 ## Package boundaries
 
-Protocol interfaces live in `protocol/protocol.go`: `protocol.Config` describes
-a protocol configuration, while application-level `node.go` adapts UCI nodes.
-Ordinary source filenames use lowercase words without underscores; test files
-retain the Go toolchain-required `_test.go` suffix.
+The layout follows the responsibilities of the former TypeScript code (before
+`f158dba`): `ts-src/core/{singbox,xray}` and `ts-src/utils/feature`. The existing
+`ts-src/utils/actions` and Shell execution flow stay outside Go. Go directories
+are real packages rather than visual file groups; see the [Go module layout guide](https://go.dev/doc/modules/layout).
 
-- `protocol/` owns the `Config` / `RemoteConfig` interfaces and each protocol's
-  fields, defaults, UCI conversion and validation. Each protocol implements
-  `DecodeUCI(*uci.Decoder) error` in its own file, alongside its model.
-- `uci/` supplies generic typed reads for strings, integers, booleans, durations
-  and lists. It never imports or selects protocols. Missing options preserve
-  defaults; conversion errors identify the offending UCI key.
-- `protocol/options.go` shares conversion of base, server, TLS, Reality,
-  multiplex and transport fields. Each protocol explicitly selects the groups
-  it supports, so stale fields from another protocol remain ignored.
-- `protocol.Decode` creates a registered node, calls its conversion method and
-  validates it. Application-level `node.go` adapts sections and normalizes core
-  names. Xray and sing-box builders retain their existing output logic.
+```text
+main.go, cli.go         executable entry point and command dispatch
+rpc.go, input.go        read-only RPC and bounded JSON input
+core/
+  config.go             native config envelope, serialization, address replacement
+  singbox/builder.go    sing-box proxy output and shared inbound/outbound builders
+  xray/builder.go       Xray proxy output and shared inbound/outbound builders
+feature/
+  config.go             application config lookup and core selection
+  node.go, proxy.go     protocol decoding and proxy dependency orchestration
+  rules.go              routing rule interpretation
+  shunt.go              shunt dependency and route orchestration
+  shuntbuilder.go       DNS/routing assembly for shunts
+  render.go             validation and whole-snapshot rendering
+protocol/               protocol models, self-registration, UCI conversion, validation
+uci/                    generic section access and typed UCI value decoding
+```
 
-The dependency direction is `application -> protocol -> uci`. Protocol fields
-still use ordinary Go types, without UCI scalar wrappers or JSON tags.
+The executable calls `feature`; features use the native core builders and
+`protocol`. Builders receive a SOCKS-port resolver from the feature layer and
+never import application orchestration. `protocol` depends on `uci`, which does
+not import application, protocol or core types. The shared `core` package does
+not import its child builder packages. Go does not load system UCI, execute shell
+commands, resolve network addresses, convert Geo resources, publish files or
+manage services.
+
+Protocol interfaces live in `protocol/protocol.go`. Each concrete protocol keeps
+its fields, defaults, `DecodeUCI` implementation and validation in its own file.
+`protocol/options.go` contains only shared field conversions. Missing UCI options
+preserve defaults and irrelevant protocol fields are ignored.
+
+Tests reside with the responsibility they exercise: output compatibility and
+native configuration checks in `feature`, decoding/registration in `protocol`,
+and LuCI save/apply plus Shell integration under `ts-src/tests`. The shared compatibility
+fixture stays in `testdata/` for both Go and frontend RPC tests. The OpenWrt
+build copies all source packages; `go build .` still builds the executable from
+the module root.
+
+Ordinary source filenames have no underscores; test files retain `_test.go`.
 
 ### Adding a protocol
 
@@ -107,32 +131,21 @@ normalize durations. JSON formatting/shape differences do not imply lost options
 
 ## Responsibilities
 
-- LuCI edits `/etc/config/hijpass` through the existing UCI session, user rule
-  files, and explicitly custom configurations. Frontend validation remains for
-  immediate feedback, but runtime generation does not depend on it.
-- `hijpass-config` renders enabled proxy nodes and template shunt configurations,
-  including protocol options, upstream SOCKS chains, load balancing, DNS,
-  ordered routing, IPv4/IPv6 variants and Geo conversion metadata.
-- The existing Shell services still manage procd, DNS and nftables.
+- LuCI edits UCI, rules and custom configurations, then submits a JSON snapshot.
+- Go validates the snapshot and generates proxy and template-shunt JSON using
+  native core types. Its output is read-only; it does not apply system changes.
+- The existing LuCI Save & Apply flow writes returned JSON, resolves chained
+  dial addresses through `net.sh` without changing TLS names, updates Geo UCI
+  metadata, cleans renamed/deleted node files and applies UCI.
+- Existing Shell scripts own service startup, Geo conversion, DNS and firewall
+  work. Startup/restart uses saved JSON rather than invoking Go generation.
 
-`generate` reads UCI through `ubus call uci get` without a browser session.
-Like the init script, this includes command-line UCI deltas in `/tmp/.uci`, but
-excludes isolated browser drafts. Commit CLI edits before rebooting.
-It preserves section order using `.index`. It resolves chained node dial addresses
-without modifying their TLS/Reality settings, converts Geo files, then validates
-staged JSON using `sing-box check` / `xray run -test`. Xray validation uses
-`XRAY_LOCATION_ASSET=/usr/share/v2ray`.
-
-Every output is staged before publishing; generated configurations have mode 0600.
-The generator serializes writers with flock, rejects non-regular destinations,
-and restores previous files if an ordinary publication I/O error occurs. Multiple
-renames are **not a power-loss transaction**. Services start only after publication.
-Custom configurations are neither generated nor validated by this program.
-
-`restart` and `reload` generate before stopping existing services. Direct `start`
-also generates. Native-core failures appear in the Hijpass log; LuCI's UCI Apply
-confirmation does not certify that the new core instances started successfully.
-A failed generation leaves the saved UCI as-is, so fix it before the next reboot.
+A render or address-resolution failure prevents Save & Apply from writing JSON
+or applying UCI. File writes retain the original LuCI behavior; they are not a
+multi-file transaction. Custom configurations are omitted from generated output.
+Go does not invoke native core executables for checking; actual startup remains
+responsible for reporting core failures. CLI UCI edits alone do not regenerate
+JSON: generate it explicitly or use LuCI Save & Apply before restarting.
 
 ## Interfaces
 
@@ -141,7 +154,6 @@ through `/usr/libexec/rpcd/hijpass-config`.
 
 | Entry point | Input | Result / side effects |
 | --- | --- | --- |
-| `generate` | system UCI | validate and publish runtime files |
 | `render` | JSON array of UCI sections on stdin | JSON `{nodes, shunt}` on stdout, no writes |
 | `list` | none | rpcd method schema |
 | `call validate` | `{sections: "JSON array"}` on stdin | `{ok: true}` or `{error: string}` |
@@ -152,23 +164,12 @@ all generated objects. Section IDs and types use LuCI's `.name` / `.type` keys;
 options must be strings or string lists. Inputs are limited to 4 MiB. RPC methods
 are read-only and cannot execute `generate` or publish client-supplied paths.
 They require the existing Hijpass **write** ACL because previews contain secrets.
-RPC validation checks the submitted snapshot's structure and references; native
-core validation and network resolution happen during service generation.
+RPC validation checks the submitted snapshot's structure, supported fields and
+references. `generate` is no longer a supported CLI command.
 
-Generated metadata:
-
-- `/etc/hijpass/generated-georules.json`: derived lists for `geoview.sh`; the Go
-  backend no longer edits `geosite_ruleset` / `geoip_ruleset` in user UCI.
-- `/etc/hijpass/generated-files.json`: known generated client files. After a
-  successful publish, stale files in the current client directory are removed.
-  Files still referenced by any node, including custom nodes, are retained.
-  Existing pre-migration files and files in an old custom directory are not
-  guessed at or deleted.
-
-The initial migration keeps existing configured paths and custom files. No config
-schema conversion is needed. Install both packages together; the LuCI post-install
-hook reloads rpcd. Before installation, back up `/etc/config/hijpass` and custom
-files as for other application upgrades.
+Geo metadata remains in the existing `geosite_ruleset` / `geoip_ruleset` UCI
+options consumed by `geoview.sh`. The old Go-generated metadata manifests are
+no longer read or written. Existing generated JSON remains usable.
 
 ## Verification
 
@@ -194,8 +195,8 @@ Xray main's public plaintext VLESS rejection and DNS rules after protobuf build.
 
 The current Xray revision is checked through its native configuration parser and
 `Build` implementation, including the DNS rules' resulting protobuf policy.
-Go race tests, `go vet`, the five backend/LuCI integration tests and static
-ARM64/MIPSLE cross-compilation passed with Go 1.27.1.
+The original dependency migration was also checked with Go race tests and static
+ARM64/MIPSLE cross-compilation. Run the commands above to verify current changes.
 All-options fixtures contain synthetic Reality keys and incompatible option
 combinations, so schema comparisons alone do not certify runtime connectivity.
 Geo and remote rule-set configurations also require external resource files.

@@ -1,7 +1,9 @@
-package main
+package feature
 
 import (
 	sb "github.com/sagernet/sing-box/option"
+	"hijpass/config/core"
+	"hijpass/config/uci"
 	"path"
 	"strconv"
 	"strings"
@@ -13,18 +15,18 @@ type rule struct {
 	sets                                                                          []sb.RuleSet
 }
 
-func parseRule(s section) rule {
-	r := rule{network: s.list("network"), protocol: s.list("protocol")}
-	for _, p := range s.list("port") {
+func parseRule(s uci.Section) rule {
+	r := rule{network: s.List("network"), protocol: s.List("protocol")}
+	for _, p := range s.List("port") {
 		if n, e := strconv.Atoi(p); e == nil {
 			r.ports = append(r.ports, n)
 		}
 	}
-	for _, p := range s.list("port_range") {
+	for _, p := range s.List("port_range") {
 		r.ranges = append(r.ranges, strings.Replace(p, "-", ":", 1))
 	}
 	for _, key := range []string{"domain_list", "ip_list"} {
-		for _, line := range strings.Split(s.str(key), "\n") {
+		for _, line := range strings.Split(s.String(key), "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" || strings.HasPrefix(line, "#") {
 				continue
@@ -119,21 +121,8 @@ func (r *rule) convertGeo() {
 	}
 }
 
-// Xray's field rule is private in infra/conf/router.go.
-type xrayRouteRule struct {
-	RuleTag     string   `json:"ruleTag,omitempty"`
-	InboundTag  []string `json:"inboundTag,omitempty"`
-	OutboundTag string   `json:"outboundTag,omitempty"`
-	BalancerTag string   `json:"balancerTag,omitempty"`
-	Network     []string `json:"network,omitempty"`
-	Protocol    []string `json:"protocol,omitempty"`
-	Port        string   `json:"port,omitempty"`
-	Domain      []string `json:"domain,omitempty"`
-	IP          []string `json:"ip,omitempty"`
-}
-
-func (r *rule) xrRules(name, out string, version int) []xrayRouteRule {
-	base := xrayRouteRule{RuleTag: name, InboundTag: []string{"tproxy-in"}, OutboundTag: out, Network: r.network, Protocol: r.protocol}
+func (r *rule) xrRules(name, out string, version int) []core.XrayRouteRule {
+	base := core.XrayRouteRule{RuleTag: name, InboundTag: []string{"tproxy-in"}, OutboundTag: out, Network: r.network, Protocol: r.protocol}
 	var ports []string
 	for _, p := range r.ports {
 		ports = append(ports, strconv.Itoa(p))
@@ -158,7 +147,7 @@ func (r *rule) xrRules(name, out string, version int) []xrayRouteRule {
 	if version == 6 {
 		ipRange = "::/0"
 	}
-	var rules []xrayRouteRule
+	var rules []core.XrayRouteRule
 	if len(domains) > 0 {
 		d := base
 		d.Domain = domains

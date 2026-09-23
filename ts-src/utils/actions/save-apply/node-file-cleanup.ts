@@ -9,6 +9,19 @@ async function cleanupChangedNodeFiles(changes: any) {
         await fs.exec('/usr/lib/hijpass/rm.sh', args);
     }
 
+    if (changes?.hijpass) {
+        for (let change of changes.hijpass) {
+            if (change.length === 2 && change[0] === 'remove') {
+                await cleanup('proxy', change[1]);
+            }
+            if (change.length === 4 && change[0] === 'set' && change[2] === 'name') {
+                const section = uci.get(LuciFlied.CONF_NAME, change[1]);
+                const keepPath = section ? FilePathUtils.getProxyConfigFilePath(section) : undefined;
+                await cleanup('proxy', change[1], keepPath);
+            }
+        }
+    }
+
     if (changes?.hijserver) {
         for (let change of changes.hijserver) {
             if (change.length === 2 && change[0] === 'remove') {

@@ -1,6 +1,10 @@
-package main
+package feature
 
-import "fmt"
+import (
+	"fmt"
+	"hijpass/config/core"
+	"hijpass/config/uci"
+)
 
 func dnsStrategy(co, s string) string {
 	if co == "xray" {
@@ -26,9 +30,9 @@ func dnsStrategy(co, s string) string {
 	}
 	return ""
 }
-func (c config) shunt() (*coreConfig, error) {
-	s := c.first("shunt")
-	co := s.str("type")
+func (c Config) Shunt() (*core.Config, error) {
+	s := c.First("shunt")
+	co := s.String("type")
 	if co == "singbox" {
 		co = "sing-box"
 	}
@@ -40,10 +44,10 @@ func (c config) shunt() (*coreConfig, error) {
 			return nil, e
 		}
 	}
-	dnsNodes := map[string]section{}
-	for _, n := range c.of("shunt_dns_node") {
-		if n.str("enabled") != "0" {
-			tag := n.str("tag")
+	dnsNodes := map[string]uci.Section{}
+	for _, n := range c.Of("shunt_dns_node") {
+		if n.String("enabled") != "0" {
+			tag := n.String("tag")
 			if _, ok := dnsNodes[tag]; ok {
 				return nil, fmt.Errorf("duplicate DNS tag %q", tag)
 			}
@@ -60,19 +64,19 @@ func (c config) shunt() (*coreConfig, error) {
 		_, err := c.node(name)
 		return err
 	}
-	if err := checkOut(s.str("default_proxy_node"), true); err != nil {
+	if err := checkOut(s.String("default_proxy_node"), true); err != nil {
 		return nil, err
 	}
-	if s.str("default_proxy_node") == "hijpass-block" {
+	if s.String("default_proxy_node") == "hijpass-block" {
 		return nil, fmt.Errorf("default DNS exit cannot be Block")
 	}
 	for _, k := range []string{"ruleset_out_node"} {
-		if err := checkOut(s.str(k), false); err != nil {
+		if err := checkOut(s.String(k), false); err != nil {
 			return nil, err
 		}
 	}
-	final := outTag(s.str("default_proxy_node"))
-	resolver := s.str("default_dns_node")
+	final := outTag(s.String("default_proxy_node"))
+	resolver := s.String("default_dns_node")
 	if dnsNodes[resolver] == nil {
 		return nil, fmt.Errorf("default DNS %q missing or disabled", resolver)
 	}
@@ -80,30 +84,30 @@ func (c config) shunt() (*coreConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, rs := range c.of("shunt_route_rule") {
-		if rs.str("enabled") != "1" {
+	for _, rs := range c.Of("shunt_route_rule") {
+		if rs.String("enabled") != "1" {
 			continue
 		}
 		if e := validateRulePorts(rs); e != nil {
 			return nil, e
 		}
-		split := rs.str("ip_version_split") == "1"
+		split := rs.String("ip_version_split") == "1"
 		versions := []int{0}
 		if split {
 			versions = []int{4, 6}
-			if rs.str("proxy_node_v4") == "" && rs.str("proxy_node_v6") == "" {
-				return nil, fmt.Errorf("split rule %q has no exit", rs.str("name"))
+			if rs.String("proxy_node_v4") == "" && rs.String("proxy_node_v6") == "" {
+				return nil, fmt.Errorf("split rule %q has no exit", rs.String("name"))
 			}
 		}
-		if e := checkOut(rs.str("dns_proxy_node"), false); e != nil {
+		if e := checkOut(rs.String("dns_proxy_node"), false); e != nil {
 			return nil, e
 		}
 		var splitRule *rule
 		for _, version := range versions {
-			name := rs.str("name")
-			out := rs.str("proxy_node")
+			name := rs.String("name")
+			out := rs.String("proxy_node")
 			if version > 0 {
-				out = rs.str(fmt.Sprintf("proxy_node_v%d", version))
+				out = rs.String(fmt.Sprintf("proxy_node_v%d", version))
 				if out == "" {
 					continue
 				}
@@ -118,8 +122,8 @@ func (c config) shunt() (*coreConfig, error) {
 			r := parseRule(rs)
 			hasDNS := r.hasDomain()
 			if co == "sing-box" {
-				hasDNS = hasDNS || len(r.sets) > 0 || s.str("ruleset_convert") == "1" && len(r.geoSite) > 0
-				if s.str("ruleset_convert") == "1" {
+				hasDNS = hasDNS || len(r.sets) > 0 || s.String("ruleset_convert") == "1" && len(r.geoSite) > 0
+				if s.String("ruleset_convert") == "1" {
 					r.convertGeo()
 				} else if len(r.geoSite)+len(r.geoIP) > 0 {
 					r.geoSite = nil
@@ -162,7 +166,7 @@ func (c config) shunt() (*coreConfig, error) {
 				continue
 			}
 			if hasDNS || co == "sing-box" && len(r.ip)+len(r.sets) > 0 {
-				detour := outTag(rs.str("dns_proxy_node"))
+				detour := outTag(rs.String("dns_proxy_node"))
 				if detour == "" {
 					detour = out
 				}
@@ -172,11 +176,11 @@ func (c config) shunt() (*coreConfig, error) {
 			}
 		}
 		if splitRule != nil {
-			out := outTag(rs.str("dns_proxy_node"))
+			out := outTag(rs.String("dns_proxy_node"))
 			if out == "" {
-				return nil, fmt.Errorf("split rule %q requires a DNS exit", rs.str("name"))
+				return nil, fmt.Errorf("split rule %q requires a DNS exit", rs.String("name"))
 			}
-			if e := b.addDNS(rs, rs.str("name"), out, *splitRule); e != nil {
+			if e := b.addDNS(rs, rs.String("name"), out, *splitRule); e != nil {
 				return nil, e
 			}
 		}

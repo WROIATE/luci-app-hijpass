@@ -1,4 +1,4 @@
-package main
+package feature
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	sj "github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/service"
 	xr "github.com/xtls/xray-core/infra/conf"
+	"hijpass/config/core"
 	"strings"
 	"testing"
 )
@@ -67,7 +68,7 @@ func canonicalCore(t *testing.T, data []byte, co string) any {
 				if e = json.Unmarshal(*out.Settings, settings); e != nil {
 					t.Fatal(e)
 				}
-				out.Settings, e = rawSettings(settings)
+				out.Settings, e = core.RawSettings(settings)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -86,7 +87,7 @@ func canonicalCore(t *testing.T, data []byte, co string) any {
 				if e = json.Unmarshal(*in.Settings, settings); e != nil {
 					t.Fatal(e)
 				}
-				in.Settings, e = rawSettings(settings)
+				in.Settings, e = core.RawSettings(settings)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -113,7 +114,7 @@ func canonicalCore(t *testing.T, data []byte, co string) any {
 // Explicitly migrate the frozen TS baseline to the pinned schema. No fixture is
 // regenerated from the implementation under test; native serializers normalize
 // defaults and scalar/list forms for both sides of the comparison.
-func migrateBaseline(raw map[string]any, co string, shunt bool) {
+func migrateBaseline(raw map[string]any, co string, Shunt bool) {
 	if co == "sing-box" {
 		var outs []any
 		for _, v := range raw["outbounds"].([]any) {
@@ -129,7 +130,7 @@ func migrateBaseline(raw map[string]any, co string, shunt bool) {
 			outs = append(outs, out)
 		}
 		raw["outbounds"] = outs
-		if !shunt {
+		if !Shunt {
 			route, ok := raw["route"].(map[string]any)
 			if !ok {
 				route = map[string]any{}
@@ -159,26 +160,26 @@ func migrateBaseline(raw map[string]any, co string, shunt bool) {
 		}
 	}
 }
-func compareBaseline(t *testing.T, g generated, c config, expected any) {
+func compareBaseline(t *testing.T, g Generated, c Config, expected any) {
 	t.Helper()
 	want := expected.(map[string]any)
 	nodes := want["nodes"].(map[string]any)
 	if len(g.Nodes) != len(nodes) {
 		t.Fatalf("node count changed: %d vs %d", len(g.Nodes), len(nodes))
 	}
-	for _, s := range c.of("proxy_node") {
-		id := s.str(".name")
+	for _, s := range c.Of("proxy_node") {
+		id := s.String(".name")
 		actual, ok := g.Nodes[id]
 		if !ok {
 			continue
 		}
-		compareCore(t, actual, nodes[id].(map[string]any), core(s), false)
+		compareCore(t, actual, nodes[id].(map[string]any), CoreName(s), false)
 	}
 	if ws, ok := want["shunt"].(map[string]any); ok && len(ws) > 0 {
 		if g.Shunt == nil {
 			t.Fatal("missing shunt")
 		}
-		co := c.first("shunt").str("type")
+		co := c.First("shunt").String("type")
 		if co == "singbox" {
 			co = "sing-box"
 		}
@@ -187,9 +188,9 @@ func compareBaseline(t *testing.T, g generated, c config, expected any) {
 		t.Fatal("unexpected shunt")
 	}
 }
-func compareCore(t *testing.T, actual *coreConfig, baseline map[string]any, co string, shunt bool) {
+func compareCore(t *testing.T, actual *core.Config, baseline map[string]any, co string, Shunt bool) {
 	t.Helper()
-	migrateBaseline(baseline, co, shunt)
+	migrateBaseline(baseline, co, Shunt)
 	want, e := json.Marshal(baseline)
 	if e != nil {
 		t.Fatal(e)

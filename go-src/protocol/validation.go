@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func (n BaseOptions) validateBase() error {
+func (n *BaseOptions) validateBase() error {
 	for _, p := range []struct {
 		name  string
 		value int64
@@ -18,7 +18,7 @@ func (n BaseOptions) validateBase() error {
 	return nil
 }
 
-func (n ServerOptions) validateServer() error {
+func (n *ServerOptions) validateServer() error {
 	if n.Server == "" || n.ServerPort < 1 || n.ServerPort > 65535 {
 		return fmt.Errorf("invalid server or server_port")
 	}
@@ -34,11 +34,11 @@ func validateInt32(values ...int64) error {
 	return nil
 }
 
-func (n MultiplexOptions) validateMultiplex() error {
+func (n *MultiplexOptions) validateMultiplex() error {
 	return validateInt32(n.MaxConnections, n.MinStreams, n.MaxStreams, n.BrutalUp, n.BrutalDown)
 }
 
-func (n TransportOptions) validateTransport() error {
+func (n *TransportOptions) validateTransport() error {
 	if uint64(n.WSEarlyData) > math.MaxUint32 {
 		return fmt.Errorf("numeric option out of range")
 	}

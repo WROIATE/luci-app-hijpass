@@ -76,8 +76,8 @@ func parseRule(s section) rule {
 	}
 	return r
 }
-func (r rule) hasDomain() bool { return len(r.domain)+len(r.suffix)+len(r.keyword)+len(r.regex) > 0 }
-func (r rule) empty(geo bool) bool {
+func (r *rule) hasDomain() bool { return len(r.domain)+len(r.suffix)+len(r.keyword)+len(r.regex) > 0 }
+func (r *rule) empty(geo bool) bool {
 	n := len(r.ip) + len(r.network) + len(r.protocol) + len(r.ports) + len(r.ranges)
 	if geo {
 		n += len(r.geoIP) + len(r.geoSite)
@@ -86,7 +86,7 @@ func (r rule) empty(geo bool) bool {
 	}
 	return !r.hasDomain() && n == 0
 }
-func (r rule) sbMatch() sb.RawDefaultRule {
+func (r *rule) sbMatch() sb.RawDefaultRule {
 	m := sb.RawDefaultRule{Domain: r.domain, DomainSuffix: r.suffix, DomainKeyword: r.keyword, DomainRegex: r.regex, IPCIDR: r.ip, Network: r.network, Protocol: r.protocol, PortRange: r.ranges}
 	for _, p := range r.ports {
 		m.Port = append(m.Port, uint16(p))
@@ -96,14 +96,14 @@ func (r rule) sbMatch() sb.RawDefaultRule {
 	}
 	return m
 }
-func (r rule) sbDNSMatch() sb.RawDefaultDNSRule {
+func (r *rule) sbDNSMatch() sb.RawDefaultDNSRule {
 	m := sb.RawDefaultDNSRule{Domain: r.domain, DomainSuffix: r.suffix, DomainKeyword: r.keyword, DomainRegex: r.regex}
 	for _, s := range r.sets {
 		m.RuleSet = append(m.RuleSet, s.Tag...)
 	}
 	return m
 }
-func (r rule) xrDomain() []string {
+func (r *rule) xrDomain() []string {
 	var out []string
 	for i, list := range [][]string{r.domain, r.suffix, r.keyword, r.regex, r.geoSite} {
 		for _, v := range list {
@@ -132,7 +132,7 @@ type xrayRouteRule struct {
 	IP          []string `json:"ip,omitempty"`
 }
 
-func (r rule) xrRules(name, out string, version int) []xrayRouteRule {
+func (r *rule) xrRules(name, out string, version int) []xrayRouteRule {
 	base := xrayRouteRule{RuleTag: name, InboundTag: []string{"tproxy-in"}, OutboundTag: out, Network: r.network, Protocol: r.protocol}
 	var ports []string
 	for _, p := range r.ports {

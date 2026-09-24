@@ -2,7 +2,6 @@ package protocol_test
 
 import (
 	"encoding/json"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -67,26 +66,6 @@ func TestDefaultsAndExplicitZero(t *testing.T) {
 	}
 }
 
-func TestListForms(t *testing.T) {
-	for _, tc := range []struct {
-		input any
-		want  []string
-	}{
-		{"node-a", []string{"node-a"}},
-		{[]string{"node-a", "node-b"}, []string{"node-a", "node-b"}},
-		{"", nil},
-		{nil, nil},
-	} {
-		node, err := decode(t, "load_balance", map[string]any{"member_node": tc.input})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := node.(*protocol.LoadBalance).Members; !reflect.DeepEqual(got, tc.want) {
-			t.Fatalf("got %v, want %v", got, tc.want)
-		}
-	}
-}
-
 func TestInvalidWireValues(t *testing.T) {
 	for _, tc := range []struct {
 		kind, key string
@@ -99,7 +78,6 @@ func TestInvalidWireValues(t *testing.T) {
 		{"hysteria2", "down_mbps", "9223372036854775808"},
 		{"load_balance", "strategy_tolerance", "NaN"},
 		{"load_balance", "strategy_tolerance", "+Inf"},
-		{"load_balance", "member_node", []any{42}},
 	} {
 		t.Run(tc.key, func(t *testing.T) {
 			_, err := decode(t, tc.kind, map[string]any{tc.key: tc.value})

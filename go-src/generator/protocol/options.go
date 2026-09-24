@@ -20,7 +20,7 @@ type BaseOptions struct {
 type ServerOptions struct {
 	Server     string
 	ServerPort int64
-	Upstream   string
+	Upstream   Config // Linked by the generator after decoding.
 }
 
 type TLSOptions struct {
@@ -80,7 +80,6 @@ func (n *BaseOptions) decodeUCI(d *uci.Decoder) {
 func (n *ServerOptions) decodeUCI(d *uci.Decoder) {
 	d.Text("server", &n.Server)
 	d.Integer("server_port", &n.ServerPort)
-	d.Text("upstream_proxy_node", &n.Upstream)
 }
 
 func (n *TLSOptions) decodeUCI(d *uci.Decoder) {

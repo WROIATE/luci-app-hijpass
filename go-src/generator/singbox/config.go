@@ -8,7 +8,8 @@ import (
 	sb "github.com/sagernet/sing-box/option"
 )
 
-func Build(node protocol.Config, resolvePort func(string) (uint16, error)) (*sb.Options, error) {
+// Build consumes a validated protocol graph with resolved dependencies.
+func Build(node protocol.Config) (*sb.Options, error) {
 	base := node.Base()
 	options := &sb.Options{
 		Log: &sb.LogOptions{
@@ -32,9 +33,7 @@ func Build(node protocol.Config, resolvePort func(string) (uint16, error)) (*sb.
 		},
 	}
 	if n, ok := node.(*protocol.LoadBalance); ok {
-		if err := buildLoadBalance(options, n, resolvePort); err != nil {
-			return nil, err
-		}
+		buildLoadBalance(options, n)
 	} else {
 		remote, ok := node.(protocol.RemoteConfig)
 		if !ok {
@@ -46,12 +45,9 @@ func Build(node protocol.Config, resolvePort func(string) (uint16, error)) (*sb.
 			return nil, e
 		}
 		options.Outbounds = append(options.Outbounds, out)
-		if endpoint.Upstream != "" {
-			port, e := resolvePort(endpoint.Upstream)
-			if e != nil {
-				return nil, e
-			}
-			tag := "upstream-" + endpoint.Upstream
+		if endpoint.Upstream != nil {
+			port := uint16(endpoint.Upstream.Base().SocksPort)
+			tag := "upstream-" + endpoint.Upstream.Base().Name
 			dialer := out.Options.(sb.DialerOptionsWrapper)
 			d := dialer.TakeDialerOptions()
 			d.Detour = tag

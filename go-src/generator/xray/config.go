@@ -8,7 +8,8 @@ import (
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
-func Build(node protocol.Config, resolvePort func(string) (uint16, error)) (*xr.Config, error) {
+// Build consumes a validated protocol graph with resolved dependencies.
+func Build(node protocol.Config) (*xr.Config, error) {
 	base := node.Base()
 	x := &xr.Config{LogConfig: Log(base.LogLevel)}
 	for _, p := range []struct {
@@ -22,7 +23,7 @@ func Build(node protocol.Config, resolvePort func(string) (uint16, error)) (*xr.
 		x.InboundConfigs = append(x.InboundConfigs, in)
 	}
 	if n, ok := node.(*protocol.LoadBalance); ok {
-		if err := buildLoadBalance(x, n, resolvePort); err != nil {
+		if err := buildLoadBalance(x, n); err != nil {
 			return nil, err
 		}
 	} else {
@@ -35,12 +36,9 @@ func Build(node protocol.Config, resolvePort func(string) (uint16, error)) (*xr.
 		if e != nil {
 			return nil, e
 		}
-		if endpoint.Upstream != "" {
-			port, e := resolvePort(endpoint.Upstream)
-			if e != nil {
-				return nil, e
-			}
-			tag := "upstream-" + endpoint.Upstream
+		if endpoint.Upstream != nil {
+			port := uint16(endpoint.Upstream.Base().SocksPort)
+			tag := "upstream-" + endpoint.Upstream.Base().Name
 			if out.StreamSetting == nil {
 				out.StreamSetting = &xr.StreamConfig{}
 			}

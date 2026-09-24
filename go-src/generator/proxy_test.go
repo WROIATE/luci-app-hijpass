@@ -1,7 +1,9 @@
 package generator
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"hijpass/config/generator/protocol"
@@ -71,13 +73,13 @@ func TestProtocolSpecificValidation(t *testing.T) {
 }
 
 func TestDependencyValidation(t *testing.T) {
-	base := uci.Section{".name": "a", ".type": "proxy_node", "name": "a", "enabled": "1", "type": "shadowsocks", "core": "sing-box", "listen_port": "10001", "socks_port": "10002"}
+	base := graphNode("a", 10001)
 	for _, tc := range []struct {
 		name     string
 		other    uci.Section
 		upstream string
 	}{
-		{"missing", nil, "missing"}, {"self", nil, "a"}, {"cycle", uci.Section{".name": "b", ".type": "proxy_node", "name": "b", "enabled": "1", "type": "shadowsocks", "listen_port": "10003", "socks_port": "10004", "upstream_proxy_node": "a"}, "b"},
+		{"missing", nil, "missing"}, {"self", nil, "a"}, {"cycle", uci.Section{".name": "b", ".type": "proxy_node", "name": "b", "enabled": "1", "type": "shadowsocks", "listen_port": "10003", "socks_port": "10004", "server": "example.org", "server_port": "443", "upstream_proxy_node": "a"}, "b"},
 		{"disabled", uci.Section{".name": "b", ".type": "proxy_node", "name": "b", "enabled": "0"}, "b"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -109,5 +111,122 @@ func TestPortAliasesStillConflict(t *testing.T) {
 	}
 	if err := newProxyCatalog(c).Validate(); err == nil {
 		t.Fatal("same numeric port accepted twice")
+	}
+}
+
+func graphNode(name string, port int) uci.Section {
+	return uci.Section{".name": name, ".type": "proxy_node", "name": name, "enabled": "1", "type": "shadowsocks", "core": "sing-box", "listen_port": fmt.Sprint(port), "socks_port": fmt.Sprint(port + 1), "server": "example.org", "server_port": "443"}
+}
+
+func TestResolvedReferences(t *testing.T) {
+	a, b, c := graphNode("a", 10001), graphNode("b", 10003), graphNode("c", 10005)
+	a["upstream_proxy_node"], b["upstream_proxy_node"] = "c", "c"
+	lb := graphNode("lb", 10007)
+	lb["type"], lb["member_node"] = "load_balance", []string{"b", "a"}
+	catalog := newProxyCatalog(Snapshot{lb, a, b, c})
+	n, err := catalog.resolve(lb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	members := n.(*protocol.LoadBalance).Members
+	if members[0].Base().Name != "b" || members[1].Base().Name != "a" {
+		t.Fatal("member order changed")
+	}
+	upstream := members[0].(protocol.RemoteConfig).Endpoint().Upstream
+	if upstream != members[1].(protocol.RemoteConfig).Endpoint().Upstream {
+		t.Fatal("shared upstream was copied")
+	}
+	again, err := catalog.resolve(c)
+	if err != nil || again != upstream {
+		t.Fatal("catalog did not reuse resolved node")
+	}
+	// Validation follows object references even when the input section is unchanged.
+	upstream.(protocol.RemoteConfig).Endpoint().Upstream = members[0]
+	if err := validateDependencies(n); err == nil || !strings.Contains(err.Error(), "cycle") {
+		t.Fatalf("expected graph cycle, got %v", err)
+	}
+}
+
+func TestReferenceListForms(t *testing.T) {
+	for _, tc := range []struct {
+		input any
+		want  []string
+	}{
+		{"a", []string{"a"}}, {[]string{"b", "a"}, []string{"b", "a"}},
+	} {
+		lb := graphNode("lb", 10001)
+		lb["type"], lb["member_node"] = "load_balance", tc.input
+		n, err := newProxyCatalog(Snapshot{lb, graphNode("a", 10003), graphNode("b", 10005)}).resolve(lb)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, member := range n.(*protocol.LoadBalance).Members {
+			got = append(got, member.Base().Name)
+		}
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Fatalf("got %v, want %v", got, tc.want)
+		}
+	}
+	for _, value := range []any{"", nil, []any{42}} {
+		lb := graphNode("lb", 10001)
+		lb["type"], lb["member_node"] = "load_balance", value
+		if _, err := newProxyCatalog(Snapshot{lb}).resolve(lb); err == nil {
+			t.Fatalf("invalid members accepted: %v", value)
+		}
+	}
+}
+
+func TestSharedDependencyDepth(t *testing.T) {
+	a, b, c, d := graphNode("a", 10001), graphNode("b", 10003), graphNode("c", 10005), graphNode("d", 10007)
+	a["upstream_proxy_node"], b["upstream_proxy_node"], c["upstream_proxy_node"] = "b", "c", "d"
+	lb := graphNode("lb", 10009)
+	lb["type"], lb["member_node"] = "load_balance", []string{"c", "a"}
+	_, err := newProxyCatalog(Snapshot{lb, a, b, c, d}).resolve(lb)
+	if err == nil || !strings.Contains(err.Error(), "three nodes") {
+		t.Fatalf("shared dependency concealed excessive depth: %v", err)
+	}
+}
+
+func TestPreviewDependencies(t *testing.T) {
+	for _, core := range []string{"sing-box", "xray"} {
+		t.Run(core, func(t *testing.T) {
+			a, b, unrelated := graphNode("a", 10001), graphNode("b", 10003), graphNode("unused", 10005)
+			a["core"], a["enabled"], a["upstream_proxy_node"] = core, "0", "b"
+			b["type"] = "custom"
+			unrelated["server_port"] = "invalid"
+			if _, err := RenderTarget(Snapshot{a, b, unrelated}, "a"); err != nil {
+				t.Fatal(err)
+			}
+			b["enabled"] = "0"
+			if _, err := RenderTarget(Snapshot{a, b, unrelated}, "a"); err == nil {
+				t.Fatal("disabled dependency accepted")
+			}
+		})
+	}
+}
+
+func TestInvalidResolvedGraphs(t *testing.T) {
+	for _, tc := range []struct {
+		name, want string
+		change     func(uci.Section, uci.Section, uci.Section)
+	}{
+		{"duplicate", "duplicate load balancing member", func(lb, a, b uci.Section) { lb["member_node"] = []string{"a", "a"} }},
+		{"fallback", "not a load balancing member", func(lb, a, b uci.Section) { lb["fallback_tag"] = "absent" }},
+		{"nested", "nested load balancing", func(lb, a, b uci.Section) { a["type"], a["member_node"] = "load_balance", []string{"b"} }},
+		{"member cycle", "cycle", func(lb, a, b uci.Section) { a["upstream_proxy_node"] = "lb" }},
+		{"balance upstream", "cannot have an upstream", func(lb, a, b uci.Section) { lb["upstream_proxy_node"] = "a" }},
+		{"malformed members", "member_node", func(lb, a, b uci.Section) { lb["member_node"] = []any{42} }},
+		{"malformed upstream", "upstream_proxy_node", func(lb, a, b uci.Section) { a["upstream_proxy_node"] = []string{"b"} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			lb, a, b := graphNode("lb", 10001), graphNode("a", 10003), graphNode("b", 10005)
+			lb["type"], lb["member_node"] = "load_balance", []string{"a", "b"}
+			tc.change(lb, a, b)
+			_, err := newProxyCatalog(Snapshot{lb, a, b}).resolve(lb)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("want %q, got %v", tc.want, err)
+			}
+		})
 	}
 }

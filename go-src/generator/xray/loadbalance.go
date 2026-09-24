@@ -30,16 +30,13 @@ type xrayLeastLoad struct {
 	Tolerance float64 `json:"tolerance"`
 }
 
-func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance, resolvePort func(string) (uint16, error)) error {
+func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 
 	fb := "lb-member-0"
-	for i, name := range n.Members {
-		port, e := resolvePort(name)
-		if e != nil {
-			return e
-		}
+	for i, member := range n.Members {
+		port := uint16(member.Base().SocksPort)
 		tag := fmt.Sprintf("lb-member-%d", i)
-		if name == n.Fallback {
+		if member.Base().Name == n.Fallback {
 			fb = tag
 		}
 		o, e := Socks(tag, port)

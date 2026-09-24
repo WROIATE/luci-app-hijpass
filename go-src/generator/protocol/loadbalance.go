@@ -10,7 +10,7 @@ import (
 // LoadBalance contains only the options supported by this proxy type.
 type LoadBalance struct {
 	BaseOptions
-	Members              []string
+	Members              []Config // Linked in UCI member order by the generator.
 	URL                  string
 	Interval             time.Duration
 	Tolerance            int64
@@ -49,7 +49,6 @@ func init() { register("load_balance", func() Config { return newLoadBalance() }
 func (n *LoadBalance) DecodeUCI(d *uci.Decoder) error {
 	n.BaseOptions.decodeUCI(d)
 
-	d.List("member_node", &n.Members)
 	d.Text("url", &n.URL)
 	d.Duration("interval", &n.Interval)
 	d.Integer("tolerance", &n.Tolerance)

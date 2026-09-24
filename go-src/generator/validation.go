@@ -4,68 +4,11 @@ import (
 	"fmt"
 	"strconv"
 
+	"hijpass/config/generator/protocol"
 	"hijpass/config/uci"
 )
 
 func (c *proxyCatalog) Validate() error {
-	seen := map[string]bool{}
-	active := map[string]bool{}
-	var visit func(string, int) error
-	visit = func(name string, depth int) error {
-		if active[name] {
-			return fmt.Errorf("proxy dependency cycle at %q", name)
-		}
-		if depth > 3 {
-			return fmt.Errorf("proxy chain exceeds three nodes at %q", name)
-		}
-		if seen[name] && depth == 1 {
-			return nil
-		}
-		s, e := c.node(name)
-		if e != nil {
-			return e
-		}
-		active[name] = true
-		deps := s.List("upstream_proxy_node")
-		if s.String("type") == "load_balance" {
-			if len(deps) > 0 {
-				return fmt.Errorf("load balancing node cannot have an upstream: %s", name)
-			}
-			deps = s.List("member_node")
-			unique := map[string]bool{}
-			for _, member := range deps {
-				if unique[member] {
-					return fmt.Errorf("duplicate load balancing member %q", member)
-				}
-				unique[member] = true
-			}
-			if fallback := s.String("fallback_tag"); fallback != "" && !unique[fallback] {
-				return fmt.Errorf("fallback %q is not a load balancing member", fallback)
-			}
-			if len(deps) == 0 {
-				return fmt.Errorf("load balancing node %q has no members", name)
-			}
-		}
-		for _, d := range deps {
-			m, e := c.node(d)
-			if e != nil {
-				return e
-			}
-			if s.String("type") == "load_balance" && m.String("type") == "load_balance" {
-				return fmt.Errorf("nested load balancing member %q", d)
-			}
-			nextDepth := depth + 1
-			if s.String("type") == "load_balance" {
-				nextDepth = 1
-			}
-			if e = visit(d, nextDepth); e != nil {
-				return e
-			}
-		}
-		active[name] = false
-		seen[name] = true
-		return nil
-	}
 	names := map[string]bool{}
 	ports := map[string]string{}
 	for _, s := range c.sections.Of("proxy_node") {
@@ -89,7 +32,11 @@ func (c *proxyCatalog) Validate() error {
 		}
 	}
 	for name := range names {
-		if err := visit(name, 1); err != nil {
+		s, err := c.node(name)
+		if err != nil {
+			return err
+		}
+		if _, err := c.resolve(s); err != nil {
 			return err
 		}
 	}
@@ -105,4 +52,66 @@ func validateRulePorts(s uci.Section) error {
 		}
 	}
 	return nil
+}
+
+// Traverse object references. Completed nodes retain their chain height so a
+// shared upstream is checked against every incoming path's depth.
+func validateDependencies(root protocol.Config) error {
+	active := map[protocol.Config]bool{}
+	heights := map[protocol.Config]int{}
+	var visit func(protocol.Config) (int, error)
+	visit = func(n protocol.Config) (int, error) {
+		name := n.Base().Name
+		if active[n] {
+			return 0, fmt.Errorf("proxy dependency cycle at %q", name)
+		}
+		if h, ok := heights[n]; ok {
+			return h, nil
+		}
+		active[n] = true
+		height := 1
+		var upstream protocol.Config
+		switch n := n.(type) {
+		case *protocol.LoadBalance:
+			if len(n.Members) == 0 {
+				return 0, fmt.Errorf("load balancing node %q has no members", name)
+			}
+			unique := map[string]bool{}
+			for _, member := range n.Members {
+				memberName := member.Base().Name
+				if unique[memberName] {
+					return 0, fmt.Errorf("duplicate load balancing member %q", memberName)
+				}
+				unique[memberName] = true
+				if _, nested := member.(*protocol.LoadBalance); nested {
+					return 0, fmt.Errorf("nested load balancing member %q", memberName)
+				}
+				if _, err := visit(member); err != nil {
+					return 0, err
+				}
+			}
+			if n.Fallback != "" && !unique[n.Fallback] {
+				return 0, fmt.Errorf("fallback %q is not a load balancing member", n.Fallback)
+			}
+		case protocol.RemoteConfig:
+			upstream = n.Endpoint().Upstream
+		case *protocol.Custom:
+			upstream = n.Upstream
+		}
+		if upstream != nil {
+			h, err := visit(upstream)
+			if err != nil {
+				return 0, err
+			}
+			height += h
+		}
+		if height > 3 {
+			return 0, fmt.Errorf("proxy chain exceeds three nodes at %q", name)
+		}
+		delete(active, n)
+		heights[n] = height
+		return height, nil
+	}
+	_, err := visit(root)
+	return err
 }

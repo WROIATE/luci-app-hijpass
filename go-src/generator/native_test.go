@@ -67,7 +67,7 @@ func TestGeoConversionRetainsExplicitRuleSets(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	sets := g.Shunt.SingBox.Route.RuleSet
+	sets := g.Shunt.(*SingBoxConfig).Route.RuleSet
 	if len(sets) != 3 {
 		t.Fatalf("expected explicit plus both Geo sets: %v", sets)
 	}
@@ -83,7 +83,7 @@ func TestXrayNativeBuild(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			configs := []*Output{}
+			configs := []json.Marshaler{}
 			for _, o := range g.Nodes {
 				configs = append(configs, o)
 			}
@@ -129,7 +129,7 @@ func TestPinnedSchemaMigrations(t *testing.T) {
 			} else {
 				var settings xr.DNSOutboundConfig
 				found := false
-				for _, out := range g.Shunt.Xray.OutboundConfigs {
+				for _, out := range g.Shunt.(*XrayConfig).OutboundConfigs {
 					if out.Tag != "dns-out" {
 						continue
 					}

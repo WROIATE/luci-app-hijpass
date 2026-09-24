@@ -12,7 +12,7 @@ import (
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
-func buildRouting(c Snapshot, nodes *proxyCatalog) (*Output, error) {
+func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
 	settings, err := decodeSettings(c.First("shunt"))
 	if err != nil {
 		return nil, err
@@ -223,7 +223,7 @@ func decodeRoute(s uci.Section) (route, error) {
 }
 
 type builder struct {
-	config   *Output
+	config   json.Marshaler
 	settings routingSettings
 	dns      *dnsPlan
 	xrRoutes []xray.XrayRouteRule
@@ -231,21 +231,25 @@ type builder struct {
 }
 
 func newBuilder(nodes *proxyCatalog, s routingSettings, final, resolver string, servers dnsCatalog) (*builder, error) {
-	b := &builder{config: &Output{}, settings: s, setIndex: map[string]int{}}
+	b := &builder{settings: s, setIndex: map[string]int{}}
 	names := nodes.names()
-	var err error
 	if s.Core == "sing-box" {
-		b.config.SingBox, err = singbox.BuildRouting(singbox.RoutingOptions{
+		options, err := singbox.BuildRouting(singbox.RoutingOptions{
 			ListenPort: s.ListenPort, DNSPort: s.DNSPort, LogLevel: s.LogLevel, Strategy: s.Strategy, UseCache: s.UseCache,
 			Final: final, Resolver: resolver, RuleSetProxy: s.RuleSetProxy, RuleSetDNS: s.RuleSetDNS,
 		}, names, nodes.Port, func(name, tag, out string) (sb.DNSServerOptions, error) { return singBoxDNS(servers[name], tag, out) })
+		if err != nil {
+			return nil, err
+		}
+		b.config = (*SingBoxConfig)(options)
 	} else {
-		b.config.Xray, err = xray.BuildRouting(xray.RoutingOptions{
+		options, err := xray.BuildRouting(xray.RoutingOptions{
 			ListenPort: s.ListenPort, DNSPort: s.DNSPort, LogLevel: s.LogLevel, Strategy: s.Strategy, UseCache: s.UseCache, Final: final,
 		}, names, nodes.Port)
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+		b.config = (*XrayConfig)(options)
 	}
 	b.dns = newDNSPlan(b.config, servers, resolver)
 	return b, nil
@@ -255,7 +259,7 @@ func (b *builder) addSet(set sb.RuleSet) {
 		set.RemoteOptions.HTTPClient = &sb.HTTPClientOptions{DialerOptions: sb.DialerOptions{Detour: "ruleset-out"}}
 	}
 	tag := set.Tag[0]
-	sets := &b.config.SingBox.Route.RuleSet
+	sets := &b.config.(*SingBoxConfig).Route.RuleSet
 	if i, ok := b.setIndex[tag]; ok {
 		(*sets)[i] = set
 	} else {
@@ -264,15 +268,15 @@ func (b *builder) addSet(set sb.RuleSet) {
 	}
 }
 func (b *builder) addSingBoxRule(r rule, out string, version int) {
-	singbox.AddRule(b.config.SingBox, r.SingBox(), out, version)
+	singbox.AddRule((*sb.Options)(b.config.(*SingBoxConfig)), r.SingBox(), out, version)
 }
 
-func (b *builder) finish() (*Output, error) {
+func (b *builder) finish() (json.Marshaler, error) {
 	routes, err := b.dns.Finish()
 	if err != nil {
 		return nil, err
 	}
-	if x := b.config.Xray; x != nil {
+	if x, ok := b.config.(*XrayConfig); ok {
 		for _, r := range append(routes, b.xrRoutes...) {
 			data, err := json.Marshal(r)
 			if err != nil {
@@ -315,14 +319,14 @@ func decodeDNS(sections []uci.Section) (dnsCatalog, error) {
 type dnsPolicy struct{ Server, Strategy string }
 
 type dnsPlan struct {
-	config    *Output
+	config    json.Marshaler
 	servers   dnsCatalog
 	resolver  string
 	dnsExits  map[string][]string
 	exitOrder []string
 }
 
-func newDNSPlan(config *Output, servers dnsCatalog, resolver string) *dnsPlan {
+func newDNSPlan(config json.Marshaler, servers dnsCatalog, resolver string) *dnsPlan {
 	return &dnsPlan{config: config, servers: servers, resolver: resolver, dnsExits: map[string][]string{}}
 }
 func (b *dnsPlan) Add(policy dnsPolicy, name, out string, r rule) error {
@@ -331,12 +335,12 @@ func (b *dnsPlan) Add(policy dnsPolicy, name, out string, r rule) error {
 	}
 	tag := name + "-dns"
 	node := b.servers[fallback(policy.Server, b.resolver)]
-	if b.config.SingBox != nil {
+	if config, ok := b.config.(*SingBoxConfig); ok {
 		d, e := singBoxDNS(node, tag, out)
 		if e != nil {
 			return e
 		}
-		singbox.AddDNSRule(b.config.SingBox, d, r.SingBoxDNS(), policy.Strategy)
+		singbox.AddDNSRule((*sb.Options)(config), d, r.SingBoxDNS(), policy.Strategy)
 	} else {
 		d, e := xrayDNS(node, tag)
 		if e != nil {
@@ -344,7 +348,8 @@ func (b *dnsPlan) Add(policy dnsPolicy, name, out string, r rule) error {
 		}
 		d.Domains = r.XrayDomains()
 		d.QueryStrategy = xray.DNSStrategy(policy.Strategy)
-		b.config.Xray.DNSConfig.Servers = append(b.config.Xray.DNSConfig.Servers, d)
+		config := b.config.(*XrayConfig)
+		config.DNSConfig.Servers = append(config.DNSConfig.Servers, d)
 		if _, ok := b.dnsExits[out]; !ok {
 			b.exitOrder = append(b.exitOrder, out)
 		}
@@ -354,7 +359,8 @@ func (b *dnsPlan) Add(policy dnsPolicy, name, out string, r rule) error {
 }
 
 func (b *dnsPlan) Finish() ([]xray.XrayRouteRule, error) {
-	if b.config.Xray == nil {
+	config, ok := b.config.(*XrayConfig)
+	if !ok {
 		return nil, nil
 	}
 	d, err := xrayDNS(b.servers[b.resolver], "default-dns")
@@ -362,7 +368,7 @@ func (b *dnsPlan) Finish() ([]xray.XrayRouteRule, error) {
 		return nil, err
 	}
 	d.SkipFallback = false
-	b.config.Xray.DNSConfig.Servers = append(b.config.Xray.DNSConfig.Servers, d)
+	config.DNSConfig.Servers = append(config.DNSConfig.Servers, d)
 	routes := []xray.XrayRouteRule{{InboundTag: []string{"dns-in"}, OutboundTag: "dns-out"}}
 	for _, out := range b.exitOrder {
 		routes = append(routes, xray.XrayRouteRule{InboundTag: b.dnsExits[out], OutboundTag: out})

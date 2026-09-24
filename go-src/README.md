@@ -45,7 +45,7 @@ generator/              complete configuration generation workflow
   proxy.go              protocol adaptation and local proxy references
   routing.go            shunt coordination, DNS selection and reference resolution
   rules.go              shared rule interpretation
-  output.go             native output envelope and serialization
+  output.go             per-core output types and serialization
   protocol/             per-protocol models, conversion, defaults and validation
   singbox/              native sing-box builders, including dns.go and routing.go
   xray/                 native Xray builders, including dns.go and routing.go
@@ -61,7 +61,9 @@ configuration-generation details, not independent top-level packages.
 local registration. `generator/singbox` and `generator/xray` receive typed inputs
 and narrow reference-resolution callbacks, and return their native configuration
 types. They do not import the parent generator package or access UCI. The parent
-wraps these native values in `Output` and serializes them consistently. There is
+converts native pointers to `XrayConfig` or `SingBoxConfig` and returns them as
+`json.Marshaler`. Each type selects its native serializer; no dual-field output
+envelope or core-selection check is needed. There is
 no separate `core`, `source`, `config`, `proxy`, `dns` or `routing` package.
 
 Only `uci.Load` accesses the running system. It executes the fixed `/bin/ubus`

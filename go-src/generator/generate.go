@@ -1,18 +1,19 @@
 package generator
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 )
 
 type Generated struct {
-	Nodes map[string]*Output `json:"nodes"`
-	Shunt *Output            `json:"shunt,omitempty"`
+	Nodes map[string]json.Marshaler `json:"nodes"`
+	Shunt json.Marshaler            `json:"shunt,omitempty"`
 }
 
 func Render(c Snapshot) (Generated, error) {
 	nodes := newProxyCatalog(c)
-	out := Generated{Nodes: map[string]*Output{}}
+	out := Generated{Nodes: map[string]json.Marshaler{}}
 	if err := c.Validate(); err != nil {
 		return out, err
 	}
@@ -41,7 +42,7 @@ func Render(c Snapshot) (Generated, error) {
 }
 
 // RenderTarget generates one preview without requiring other nodes to be enabled.
-func RenderTarget(c Snapshot, target string) (*Output, error) {
+func RenderTarget(c Snapshot, target string) (json.Marshaler, error) {
 	nodes := newProxyCatalog(c)
 	if err := c.Validate(); err != nil {
 		return nil, err

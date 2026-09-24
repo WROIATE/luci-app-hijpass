@@ -190,7 +190,7 @@ func compareBaseline(t *testing.T, g Generated, c Snapshot, expected any) {
 		t.Fatal("unexpected shunt")
 	}
 }
-func compareCore(t *testing.T, actual *Output, baseline map[string]any, co string, Shunt bool) {
+func compareCore(t *testing.T, actual json.Marshaler, baseline map[string]any, co string, Shunt bool) {
 	t.Helper()
 	migrateBaseline(baseline, co, Shunt)
 	want, e := json.Marshal(baseline)

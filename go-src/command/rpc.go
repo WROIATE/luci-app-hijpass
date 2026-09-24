@@ -1,6 +1,7 @@
 package command
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 
@@ -44,7 +45,7 @@ func rpc(method string, in io.Reader) any {
 }
 
 type rpcResponse struct {
-	Error  string            `json:"error,omitempty"`
-	OK     bool              `json:"ok,omitempty"`
-	Config *generator.Output `json:"config,omitempty"`
+	Error  string         `json:"error,omitempty"`
+	OK     bool           `json:"ok,omitempty"`
+	Config json.Marshaler `json:"config,omitempty"`
 }

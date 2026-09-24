@@ -36,7 +36,7 @@ func (c *proxyCatalog) node(name string) (uci.Section, error) {
 	}
 	return nil, fmt.Errorf("proxy node %q missing or disabled", name)
 }
-func (c *proxyCatalog) Build(raw uci.Section) (*Output, error) {
+func (c *proxyCatalog) Build(raw uci.Section) (json.Marshaler, error) {
 	n, err := decodeProxy(raw)
 	if err != nil {
 		return nil, err
@@ -44,10 +44,16 @@ func (c *proxyCatalog) Build(raw uci.Section) (*Output, error) {
 	switch n.Base().Core {
 	case "sing-box":
 		options, err := singbox.Build(n, c.Port)
-		return &Output{SingBox: options}, err
+		if err != nil {
+			return nil, err
+		}
+		return (*SingBoxConfig)(options), nil
 	case "xray":
 		options, err := xray.Build(n, c.Port)
-		return &Output{Xray: options}, err
+		if err != nil {
+			return nil, err
+		}
+		return (*XrayConfig)(options), nil
 	default:
 		return nil, fmt.Errorf("unsupported core %q", n.Base().Core)
 	}

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	sb "github.com/sagernet/sing-box/option"
 	xr "github.com/xtls/xray-core/infra/conf"
 	dnsproxy "github.com/xtls/xray-core/proxy/dns"
 )
@@ -55,36 +54,6 @@ func TestTypedNumericValidation(t *testing.T) {
 			target[tc.key] = tc.value
 			if _, e := Render(c); e == nil {
 				t.Fatal("invalid typed input accepted")
-			}
-		})
-	}
-}
-func TestResolvedAddressPreservesTLS(t *testing.T) {
-	for _, co := range []string{"sing-box", "xray"} {
-		t.Run(co, func(t *testing.T) {
-			c := fixtureConfig(t, co+"-vless-options")
-			g, e := Render(c)
-			if e != nil {
-				t.Fatal(e)
-			}
-			o := g.Nodes["node"]
-			if e = o.ReplaceServer("192.0.2.10"); e != nil {
-				t.Fatal(e)
-			}
-			if co == "sing-box" {
-				v := o.SingBox.Outbounds[0].Options.(*sb.VLESSOutboundOptions)
-				if v.Server != "192.0.2.10" || v.TLS.ServerName != "tls.example.org" || v.TLS.Reality.PublicKey != "test-public-key" {
-					t.Fatal("server replacement changed security settings")
-				}
-			} else {
-				out := o.Xray.OutboundConfigs[0]
-				var v xr.VLessOutboundConfig
-				if e = json.Unmarshal(*out.Settings, &v); e != nil {
-					t.Fatal(e)
-				}
-				if v.Address.Address.String() != "192.0.2.10" || out.StreamSetting.REALITYSettings.ServerName != "tls.example.org" || out.StreamSetting.REALITYSettings.Password != "test-public-key" {
-					t.Fatal("server replacement changed security settings")
-				}
 			}
 		})
 	}

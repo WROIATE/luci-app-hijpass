@@ -236,8 +236,9 @@ The Xray Shadowsocks UoT sample must first return an explicit error; its remaini
 options are then compared with UoT disabled. For all 49 samples, tests apply the
 explicitly listed schema migrations, then
 use native parsers/serializers to compare both sides. They also exercise Xray's
-native `Build`, numeric bounds, TLS preservation during address replacement,
-Geo rule-set preservation and removed outbound handling. Native tests also check
+native `Build`, numeric bounds, Geo rule-set preservation and removed outbound
+handling. TLS preservation during address replacement is covered by the LuCI
+file-write integration test, where the production replacement runs. Native tests also check
 Xray main's public plaintext VLESS rejection and DNS rules after protobuf build.
 
 The current Xray revision is checked through its native configuration parser and

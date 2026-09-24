@@ -46,9 +46,6 @@ func (c *proxyCatalog) all() ([]protocol.Config, error) {
 
 func (c *proxyCatalog) node(name string) (uci.Section, error) {
 	if s := c.byName[name]; s != nil {
-		if err := uci.ValidatePort(s, "socks_port"); err != nil {
-			return nil, err
-		}
 		return s, nil
 	}
 	return nil, fmt.Errorf("proxy node %q missing or disabled", name)

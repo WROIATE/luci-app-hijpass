@@ -23,32 +23,46 @@ release, both pinned in `go.mod`/`go.sum` for reproducible builds:
 
 ## Package boundaries
 
-The backend is organized by responsibility, independently of the TypeScript
-layout. Packages are compilation boundaries; see the
-[Go module layout guide](https://go.dev/doc/modules/layout).
+There are three top-level functional modules. The layout follows the
+[Go module layout guide](https://go.dev/doc/modules/layout): directories represent
+cohesive packages, while files separate details within a responsibility.
 
 ```text
 main.go                 process entry and exit status
-command/                CLI arguments and read-only rpcd handlers
-source/                 select system UCI or an explicit JSON snapshot; input limits
-config/                 ordered configuration snapshot, section lookup and validation
-uci/                    native UCI loading, generic fields and scalar conversion
-protocol/               concrete protocol models, defaults, conversion and validation
-proxy/                  protocol adaptation, proxy dependencies and local SOCKS endpoints
-dns/                    typed DNS servers, per-core conversion and DNS rule planning
-routing/                typed shunt settings, split rules and per-core assembly
-  match/                domain/IP/Geo/rule-set matching and native rule conversion
-core/                   native output envelope and serialization
-  singbox/              protocol-specific builders, listeners, transport and balancing
-  xray/                 protocol-specific builders, listeners and balancing
-generator/              whole-config and single-target orchestration; compatibility tests
+command/                CLI/RPC dispatch, input limits and source selection
+  cli.go
+  rpc.go
+  input.go
+uci/                    UCI loading, section access and scalar decoding
+  load.go
+  section.go
+  decoder.go, values.go
+  validation.go
+generator/              complete configuration generation workflow
+  generate.go           whole-config generation, previews and validation
+  config.go             ordered input snapshot and section lookup
+  validation.go         proxy dependency and port validation
+  proxy.go              protocol adaptation and local proxy references
+  routing.go            shunt coordination, DNS selection and reference resolution
+  rules.go              shared rule interpretation
+  output.go             native output envelope and serialization
+  protocol/             per-protocol models, conversion, defaults and validation
+  singbox/              native sing-box builders, including dns.go and routing.go
+  xray/                 native Xray builders, including dns.go and routing.go
+  testdata/             immutable compatibility fixtures
 ```
 
-`command -> source -> config` loads input. `command -> generator` generates output;
-`generator` composes `proxy` and `routing`. Routing consumes proxy endpoints and
-DNS plans; native builders receive typed settings or protocol models, not UCI
-field maps. UCI code imports no application, protocol or core packages. The
-protocol interface and each protocol's local registration remain intact.
+`command` selects system UCI or a supplied snapshot and calls `generator`.
+`uci` imports no application or core models. `generator` owns proxy dependencies,
+DNS selection, route interpretation, validation and JSON output. DNS/routing are
+configuration-generation details, not independent top-level packages.
+
+`generator/protocol` retains each protocol's interface, fields, conversion and
+local registration. `generator/singbox` and `generator/xray` receive typed inputs
+and narrow reference-resolution callbacks, and return their native configuration
+types. They do not import the parent generator package or access UCI. The parent
+wraps these native values in `Output` and serializes them consistently. There is
+no separate `core`, `source`, `config`, `proxy`, `dns` or `routing` package.
 
 Only `uci.Load` accesses the running system. It executes the fixed `/bin/ubus`
 program directly (no shell) to read a UCI package through the
@@ -64,15 +78,15 @@ rpcd's ordinary UCI view, including any non-session staged changes visible to it
 Go does not manage services, resolve network addresses, convert Geo resources or
 publish generated files. Those operations stay in the existing LuCI/Shell flow.
 
-Protocol interfaces live in `protocol/protocol.go`. Each concrete protocol keeps
+Protocol interfaces live in `generator/protocol/protocol.go`. Each concrete protocol keeps
 its fields, defaults, `DecodeUCI` implementation and validation in its own file.
-`protocol/options.go` contains only shared field conversions. Missing UCI options
+`generator/protocol/options.go` contains only shared field conversions. Missing UCI options
 preserve defaults and irrelevant protocol fields are ignored.
 
 Tests reside with the responsibility they exercise: output compatibility and
-native configuration checks in `generator`, decoding/registration in `protocol` and `proxy`, source decoding in `uci`,
+native configuration checks in `generator`, decoding/registration in `generator/protocol` and `generator`, source decoding in `uci`,
 and LuCI save/apply plus Shell integration under `ts-src/tests`. The shared compatibility
-fixture stays in `testdata/` for both Go and frontend RPC tests. The OpenWrt
+fixture stays in `generator/testdata/` for both Go and frontend RPC tests. The OpenWrt
 build copies all source packages; `go build .` still builds the executable from
 the module root.
 
@@ -80,7 +94,7 @@ Ordinary source filenames have no underscores; test files retain `_test.go`.
 
 ### Adding a protocol
 
-Add a file in `protocol/` containing the model, defaults, `DecodeUCI`, `Validate`
+Add a file in `generator/protocol/` containing the model, defaults, `DecodeUCI`, `Validate`
 and a local `init` registration, following an existing protocol file:
 
 ```go
@@ -215,7 +229,7 @@ ts-src/node_modules/.bin/tsc --project ts-src/tsconfig.json
 (cd ts-src && npm run build)
 ```
 
-`testdata/compatibility.json` contains 49 immutable output samples captured from the
+`generator/testdata/compatibility.json` contains 49 immutable output samples captured from the
 former browser generator at commit
 `bca34e5285fd8edd7da6cb2fd23e499e68c9f502`. Fixtures use synthetic credentials.
 The Xray Shadowsocks UoT sample must first return an explicit error; its remaining
@@ -243,7 +257,7 @@ node ts-src/tests/generate-go-fixtures.cjs
 Additional tests exercise RPC/CLI boundaries, explicit snapshot selection, UCI
 response ordering and output limits, DNS port validation, dependency failures,
 LuCI Save & Apply ordering and custom config preservation. The current rewrite
-passes `go test`, `go vet`, all 49 compatibility fixtures and all 25 frontend/Shell
+passes `go test`, `go vet`, all 49 compatibility fixtures and the 9 backend/frontend integration
 tests. System UCI reads still need on-device ubus integration verification; these
 checks do not replace an OpenWrt SDK build or connectivity tests with the installed
 proxy cores.

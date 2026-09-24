@@ -7,7 +7,6 @@ import (
 	"io"
 
 	"hijpass/config/generator"
-	"hijpass/config/source"
 )
 
 // Run dispatches the CLI and rpcd entry points.
@@ -37,13 +36,13 @@ func Run(args []string, in io.Reader, out io.Writer) error {
 		var snapshot *string
 		if *stdin {
 			var raw json.RawMessage
-			if err := source.DecodeJSON(in, &raw); err != nil {
+			if err := decodeInput(in, &raw); err != nil {
 				return err
 			}
 			s := string(raw)
 			snapshot = &s
 		}
-		c, err := source.Load(snapshot)
+		c, err := loadConfig(snapshot)
 		if err != nil {
 			return err
 		}

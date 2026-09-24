@@ -7,23 +7,20 @@ import (
 	"strings"
 	"testing"
 
-	"hijpass/config/config"
-	"hijpass/config/core"
-
 	sb "github.com/sagernet/sing-box/option"
 	xr "github.com/xtls/xray-core/infra/conf"
 	dnsproxy "github.com/xtls/xray-core/proxy/dns"
 )
 
-func fixtureConfig(t *testing.T, name string) config.Snapshot {
+func fixtureConfig(t *testing.T, name string) Snapshot {
 	t.Helper()
-	data, e := os.ReadFile("../testdata/compatibility.json")
+	data, e := os.ReadFile("testdata/compatibility.json")
 	if e != nil {
 		t.Fatal(e)
 	}
 	var fixtures []struct {
 		Name     string
-		Sections config.Snapshot
+		Sections Snapshot
 	}
 	if e = json.Unmarshal(data, &fixtures); e != nil {
 		t.Fatal(e)
@@ -117,7 +114,7 @@ func TestXrayNativeBuild(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			configs := []*core.Config{}
+			configs := []*Output{}
 			for _, o := range g.Nodes {
 				configs = append(configs, o)
 			}

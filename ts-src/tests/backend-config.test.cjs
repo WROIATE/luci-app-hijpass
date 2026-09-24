@@ -15,7 +15,7 @@ const build = spawnSync('go', ['build', '-o', binary, '.'], {
     env: { ...process.env, GOCACHE: process.env.GOCACHE || path.join(os.tmpdir(), 'hijpass-go-cache') }
 });
 assert.equal(build.status, 0, build.stderr);
-const fixtures = JSON.parse(fs.readFileSync(path.join(root, 'go-src/testdata/compatibility.json')));
+const fixtures = JSON.parse(fs.readFileSync(path.join(root, 'go-src/generator/testdata/compatibility.json')));
 function rpc(method, request) {
     const result = spawnSync(binary, ['call', method], { input: JSON.stringify(request), encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);

@@ -59,7 +59,7 @@ func TestDecodePackageRejectsInvalidResponses(t *testing.T) {
 }
 
 func TestDecodePackageMatchesEverySnapshot(t *testing.T) {
-	data, err := os.ReadFile("../testdata/compatibility.json")
+	data, err := os.ReadFile("../generator/testdata/compatibility.json")
 	if err != nil {
 		t.Fatal(err)
 	}

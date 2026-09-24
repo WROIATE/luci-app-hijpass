@@ -40,6 +40,6 @@ for(const core of ['sing-box','xray']){
  add(`${core}-shunt-rulesets`,[global,member,{...shunt,ruleset_out_node:'member',ruleset_dns_node:'dns'},dns,{...rule,domain_list:'rule-set:remote:https://example.org/test.srs\nrule-set:local:/etc/hijpass/test.json'}]);
  for(const type of ['tcp','udp','quic'])add(`${core}-dns-${type}`,[global,{...shunt,use_cache:'0',default_strategy:'6'},{...dns,type,port:'5353'}]);
 }
-fs.mkdirSync(root+'/go-src/testdata',{recursive:true});
-fs.writeFileSync(root+'/go-src/testdata/compatibility.json',JSON.stringify(samples,null,2)+'\n');
+fs.mkdirSync(root+'/go-src/generator/testdata',{recursive:true});
+fs.writeFileSync(root+'/go-src/generator/testdata/compatibility.json',JSON.stringify(samples,null,2)+'\n');
 console.log(samples.length+' fixtures');

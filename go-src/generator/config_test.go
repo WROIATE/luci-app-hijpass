@@ -5,18 +5,16 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"hijpass/config/config"
 )
 
 func TestCompatibility(t *testing.T) {
-	b, e := os.ReadFile("../testdata/compatibility.json")
+	b, e := os.ReadFile("testdata/compatibility.json")
 	if e != nil {
 		t.Fatal(e)
 	}
 	var cases []struct {
 		Name     string
-		Sections config.Snapshot
+		Sections Snapshot
 		Expected any
 	}
 	if e = json.Unmarshal(b, &cases); e != nil {

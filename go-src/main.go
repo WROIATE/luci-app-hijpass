@@ -1,10 +1,10 @@
 package main
 
 import (
-"fmt"
-"os"
+	"fmt"
+	"os"
 
-"hijpass/config/command"
+	"hijpass/config/command"
 )
 
 func main() {

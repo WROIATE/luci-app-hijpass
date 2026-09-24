@@ -4,9 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"hijpass/config/core"
 	"hijpass/config/generator"
-	"hijpass/config/source"
 )
 
 func rpc(method string, in io.Reader) any {
@@ -18,10 +16,10 @@ func rpc(method string, in io.Reader) any {
 	if method != "render" && method != "validate" {
 		return fail(errors.New("unknown method"))
 	}
-	if err := source.DecodeJSON(in, &req); err != nil {
+	if err := decodeInput(in, &req); err != nil {
 		return fail(err)
 	}
-	c, err := source.Load(req.Sections)
+	c, err := loadConfig(req.Sections)
 	if err != nil {
 		return fail(err)
 	}
@@ -46,7 +44,7 @@ func rpc(method string, in io.Reader) any {
 }
 
 type rpcResponse struct {
-	Error  string       `json:"error,omitempty"`
-	OK     bool         `json:"ok,omitempty"`
-	Config *core.Config `json:"config,omitempty"`
+	Error  string            `json:"error,omitempty"`
+	OK     bool              `json:"ok,omitempty"`
+	Config *generator.Output `json:"config,omitempty"`
 }

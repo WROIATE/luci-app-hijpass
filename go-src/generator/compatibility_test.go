@@ -6,9 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"hijpass/config/config"
-	"hijpass/config/core"
-	"hijpass/config/proxy"
+	"hijpass/config/generator/xray"
 
 	sb "github.com/sagernet/sing-box/option"
 	sj "github.com/sagernet/sing/common/json"
@@ -72,7 +70,7 @@ func canonicalCore(t *testing.T, data []byte, co string) any {
 				if e = json.Unmarshal(*out.Settings, settings); e != nil {
 					t.Fatal(e)
 				}
-				out.Settings, e = core.RawSettings(settings)
+				out.Settings, e = xray.RawSettings(settings)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -91,7 +89,7 @@ func canonicalCore(t *testing.T, data []byte, co string) any {
 				if e = json.Unmarshal(*in.Settings, settings); e != nil {
 					t.Fatal(e)
 				}
-				in.Settings, e = core.RawSettings(settings)
+				in.Settings, e = xray.RawSettings(settings)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -164,7 +162,7 @@ func migrateBaseline(raw map[string]any, co string, Shunt bool) {
 		}
 	}
 }
-func compareBaseline(t *testing.T, g Generated, c config.Snapshot, expected any) {
+func compareBaseline(t *testing.T, g Generated, c Snapshot, expected any) {
 	t.Helper()
 	want := expected.(map[string]any)
 	nodes := want["nodes"].(map[string]any)
@@ -177,7 +175,7 @@ func compareBaseline(t *testing.T, g Generated, c config.Snapshot, expected any)
 		if !ok {
 			continue
 		}
-		compareCore(t, actual, nodes[id].(map[string]any), proxy.CoreName(s), false)
+		compareCore(t, actual, nodes[id].(map[string]any), coreName(s), false)
 	}
 	if ws, ok := want["shunt"].(map[string]any); ok && len(ws) > 0 {
 		if g.Shunt == nil {
@@ -192,7 +190,7 @@ func compareBaseline(t *testing.T, g Generated, c config.Snapshot, expected any)
 		t.Fatal("unexpected shunt")
 	}
 }
-func compareCore(t *testing.T, actual *core.Config, baseline map[string]any, co string, Shunt bool) {
+func compareCore(t *testing.T, actual *Output, baseline map[string]any, co string, Shunt bool) {
 	t.Helper()
 	migrateBaseline(baseline, co, Shunt)
 	want, e := json.Marshal(baseline)

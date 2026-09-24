@@ -1,10 +1,11 @@
-package feature
+package proxy
 
 import (
-	"hijpass/config/protocol"
-	"hijpass/config/uci"
 	"reflect"
 	"testing"
+
+	"hijpass/config/protocol"
+	"hijpass/config/uci"
 )
 
 func TestProtocolSpecificDecoding(t *testing.T) {
@@ -23,7 +24,7 @@ func TestProtocolSpecificDecoding(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.protocol, func(t *testing.T) {
 			s := uci.Section{".name": "node", "name": "node", "type": tc.protocol, "listen_port": "11001", "socks_port": "12001", "server": "example.org", "server_port": "443"}
-			before, err := parseNode(s)
+			before, err := Decode(s)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -33,7 +34,7 @@ func TestProtocolSpecificDecoding(t *testing.T) {
 			for key, value := range tc.stale {
 				s[key] = value
 			}
-			after, err := parseNode(s)
+			after, err := Decode(s)
 			if err != nil {
 				t.Fatalf("unrelated protocol field affected decoding: %v", err)
 			}
@@ -59,12 +60,12 @@ func TestProtocolSpecificValidation(t *testing.T) {
 	} {
 		t.Run(tc.protocol, func(t *testing.T) {
 			s := uci.Section{"type": tc.protocol, "listen_port": "11001", "socks_port": "12001", "server": "example.org", "server_port": "443", tc.key: tc.value}
-			if _, err := parseNode(s); err == nil {
+			if _, err := Decode(s); err == nil {
 				t.Fatalf("invalid %s accepted by %s", tc.key, tc.protocol)
 			}
 		})
 	}
-	if _, err := parseNode(uci.Section{"type": "unknown"}); err == nil {
+	if _, err := Decode(uci.Section{"type": "unknown"}); err == nil {
 		t.Fatal("unknown protocol accepted")
 	}
 }

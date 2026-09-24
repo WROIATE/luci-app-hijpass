@@ -1,18 +1,21 @@
-package feature
+package generator
 
 import (
 	"encoding/json"
-	sb "github.com/sagernet/sing-box/option"
-	xr "github.com/xtls/xray-core/infra/conf"
-	dnsproxy "github.com/xtls/xray-core/proxy/dns"
-	"hijpass/config/core"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+
+	"hijpass/config/config"
+	"hijpass/config/core"
+
+	sb "github.com/sagernet/sing-box/option"
+	xr "github.com/xtls/xray-core/infra/conf"
+	dnsproxy "github.com/xtls/xray-core/proxy/dns"
 )
 
-func fixtureConfig(t *testing.T, name string) Config {
+func fixtureConfig(t *testing.T, name string) config.Snapshot {
 	t.Helper()
 	data, e := os.ReadFile("../testdata/compatibility.json")
 	if e != nil {
@@ -20,7 +23,7 @@ func fixtureConfig(t *testing.T, name string) Config {
 	}
 	var fixtures []struct {
 		Name     string
-		Sections Config
+		Sections config.Snapshot
 	}
 	if e = json.Unmarshal(data, &fixtures); e != nil {
 		t.Fatal(e)

@@ -23,36 +23,46 @@ release, both pinned in `go.mod`/`go.sum` for reproducible builds:
 
 ## Package boundaries
 
-The layout follows the responsibilities of the former TypeScript code (before
-`f158dba`): `ts-src/core/{singbox,xray}` and `ts-src/utils/feature`. The existing
-`ts-src/utils/actions` and Shell execution flow stay outside Go. Go directories
-are real packages rather than visual file groups; see the [Go module layout guide](https://go.dev/doc/modules/layout).
+The backend is organized by responsibility, independently of the TypeScript
+layout. Packages are compilation boundaries; see the
+[Go module layout guide](https://go.dev/doc/modules/layout).
 
 ```text
-main.go, cli.go         executable entry point and command dispatch
-rpc.go, input.go        read-only RPC and bounded JSON input
-core/
-  config.go             native config envelope, serialization, address replacement
-  singbox/builder.go    sing-box proxy output and shared inbound/outbound builders
-  xray/builder.go       Xray proxy output and shared inbound/outbound builders
-feature/
-  config.go             application config lookup and core selection
-  node.go, proxy.go     protocol decoding and proxy dependency orchestration
-  rules.go              routing rule interpretation
-  shunt.go              shunt dependency and route orchestration
-  shuntbuilder.go       DNS/routing assembly for shunts
-  render.go             validation and whole-snapshot rendering
-protocol/               protocol models, self-registration, UCI conversion, validation
-uci/                    generic section access and typed UCI value decoding
+main.go                 process entry and exit status
+command/                CLI arguments and read-only rpcd handlers
+source/                 select system UCI or an explicit JSON snapshot; input limits
+config/                 ordered configuration snapshot, section lookup and validation
+uci/                    native UCI loading, generic fields and scalar conversion
+protocol/               concrete protocol models, defaults, conversion and validation
+proxy/                  protocol adaptation, proxy dependencies and local SOCKS endpoints
+dns/                    typed DNS servers, per-core conversion and DNS rule planning
+routing/                typed shunt settings, split rules and per-core assembly
+  match/                domain/IP/Geo/rule-set matching and native rule conversion
+core/                   native output envelope and serialization
+  singbox/              protocol-specific builders, listeners, transport and balancing
+  xray/                 protocol-specific builders, listeners and balancing
+generator/              whole-config and single-target orchestration; compatibility tests
 ```
 
-The executable calls `feature`; features use the native core builders and
-`protocol`. Builders receive a SOCKS-port resolver from the feature layer and
-never import application orchestration. `protocol` depends on `uci`, which does
-not import application, protocol or core types. The shared `core` package does
-not import its child builder packages. Go does not load system UCI, execute shell
-commands, resolve network addresses, convert Geo resources, publish files or
-manage services.
+`command -> source -> config` loads input. `command -> generator` generates output;
+`generator` composes `proxy` and `routing`. Routing consumes proxy endpoints and
+DNS plans; native builders receive typed settings or protocol models, not UCI
+field maps. UCI code imports no application, protocol or core packages. The
+protocol interface and each protocol's local registration remain intact.
+
+Only `uci.Load` accesses the running system. It executes the fixed `/bin/ubus`
+program directly (no shell) to read a UCI package through the
+[OpenWrt UCI interface](https://openwrt.org/docs/guide-developer/ubus/uci).
+This works without a browser or LuCI session. It requires `ubusd`, `rpcd` and
+the `ubus` CLI on OpenWrt; the backend package declares `rpcd` and `ubus`.
+The response's `.index` restores section order before routing rules are built;
+section IDs, anonymous metadata, strings and lists are retained. Reads have a
+10-second timeout and a 4 MiB output limit. Browser-session edits are not loaded
+implicitly: previews explicitly submit their snapshot. The system source uses
+rpcd's ordinary UCI view, including any non-session staged changes visible to it.
+
+Go does not manage services, resolve network addresses, convert Geo resources or
+publish generated files. Those operations stay in the existing LuCI/Shell flow.
 
 Protocol interfaces live in `protocol/protocol.go`. Each concrete protocol keeps
 its fields, defaults, `DecodeUCI` implementation and validation in its own file.
@@ -60,7 +70,7 @@ its fields, defaults, `DecodeUCI` implementation and validation in its own file.
 preserve defaults and irrelevant protocol fields are ignored.
 
 Tests reside with the responsibility they exercise: output compatibility and
-native configuration checks in `feature`, decoding/registration in `protocol`,
+native configuration checks in `generator`, decoding/registration in `protocol` and `proxy`, source decoding in `uci`,
 and LuCI save/apply plus Shell integration under `ts-src/tests`. The shared compatibility
 fixture stays in `testdata/` for both Go and frontend RPC tests. The OpenWrt
 build copies all source packages; `go build .` still builds the executable from
@@ -131,8 +141,9 @@ normalize durations. JSON formatting/shape differences do not imply lost options
 
 ## Responsibilities
 
-- LuCI edits UCI, rules and custom configurations, then submits a JSON snapshot.
-- Go validates the snapshot and generates proxy and template-shunt JSON using
+- Go reads system UCI by default. LuCI can submit a snapshot for unsaved previews
+  and the existing Save & Apply flow. Both sources share one generation pipeline.
+- Go validates the configuration and generates proxy and template-shunt JSON using
   native core types. Its output is read-only; it does not apply system changes.
 - The existing LuCI Save & Apply flow writes returned JSON, resolves chained
   dial addresses through `net.sh` without changing TLS names, updates Geo UCI
@@ -145,7 +156,8 @@ or applying UCI. File writes retain the original LuCI behavior; they are not a
 multi-file transaction. Custom configurations are omitted from generated output.
 Go does not invoke native core executables for checking; actual startup remains
 responsible for reporting core failures. CLI UCI edits alone do not regenerate
-JSON: generate it explicitly or use LuCI Save & Apply before restarting.
+JSON: use the CLI examples below to obtain the new JSON, or use LuCI Save & Apply
+before restarting. CLI output is not automatically installed into runtime files.
 
 ## Interfaces
 
@@ -154,18 +166,39 @@ through `/usr/libexec/rpcd/hijpass-config`.
 
 | Entry point | Input | Result / side effects |
 | --- | --- | --- |
-| `render` | JSON array of UCI sections on stdin | JSON `{nodes, shunt}` on stdout, no writes |
+| `render` | system UCI `hijpass` | JSON `{nodes, shunt}` on stdout, no writes |
+| `render --target ID` | system UCI `hijpass` | one native core JSON object |
+| `render --stdin [--target ID]` | JSON section array on stdin | same generator, explicit snapshot |
 | `list` | none | rpcd method schema |
-| `call validate` | `{sections: "JSON array"}` on stdin | `{ok: true}` or `{error: string}` |
-| `call render` | `{sections: "JSON array", target: "section-id"}` | `{config: object}` or `{error: string}` |
+| `call validate` | `{}` or `{sections: "JSON array"}` | `{ok: true}` or `{error: string}` |
+| `call render` | `{target: "section-id"}` with optional `sections` | `{config: object}` or `{error: string}` |
 
-The RPC render target `shunt` previews template routing. An empty target returns
-all generated objects. Section IDs and types use LuCI's `.name` / `.type` keys;
-options must be strings or string lists. Inputs are limited to 4 MiB. RPC methods
-are read-only and cannot execute `generate` or publish client-supplied paths.
-They require the existing Hijpass **write** ACL because previews contain secrets.
-RPC validation checks the submitted snapshot's structure, supported fields and
-references. `generate` is no longer a supported CLI command.
+Omitting `sections` (or sending JSON null) selects system UCI. An explicit string,
+even an empty or invalid one, never falls back to system configuration. An empty
+render target returns all generated objects. `shunt` selects the template shunt.
+Section IDs/types use `.name`/`.type`; option values must be strings or string lists.
+Inputs are limited to 4 MiB. Read-only RPC methods keep the existing Hijpass
+**write** ACL because their output contains credentials. `generate` remains
+unsupported: this executable produces JSON, it does not apply services or files.
+
+```sh
+# Independent of LuCI; emit all enabled generated configurations.
+hijpass-config render
+
+# Emit one native configuration (replace SECTION_ID with its UCI section ID).
+hijpass-config render --target SECTION_ID
+hijpass-config render --target shunt
+
+# Explicit editor/test snapshot; no system UCI access.
+hijpass-config render --stdin < sections.json
+
+# System-backed RPC, without frontend section data.
+ubus call hijpass-config render '{"target":"shunt"}'
+```
+
+The default CLI source changed from stdin to system UCI. Existing snapshot scripts
+must add `--stdin`. LuCI's existing explicit snapshot requests remain compatible.
+Errors produce nonzero CLI status; RPC returns its established error envelope.
 
 Geo metadata remains in the existing `geosite_ruleset` / `geoip_ruleset` UCI
 options consumed by `geoview.sh`. The old Go-generated metadata manifests are
@@ -207,10 +240,13 @@ To reproduce them with that commit available in Git history:
 node ts-src/tests/generate-go-fixtures.cjs
 ```
 
-Additional tests exercise RPC boundaries, LuCI snapshot/error handling, service
-restart ordering, dependency failures, custom config preservation, file permissions
-and failed publication preparation. These checks do not replace an OpenWrt SDK
-build or on-device connectivity tests with the installed proxy cores.
+Additional tests exercise RPC/CLI boundaries, explicit snapshot selection, UCI
+response ordering and output limits, DNS port validation, dependency failures,
+LuCI Save & Apply ordering and custom config preservation. The current rewrite
+passes `go test`, `go vet`, all 49 compatibility fixtures and all 25 frontend/Shell
+tests. System UCI reads still need on-device ubus integration verification; these
+checks do not replace an OpenWrt SDK build or connectivity tests with the installed
+proxy cores.
 
 For cross-compilation without an SDK (binary smoke check only):
 

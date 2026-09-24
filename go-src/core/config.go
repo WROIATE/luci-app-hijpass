@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
 	sb "github.com/sagernet/sing-box/option"
 	sj "github.com/sagernet/sing/common/json"
 	xn "github.com/xtls/xray-core/common/net"

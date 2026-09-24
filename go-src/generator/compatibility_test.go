@@ -1,15 +1,19 @@
-package feature
+package generator
 
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"testing"
+
+	"hijpass/config/config"
+	"hijpass/config/core"
+	"hijpass/config/proxy"
+
 	sb "github.com/sagernet/sing-box/option"
 	sj "github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/service"
 	xr "github.com/xtls/xray-core/infra/conf"
-	"hijpass/config/core"
-	"strings"
-	"testing"
 )
 
 // Register only schema constructors: no core listeners, runtimes or test hooks in
@@ -160,7 +164,7 @@ func migrateBaseline(raw map[string]any, co string, Shunt bool) {
 		}
 	}
 }
-func compareBaseline(t *testing.T, g Generated, c Config, expected any) {
+func compareBaseline(t *testing.T, g Generated, c config.Snapshot, expected any) {
 	t.Helper()
 	want := expected.(map[string]any)
 	nodes := want["nodes"].(map[string]any)
@@ -173,7 +177,7 @@ func compareBaseline(t *testing.T, g Generated, c Config, expected any) {
 		if !ok {
 			continue
 		}
-		compareCore(t, actual, nodes[id].(map[string]any), CoreName(s), false)
+		compareCore(t, actual, nodes[id].(map[string]any), proxy.CoreName(s), false)
 	}
 	if ws, ok := want["shunt"].(map[string]any); ok && len(ws) > 0 {
 		if g.Shunt == nil {

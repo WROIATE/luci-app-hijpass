@@ -1,25 +1,13 @@
-package feature
+package proxy
 
 import (
 	"fmt"
-	"hijpass/config/core"
-	"hijpass/config/core/singbox"
-	"hijpass/config/core/xray"
+	"strconv"
+
 	"hijpass/config/uci"
 )
 
-func (c Config) node(name string) (uci.Section, error) {
-	for _, s := range c.Of("proxy_node") {
-		if s.Value("name", s.String(".name")) == name && s.String("enabled") == "1" {
-			if err := port(s, "socks_port"); err != nil {
-				return nil, err
-			}
-			return s, nil
-		}
-	}
-	return nil, fmt.Errorf("proxy node %q missing or disabled", name)
-}
-func (c Config) validateDependencies() error {
+func (c *Catalog) Validate() error {
 	seen := map[string]bool{}
 	active := map[string]bool{}
 	var visit func(string, int) error
@@ -80,7 +68,7 @@ func (c Config) validateDependencies() error {
 	}
 	names := map[string]bool{}
 	ports := map[string]string{}
-	for _, s := range c.Of("proxy_node") {
+	for _, s := range c.sections.Of("proxy_node") {
 		if s.String("enabled") != "1" {
 			continue
 		}
@@ -90,10 +78,10 @@ func (c Config) validateDependencies() error {
 		}
 		names[name] = true
 		for _, k := range []string{"listen_port", "socks_port"} {
-			if err := port(s, k); err != nil {
+			if err := uci.ValidatePort(s, k); err != nil {
 				return err
 			}
-			p := s.String(k)
+			p := strconv.Itoa(int(s.Number(k)))
 			if owner, ok := ports[p]; ok {
 				return fmt.Errorf("port %s is shared by %s and %s", p, owner, name)
 			}
@@ -106,26 +94,4 @@ func (c Config) validateDependencies() error {
 		}
 	}
 	return nil
-}
-func (c Config) Proxy(raw uci.Section) (*core.Config, error) {
-	n, err := parseNode(raw)
-	if err != nil {
-		return nil, err
-	}
-	switch n.Base().Core {
-	case "sing-box":
-		return singbox.Build(n, c.nodePort)
-	case "xray":
-		return xray.Build(n, c.nodePort)
-	default:
-		return nil, fmt.Errorf("unsupported core %q", n.Base().Core)
-	}
-}
-
-func (c Config) nodePort(name string) (uint16, error) {
-	s, err := c.node(name)
-	if err != nil {
-		return 0, err
-	}
-	return uint16(s.Number("socks_port")), nil
 }

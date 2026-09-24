@@ -77,7 +77,7 @@ function loadTS(relative, modules) {
 
 test('CLI renders supplied input without runtime commands and rejects generate', () => {
     const fixture = fixtures.find(f => f.name === 'sing-box-chain');
-    const rendered = spawnSync(binary, ['render'], {
+    const rendered = spawnSync(binary, ['render', '--stdin'], {
         input: JSON.stringify(fixture.sections), encoding: 'utf8', env: { ...process.env, PATH: '' }
     });
     assert.equal(rendered.status, 0, rendered.stderr);

@@ -1,4 +1,4 @@
-package main
+package source
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 
 const maxInput = 4 << 20
 
-func decodeInput(r io.Reader, v any) error {
+func DecodeJSON(r io.Reader, v any) error {
 	b, e := io.ReadAll(io.LimitReader(r, maxInput+1))
 	if e != nil {
 		return e

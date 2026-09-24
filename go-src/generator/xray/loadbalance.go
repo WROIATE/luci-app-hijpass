@@ -21,11 +21,11 @@ type xrayPing struct {
 	Connectivity string `json:"connectivity,omitempty"`
 	Interval     string `json:"interval"`
 	Timeout      string `json:"timeout"`
-	Sampling     int    `json:"sampling"`
+	Sampling     int64  `json:"sampling"`
 	HTTPMethod   string `json:"httpMethod,omitempty"`
 }
 type xrayLeastLoad struct {
-	Expected  int     `json:"expected"`
+	Expected  int64   `json:"expected"`
 	MaxRTT    string  `json:"maxRTT"`
 	Tolerance float64 `json:"tolerance"`
 }
@@ -47,17 +47,35 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 	}
 	strategy := xr.StrategyConfig{Type: n.Strategy}
 	if n.Strategy == "leastLoad" {
-		s, e := RawSettings(xrayLeastLoad{int(n.StrategyExpected), time.Duration(n.StrategyMaxRTT).String(), float64(n.StrategyTolerance)})
+		s, e := RawSettings(xrayLeastLoad{
+			Expected:  n.StrategyExpected,
+			MaxRTT:    time.Duration(n.StrategyMaxRTT).String(),
+			Tolerance: float64(n.StrategyTolerance),
+		})
 		if e != nil {
 			return e
 		}
 		strategy.Settings = s
 	}
-	rr, e := json.Marshal(XrayRouteRule{InboundTag: []string{"tproxy-in", "socks-in"}, BalancerTag: "slb"})
+	rr, e := json.Marshal(XrayRouteRule{
+		InboundTag:  []string{"tproxy-in", "socks-in"},
+		BalancerTag: "slb",
+	})
 	if e != nil {
 		return e
 	}
-	x.RouterConfig = &xr.RouterConfig{DomainStrategy: new("AsIs"), RuleList: []json.RawMessage{rr}, Balancers: []*xr.BalancingRule{{Tag: "slb", Selectors: xr.StringList{"lb-member-"}, FallbackTag: fb, Strategy: strategy}}}
+	x.RouterConfig = &xr.RouterConfig{
+		DomainStrategy: new("AsIs"),
+		RuleList:       []json.RawMessage{rr},
+		Balancers: []*xr.BalancingRule{
+			{
+				Tag:         "slb",
+				Selectors:   xr.StringList{"lb-member-"},
+				FallbackTag: fb,
+				Strategy:    strategy,
+			},
+		},
+	}
 	burst := xrayBurstOptions{
 		SubjectSelector: []string{"lb-member-"},
 		PingConfig: xrayPing{
@@ -65,7 +83,7 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 			Connectivity: n.ProbeConnectivity,
 			Interval:     time.Duration(n.ProbeInterval).String(),
 			Timeout:      time.Duration(n.ProbeTimeout).String(),
-			Sampling:     int(n.ProbeSampling),
+			Sampling:     n.ProbeSampling,
 			HTTPMethod:   n.ProbeMethod,
 		},
 	}

@@ -24,16 +24,14 @@ func BuildRouting(s RoutingOptions, names []string, resolvePort func(string) (ui
 			{
 				Type: "default",
 				DefaultOptions: sb.DefaultRule{
-					RuleAction: sb.RuleAction{Action: "sniff"},
+					Action: "sniff",
 				},
 			},
 			{
 				Type: "default",
 				DefaultOptions: sb.DefaultRule{
-					RawDefaultRule: sb.RawDefaultRule{
-						Protocol: []string{"dns"},
-					},
-					RuleAction: sb.RuleAction{Action: "hijack-dns"},
+					Protocol: []string{"dns"},
+					Action:   "hijack-dns",
 				},
 			},
 		},

@@ -24,7 +24,7 @@ func DNSStrategy(s string) sb.DomainStrategy {
 func DNSServer(kind, address string, port uint16, tag, detour string) (sb.DNSServerOptions, error) {
 	o := sb.DNSServerOptions{Tag: tag}
 	o.Type = kind
-	remote := sb.RemoteDNSServerOptions{DNSServerAddressOptions: sb.DNSServerAddressOptions{Server: address, ServerPort: port}}
+	remote := sb.RemoteDNSServerOptions{Server: address, ServerPort: port}
 	if detour != "direct-out" {
 		remote.Detour = detour
 	}
@@ -34,7 +34,7 @@ func DNSServer(kind, address string, port uint16, tag, detour string) (sb.DNSSer
 	case "tls", "quic":
 		o.Options = &sb.RemoteTLSDNSServerOptions{RemoteDNSServerOptions: remote}
 	case "https":
-		o.Options = &sb.RemoteHTTPSDNSServerOptions{RemoteTLSDNSServerOptions: sb.RemoteTLSDNSServerOptions{RemoteDNSServerOptions: remote}}
+		o.Options = &sb.RemoteHTTPSDNSServerOptions{RemoteDNSServerOptions: remote}
 	case "local":
 		o.Options = &sb.LocalDNSServerOptions{}
 	default:
@@ -51,15 +51,11 @@ func AddDNSRule(options *sb.Options, d sb.DNSServerOptions, match sb.RawDefaultD
 		Type: "default",
 		DefaultOptions: sb.DefaultDNSRule{
 			RawDefaultDNSRule: match,
-			DNSRuleAction: sb.DNSRuleAction{
-				Action: "route",
-				RouteOptions: sb.DNSRouteActionOptions{
-					Server: tag,
-					AbstractDNSRouteActionOptions: sb.AbstractDNSRouteActionOptions{
-						Strategy:     DNSStrategy(strategy),
-						DisableCache: true,
-					},
-				},
+			Action:            "route",
+			RouteOptions: sb.DNSRouteActionOptions{
+				Server:       tag,
+				Strategy:     DNSStrategy(strategy),
+				DisableCache: true,
 			},
 		},
 	})

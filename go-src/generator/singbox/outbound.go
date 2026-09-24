@@ -9,7 +9,7 @@ import (
 )
 
 func Socks(tag string, port uint16) sb.Outbound {
-	return sb.Outbound{Type: "socks", Tag: tag, Options: &sb.SOCKSOutboundOptions{ServerOptions: sb.ServerOptions{Server: "127.0.0.1", ServerPort: port}, Version: "5"}}
+	return sb.Outbound{Type: "socks", Tag: tag, Options: &sb.SOCKSOutboundOptions{Server: "127.0.0.1", ServerPort: port, Version: "5"}}
 }
 
 func Fallback(s, defaultValue string) string {

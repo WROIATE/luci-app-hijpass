@@ -29,8 +29,8 @@ func (n *VLESS) Validate() error {
 
 func newVLESS() *VLESS {
 	return &VLESS{
-		Network: "tcp", MultiplexOptions: MultiplexOptions{MultiplexProtocol: "h2mux"},
-		TransportOptions: TransportOptions{HTTPIdle: 15 * time.Second, HTTPPing: 15 * time.Second, GRPCIdle: 15 * time.Second, GRPCPing: 15 * time.Second},
+		Network: "tcp", MultiplexProtocol: "h2mux",
+		HTTPIdle: 15 * time.Second, HTTPPing: 15 * time.Second, GRPCIdle: 15 * time.Second, GRPCPing: 15 * time.Second,
 	}
 }
 

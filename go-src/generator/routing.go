@@ -256,7 +256,7 @@ func newBuilder(nodes *proxyCatalog, s routingSettings, final, resolver string, 
 }
 func (b *builder) addSet(set sb.RuleSet) {
 	if set.Type == "remote" && b.settings.RuleSetProxy != "" {
-		set.RemoteOptions.HTTPClient = &sb.HTTPClientOptions{DialerOptions: sb.DialerOptions{Detour: "ruleset-out"}}
+		set.RemoteOptions.HTTPClient = &sb.HTTPClientOptions{Detour: "ruleset-out"}
 	}
 	tag := set.Tag[0]
 	sets := &b.config.(*SingBoxConfig).Route.RuleSet

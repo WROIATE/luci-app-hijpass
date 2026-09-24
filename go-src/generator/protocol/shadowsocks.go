@@ -18,7 +18,7 @@ type Shadowsocks struct {
 func (n *Shadowsocks) Validate() error { return n.validateMultiplex() }
 
 func newShadowsocks() *Shadowsocks {
-	return &Shadowsocks{MultiplexOptions: MultiplexOptions{MultiplexProtocol: "h2mux"}}
+	return &Shadowsocks{MultiplexProtocol: "h2mux"}
 }
 
 func init() { register("shadowsocks", func() Config { return newShadowsocks() }) }

@@ -68,19 +68,32 @@ converts native pointers to `XrayConfig` or `SingBoxConfig` and returns them as
 envelope or core-selection check is needed. There is
 no separate `core`, `source`, `config`, `proxy`, `dns` or `routing` package.
 
-Proxy generation decodes reachable nodes, connects `ServerOptions.Upstream`
-and `LoadBalance.Members` to shared `protocol.Config` objects, validates that
-graph, then calls the core's `Build(config)` without a port lookup callback.
+Full generation, previews and validation use the same explicit pipeline:
+
+1. `prepare` validates the snapshot structure and selects the generation scope.
+2. `resolveProxies` decodes each selected node once, checks field values and core
+   names, and connects `ServerOptions.Upstream` and `LoadBalance.Members` to
+   shared `protocol.Config` objects. Missing or ambiguous names fail here.
+3. Dependency validation checks the linked graph without decoding or mutating it.
+   Routing preparation resolves exits and DNS selections, then one port check
+   compares proxy listen/SOCKS ports with the included shunt listen/DNS ports.
+4. `buildPrepared` calls each selected node's native builder once, including
+   preview dependencies, then builds the shunt if selected. Protocol/core and
+   core-specific option checks stay in those builders. Any error discards output.
+
+There is no catalog cache or lookup method that implicitly triggers validation.
 Each core's `Build` creates the common configuration and dispatches once to
 `buildRemote` or `buildLoadBalance`. `buildRemote` owns protocol outbound creation
 and the optional upstream SOCKS hop; protocol-specific conversion remains in
 that core's protocol files.
-The catalog owns UCI reference names; protocol objects retain no duplicate name
+The resolver owns UCI reference names; protocol objects retain no duplicate name
 list. Graph validation detects cycles along the active path and remembers chain
 heights so shared upstreams neither cause false cycles nor hide excessive depth.
 Custom configurations expose only their local entry metadata and dependency;
-their JSON is still user-managed. A single-node preview resolves only its
+their JSON is still user-managed. A single-node preview checks itself and its
 reachable dependencies, which must be enabled even if the previewed root is not.
+Unrelated nodes' protocol fields and inactive shunt settings do not block this
+preview; enabled names still cannot conflict with a selected node's name.
 Shunt generation and preview resolve and validate every enabled proxy because
 all of them become local SOCKS outbounds, preserving UCI order. Default, rule,
 split-rule and DNS exits are checked before generation; core output tags remain
@@ -88,7 +101,14 @@ strings. DNS policies retain server objects rather than looking up UCI names
 while generating rules. sing-box rule-set download exits and their DNS settings
 are prepared from the same resolved objects. Missing/disabled references and
 invalid proxy dependency graphs fail in both full generation and shunt previews.
-
+An ordinary rule requires `proxy_node`; a split rule requires both
+`proxy_node_v4` and `proxy_node_v6`, matching the existing
+[LuCI form validation](../ts-src/views/shunt.ts) and
+[save/apply precheck](../ts-src/utils/actions/save-apply/precheck.ts).
+Fields for the inactive rule mode are ignored. Disabled shunts are excluded from
+full generation, but an explicit shunt preview checks them. With the overall
+service disabled, `Validate` checks only the snapshot structure so unfinished
+forms can still be saved; explicit generation always performs the full pipeline.
 
 Only `uci.Load` accesses the running system. It executes the fixed `/bin/ubus`
 program directly (no shell) to read a UCI package through the

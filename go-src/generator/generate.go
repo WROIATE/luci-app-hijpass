@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"hijpass/config/generator/protocol"
 )
 
 type Generated struct {
@@ -11,60 +13,121 @@ type Generated struct {
 	Shunt json.Marshaler            `json:"shunt,omitempty"`
 }
 
-func Render(c Snapshot) (Generated, error) {
-	nodes := newProxyCatalog(c)
-	out := Generated{Nodes: map[string]json.Marshaler{}}
+// preparedConfig holds a decoded, linked and prechecked generation scope.
+type preparedConfig struct {
+	nodes   []protocol.Config
+	routing *routingConfig
+}
+
+func prepare(c Snapshot, target string) (*preparedConfig, error) {
 	if err := c.Validate(); err != nil {
-		return out, err
+		return nil, err
 	}
-	if err := nodes.Validate(); err != nil {
-		return out, err
+	sections := c.Of("proxy_node")
+	var roots Snapshot
+	switch target {
+	case "", "shunt":
+		for _, s := range sections {
+			if s.String("enabled") == "1" {
+				roots = append(roots, s)
+			}
+		}
+	default:
+		for _, s := range sections {
+			if s.String(".name") == target {
+				roots = append(roots, s)
+				break
+			}
+		}
+		if len(roots) == 0 {
+			return nil, errors.New("node not found")
+		}
 	}
-	for _, s := range c.Of("proxy_node") {
-		if s.String("enabled") != "1" || s.String("type") == "custom" || coreName(s) == "custom" {
+	nodes, err := resolveProxies(sections, roots)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateDependencies(nodes...); err != nil {
+		return nil, err
+	}
+	result := &preparedConfig{nodes: nodes}
+	shunt := c.First("shunt")
+	if target == "shunt" || target == "" && shunt.String("enabled") != "0" && shunt.String("config_type") == "tmpl" {
+		result.routing, err = prepareRouting(c, nodes)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var routing *routingSettings
+	if result.routing != nil {
+		routing = &result.routing.settings
+	}
+	if err := validateListenPorts(nodes, routing); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// buildPrepared runs each selected node through its own core builder, including
+// dependencies of a preview. This keeps core compatibility checks in one place.
+func buildPrepared(c *preparedConfig) (Generated, error) {
+	out := Generated{Nodes: map[string]json.Marshaler{}}
+	for _, node := range c.nodes {
+		if _, custom := node.(*protocol.Custom); custom {
 			continue
 		}
-		o, err := nodes.Build(s)
+		config, err := buildProxy(node)
 		if err != nil {
-			return out, fmt.Errorf("node %q: %w", s.String("name"), err)
+			return Generated{}, fmt.Errorf("node %q: %w", node.Base().Name, err)
 		}
-		out.Nodes[s.String(".name")] = o
+		out.Nodes[node.Base().ID] = config
 	}
-	s := c.First("shunt")
-	if s.String("enabled") != "0" && s.String("config_type") == "tmpl" {
-		o, err := buildRouting(c, nodes)
+	if c.routing != nil {
+		config, err := buildRouting(c.nodes, c.routing)
 		if err != nil {
-			return out, err
+			return Generated{}, err
 		}
-		out.Shunt = o
+		out.Shunt = config
 	}
 	return out, nil
 }
 
-// RenderTarget generates one preview without requiring other nodes to be enabled.
+func Render(c Snapshot) (Generated, error) {
+	prepared, err := prepare(c, "")
+	if err != nil {
+		return Generated{}, err
+	}
+	return buildPrepared(prepared)
+}
+
+// RenderTarget checks the target and its reachable dependencies. A shunt preview
+// includes every enabled proxy because all are emitted as local SOCKS outbounds.
 func RenderTarget(c Snapshot, target string) (json.Marshaler, error) {
-	nodes := newProxyCatalog(c)
-	if err := c.Validate(); err != nil {
+	if target == "" {
+		return nil, errors.New("node not found")
+	}
+	prepared, err := prepare(c, target)
+	if err != nil {
+		return nil, err
+	}
+	generated, err := buildPrepared(prepared)
+	if err != nil {
 		return nil, err
 	}
 	if target == "shunt" {
-		return buildRouting(c, nodes)
+		return generated.Shunt, nil
 	}
-	for _, s := range c.Of("proxy_node") {
-		if s.String(".name") == target {
-			return nodes.Build(s)
-		}
+	if output := generated.Nodes[target]; output != nil {
+		return output, nil
 	}
-	return nil, errors.New("node not found")
+	return nil, errors.New("custom node configuration is not generated")
 }
 
-// Validate checks the submitted configuration without requiring enabled services.
+// Validate uses the generation path so it also checks core-specific constraints.
+// Disabling the service still permits saving unfinished protocol configurations.
 func Validate(c Snapshot) error {
-	if err := c.Validate(); err != nil {
-		return err
-	}
 	if c.First("hijpass").String("enabled") == "0" {
-		return nil
+		return c.Validate()
 	}
 	_, err := Render(c)
 	return err

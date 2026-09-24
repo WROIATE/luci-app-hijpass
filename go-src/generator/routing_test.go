@@ -56,14 +56,15 @@ func TestShuntReferenceFailures(t *testing.T) {
 					c.First("shunt")["default_proxy_node"] = "a"
 					c.First("shunt_route_rule")["dns_proxy_node"] = "a"
 					s := c.First(tc.section)
-					s[tc.key] = "missing"
 					if tc.key == "proxy_node_v4" || tc.key == "proxy_node_v6" {
 						s["ip_version_split"] = "1"
+						s["proxy_node_v4"], s["proxy_node_v6"] = "a", "a"
 						s["dns_proxy_node"] = "a"
 					}
 					if tc.key == "ruleset_dns_node" {
 						s["ruleset_out_node"] = "b"
 					}
+					s[tc.key] = "missing"
 					if disabled {
 						if tc.key == "default_dns_node" || tc.key == "ruleset_dns_node" || tc.key == "dns_node" {
 							s[tc.key] = "off"
@@ -107,6 +108,46 @@ func TestShuntPreviewChecksProxyGraph(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestRequiredRuleExits(t *testing.T) {
+	for _, core := range []string{"sing-box", "xray"} {
+		for _, key := range []string{"proxy_node", "proxy_node_v4", "proxy_node_v6"} {
+			t.Run(core+"/"+key, func(t *testing.T) {
+				c := routingSnapshot(core)
+				rule := c.First("shunt_route_rule")
+				if key != "proxy_node" {
+					rule["ip_version_split"] = "1"
+					rule["proxy_node_v4"], rule["proxy_node_v6"] = "a", "b"
+				}
+				delete(rule, key)
+				assertGenerationFailure(t, c, key+": proxy exit is required", "shunt")
+				// Disabled rules do not participate in generation or preflight.
+				rule["enabled"] = "0"
+				if _, err := Render(c); err != nil {
+					t.Fatalf("disabled incomplete rule affected generation: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestInactiveRuleExits(t *testing.T) {
+	for _, core := range []string{"sing-box", "xray"} {
+		t.Run(core, func(t *testing.T) {
+			c := routingSnapshot(core)
+			rule := c.First("shunt_route_rule")
+			rule["proxy_node_v4"], rule["proxy_node_v6"] = "stale", "stale"
+			if _, err := Render(c); err != nil {
+				t.Fatalf("inactive split exits affected ordinary rule: %v", err)
+			}
+			rule["ip_version_split"] = "1"
+			rule["proxy_node_v4"], rule["proxy_node_v6"], rule["proxy_node"] = "a", "b", "stale"
+			if _, err := RenderTarget(c, "shunt"); err != nil {
+				t.Fatalf("inactive ordinary exit affected split rule: %v", err)
+			}
+		})
 	}
 }
 

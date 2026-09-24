@@ -10,51 +10,8 @@ import (
 	"hijpass/config/uci"
 )
 
-// proxyCatalog resolves application node references and owns graph validation.
-type proxyCatalog struct {
-	sections Snapshot
-	byName   map[string]uci.Section
-	resolved map[string]protocol.Config
-}
-
-func newProxyCatalog(sections Snapshot) *proxyCatalog {
-	c := &proxyCatalog{sections: sections, byName: make(map[string]uci.Section)}
-	for _, s := range sections.Of("proxy_node") {
-		if s.String("enabled") == "1" {
-			name := s.Value("name", s.String(".name"))
-			if c.byName[name] == nil {
-				c.byName[name] = s
-			}
-		}
-	}
-	return c
-}
-
-// all resolves the enabled graph in UCI order, including custom entry points.
-func (c *proxyCatalog) all() ([]protocol.Config, error) {
-	if err := c.Validate(); err != nil {
-		return nil, err
-	}
-	var nodes []protocol.Config
-	for _, s := range c.sections.Of("proxy_node") {
-		if s.String("enabled") == "1" {
-			nodes = append(nodes, c.resolved[s.String(".name")])
-		}
-	}
-	return nodes, nil
-}
-
-func (c *proxyCatalog) node(name string) (uci.Section, error) {
-	if s := c.byName[name]; s != nil {
-		return s, nil
-	}
-	return nil, fmt.Errorf("proxy node %q missing or disabled", name)
-}
-func (c *proxyCatalog) Build(raw uci.Section) (json.Marshaler, error) {
-	n, err := c.resolve(raw)
-	if err != nil {
-		return nil, err
-	}
+// buildProxy converts one prepared protocol object to its native core config.
+func buildProxy(n protocol.Config) (json.Marshaler, error) {
 	switch n.Base().Core {
 	case "sing-box":
 		options, err := singbox.Build(n)
@@ -87,11 +44,17 @@ func coreName(s uci.Section) string {
 // Adapt raw UCI sections to the protocol package without coupling its models to
 // the application's section lookup or core-name normalization.
 func decodeProxy(s uci.Section) (protocol.Config, error) {
+	core := coreName(s)
+	switch core {
+	case "sing-box", "xray", "custom":
+	default:
+		return nil, fmt.Errorf("unsupported core %q", core)
+	}
 	data, err := json.Marshal(s)
 	if err != nil {
 		return nil, err
 	}
-	if coreName(s) == "custom" {
+	if core == "custom" {
 		d, err := uci.NewDecoder(data)
 		if err != nil {
 			return nil, err
@@ -111,100 +74,100 @@ func decodeProxy(s uci.Section) (protocol.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	n.Base().Core = coreName(s)
+	n.Base().Core = core
 	n.Base().Name = s.Value("name", s.String(".name"))
 	return n, nil
 }
 
-// resolve decodes each reachable node once, then links references in a second pass.
-// Only successful graphs are cached; previews need not decode unrelated nodes.
-func (c *proxyCatalog) resolve(root uci.Section) (protocol.Config, error) {
-	id := root.String(".name")
-	if n := c.resolved[id]; n != nil {
-		return n, nil
+// resolveProxies decodes the selected roots and their enabled dependencies, then
+// connects object references. All state is local to this preparation pass.
+func resolveProxies(sections Snapshot, roots Snapshot) ([]protocol.Config, error) {
+	byName := make(map[string][]uci.Section)
+	for _, s := range sections {
+		if s.String("enabled") == "1" {
+			name := s.Value("name", s.String(".name"))
+			byName[name] = append(byName[name], s)
+		}
 	}
-	nodes := make(map[string]protocol.Config)
-	for key, n := range c.resolved {
-		nodes[key] = n
-	}
-	var decoded []uci.Section
-	sections := []uci.Section{root}
+	byID := make(map[string]protocol.Config)
+	var nodes []protocol.Config
+	pending := append(Snapshot(nil), roots...)
 	references := make(map[string][]string)
-	for i := 0; i < len(sections); i++ {
-		s := sections[i]
-		key := s.String(".name")
-		if nodes[key] != nil {
+	for i := 0; i < len(pending); i++ {
+		s := pending[i]
+		id := s.String(".name")
+		if byID[id] != nil {
 			continue
+		}
+		name := s.Value("name", id)
+		for _, other := range byName[name] {
+			if other.String(".name") != id {
+				return nil, fmt.Errorf("duplicate proxy name %q", name)
+			}
 		}
 		n, err := decodeProxy(s)
 		if err != nil {
-			return nil, fmt.Errorf("node %q: %w", s.Value("name", key), err)
+			return nil, fmt.Errorf("node %q: %w", name, err)
 		}
-		nodes[key] = n
-		decoded = append(decoded, s)
-		data, err := json.Marshal(s)
+		byID[id] = n
+		nodes = append(nodes, n)
+		refs, err := proxyReferences(s, n)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("node %q: %w", name, err)
 		}
-		d, err := uci.NewDecoder(data)
-		if err != nil {
-			return nil, err
-		}
-		var refs []string
-		switch n.(type) {
-		case *protocol.LoadBalance:
-			var upstream string
-			d.Text("upstream_proxy_node", &upstream)
-			if upstream != "" {
-				return nil, fmt.Errorf("load balancing node cannot have an upstream: %s", n.Base().Name)
+		for _, ref := range refs {
+			matches := byName[ref]
+			if len(matches) == 0 {
+				return nil, fmt.Errorf("proxy node %q missing or disabled", ref)
 			}
-			d.List("member_node", &refs)
-		case protocol.RemoteConfig, *protocol.Custom:
-			var upstream string
-			d.Text("upstream_proxy_node", &upstream)
-			if upstream != "" {
-				refs = []string{upstream}
+			if len(matches) > 1 {
+				return nil, fmt.Errorf("duplicate proxy name %q", ref)
 			}
-		}
-		if err := d.Err(); err != nil {
-			return nil, err
-		}
-		for _, name := range refs {
-			target, err := c.node(name)
-			if err != nil {
-				return nil, err
-			}
-			references[key] = append(references[key], target.String(".name"))
-			sections = append(sections, target)
+			target := matches[0]
+			references[id] = append(references[id], target.String(".name"))
+			pending = append(pending, target)
 		}
 	}
-	for _, s := range decoded {
-		key := s.String(".name")
-		n := nodes[key]
+	for _, n := range nodes {
+		refs := references[n.Base().ID]
 		switch n := n.(type) {
 		case *protocol.LoadBalance:
-			n.Members = nil
-			for _, target := range references[key] {
-				n.Members = append(n.Members, nodes[target])
+			for _, id := range refs {
+				n.Members = append(n.Members, byID[id])
 			}
 		case *protocol.Custom:
-			if refs := references[key]; len(refs) > 0 {
-				n.Upstream = nodes[refs[0]]
+			if len(refs) > 0 {
+				n.Upstream = byID[refs[0]]
 			}
 		case protocol.RemoteConfig:
-			if refs := references[key]; len(refs) > 0 {
-				n.Endpoint().Upstream = nodes[refs[0]]
+			if len(refs) > 0 {
+				n.Endpoint().Upstream = byID[refs[0]]
 			}
 		}
 	}
-	if err := validateDependencies(nodes[id]); err != nil {
+	return nodes, nil
+}
+
+// Reference names belong to application configuration, not protocol fields.
+func proxyReferences(s uci.Section, n protocol.Config) ([]string, error) {
+	data, err := json.Marshal(s)
+	if err != nil {
 		return nil, err
 	}
-	if c.resolved == nil {
-		c.resolved = make(map[string]protocol.Config)
+	d, err := uci.NewDecoder(data)
+	if err != nil {
+		return nil, err
 	}
-	for key, n := range nodes {
-		c.resolved[key] = n
+	var upstream string
+	d.Text("upstream_proxy_node", &upstream)
+	var refs []string
+	if _, loadBalance := n.(*protocol.LoadBalance); loadBalance {
+		d.List("member_node", &refs)
+		if upstream != "" {
+			return nil, fmt.Errorf("load balancing node cannot have an upstream: %s", n.Base().Name)
+		}
+	} else if upstream != "" {
+		refs = []string{upstream}
 	}
-	return nodes[id], nil
+	return refs, d.Err()
 }

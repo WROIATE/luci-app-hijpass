@@ -13,11 +13,12 @@ import (
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
-func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
-	proxies, err := nodes.all()
-	if err != nil {
-		return nil, err
-	}
+type routingConfig struct {
+	settings routingSettings
+	entries  []route
+}
+
+func prepareRouting(c Snapshot, proxies []protocol.Config) (*routingConfig, error) {
 	byName := make(map[string]protocol.Config, len(proxies))
 	for _, node := range proxies {
 		byName[node.Base().Name] = node
@@ -41,7 +42,12 @@ func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
 		}
 		entries = append(entries, entry)
 	}
-	co, final := settings.Core, settings.Final
+	return &routingConfig{settings: settings, entries: entries}, nil
+}
+
+func buildRouting(proxies []protocol.Config, prepared *routingConfig) (json.Marshaler, error) {
+	settings, entries := prepared.settings, prepared.entries
+	co := settings.Core
 	b, err := newBuilder(proxies, settings)
 	if err != nil {
 		return nil, err
@@ -60,9 +66,6 @@ func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
 				out = entry.IPv4Exit
 				if version == 6 {
 					out = entry.IPv6Exit
-				}
-				if out == "" {
-					continue
 				}
 				if name != "" {
 					name += fmt.Sprintf("-ipv%d", version)
@@ -98,9 +101,6 @@ func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
 					if p != "http" && p != "tls" && p != "quic" && p != "bittorrent" {
 						return nil, fmt.Errorf("unsupported Xray route protocol %q", p)
 					}
-				}
-				if out == "" {
-					out = final
 				}
 				b.xrRoutes = append(b.xrRoutes, r.XrayRules(name, out, version)...)
 			}
@@ -145,6 +145,7 @@ func resolveExit(name string, required bool, nodes map[string]protocol.Config) (
 		if !required {
 			return "", nil
 		}
+		return "", fmt.Errorf("proxy exit is required")
 	case "hijpass-direct":
 		return "direct-out", nil
 	case "hijpass-block":
@@ -235,21 +236,18 @@ func decodeRoute(s uci.Section, nodes map[string]protocol.Config, servers dnsCat
 	}
 
 	if r.Split {
-		r.IPv4Exit, err = resolveExit(s.String("proxy_node_v4"), false, nodes)
+		r.IPv4Exit, err = resolveExit(s.String("proxy_node_v4"), true, nodes)
 		if err != nil {
-			return r, err
+			return r, fmt.Errorf("rule %q proxy_node_v4: %w", r.Name, err)
 		}
-		r.IPv6Exit, err = resolveExit(s.String("proxy_node_v6"), false, nodes)
+		r.IPv6Exit, err = resolveExit(s.String("proxy_node_v6"), true, nodes)
 		if err != nil {
-			return r, err
-		}
-		if r.IPv4Exit == "" && r.IPv6Exit == "" {
-			return r, fmt.Errorf("split rule %q has no exit", r.Name)
+			return r, fmt.Errorf("rule %q proxy_node_v6: %w", r.Name, err)
 		}
 	} else {
-		r.Exit, err = resolveExit(s.String("proxy_node"), false, nodes)
+		r.Exit, err = resolveExit(s.String("proxy_node"), true, nodes)
 		if err != nil {
-			return r, err
+			return r, fmt.Errorf("rule %q proxy_node: %w", r.Name, err)
 		}
 	}
 	r.DNS = dnsPolicy{Server: defaultDNS, Strategy: s.String("dns_strategy")}

@@ -8,35 +8,30 @@ import (
 	"hijpass/config/uci"
 )
 
-func (c *proxyCatalog) Validate() error {
-	names := map[string]bool{}
-	ports := map[string]string{}
-	for _, s := range c.sections.Of("proxy_node") {
-		if s.String("enabled") != "1" {
-			continue
+// Port ranges were checked during decoding. Only cross-field conflicts remain.
+func validateListenPorts(nodes []protocol.Config, shunt *routingSettings) error {
+	owners := make(map[int64]string)
+	add := func(port int64, owner string) error {
+		if previous, exists := owners[port]; exists {
+			return fmt.Errorf("port %d is shared by %s and %s", port, previous, owner)
 		}
-		name := s.Value("name", s.String(".name"))
-		if names[name] {
-			return fmt.Errorf("duplicate proxy name %q", name)
-		}
-		names[name] = true
-		for _, k := range []string{"listen_port", "socks_port"} {
-			if err := uci.ValidatePort(s, k); err != nil {
-				return err
-			}
-			p := strconv.Itoa(int(s.Number(k)))
-			if owner, ok := ports[p]; ok {
-				return fmt.Errorf("port %s is shared by %s and %s", p, owner, name)
-			}
-			ports[p] = name
-		}
+		owners[port] = owner
+		return nil
 	}
-	for name := range names {
-		s, err := c.node(name)
-		if err != nil {
+	for _, n := range nodes {
+		base := n.Base()
+		if err := add(base.ListenPort, base.Name+".listen_port"); err != nil {
 			return err
 		}
-		if _, err := c.resolve(s); err != nil {
+		if err := add(base.SocksPort, base.Name+".socks_port"); err != nil {
+			return err
+		}
+	}
+	if shunt != nil {
+		if err := add(int64(shunt.ListenPort), "shunt.shunt_listen_port"); err != nil {
+			return err
+		}
+		if err := add(int64(shunt.DNSPort), "shunt.dns_listen_port"); err != nil {
 			return err
 		}
 	}
@@ -56,7 +51,7 @@ func validateRulePorts(s uci.Section) error {
 
 // Traverse object references. Completed nodes retain their chain height so a
 // shared upstream is checked against every incoming path's depth.
-func validateDependencies(root protocol.Config) error {
+func validateDependencies(roots ...protocol.Config) error {
 	active := map[protocol.Config]bool{}
 	heights := map[protocol.Config]int{}
 	var visit func(protocol.Config) (int, error)
@@ -112,6 +107,10 @@ func validateDependencies(root protocol.Config) error {
 		heights[n] = height
 		return height, nil
 	}
-	_, err := visit(root)
-	return err
+	for _, root := range roots {
+		if _, err := visit(root); err != nil {
+			return err
+		}
+	}
+	return nil
 }

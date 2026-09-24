@@ -89,7 +89,7 @@ func TestDependencyValidation(t *testing.T) {
 			if tc.other != nil {
 				c = append(c, tc.other)
 			}
-			if e := newProxyCatalog(c).Validate(); e == nil {
+			if _, e := prepare(c, ""); e == nil {
 				t.Fatal("expected validation failure")
 			}
 		})
@@ -109,7 +109,7 @@ func TestPortAliasesStillConflict(t *testing.T) {
 		{".name": "a", ".type": "proxy_node", "enabled": "1", "name": "a", "type": "custom", "listen_port": "010001", "socks_port": "10002"},
 		{".name": "b", ".type": "proxy_node", "enabled": "1", "name": "b", "type": "custom", "listen_port": "10001", "socks_port": "10003"},
 	}
-	if err := newProxyCatalog(c).Validate(); err == nil {
+	if _, err := prepare(c, ""); err == nil {
 		t.Fatal("same numeric port accepted twice")
 	}
 }
@@ -123,11 +123,11 @@ func TestResolvedReferences(t *testing.T) {
 	a["upstream_proxy_node"], b["upstream_proxy_node"] = "c", "c"
 	lb := graphNode("lb", 10007)
 	lb["type"], lb["member_node"] = "load_balance", []string{"b", "a"}
-	catalog := newProxyCatalog(Snapshot{lb, a, b, c})
-	n, err := catalog.resolve(lb)
+	prepared, err := prepare(Snapshot{lb, a, b, c}, "lb")
 	if err != nil {
 		t.Fatal(err)
 	}
+	n := prepared.nodes[0]
 	members := n.(*protocol.LoadBalance).Members
 	if members[0].Base().Name != "b" || members[1].Base().Name != "a" {
 		t.Fatal("member order changed")
@@ -136,9 +136,8 @@ func TestResolvedReferences(t *testing.T) {
 	if upstream != members[1].(protocol.RemoteConfig).Endpoint().Upstream {
 		t.Fatal("shared upstream was copied")
 	}
-	again, err := catalog.resolve(c)
-	if err != nil || again != upstream {
-		t.Fatal("catalog did not reuse resolved node")
+	if prepared.nodes[3] != upstream {
+		t.Fatal("resolved graph did not reuse the shared upstream")
 	}
 	// Validation follows object references even when the input section is unchanged.
 	upstream.(protocol.RemoteConfig).Endpoint().Upstream = members[0]
@@ -156,12 +155,12 @@ func TestReferenceListForms(t *testing.T) {
 	} {
 		lb := graphNode("lb", 10001)
 		lb["type"], lb["member_node"] = "load_balance", tc.input
-		n, err := newProxyCatalog(Snapshot{lb, graphNode("a", 10003), graphNode("b", 10005)}).resolve(lb)
+		prepared, err := prepare(Snapshot{lb, graphNode("a", 10003), graphNode("b", 10005)}, "lb")
 		if err != nil {
 			t.Fatal(err)
 		}
 		var got []string
-		for _, member := range n.(*protocol.LoadBalance).Members {
+		for _, member := range prepared.nodes[0].(*protocol.LoadBalance).Members {
 			got = append(got, member.Base().Name)
 		}
 		if !reflect.DeepEqual(got, tc.want) {
@@ -171,7 +170,7 @@ func TestReferenceListForms(t *testing.T) {
 	for _, value := range []any{"", nil, []any{42}} {
 		lb := graphNode("lb", 10001)
 		lb["type"], lb["member_node"] = "load_balance", value
-		if _, err := newProxyCatalog(Snapshot{lb}).resolve(lb); err == nil {
+		if _, err := prepare(Snapshot{lb}, "lb"); err == nil {
 			t.Fatalf("invalid members accepted: %v", value)
 		}
 	}
@@ -182,7 +181,7 @@ func TestSharedDependencyDepth(t *testing.T) {
 	a["upstream_proxy_node"], b["upstream_proxy_node"], c["upstream_proxy_node"] = "b", "c", "d"
 	lb := graphNode("lb", 10009)
 	lb["type"], lb["member_node"] = "load_balance", []string{"c", "a"}
-	_, err := newProxyCatalog(Snapshot{lb, a, b, c, d}).resolve(lb)
+	_, err := prepare(Snapshot{lb, a, b, c, d}, "lb")
 	if err == nil || !strings.Contains(err.Error(), "three nodes") {
 		t.Fatalf("shared dependency concealed excessive depth: %v", err)
 	}
@@ -223,7 +222,7 @@ func TestInvalidResolvedGraphs(t *testing.T) {
 			lb, a, b := graphNode("lb", 10001), graphNode("a", 10003), graphNode("b", 10005)
 			lb["type"], lb["member_node"] = "load_balance", []string{"a", "b"}
 			tc.change(lb, a, b)
-			_, err := newProxyCatalog(Snapshot{lb, a, b}).resolve(lb)
+			_, err := prepare(Snapshot{lb, a, b}, "lb")
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("want %q, got %v", tc.want, err)
 			}

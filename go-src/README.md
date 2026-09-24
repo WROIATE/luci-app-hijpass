@@ -60,8 +60,9 @@ configuration-generation details, not independent top-level packages.
 `generator/protocol` retains each protocol's interface, fields, conversion and
 local registration. `generator/singbox` and `generator/xray` receive typed inputs
 with resolved upstream/member object references for proxy generation, and return
-their native configuration types. Shunt builders retain their separate DNS and
-exit-resolution callbacks. They do not import the parent generator package or access UCI. The parent
+their native configuration types. Shunt builders also receive resolved proxy
+objects and DNS options; neither builder accepts reference-resolution callbacks.
+They do not import the parent generator package or access UCI. The parent
 converts native pointers to `XrayConfig` or `SingBoxConfig` and returns them as
 `json.Marshaler`. Each type selects its native serializer; no dual-field output
 envelope or core-selection check is needed. There is
@@ -76,6 +77,14 @@ heights so shared upstreams neither cause false cycles nor hide excessive depth.
 Custom configurations expose only their local entry metadata and dependency;
 their JSON is still user-managed. A single-node preview resolves only its
 reachable dependencies, which must be enabled even if the previewed root is not.
+Shunt generation and preview resolve and validate every enabled proxy because
+all of them become local SOCKS outbounds, preserving UCI order. Default, rule,
+split-rule and DNS exits are checked before generation; core output tags remain
+strings. DNS policies retain server objects rather than looking up UCI names
+while generating rules. sing-box rule-set download exits and their DNS settings
+are prepared from the same resolved objects. Missing/disabled references and
+invalid proxy dependency graphs fail in both full generation and shunt previews.
+
 
 Only `uci.Load` accesses the running system. It executes the fixed `/bin/ubus`
 program directly (no shell) to read a UCI package through the

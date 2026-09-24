@@ -1,20 +1,25 @@
 package singbox
 
 import (
-	"fmt"
+	"hijpass/config/generator/protocol"
 
 	sb "github.com/sagernet/sing-box/option"
 )
 
 type RoutingOptions struct {
-	ListenPort, DNSPort                       uint16
-	LogLevel, Strategy                        string
-	UseCache                                  bool
-	Final, Resolver, RuleSetProxy, RuleSetDNS string
+	ListenPort, DNSPort uint16
+	LogLevel, Strategy  string
+	UseCache            bool
+	Final               string
+	DefaultDNS          sb.DNSServerOptions
+	RuleSetProxy        protocol.Config
+	RuleSetDirect       bool
+	RuleSetDNS          *sb.DNSServerOptions
 }
 
-func BuildRouting(s RoutingOptions, names []string, resolvePort func(string) (uint16, error), resolveDNS func(string, string, string) (sb.DNSServerOptions, error)) (*sb.Options, error) {
-	final, resolver := s.Final, s.Resolver
+// BuildRouting consumes resolved proxy objects and native DNS options.
+func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
+	final, resolver := s.Final, s.DefaultDNS.Tag
 	cache := s.UseCache
 	optionsDNS := &sb.DNSOptions{Final: resolver, Strategy: DNSStrategy(s.Strategy), DisableCache: !cache, DisableExpire: !cache}
 	route := &sb.RouteOptions{
@@ -64,46 +69,27 @@ func BuildRouting(s RoutingOptions, names []string, resolvePort func(string) (ui
 		},
 	}
 
-	for _, name := range names {
-		port, err := resolvePort(name)
-		if err != nil {
-			return nil, err
-		}
-		o.Outbounds = append(o.Outbounds, Socks(name, port))
+	for _, node := range nodes {
+		base := node.Base()
+		o.Outbounds = append(o.Outbounds, Socks(base.Name, uint16(base.SocksPort)))
 	}
-	d, e := resolveDNS(resolver, resolver, final)
-	if e != nil {
-		return nil, e
-	}
-	optionsDNS.Servers = append(optionsDNS.Servers, d)
-	if name := s.RuleSetProxy; name != "" {
-		if name == "hijpass-block" {
-			return nil, fmt.Errorf("rule-set download exit cannot be Block")
+	optionsDNS.Servers = append(optionsDNS.Servers, s.DefaultDNS)
+	if s.RuleSetProxy != nil || s.RuleSetDirect {
+		out := sb.Outbound{Type: "direct", Tag: "ruleset-out", Options: &sb.DirectOutboundOptions{}}
+		if s.RuleSetProxy != nil {
+			out = Socks("ruleset-out", uint16(s.RuleSetProxy.Base().SocksPort))
 		}
-		var out sb.Outbound
-		if name == "hijpass-direct" {
-			out = sb.Outbound{Type: "direct", Tag: "ruleset-out", Options: &sb.DirectOutboundOptions{}}
-		} else {
-			node, e := resolvePort(name)
-			if e != nil {
-				return nil, e
-			}
-			out = Socks("ruleset-out", node)
-		}
-		if r := s.RuleSetDNS; r != "" {
+		if s.RuleSetDNS != nil {
 			dialer := out.Options.(sb.DialerOptionsWrapper)
 			d := dialer.TakeDialerOptions()
-			d.DomainResolver = &sb.DomainResolveOptions{Server: "ruleset-dns-resolver"}
+			d.DomainResolver = &sb.DomainResolveOptions{Server: s.RuleSetDNS.Tag}
 			dialer.ReplaceDialerOptions(d)
-			dnsServer, e := resolveDNS(r, "ruleset-dns-resolver", "ruleset-out")
-			if e != nil {
-				return nil, e
-			}
-			optionsDNS.Servers = append(optionsDNS.Servers, dnsServer)
+			optionsDNS.Servers = append(optionsDNS.Servers, *s.RuleSetDNS)
 		}
 		o.Outbounds = append(o.Outbounds, out)
 	}
-	return o, nil
+
+	return o
 }
 
 func AddRule(options *sb.Options, match sb.RawDefaultRule, out string, version int) {

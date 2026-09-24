@@ -1,6 +1,8 @@
 package xray
 
 import (
+	"hijpass/config/generator/protocol"
+
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
@@ -11,7 +13,8 @@ type RoutingOptions struct {
 	Final               string
 }
 
-func BuildRouting(s RoutingOptions, names []string, resolvePort func(string) (uint16, error)) (*xr.Config, error) {
+// BuildRouting consumes validated proxy objects with resolved dependencies.
+func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error) {
 	final := s.Final
 	cache := s.UseCache
 	x := &xr.Config{
@@ -37,12 +40,9 @@ func BuildRouting(s RoutingOptions, names []string, resolvePort func(string) (ui
 		}
 		x.InboundConfigs = append(x.InboundConfigs, in)
 	}
-	for _, name := range names {
-		port, err := resolvePort(name)
-		if err != nil {
-			return nil, err
-		}
-		out, e := Socks(name, port)
+	for _, node := range nodes {
+		base := node.Base()
+		out, e := Socks(base.Name, uint16(base.SocksPort))
 		if e != nil {
 			return nil, e
 		}

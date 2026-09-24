@@ -30,14 +30,18 @@ func newProxyCatalog(sections Snapshot) *proxyCatalog {
 	return c
 }
 
-func (c *proxyCatalog) names() []string {
-	var names []string
+// all resolves the enabled graph in UCI order, including custom entry points.
+func (c *proxyCatalog) all() ([]protocol.Config, error) {
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+	var nodes []protocol.Config
 	for _, s := range c.sections.Of("proxy_node") {
 		if s.String("enabled") == "1" {
-			names = append(names, s.Value("name", s.String(".name")))
+			nodes = append(nodes, c.resolved[s.String(".name")])
 		}
 	}
-	return names
+	return nodes, nil
 }
 
 func (c *proxyCatalog) node(name string) (uci.Section, error) {
@@ -72,13 +76,6 @@ func (c *proxyCatalog) Build(raw uci.Section) (json.Marshaler, error) {
 	}
 }
 
-func (c *proxyCatalog) Port(name string) (uint16, error) {
-	s, err := c.node(name)
-	if err != nil {
-		return 0, err
-	}
-	return uint16(s.Number("socks_port")), nil
-}
 func coreName(s uci.Section) string {
 	v := s.Value("core", "sing-box")
 	if _, ok := s["core"]; !ok && s.String("type") == "vless" {

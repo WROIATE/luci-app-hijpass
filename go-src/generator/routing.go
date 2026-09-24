@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"hijpass/config/generator/protocol"
 	"hijpass/config/generator/singbox"
 	"hijpass/config/generator/xray"
 	"hijpass/config/uci"
@@ -13,61 +14,43 @@ import (
 )
 
 func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
-	settings, err := decodeSettings(c.First("shunt"))
+	proxies, err := nodes.all()
 	if err != nil {
 		return nil, err
 	}
-	co := settings.Core
+	byName := make(map[string]protocol.Config, len(proxies))
+	for _, node := range proxies {
+		byName[node.Base().Name] = node
+	}
 	dnsNodes, err := decodeDNS(c.Of("shunt_dns_node"))
 	if err != nil {
 		return nil, err
 	}
-	checkOut := func(name string, required bool) error {
-		if name == "" && !required {
-			return nil
-		}
-		if name == "hijpass-direct" || name == "hijpass-block" {
-			return nil
-		}
-		_, err := nodes.Port(name)
-		return err
-	}
-	if err := checkOut(settings.DefaultProxy, true); err != nil {
-		return nil, err
-	}
-	if settings.DefaultProxy == "hijpass-block" {
-		return nil, fmt.Errorf("default DNS exit cannot be Block")
-	}
-	if err := checkOut(settings.RuleSetProxy, false); err != nil {
-		return nil, err
-	}
-	final := outTag(settings.DefaultProxy)
-	resolver := settings.DefaultDNS
-	if dnsNodes[resolver] == nil {
-		return nil, fmt.Errorf("default DNS %q missing or disabled", resolver)
-	}
-	b, err := newBuilder(nodes, settings, final, resolver, dnsNodes)
+	settings, err := decodeSettings(c.First("shunt"), byName, dnsNodes)
 	if err != nil {
 		return nil, err
 	}
+	var entries []route
 	for _, rs := range c.Of("shunt_route_rule") {
 		if rs.String("enabled") != "1" {
 			continue
 		}
-		entry, err := decodeRoute(rs)
+		entry, err := decodeRoute(rs, byName, dnsNodes, settings.DefaultDNS)
 		if err != nil {
 			return nil, err
 		}
+		entries = append(entries, entry)
+	}
+	co, final := settings.Core, settings.Final
+	b, err := newBuilder(proxies, settings)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
 		split := entry.Split
 		versions := []int{0}
 		if split {
 			versions = []int{4, 6}
-			if entry.IPv4Exit == "" && entry.IPv6Exit == "" {
-				return nil, fmt.Errorf("split rule %q has no exit", entry.Name)
-			}
-		}
-		if e := checkOut(entry.DNSExit, false); e != nil {
-			return nil, e
 		}
 		var splitRule *rule
 		for _, version := range versions {
@@ -85,10 +68,6 @@ func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
 					name += fmt.Sprintf("-ipv%d", version)
 				}
 			}
-			if e := checkOut(out, false); e != nil {
-				return nil, e
-			}
-			out = outTag(out)
 			r := entry.Match
 			hasDNS := r.HasDomain()
 			if co == "sing-box" {
@@ -136,7 +115,7 @@ func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
 				continue
 			}
 			if hasDNS || co == "sing-box" && len(r.IP)+len(r.Sets) > 0 {
-				detour := outTag(entry.DNSExit)
+				detour := entry.DNSExit
 				if detour == "" {
 					detour = out
 				}
@@ -146,7 +125,7 @@ func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
 			}
 		}
 		if splitRule != nil {
-			out := outTag(entry.DNSExit)
+			out := entry.DNSExit
 			if out == "" {
 				return nil, fmt.Errorf("split rule %q requires a DNS exit", entry.Name)
 			}
@@ -158,32 +137,42 @@ func buildRouting(c Snapshot, nodes *proxyCatalog) (json.Marshaler, error) {
 	return b.finish()
 }
 
-func outTag(s string) string {
-	switch s {
+// resolveExit converts UCI node names to output tags at the input boundary.
+// Direct, Block and inherited exits do not correspond to proxy objects.
+func resolveExit(name string, required bool, nodes map[string]protocol.Config) (string, error) {
+	switch name {
+	case "":
+		if !required {
+			return "", nil
+		}
 	case "hijpass-direct":
-		return "direct-out"
+		return "direct-out", nil
 	case "hijpass-block":
-		return "block"
+		return "block", nil
+	default:
+		if node := nodes[name]; node != nil {
+			return node.Base().Name, nil
+		}
 	}
-	return s
+	return "", fmt.Errorf("proxy node %q missing or disabled", name)
 }
 
-// routingSettings are decoded at the boundary; native builders do not read UCI fields.
+// routingSettings contain resolved references; builders do not read UCI fields.
 type routingSettings struct {
-	Core                     string
-	ListenPort, DNSPort      uint16
-	LogLevel, Strategy       string
-	UseCache, ConvertGeo     bool
-	DefaultProxy, DefaultDNS string
-	RuleSetProxy, RuleSetDNS string
+	Core                   string
+	ListenPort, DNSPort    uint16
+	LogLevel, Strategy     string
+	UseCache, ConvertGeo   bool
+	Final, RuleSetExit     string
+	DefaultDNS, RuleSetDNS *dnsServer
+	RuleSetProxy           protocol.Config
 }
 
-func decodeSettings(s uci.Section) (routingSettings, error) {
+func decodeSettings(s uci.Section, nodes map[string]protocol.Config, servers dnsCatalog) (routingSettings, error) {
 	settings := routingSettings{
 		Core: s.String("type"), LogLevel: s.Value("log_level", "info"),
 		Strategy: s.Value("default_strategy", "64"), UseCache: s.String("use_cache") == "1",
-		ConvertGeo: s.String("ruleset_convert") == "1", DefaultProxy: s.String("default_proxy_node"),
-		DefaultDNS: s.String("default_dns_node"), RuleSetProxy: s.String("ruleset_out_node"), RuleSetDNS: s.String("ruleset_dns_node"),
+		ConvertGeo: s.String("ruleset_convert") == "1",
 	}
 	if settings.Core == "singbox" {
 		settings.Core = "sing-box"
@@ -198,6 +187,34 @@ func decodeSettings(s uci.Section) (routingSettings, error) {
 	}
 	settings.ListenPort = uint16(s.Number("shunt_listen_port"))
 	settings.DNSPort = uint16(s.Number("dns_listen_port"))
+	var err error
+	settings.Final, err = resolveExit(s.String("default_proxy_node"), true, nodes)
+	if err != nil {
+		return settings, err
+	}
+	if settings.Final == "block" {
+		return settings, fmt.Errorf("default DNS exit cannot be Block")
+	}
+	settings.DefaultDNS, err = servers.lookup(s.String("default_dns_node"))
+	if err != nil {
+		return settings, err
+	}
+	settings.RuleSetExit, err = resolveExit(s.String("ruleset_out_node"), false, nodes)
+	if err != nil {
+		return settings, err
+	}
+	if settings.Core == "sing-box" && settings.RuleSetExit != "" {
+		if settings.RuleSetExit == "block" {
+			return settings, fmt.Errorf("rule-set download exit cannot be Block")
+		}
+		settings.RuleSetProxy = nodes[s.String("ruleset_out_node")]
+		if name := s.String("ruleset_dns_node"); name != "" {
+			settings.RuleSetDNS, err = servers.lookup(name)
+			if err != nil {
+				return settings, err
+			}
+		}
+	}
 	return settings, nil
 }
 
@@ -209,11 +226,38 @@ type route struct {
 	Match                             rule
 }
 
-func decodeRoute(s uci.Section) (route, error) {
-	r := route{
-		Name: s.String("name"), Split: s.String("ip_version_split") == "1",
-		Exit: s.String("proxy_node"), IPv4Exit: s.String("proxy_node_v4"), IPv6Exit: s.String("proxy_node_v6"),
-		DNSExit: s.String("dns_proxy_node"), DNS: dnsPolicy{Server: s.String("dns_node"), Strategy: s.String("dns_strategy")},
+func decodeRoute(s uci.Section, nodes map[string]protocol.Config, servers dnsCatalog, defaultDNS *dnsServer) (route, error) {
+	r := route{Name: s.String("name"), Split: s.String("ip_version_split") == "1"}
+	var err error
+	r.DNSExit, err = resolveExit(s.String("dns_proxy_node"), false, nodes)
+	if err != nil {
+		return r, err
+	}
+
+	if r.Split {
+		r.IPv4Exit, err = resolveExit(s.String("proxy_node_v4"), false, nodes)
+		if err != nil {
+			return r, err
+		}
+		r.IPv6Exit, err = resolveExit(s.String("proxy_node_v6"), false, nodes)
+		if err != nil {
+			return r, err
+		}
+		if r.IPv4Exit == "" && r.IPv6Exit == "" {
+			return r, fmt.Errorf("split rule %q has no exit", r.Name)
+		}
+	} else {
+		r.Exit, err = resolveExit(s.String("proxy_node"), false, nodes)
+		if err != nil {
+			return r, err
+		}
+	}
+	r.DNS = dnsPolicy{Server: defaultDNS, Strategy: s.String("dns_strategy")}
+	if name := s.String("dns_node"); name != "" {
+		r.DNS.Server, err = servers.lookup(name)
+		if err != nil {
+			return r, err
+		}
 	}
 	if err := validateRulePorts(s); err != nil {
 		return r, err
@@ -230,32 +274,40 @@ type builder struct {
 	setIndex map[string]int
 }
 
-func newBuilder(nodes *proxyCatalog, s routingSettings, final, resolver string, servers dnsCatalog) (*builder, error) {
+func newBuilder(nodes []protocol.Config, s routingSettings) (*builder, error) {
 	b := &builder{settings: s, setIndex: map[string]int{}}
-	names := nodes.names()
 	if s.Core == "sing-box" {
-		options, err := singbox.BuildRouting(singbox.RoutingOptions{
-			ListenPort: s.ListenPort, DNSPort: s.DNSPort, LogLevel: s.LogLevel, Strategy: s.Strategy, UseCache: s.UseCache,
-			Final: final, Resolver: resolver, RuleSetProxy: s.RuleSetProxy, RuleSetDNS: s.RuleSetDNS,
-		}, names, nodes.Port, func(name, tag, out string) (sb.DNSServerOptions, error) { return singBoxDNS(servers[name], tag, out) })
+		dns, err := singBoxDNS(s.DefaultDNS, s.DefaultDNS.Tag, s.Final)
 		if err != nil {
 			return nil, err
 		}
-		b.config = (*SingBoxConfig)(options)
+		options := singbox.RoutingOptions{
+			ListenPort: s.ListenPort, DNSPort: s.DNSPort, LogLevel: s.LogLevel, Strategy: s.Strategy, UseCache: s.UseCache,
+			Final: s.Final, DefaultDNS: dns, RuleSetProxy: s.RuleSetProxy, RuleSetDirect: s.RuleSetExit == "direct-out",
+		}
+		if s.RuleSetDNS != nil {
+			server, err := singBoxDNS(s.RuleSetDNS, "ruleset-dns-resolver", "ruleset-out")
+			if err != nil {
+				return nil, err
+			}
+			options.RuleSetDNS = &server
+		}
+
+		b.config = (*SingBoxConfig)(singbox.BuildRouting(options, nodes))
 	} else {
 		options, err := xray.BuildRouting(xray.RoutingOptions{
-			ListenPort: s.ListenPort, DNSPort: s.DNSPort, LogLevel: s.LogLevel, Strategy: s.Strategy, UseCache: s.UseCache, Final: final,
-		}, names, nodes.Port)
+			ListenPort: s.ListenPort, DNSPort: s.DNSPort, LogLevel: s.LogLevel, Strategy: s.Strategy, UseCache: s.UseCache, Final: s.Final,
+		}, nodes)
 		if err != nil {
 			return nil, err
 		}
 		b.config = (*XrayConfig)(options)
 	}
-	b.dns = newDNSPlan(b.config, servers, resolver)
+	b.dns = &dnsPlan{config: b.config, resolver: s.DefaultDNS, dnsExits: map[string][]string{}}
 	return b, nil
 }
 func (b *builder) addSet(set sb.RuleSet) {
-	if set.Type == "remote" && b.settings.RuleSetProxy != "" {
+	if set.Type == "remote" && b.settings.RuleSetExit != "" {
 		set.RemoteOptions.HTTPClient = &sb.HTTPClientOptions{Detour: "ruleset-out"}
 	}
 	tag := set.Tag[0]
@@ -290,10 +342,17 @@ func (b *builder) finish() (json.Marshaler, error) {
 
 // Server is independent of the UCI representation and native core schemas.
 type dnsServer struct {
-	Type, Address string
-	Port          uint16
+	Tag, Type, Address string
+	Port               uint16
 }
 type dnsCatalog map[string]*dnsServer
+
+func (c dnsCatalog) lookup(name string) (*dnsServer, error) {
+	if server := c[name]; server != nil {
+		return server, nil
+	}
+	return nil, fmt.Errorf("DNS node %q missing or disabled", name)
+}
 
 func decodeDNS(sections []uci.Section) (dnsCatalog, error) {
 	out := dnsCatalog{}
@@ -310,31 +369,30 @@ func decodeDNS(sections []uci.Section) (dnsCatalog, error) {
 				return nil, err
 			}
 		}
-		out[tag] = &dnsServer{Type: s.String("type"), Address: s.String("server"), Port: uint16(s.Number("port"))}
+		out[tag] = &dnsServer{Tag: tag, Type: s.String("type"), Address: s.String("server"), Port: uint16(s.Number("port"))}
 	}
 	return out, nil
 }
 
 // Policy selects the DNS server and strategy for a routing rule.
-type dnsPolicy struct{ Server, Strategy string }
+type dnsPolicy struct {
+	Server   *dnsServer
+	Strategy string
+}
 
 type dnsPlan struct {
 	config    json.Marshaler
-	servers   dnsCatalog
-	resolver  string
+	resolver  *dnsServer
 	dnsExits  map[string][]string
 	exitOrder []string
 }
 
-func newDNSPlan(config json.Marshaler, servers dnsCatalog, resolver string) *dnsPlan {
-	return &dnsPlan{config: config, servers: servers, resolver: resolver, dnsExits: map[string][]string{}}
-}
 func (b *dnsPlan) Add(policy dnsPolicy, name, out string, r rule) error {
 	if out == "block" {
 		return fmt.Errorf("rule %q DNS exit cannot be Block", name)
 	}
 	tag := name + "-dns"
-	node := b.servers[fallback(policy.Server, b.resolver)]
+	node := policy.Server
 	if config, ok := b.config.(*SingBoxConfig); ok {
 		d, e := singBoxDNS(node, tag, out)
 		if e != nil {
@@ -363,7 +421,7 @@ func (b *dnsPlan) Finish() ([]xray.XrayRouteRule, error) {
 	if !ok {
 		return nil, nil
 	}
-	d, err := xrayDNS(b.servers[b.resolver], "default-dns")
+	d, err := xrayDNS(b.resolver, "default-dns")
 	if err != nil {
 		return nil, err
 	}
@@ -387,10 +445,4 @@ func xrayDNS(s *dnsServer, tag string) (*xr.NameServerConfig, error) {
 		return nil, fmt.Errorf("DNS node for %q does not exist", tag)
 	}
 	return xray.DNSServer(s.Type, s.Address, s.Port, tag)
-}
-func fallback(s, defaultValue string) string {
-	if s == "" {
-		return defaultValue
-	}
-	return s
 }

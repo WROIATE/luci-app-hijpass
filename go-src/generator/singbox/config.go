@@ -32,28 +32,15 @@ func Build(node protocol.Config) (*sb.Options, error) {
 			DefaultDomainResolver: &sb.DomainResolveOptions{Server: "local"},
 		},
 	}
-	if n, ok := node.(*protocol.LoadBalance); ok {
+	switch n := node.(type) {
+	case *protocol.LoadBalance:
 		buildLoadBalance(options, n)
-	} else {
-		remote, ok := node.(protocol.RemoteConfig)
-		if !ok {
-			return nil, fmt.Errorf("unsupported remote proxy %T", node)
+	case protocol.RemoteConfig:
+		if err := buildRemote(options, n); err != nil {
+			return nil, err
 		}
-		out, e := sbProtocol(remote)
-		endpoint := remote.Endpoint()
-		if e != nil {
-			return nil, e
-		}
-		options.Outbounds = append(options.Outbounds, out)
-		if endpoint.Upstream != nil {
-			port := uint16(endpoint.Upstream.Base().SocksPort)
-			tag := "upstream-" + endpoint.Upstream.Base().Name
-			dialer := out.Options.(sb.DialerOptionsWrapper)
-			d := dialer.TakeDialerOptions()
-			d.Detour = tag
-			dialer.ReplaceDialerOptions(d)
-			options.Outbounds = append(options.Outbounds, Socks(tag, port))
-		}
+	default:
+		return nil, fmt.Errorf("unsupported remote proxy %T", node)
 	}
 	return options, nil
 }

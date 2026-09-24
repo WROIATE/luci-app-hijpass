@@ -71,6 +71,10 @@ no separate `core`, `source`, `config`, `proxy`, `dns` or `routing` package.
 Proxy generation decodes reachable nodes, connects `ServerOptions.Upstream`
 and `LoadBalance.Members` to shared `protocol.Config` objects, validates that
 graph, then calls the core's `Build(config)` without a port lookup callback.
+Each core's `Build` creates the common configuration and dispatches once to
+`buildRemote` or `buildLoadBalance`. `buildRemote` owns protocol outbound creation
+and the optional upstream SOCKS hop; protocol-specific conversion remains in
+that core's protocol files.
 The catalog owns UCI reference names; protocol objects retain no duplicate name
 list. Graph validation detects cycles along the active path and remembers chain
 heights so shared upstreams neither cause false cycles nor hide excessive depth.

@@ -22,35 +22,17 @@ func Build(node protocol.Config) (*xr.Config, error) {
 		}
 		x.InboundConfigs = append(x.InboundConfigs, in)
 	}
-	if n, ok := node.(*protocol.LoadBalance); ok {
+	switch n := node.(type) {
+	case *protocol.LoadBalance:
 		if err := buildLoadBalance(x, n); err != nil {
 			return nil, err
 		}
-	} else {
-		remote, ok := node.(protocol.RemoteConfig)
-		if !ok {
-			return nil, fmt.Errorf("unsupported remote proxy %T", node)
+	case protocol.RemoteConfig:
+		if err := buildRemote(x, n); err != nil {
+			return nil, err
 		}
-		out, e := xrProtocol(remote)
-		endpoint := remote.Endpoint()
-		if e != nil {
-			return nil, e
-		}
-		if endpoint.Upstream != nil {
-			port := uint16(endpoint.Upstream.Base().SocksPort)
-			tag := "upstream-" + endpoint.Upstream.Base().Name
-			if out.StreamSetting == nil {
-				out.StreamSetting = &xr.StreamConfig{}
-			}
-			out.StreamSetting.SocketSettings = &xr.SocketConfig{DialerProxy: tag, DomainStrategy: "UseIP"}
-			socks, e := Socks(tag, port)
-			if e != nil {
-				return nil, e
-			}
-			x.OutboundConfigs = []xr.OutboundDetourConfig{out, socks}
-		} else {
-			x.OutboundConfigs = []xr.OutboundDetourConfig{out}
-		}
+	default:
+		return nil, fmt.Errorf("unsupported remote proxy %T", node)
 	}
 	return x, nil
 }

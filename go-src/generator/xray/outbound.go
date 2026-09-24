@@ -39,6 +39,30 @@ func RawSettings(v any) (*json.RawMessage, error) {
 	return &r, nil
 }
 
+// buildRemote adds the protocol outbound and its optional upstream SOCKS hop.
+func buildRemote(config *xr.Config, node protocol.RemoteConfig) error {
+	out, err := xrProtocol(node)
+	if err != nil {
+		return err
+	}
+	if upstream := node.Endpoint().Upstream; upstream != nil {
+		port := uint16(upstream.Base().SocksPort)
+		tag := "upstream-" + upstream.Base().Name
+		if out.StreamSetting == nil {
+			out.StreamSetting = &xr.StreamConfig{}
+		}
+		out.StreamSetting.SocketSettings = &xr.SocketConfig{DialerProxy: tag, DomainStrategy: "UseIP"}
+		socks, err := Socks(tag, port)
+		if err != nil {
+			return err
+		}
+		config.OutboundConfigs = []xr.OutboundDetourConfig{out, socks}
+	} else {
+		config.OutboundConfigs = []xr.OutboundDetourConfig{out}
+	}
+	return nil
+}
+
 func xrProtocol(node protocol.RemoteConfig) (xr.OutboundDetourConfig, error) {
 	o := xr.OutboundDetourConfig{Protocol: node.Base().Type, Tag: node.Base().Name}
 	switch n := node.(type) {

@@ -60,7 +60,7 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance, resolvePort func(st
 	if e != nil {
 		return e
 	}
-	x.RouterConfig = &xr.RouterConfig{DomainStrategy: Ptr("AsIs"), RuleList: []json.RawMessage{rr}, Balancers: []*xr.BalancingRule{{Tag: "slb", Selectors: xr.StringList{"lb-member-"}, FallbackTag: fb, Strategy: strategy}}}
+	x.RouterConfig = &xr.RouterConfig{DomainStrategy: new("AsIs"), RuleList: []json.RawMessage{rr}, Balancers: []*xr.BalancingRule{{Tag: "slb", Selectors: xr.StringList{"lb-member-"}, FallbackTag: fb, Strategy: strategy}}}
 	burst := xrayBurstOptions{
 		SubjectSelector: []string{"lb-member-"},
 		PingConfig: xrayPing{

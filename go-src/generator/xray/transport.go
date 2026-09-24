@@ -15,13 +15,13 @@ func applyTransport(st *xr.StreamConfig, n protocol.TransportOptions) error {
 	switch n.Transport {
 	case "":
 	case "xhttp":
-		st.Network = Ptr(xr.TransportProtocol("xhttp"))
+		st.Network = new(xr.TransportProtocol("xhttp"))
 		st.XHTTPSettings = &xr.SplitHTTPConfig{Host: n.XHTTPHost, Path: Fallback(n.XHTTPPath, "/"), Mode: Fallback(n.XHTTPMode, "auto")}
 	case "http":
-		st.Network = Ptr(xr.TransportProtocol("xhttp"))
+		st.Network = new(xr.TransportProtocol("xhttp"))
 		st.XHTTPSettings = &xr.SplitHTTPConfig{Host: n.HTTPHost, Path: Fallback(n.HTTPPath, "/"), Mode: "stream-one", UplinkHTTPMethod: n.HTTPMethod}
 	case "httpupgrade":
-		st.Network = Ptr(xr.TransportProtocol("httpupgrade"))
+		st.Network = new(xr.TransportProtocol("httpupgrade"))
 		st.HTTPUPGRADESettings = &xr.HttpUpgradeConfig{Host: n.UpgradeHost, Path: Fallback(n.UpgradePath, "/")}
 	case "ws":
 		p := Fallback(n.WSPath, "/")
@@ -36,10 +36,10 @@ func applyTransport(st *xr.StreamConfig, n protocol.TransportOptions) error {
 				p += "#" + hash
 			}
 		}
-		st.Network = Ptr(xr.TransportProtocol("websocket"))
+		st.Network = new(xr.TransportProtocol("websocket"))
 		st.WSSettings = &xr.WebSocketConfig{Host: n.WSHost, Path: p}
 	case "grpc":
-		st.Network = Ptr(xr.TransportProtocol("grpc"))
+		st.Network = new(xr.TransportProtocol("grpc"))
 		st.GRPCSettings = &xr.GRPCConfig{
 			ServiceName:         Fallback(n.GRPCService, "TunService"),
 			IdleTimeout:         int32(time.Duration(n.GRPCIdle) / time.Second),

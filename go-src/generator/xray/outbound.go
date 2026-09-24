@@ -38,7 +38,6 @@ func RawSettings(v any) (*json.RawMessage, error) {
 	r := json.RawMessage(b)
 	return &r, nil
 }
-func Ptr[T any](v T) *T { return &v }
 
 func xrProtocol(node protocol.RemoteConfig) (xr.OutboundDetourConfig, error) {
 	o := xr.OutboundDetourConfig{Protocol: node.Base().Type, Tag: node.Base().Name}

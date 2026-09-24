@@ -24,7 +24,6 @@ func IntValue(v *int64) int {
 	}
 	return int(*v)
 }
-func Ptr[T any](v T) *T { return &v }
 
 func sbProtocol(node protocol.RemoteConfig) (sb.Outbound, error) {
 	o := sb.Outbound{Type: node.Base().Type, Tag: node.Base().Name}

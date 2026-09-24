@@ -10,7 +10,7 @@ import (
 )
 
 func Listen(port uint16, address string) sb.ListenOptions {
-	return sb.ListenOptions{Listen: Ptr(badoption.Addr(netip.MustParseAddr(address))), ListenPort: port}
+	return sb.ListenOptions{Listen: new(badoption.Addr(netip.MustParseAddr(address))), ListenPort: port}
 }
 
 func sbInbounds(n protocol.BaseOptions) []sb.Inbound {

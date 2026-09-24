@@ -14,12 +14,12 @@ func buildHysteria2(n *protocol.Hysteria2) (xr.OutboundDetourConfig, error) {
 	o.Protocol = "hysteria"
 	o.Settings, e = RawSettings(xr.HysteriaClientConfig{Version: 2, Address: Address(n.Server), Port: uint16(n.ServerPort)})
 	o.StreamSetting = &xr.StreamConfig{
-		Network:  Ptr(xr.TransportProtocol("hysteria")),
+		Network:  new(xr.TransportProtocol("hysteria")),
 		Security: "tls",
 		TLSSettings: &xr.TLSConfig{
 			ServerName: Fallback(n.TLSServerName,
 				n.Server),
-			ALPN: Ptr(xr.StringList{"h3"}),
+			ALPN: new(xr.StringList{"h3"}),
 		},
 		HysteriaSettings: &xr.HysteriaConfig{
 			Version:        2,

@@ -16,7 +16,7 @@ func BuildRouting(s RoutingOptions, names []string, resolvePort func(string) (ui
 	cache := s.UseCache
 	x := &xr.Config{
 		LogConfig:    Log(s.LogLevel),
-		RouterConfig: &xr.RouterConfig{DomainStrategy: Ptr("AsIs")},
+		RouterConfig: &xr.RouterConfig{DomainStrategy: new("AsIs")},
 		DNSConfig: &xr.DNSConfig{
 			QueryStrategy: Fallback(DNSStrategy(
 				s.Strategy), "UseIP"),

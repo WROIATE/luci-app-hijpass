@@ -13,7 +13,7 @@ func Inbound(typ, tag string, port uint16, shunt bool) (xr.InboundDetourConfig, 
 		o.Settings, e = RawSettings(xr.SocksServerConfig{UDP: true})
 	} else {
 		o.Protocol = "dokodemo-door"
-		d := xr.DokodemoConfig{Network: Ptr(xr.NetworkList{"tcp", "udp"})}
+		d := xr.DokodemoConfig{Network: new(xr.NetworkList{"tcp", "udp"})}
 		if typ == "tproxy" {
 			d.FollowRedirect = true
 			o.StreamSetting = &xr.StreamConfig{SocketSettings: &xr.SocketConfig{TProxy: "tproxy"}}

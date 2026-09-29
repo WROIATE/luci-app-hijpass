@@ -8,7 +8,7 @@ import (
 func (s Section) Port(k string) (uint16, error) {
 	port, err := ParsePort(s.String(k))
 	if err != nil {
-		return 0, fmt.Errorf("%s: invalid %s", s.Value("name", s.String(".name")), k)
+		return 0, fmt.Errorf("%s: invalid %s", s.Value(OptionName, s.String(SectionName)), k)
 	}
 	return port, nil
 }

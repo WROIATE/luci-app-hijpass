@@ -9,10 +9,19 @@ import (
 
 type Snapshot []uci.Section
 
+const (
+	sectionProxyNode      = "proxy_node"
+	sectionShunt          = "shunt"
+	sectionShuntDNSNode   = "shunt_dns_node"
+	sectionShuntRouteRule = "shunt_route_rule"
+	sectionService        = "hijpass"
+	configTypeTemplate    = "tmpl"
+)
+
 func (c Snapshot) Of(t string) Snapshot {
 	var out Snapshot
 	for _, s := range c {
-		if s.String(".type") == t {
+		if s.String(uci.SectionType) == t {
 			out = append(out, s)
 		}
 	}
@@ -20,7 +29,7 @@ func (c Snapshot) Of(t string) Snapshot {
 }
 func (c Snapshot) First(t string) uci.Section {
 	for _, s := range c {
-		if s.String(".type") == t {
+		if s.String(uci.SectionType) == t {
 			return s
 		}
 	}
@@ -32,13 +41,13 @@ func (c Snapshot) Validate() error {
 	}
 	ids := map[string]bool{}
 	for _, s := range c {
-		if s == nil || s.String(".name") == "" || s.String(".type") == "" {
+		if s == nil || s.String(uci.SectionName) == "" || s.String(uci.SectionType) == "" {
 			return errors.New("section requires .name and .type")
 		}
-		if ids[s.String(".name")] {
-			return fmt.Errorf("duplicate section %q", s.String(".name"))
+		if ids[s.String(uci.SectionName)] {
+			return fmt.Errorf("duplicate section %q", s.String(uci.SectionName))
 		}
-		ids[s.String(".name")] = true
+		ids[s.String(uci.SectionName)] = true
 		for k, v := range s {
 			if len(k) > 0 && k[0] == '.' {
 				continue
@@ -48,11 +57,11 @@ func (c Snapshot) Validate() error {
 			case []any:
 				for _, item := range x {
 					if _, ok := item.(string); !ok {
-						return fmt.Errorf("%s: %s must be a string list", s.String(".name"), k)
+						return fmt.Errorf("%s: %s must be a string list", s.String(uci.SectionName), k)
 					}
 				}
 			default:
-				return fmt.Errorf("%s: %s must be a string or string list", s.String(".name"), k)
+				return fmt.Errorf("%s: %s must be a string or string list", s.String(uci.SectionName), k)
 			}
 		}
 	}

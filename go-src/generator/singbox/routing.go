@@ -2,7 +2,9 @@ package singbox
 
 import (
 	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/wire"
 
+	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
 )
 
@@ -27,16 +29,16 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
 		DefaultDomainResolver: &sb.DomainResolveOptions{Server: resolver},
 		Rules: []sb.Rule{
 			{
-				Type: "default",
+				Type: C.RuleTypeDefault,
 				DefaultOptions: sb.DefaultRule{
-					Action: "sniff",
+					Action: C.RuleActionTypeSniff,
 				},
 			},
 			{
-				Type: "default",
+				Type: C.RuleTypeDefault,
 				DefaultOptions: sb.DefaultRule{
-					Protocol: []string{"dns"},
-					Action:   "hijack-dns",
+					Protocol: []string{C.TypeDNS},
+					Action:   C.RuleActionTypeHijackDNS,
 				},
 			},
 		},
@@ -50,20 +52,20 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
 		Route: route,
 		Inbounds: []sb.Inbound{
 			{
-				Type:    "tproxy",
-				Tag:     "tproxy-in",
+				Type:    C.TypeTProxy,
+				Tag:     wire.TProxyInbound,
 				Options: &sb.TProxyInboundOptions{ListenOptions: Listen(s.ListenPort, "::")},
 			},
 			{
-				Type:    "direct",
-				Tag:     "dns-in",
+				Type:    C.TypeDirect,
+				Tag:     wire.DNSInbound,
 				Options: &sb.DirectInboundOptions{ListenOptions: Listen(s.DNSPort, "::")},
 			},
 		},
 		Outbounds: []sb.Outbound{
 			{
-				Type:    "direct",
-				Tag:     "direct-out",
+				Type:    C.TypeDirect,
+				Tag:     wire.DirectOutbound,
 				Options: &sb.DirectOutboundOptions{},
 			},
 		},
@@ -75,9 +77,9 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
 	}
 	optionsDNS.Servers = append(optionsDNS.Servers, s.DefaultDNS)
 	if s.RuleSetProxy != nil || s.RuleSetDirect {
-		out := sb.Outbound{Type: "direct", Tag: "ruleset-out", Options: &sb.DirectOutboundOptions{}}
+		out := sb.Outbound{Type: C.TypeDirect, Tag: wire.RuleSetOutbound, Options: &sb.DirectOutboundOptions{}}
 		if s.RuleSetProxy != nil {
-			out = Socks("ruleset-out", s.RuleSetProxy.Base().SocksPort)
+			out = Socks(wire.RuleSetOutbound, s.RuleSetProxy.Base().SocksPort)
 		}
 		if s.RuleSetDNS != nil {
 			dialer := out.Options.(sb.DialerOptionsWrapper)
@@ -94,9 +96,9 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
 
 func AddRule(options *sb.Options, match sb.RawDefaultRule, out string, version int) {
 	match.IPVersion = version
-	action := sb.RuleAction{Action: "route", RouteOptions: sb.RouteActionOptions{Outbound: out}}
-	if out == "block" {
-		action = sb.RuleAction{Action: "reject"}
+	action := sb.RuleAction{Action: C.RuleActionTypeRoute, RouteOptions: sb.RouteActionOptions{Outbound: out}}
+	if out == wire.BlockOutbound {
+		action = sb.RuleAction{Action: C.RuleActionTypeReject}
 	}
-	options.Route.Rules = append(options.Route.Rules, sb.Rule{Type: "default", DefaultOptions: sb.DefaultRule{RawDefaultRule: match, RuleAction: action}})
+	options.Route.Rules = append(options.Route.Rules, sb.Rule{Type: C.RuleTypeDefault, DefaultOptions: sb.DefaultRule{RawDefaultRule: match, RuleAction: action}})
 }

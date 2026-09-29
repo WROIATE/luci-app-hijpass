@@ -5,9 +5,11 @@ import (
 	"strconv"
 	"strings"
 
+	"hijpass/config/generator/wire"
 	"hijpass/config/generator/xray"
 	"hijpass/config/uci"
 
+	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
 )
 
@@ -34,21 +36,21 @@ func parseRule(s uci.Section) rule {
 				continue
 			}
 			if strings.HasPrefix(line, "rule-set:") {
-				typ := "local"
+				typ := C.RuleSetTypeLocal
 				prefix := "rule-set:local:"
 				if strings.HasPrefix(line, "rule-set:remote:") {
-					typ = "remote"
+					typ = C.RuleSetTypeRemote
 					prefix = "rule-set:remote:"
 				}
 				p := strings.TrimPrefix(line, prefix)
 				filename := path.Base(p)
 				tag := strings.TrimSuffix(filename, path.Ext(filename))
-				format := "source"
+				format := C.RuleSetFormatSource
 				if strings.HasSuffix(p, "srs") {
-					format = "binary"
+					format = C.RuleSetFormatBinary
 				}
 				rs := sb.RuleSet{Tag: []string{tag}, Type: typ, Format: format}
-				if typ == "remote" {
+				if typ == C.RuleSetTypeRemote {
 					rs.RemoteOptions.URL = p
 				} else {
 					rs.LocalOptions.Path = p
@@ -119,12 +121,12 @@ func (r *rule) XrayDomains() []string {
 func (r *rule) ConvertGeo() {
 	for _, v := range append(append([]string{}, r.GeoSite...), r.GeoIP...) {
 		tag := strings.Replace(v, ":", "-", 1)
-		r.Sets = append(r.Sets, sb.RuleSet{Tag: []string{tag}, Type: "local", Format: "binary", LocalOptions: sb.LocalRuleSet{Path: "/etc/hijpass/ruleset/" + tag + ".srs"}})
+		r.Sets = append(r.Sets, sb.RuleSet{Tag: []string{tag}, Type: C.RuleSetTypeLocal, Format: C.RuleSetFormatBinary, LocalOptions: sb.LocalRuleSet{Path: "/etc/hijpass/ruleset/" + tag + ".srs"}})
 	}
 }
 
 func (r *rule) XrayRules(name, out string, version int) []xray.XrayRouteRule {
-	base := xray.XrayRouteRule{RuleTag: name, InboundTag: []string{"tproxy-in"}, OutboundTag: out, Network: r.Network, Protocol: r.Protocol}
+	base := xray.XrayRouteRule{RuleTag: name, InboundTag: []string{wire.TProxyInbound}, OutboundTag: out, Network: r.Network, Protocol: r.Protocol}
 	var ports []string
 	for _, p := range r.Ports {
 		ports = append(ports, strconv.FormatUint(uint64(p), 10))

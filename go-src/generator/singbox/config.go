@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/wire"
 
+	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
 )
 
@@ -21,15 +23,15 @@ func Build(node protocol.Config) (*sb.Options, error) {
 			RawDNSOptions: sb.RawDNSOptions{
 				Servers: []sb.DNSServerOptions{
 					{
-						Type:    "local",
-						Tag:     "local",
+						Type:    C.DNSTypeLocal,
+						Tag:     wire.LocalDNS,
 						Options: &sb.LocalDNSServerOptions{},
 					},
 				},
 			},
 		},
 		Route: &sb.RouteOptions{
-			DefaultDomainResolver: &sb.DomainResolveOptions{Server: "local"},
+			DefaultDomainResolver: &sb.DomainResolveOptions{Server: wire.LocalDNS},
 		},
 	}
 	switch n := node.(type) {

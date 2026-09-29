@@ -64,10 +64,10 @@ func (v *boolean) UnmarshalJSON(b []byte) error {
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
 	}
-	if s != "" && s != "0" && s != "1" {
+	if s != "" && s != Disabled && s != Enabled {
 		return fmt.Errorf("invalid UCI boolean %q", s)
 	}
-	*v = s == "1"
+	*v = s == Enabled
 	return nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/wire"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/infra/conf/cfgcommon/duration"
@@ -19,10 +20,10 @@ type xrayLeastLoad struct {
 
 func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 
-	fb := "lb-member-0"
+	fb := wire.LoadBalanceMemberPrefix + "0"
 	for i, member := range n.Members {
 		port := member.Base().SocksPort
-		tag := fmt.Sprintf("lb-member-%d", i)
+		tag := fmt.Sprintf("%s%d", wire.LoadBalanceMemberPrefix, i)
 		if member.Base().Name == n.Fallback {
 			fb = tag
 		}
@@ -45,26 +46,26 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 		strategy.Settings = s
 	}
 	rr, e := json.Marshal(XrayRouteRule{
-		InboundTag:  []string{"tproxy-in", "socks-in"},
-		BalancerTag: "slb",
+		InboundTag:  []string{wire.TProxyInbound, wire.SocksInbound},
+		BalancerTag: wire.LoadBalance,
 	})
 	if e != nil {
 		return e
 	}
 	x.RouterConfig = &xr.RouterConfig{
-		DomainStrategy: new("AsIs"),
+		DomainStrategy: new(domainStrategyAsIs),
 		RuleList:       []json.RawMessage{rr},
 		Balancers: []*xr.BalancingRule{
 			{
-				Tag:         "slb",
-				Selectors:   xr.StringList{"lb-member-"},
+				Tag:         wire.LoadBalance,
+				Selectors:   xr.StringList{wire.LoadBalanceMemberPrefix},
 				FallbackTag: fb,
 				Strategy:    strategy,
 			},
 		},
 	}
 	x.BurstObservatory = &xr.BurstObservatoryConfig{
-		SubjectSelector: []string{"lb-member-"},
+		SubjectSelector: []string{wire.LoadBalanceMemberPrefix},
 		HealthCheck: &xr.HealthCheckSettings{
 			Destination:   n.ProbeURL,
 			Connectivity:  n.ProbeConnectivity,

@@ -10,16 +10,18 @@ import (
 	"hijpass/config/uci"
 )
 
+const optionCore = "core"
+
 // buildProxy converts one prepared protocol object to its native core config.
 func buildProxy(n protocol.Config) (json.Marshaler, error) {
 	switch n.Base().Core {
-	case "sing-box":
+	case protocol.CoreSingBox:
 		options, err := singbox.Build(n)
 		if err != nil {
 			return nil, err
 		}
 		return (*SingBoxConfig)(options), nil
-	case "xray":
+	case protocol.CoreXray:
 		options, err := xray.Build(n)
 		if err != nil {
 			return nil, err
@@ -31,12 +33,12 @@ func buildProxy(n protocol.Config) (json.Marshaler, error) {
 }
 
 func coreName(s uci.Section) string {
-	v := s.Value("core", "sing-box")
-	if _, ok := s["core"]; !ok && s.String("type") == "vless" {
-		v = "xray"
+	v := s.Value(optionCore, protocol.CoreSingBox)
+	if _, ok := s[optionCore]; !ok && s.String(uci.OptionType) == protocol.TypeVLESS {
+		v = protocol.CoreXray
 	}
-	if v == "singbox" {
-		v = "sing-box"
+	if v == protocol.CoreSingBoxLegacy {
+		v = protocol.CoreSingBox
 	}
 	return v
 }
@@ -46,7 +48,7 @@ func coreName(s uci.Section) string {
 func decodeProxy(s uci.Section) (protocol.Config, error) {
 	core := coreName(s)
 	switch core {
-	case "sing-box", "xray", "custom":
+	case protocol.CoreSingBox, protocol.CoreXray, protocol.CoreCustom:
 	default:
 		return nil, fmt.Errorf("unsupported core %q", core)
 	}
@@ -54,7 +56,7 @@ func decodeProxy(s uci.Section) (protocol.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if core == "custom" {
+	if core == protocol.CoreCustom {
 		d, err := uci.NewDecoder(data)
 		if err != nil {
 			return nil, err
@@ -66,8 +68,8 @@ func decodeProxy(s uci.Section) (protocol.Config, error) {
 		if err := protocol.Validate(n); err != nil {
 			return nil, err
 		}
-		n.Core = "custom"
-		n.Name = s.Value("name", s.String(".name"))
+		n.Core = protocol.CoreCustom
+		n.Name = s.Value(uci.OptionName, s.String(uci.SectionName))
 		return n, nil
 	}
 	n, err := protocol.Decode(data)
@@ -75,7 +77,7 @@ func decodeProxy(s uci.Section) (protocol.Config, error) {
 		return nil, err
 	}
 	n.Base().Core = core
-	n.Base().Name = s.Value("name", s.String(".name"))
+	n.Base().Name = s.Value(uci.OptionName, s.String(uci.SectionName))
 	return n, nil
 }
 
@@ -84,8 +86,8 @@ func decodeProxy(s uci.Section) (protocol.Config, error) {
 func resolveProxies(sections Snapshot, roots Snapshot) ([]protocol.Config, error) {
 	byName := make(map[string][]uci.Section)
 	for _, s := range sections {
-		if s.String("enabled") == "1" {
-			name := s.Value("name", s.String(".name"))
+		if s.String(uci.OptionEnabled) == uci.Enabled {
+			name := s.Value(uci.OptionName, s.String(uci.SectionName))
 			byName[name] = append(byName[name], s)
 		}
 	}
@@ -95,13 +97,13 @@ func resolveProxies(sections Snapshot, roots Snapshot) ([]protocol.Config, error
 	references := make(map[string][]string)
 	for i := 0; i < len(pending); i++ {
 		s := pending[i]
-		id := s.String(".name")
+		id := s.String(uci.SectionName)
 		if byID[id] != nil {
 			continue
 		}
-		name := s.Value("name", id)
+		name := s.Value(uci.OptionName, id)
 		for _, other := range byName[name] {
-			if other.String(".name") != id {
+			if other.String(uci.SectionName) != id {
 				return nil, fmt.Errorf("duplicate proxy name %q", name)
 			}
 		}
@@ -124,7 +126,7 @@ func resolveProxies(sections Snapshot, roots Snapshot) ([]protocol.Config, error
 				return nil, fmt.Errorf("duplicate proxy name %q", ref)
 			}
 			target := matches[0]
-			references[id] = append(references[id], target.String(".name"))
+			references[id] = append(references[id], target.String(uci.SectionName))
 			pending = append(pending, target)
 		}
 	}

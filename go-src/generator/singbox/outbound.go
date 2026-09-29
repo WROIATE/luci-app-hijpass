@@ -4,12 +4,14 @@ import (
 	"fmt"
 
 	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/wire"
 
+	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
 )
 
 func Socks(tag string, port uint16) sb.Outbound {
-	return sb.Outbound{Type: "socks", Tag: tag, Options: &sb.SOCKSOutboundOptions{Server: "127.0.0.1", ServerPort: port, Version: "5"}}
+	return sb.Outbound{Type: C.TypeSOCKS, Tag: tag, Options: &sb.SOCKSOutboundOptions{Server: wire.LoopbackAddress, ServerPort: port, Version: "5"}}
 }
 
 func Fallback(s, defaultValue string) string {
@@ -34,7 +36,7 @@ func buildRemote(options *sb.Options, node protocol.RemoteConfig) error {
 	options.Outbounds = append(options.Outbounds, out)
 	if upstream := node.Endpoint().Upstream; upstream != nil {
 		port := upstream.Base().SocksPort
-		tag := "upstream-" + upstream.Base().Name
+		tag := wire.UpstreamPrefix + upstream.Base().Name
 		dialer := out.Options.(sb.DialerOptionsWrapper)
 		d := dialer.TakeDialerOptions()
 		d.Detour = tag

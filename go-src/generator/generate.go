@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"hijpass/config/generator/protocol"
+	"hijpass/config/uci"
 )
 
 type Generated struct {
@@ -23,18 +24,18 @@ func prepare(c Snapshot, target string) (*preparedConfig, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
-	sections := c.Of("proxy_node")
+	sections := c.Of(sectionProxyNode)
 	var roots Snapshot
 	switch target {
-	case "", "shunt":
+	case "", sectionShunt:
 		for _, s := range sections {
-			if s.String("enabled") == "1" {
+			if s.String(uci.OptionEnabled) == uci.Enabled {
 				roots = append(roots, s)
 			}
 		}
 	default:
 		for _, s := range sections {
-			if s.String(".name") == target {
+			if s.String(uci.SectionName) == target {
 				roots = append(roots, s)
 				break
 			}
@@ -51,8 +52,8 @@ func prepare(c Snapshot, target string) (*preparedConfig, error) {
 		return nil, err
 	}
 	result := &preparedConfig{nodes: nodes}
-	shunt := c.First("shunt")
-	if target == "shunt" || target == "" && shunt.String("enabled") != "0" && shunt.String("config_type") == "tmpl" {
+	shunt := c.First(sectionShunt)
+	if target == sectionShunt || target == "" && shunt.String(uci.OptionEnabled) != uci.Disabled && shunt.String("config_type") == configTypeTemplate {
 		result.routing, err = prepareRouting(c, nodes)
 		if err != nil {
 			return nil, err
@@ -114,7 +115,7 @@ func RenderTarget(c Snapshot, target string) (json.Marshaler, error) {
 	if err != nil {
 		return nil, err
 	}
-	if target == "shunt" {
+	if target == sectionShunt {
 		return generated.Shunt, nil
 	}
 	if output := generated.Nodes[target]; output != nil {
@@ -126,7 +127,7 @@ func RenderTarget(c Snapshot, target string) (json.Marshaler, error) {
 // Validate uses the generation path so it also checks core-specific constraints.
 // Disabling the service still permits saving unfinished protocol configurations.
 func Validate(c Snapshot) error {
-	if c.First("hijpass").String("enabled") == "0" {
+	if c.First(sectionService).String(uci.OptionEnabled) == uci.Disabled {
 		return c.Validate()
 	}
 	_, err := Render(c)

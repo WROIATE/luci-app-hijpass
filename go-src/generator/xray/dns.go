@@ -39,7 +39,7 @@ func DNSStrategy(s string) string {
 	case "6":
 		return "UseIPv6"
 	case "64", "46":
-		return "UseIP"
+		return domainStrategyUseIP
 	}
 	return ""
 }

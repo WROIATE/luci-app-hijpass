@@ -2,8 +2,14 @@ package xray
 
 import (
 	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/wire"
 
 	xr "github.com/xtls/xray-core/infra/conf"
+)
+
+const (
+	domainStrategyAsIs  = "AsIs"
+	domainStrategyUseIP = "UseIP"
 )
 
 type RoutingOptions struct {
@@ -19,10 +25,10 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	cache := s.UseCache
 	x := &xr.Config{
 		LogConfig:    Log(s.LogLevel),
-		RouterConfig: &xr.RouterConfig{DomainStrategy: new("AsIs")},
+		RouterConfig: &xr.RouterConfig{DomainStrategy: new(domainStrategyAsIs)},
 		DNSConfig: &xr.DNSConfig{
 			QueryStrategy: Fallback(DNSStrategy(
-				s.Strategy), "UseIP"),
+				s.Strategy), domainStrategyUseIP),
 			DisableCache:           !cache,
 			ServeStale:             !cache,
 			ServeExpiredTTL:        3600,
@@ -33,7 +39,7 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	for _, p := range []struct {
 		typ, tag string
 		port     uint16
-	}{{"tproxy", "tproxy-in", s.ListenPort}, {"direct", "dns-in", s.DNSPort}} {
+	}{{inboundTProxy, wire.TProxyInbound, s.ListenPort}, {"direct", wire.DNSInbound, s.DNSPort}} {
 		in, e := Inbound(p.typ, p.tag, p.port, true)
 		if e != nil {
 			return nil, e
@@ -56,8 +62,15 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	if e != nil {
 		return nil, e
 	}
-	direct := xr.OutboundDetourConfig{Protocol: "freedom", Tag: "direct-out", Settings: settings, StreamSetting: &xr.StreamConfig{SocketSettings: &xr.SocketConfig{DomainStrategy: "UseIP"}}}
-	if final == "direct-out" {
+	direct := xr.OutboundDetourConfig{
+		Protocol: "freedom",
+		Tag:      wire.DirectOutbound,
+		Settings: settings,
+		StreamSetting: &xr.StreamConfig{
+			SocketSettings: &xr.SocketConfig{DomainStrategy: domainStrategyUseIP},
+		},
+	}
+	if final == wire.DirectOutbound {
 		x.OutboundConfigs = append([]xr.OutboundDetourConfig{direct}, x.OutboundConfigs...)
 	} else {
 		x.OutboundConfigs = append(x.OutboundConfigs, direct)
@@ -69,7 +82,7 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	if e != nil {
 		return nil, e
 	}
-	x.OutboundConfigs = append(x.OutboundConfigs, xr.OutboundDetourConfig{Protocol: "blackhole", Tag: "block"}, xr.OutboundDetourConfig{Protocol: "dns", Tag: "dns-out", Settings: dnsSettings})
+	x.OutboundConfigs = append(x.OutboundConfigs, xr.OutboundDetourConfig{Protocol: "blackhole", Tag: wire.BlockOutbound}, xr.OutboundDetourConfig{Protocol: "dns", Tag: wire.DNSOutbound, Settings: dnsSettings})
 	return x, nil
 }
 

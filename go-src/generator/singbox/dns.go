@@ -3,6 +3,8 @@ package singbox
 import (
 	"fmt"
 
+	"hijpass/config/generator/wire"
+
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
 )
@@ -25,17 +27,17 @@ func DNSServer(kind, address string, port uint16, tag, detour string) (sb.DNSSer
 	o := sb.DNSServerOptions{Tag: tag}
 	o.Type = kind
 	remote := sb.RemoteDNSServerOptions{Server: address, ServerPort: port}
-	if detour != "direct-out" {
+	if detour != wire.DirectOutbound {
 		remote.Detour = detour
 	}
 	switch o.Type {
-	case "udp", "tcp":
+	case C.DNSTypeUDP, C.DNSTypeTCP:
 		o.Options = &remote
-	case "tls", "quic":
+	case C.DNSTypeTLS, C.DNSTypeQUIC:
 		o.Options = &sb.RemoteTLSDNSServerOptions{RemoteDNSServerOptions: remote}
-	case "https":
+	case C.DNSTypeHTTPS:
 		o.Options = &sb.RemoteHTTPSDNSServerOptions{RemoteDNSServerOptions: remote}
-	case "local":
+	case C.DNSTypeLocal:
 		o.Options = &sb.LocalDNSServerOptions{}
 	default:
 		return o, fmt.Errorf("invalid sing-box DNS type %q", o.Type)
@@ -48,10 +50,10 @@ func AddDNSRule(options *sb.Options, d sb.DNSServerOptions, match sb.RawDefaultD
 	dns := options.DNS
 	dns.Servers = append(dns.Servers, d)
 	dns.Rules = append(dns.Rules, sb.DNSRule{
-		Type: "default",
+		Type: C.RuleTypeDefault,
 		DefaultOptions: sb.DefaultDNSRule{
 			RawDefaultDNSRule: match,
-			Action:            "route",
+			Action:            C.RuleActionTypeRoute,
 			RouteOptions: sb.DNSRouteActionOptions{
 				Server:       tag,
 				Strategy:     DNSStrategy(strategy),

@@ -7,6 +7,13 @@ import (
 	"hijpass/config/uci"
 )
 
+const (
+	CoreSingBox       = "sing-box"
+	CoreSingBoxLegacy = "singbox"
+	CoreXray          = "xray"
+	CoreCustom        = "custom"
+)
+
 // Config exposes common metadata, UCI conversion and protocol-specific validation.
 type Config interface {
 	Base() *BaseOptions
@@ -72,7 +79,7 @@ func Decode(data []byte) (Config, error) {
 		return nil, err
 	}
 	var kind string
-	d.Text("type", &kind)
+	d.Text(uci.OptionType, &kind)
 	if err := d.Err(); err != nil {
 		return nil, err
 	}

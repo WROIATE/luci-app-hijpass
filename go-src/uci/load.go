@@ -70,7 +70,7 @@ func decodePackage(data []byte) ([]Section, error) {
 	indexes := make(map[float64]bool)
 	for name, s := range response.Values {
 		index, ok := s[".index"].(float64)
-		if s.String(".name") != name || s.String(".type") == "" || !ok || index < 0 || index != math.Trunc(index) || indexes[index] {
+		if s.String(SectionName) != name || s.String(SectionType) == "" || !ok || index < 0 || index != math.Trunc(index) || indexes[index] {
 			return nil, errors.New("invalid UCI section metadata")
 		}
 		indexes[index] = true

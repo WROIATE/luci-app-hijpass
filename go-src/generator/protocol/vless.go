@@ -6,6 +6,8 @@ import (
 	"hijpass/config/uci"
 )
 
+const TypeVLESS = "vless"
+
 // VLESS contains only the options supported by this proxy type.
 type VLESS struct {
 	BaseOptions
@@ -34,7 +36,7 @@ func newVLESS() *VLESS {
 	}
 }
 
-func init() { register("vless", func() Config { return newVLESS() }) }
+func init() { register(TypeVLESS, func() Config { return newVLESS() }) }
 
 // DecodeUCI reads only options supported by VLESS.
 func (n *VLESS) DecodeUCI(d *uci.Decoder) error {

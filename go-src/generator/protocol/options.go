@@ -68,9 +68,9 @@ type TransportOptions struct {
 }
 
 func (n *BaseOptions) decodeUCI(d *uci.Decoder) {
-	d.Text(".name", &n.ID)
-	d.Text("name", &n.Name)
-	d.Text("type", &n.Type)
+	d.Text(uci.SectionName, &n.ID)
+	d.Text(uci.OptionName, &n.Name)
+	d.Text(uci.OptionType, &n.Type)
 	d.Text("core", &n.Core)
 	d.Port("listen_port", &n.ListenPort)
 	d.Port("socks_port", &n.SocksPort)

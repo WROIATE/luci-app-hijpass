@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/wire"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 )
@@ -15,7 +16,7 @@ func Build(node protocol.Config) (*xr.Config, error) {
 	for _, p := range []struct {
 		typ, tag string
 		port     uint16
-	}{{"tproxy", "tproxy-in", base.ListenPort}, {"socks", "socks-in", base.SocksPort}} {
+	}{{inboundTProxy, wire.TProxyInbound, base.ListenPort}, {inboundSocks, wire.SocksInbound, base.SocksPort}} {
 		in, e := Inbound(p.typ, p.tag, p.port, false)
 		if e != nil {
 			return nil, e

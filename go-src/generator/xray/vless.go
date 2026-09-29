@@ -9,7 +9,7 @@ import (
 func buildVLESS(n *protocol.VLESS) (xr.OutboundDetourConfig, error) {
 	o := xr.OutboundDetourConfig{Protocol: n.Type, Tag: n.Name}
 	var e error
-	o.Settings, e = RawSettings(xr.VLessOutboundConfig{Address: Address(n.Server), Port: uint16(n.ServerPort), Id: n.UUID, Encryption: "none", Flow: n.Flow})
+	o.Settings, e = RawSettings(xr.VLessOutboundConfig{Address: Address(n.Server), Port: n.ServerPort, Id: n.UUID, Encryption: "none", Flow: n.Flow})
 	st := &xr.StreamConfig{Network: new(xr.TransportProtocol("raw")), Security: "none"}
 	o.StreamSetting = st
 	if n.RealityEnabled {

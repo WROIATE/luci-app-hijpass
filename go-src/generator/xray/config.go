@@ -14,9 +14,9 @@ func Build(node protocol.Config) (*xr.Config, error) {
 	x := &xr.Config{LogConfig: Log(base.LogLevel)}
 	for _, p := range []struct {
 		typ, tag string
-		port     int64
+		port     uint16
 	}{{"tproxy", "tproxy-in", base.ListenPort}, {"socks", "socks-in", base.SocksPort}} {
-		in, e := Inbound(p.typ, p.tag, uint16(p.port), false)
+		in, e := Inbound(p.typ, p.tag, p.port, false)
 		if e != nil {
 			return nil, e
 		}

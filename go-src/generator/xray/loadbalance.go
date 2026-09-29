@@ -8,22 +8,9 @@ import (
 	"hijpass/config/generator/protocol"
 
 	xr "github.com/xtls/xray-core/infra/conf"
+	"github.com/xtls/xray-core/infra/conf/cfgcommon/duration"
 )
 
-// Xray's healthCheckSettings is private. Decode a typed wire adapter into the
-// native BurstObservatoryConfig rather than constructing untyped JSON objects.
-type xrayBurstOptions struct {
-	SubjectSelector []string `json:"subjectSelector"`
-	PingConfig      xrayPing `json:"pingConfig"`
-}
-type xrayPing struct {
-	Destination  string `json:"destination"`
-	Connectivity string `json:"connectivity,omitempty"`
-	Interval     string `json:"interval"`
-	Timeout      string `json:"timeout"`
-	Sampling     int64  `json:"sampling"`
-	HTTPMethod   string `json:"httpMethod,omitempty"`
-}
 type xrayLeastLoad struct {
 	Expected  int64   `json:"expected"`
 	MaxRTT    string  `json:"maxRTT"`
@@ -34,7 +21,7 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 
 	fb := "lb-member-0"
 	for i, member := range n.Members {
-		port := uint16(member.Base().SocksPort)
+		port := member.Base().SocksPort
 		tag := fmt.Sprintf("lb-member-%d", i)
 		if member.Base().Name == n.Fallback {
 			fb = tag
@@ -50,7 +37,7 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 		s, e := RawSettings(xrayLeastLoad{
 			Expected:  n.StrategyExpected,
 			MaxRTT:    time.Duration(n.StrategyMaxRTT).String(),
-			Tolerance: float64(n.StrategyTolerance),
+			Tolerance: n.StrategyTolerance,
 		})
 		if e != nil {
 			return e
@@ -76,24 +63,16 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 			},
 		},
 	}
-	burst := xrayBurstOptions{
+	x.BurstObservatory = &xr.BurstObservatoryConfig{
 		SubjectSelector: []string{"lb-member-"},
-		PingConfig: xrayPing{
-			Destination:  n.ProbeURL,
-			Connectivity: n.ProbeConnectivity,
-			Interval:     time.Duration(n.ProbeInterval).String(),
-			Timeout:      time.Duration(n.ProbeTimeout).String(),
-			Sampling:     n.ProbeSampling,
-			HTTPMethod:   n.ProbeMethod,
+		HealthCheck: &xr.HealthCheckSettings{
+			Destination:   n.ProbeURL,
+			Connectivity:  n.ProbeConnectivity,
+			Interval:      duration.Duration(n.ProbeInterval),
+			Timeout:       duration.Duration(n.ProbeTimeout),
+			SamplingCount: int(n.ProbeSampling),
+			HttpMethod:    n.ProbeMethod,
 		},
-	}
-	data, e := json.Marshal(burst)
-	if e != nil {
-		return e
-	}
-	x.BurstObservatory = &xr.BurstObservatoryConfig{}
-	if e = json.Unmarshal(data, x.BurstObservatory); e != nil {
-		return e
 	}
 	return nil
 }

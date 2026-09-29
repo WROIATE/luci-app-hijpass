@@ -71,13 +71,13 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
 
 	for _, node := range nodes {
 		base := node.Base()
-		o.Outbounds = append(o.Outbounds, Socks(base.Name, uint16(base.SocksPort)))
+		o.Outbounds = append(o.Outbounds, Socks(base.Name, base.SocksPort))
 	}
 	optionsDNS.Servers = append(optionsDNS.Servers, s.DefaultDNS)
 	if s.RuleSetProxy != nil || s.RuleSetDirect {
 		out := sb.Outbound{Type: "direct", Tag: "ruleset-out", Options: &sb.DirectOutboundOptions{}}
 		if s.RuleSetProxy != nil {
-			out = Socks("ruleset-out", uint16(s.RuleSetProxy.Base().SocksPort))
+			out = Socks("ruleset-out", s.RuleSetProxy.Base().SocksPort)
 		}
 		if s.RuleSetDNS != nil {
 			dialer := out.Options.(sb.DialerOptionsWrapper)

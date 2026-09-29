@@ -15,7 +15,7 @@ func Listen(port uint16, address string) sb.ListenOptions {
 
 func sbInbounds(n protocol.BaseOptions) []sb.Inbound {
 	return []sb.Inbound{
-		{Type: "tproxy", Tag: "tproxy-in", Options: &sb.TProxyInboundOptions{ListenOptions: Listen(uint16(n.ListenPort), "127.0.0.1")}},
-		{Type: "socks", Tag: "socks-in", Options: &sb.SocksInboundOptions{ListenOptions: Listen(uint16(n.SocksPort), "127.0.0.1")}},
+		{Type: "tproxy", Tag: "tproxy-in", Options: &sb.TProxyInboundOptions{ListenOptions: Listen(n.ListenPort, "127.0.0.1")}},
+		{Type: "socks", Tag: "socks-in", Options: &sb.SocksInboundOptions{ListenOptions: Listen(n.SocksPort, "127.0.0.1")}},
 	}
 }

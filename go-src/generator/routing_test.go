@@ -27,6 +27,23 @@ func TestDNSPortValidationAndDisabledNodes(t *testing.T) {
 	}
 }
 
+func TestShuntPortBounds(t *testing.T) {
+	for _, key := range []string{"shunt_listen_port", "dns_listen_port"} {
+		t.Run(key, func(t *testing.T) {
+			c := routingSnapshot("sing-box")
+			shunt := c.First("shunt")
+			shunt[key] = "65536"
+			if _, err := Render(c); err == nil || !strings.Contains(err.Error(), key) {
+				t.Fatalf("accepted overflowing %s: %v", key, err)
+			}
+			shunt[key] = "65535"
+			if _, err := Render(c); err != nil {
+				t.Fatalf("rejected maximum %s: %v", key, err)
+			}
+		})
+	}
+}
+
 func routingSnapshot(core string) Snapshot {
 	a, b := graphNode("a", 11001), graphNode("b", 11003)
 	b["type"] = "custom"

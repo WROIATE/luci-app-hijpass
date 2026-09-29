@@ -12,6 +12,34 @@ import (
 // boundary so builders operate on typed fields and cannot silently truncate ports.
 type integer int64
 
+type port uint16
+
+// ParsePort converts a UCI decimal port without narrowing an out-of-range value.
+func ParsePort(s string) (uint16, error) {
+	n, err := strconv.ParseUint(s, 10, 16)
+	if err != nil || n == 0 {
+		return 0, fmt.Errorf("invalid port %q", s)
+	}
+	return uint16(n), nil
+}
+
+func (v *port) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if s == "" {
+		*v = 0 // The protocol validator reports missing required ports.
+		return nil
+	}
+	n, err := ParsePort(s)
+	if err != nil {
+		return err
+	}
+	*v = port(n)
+	return nil
+}
+
 func (v *integer) UnmarshalJSON(b []byte) error {
 	var s string
 	if e := json.Unmarshal(b, &s); e != nil {

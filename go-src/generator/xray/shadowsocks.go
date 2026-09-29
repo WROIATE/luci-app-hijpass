@@ -14,7 +14,7 @@ func buildShadowsocks(n *protocol.Shadowsocks) (xr.OutboundDetourConfig, error) 
 	if n.UDPOverTCP {
 		return o, fmt.Errorf("Xray main no longer supports Shadowsocks udp_over_tcp; disable it or select sing-box")
 	}
-	o.Settings, e = RawSettings(xr.ShadowsocksClientConfig{Address: Address(n.Server), Port: uint16(n.ServerPort), Cipher: n.Method, Password: n.Password})
+	o.Settings, e = RawSettings(xr.ShadowsocksClientConfig{Address: Address(n.Server), Port: n.ServerPort, Cipher: n.Method, Password: n.Password})
 
 	return o, e
 }

@@ -74,6 +74,10 @@ func TestInvalidWireValues(t *testing.T) {
 		{"tuic", "zero_rtt_handshake", "true"},
 		{"tuic", "heartbeat", "-1s"},
 		{"tuic", "server_port", 443},
+		{"tuic", "server_port", "65536"},
+		{"tuic", "server_port", "0"},
+		{"tuic", "listen_port", "65536"},
+		{"tuic", "socks_port", "-1"},
 		{"hysteria2", "up_mbps", "-1"},
 		{"hysteria2", "down_mbps", "9223372036854775808"},
 		{"load_balance", "strategy_tolerance", "NaN"},
@@ -85,5 +89,21 @@ func TestInvalidWireValues(t *testing.T) {
 				t.Fatalf("expected error naming %s, got %v", tc.key, err)
 			}
 		})
+	}
+}
+
+func TestPortBounds(t *testing.T) {
+	node, err := decode(t, "shadowsocks", map[string]any{
+		"listen_port": "065535",
+		"socks_port":  "1",
+		"server_port": "65535",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := node.Base()
+	server := node.(protocol.RemoteConfig).Endpoint()
+	if base.ListenPort != 65535 || base.SocksPort != 1 || server.ServerPort != 65535 {
+		t.Fatalf("port boundary changed: %+v %+v", base, server)
 	}
 }

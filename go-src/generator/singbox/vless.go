@@ -25,7 +25,7 @@ func buildVLESS(n *protocol.VLESS, server sb.ServerOptions) (sb.Outbound, error)
 	}
 	p := &sb.VLESSOutboundOptions{ServerOptions: server, UUID: n.UUID, Flow: n.Flow, Network: network, OutboundTLSOptionsContainer: tls, Transport: tr, Multiplex: sbMultiplex(n.MultiplexOptions)}
 	if n.PacketEncoding != "" {
-		p.PacketEncoding = Ptr(n.PacketEncoding)
+		p.PacketEncoding = new(n.PacketEncoding)
 	}
 	o.Options = p
 	return o, nil

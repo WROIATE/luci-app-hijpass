@@ -26,6 +26,7 @@ func (d *Decoder) read(key string, target any) {
 }
 func (d *Decoder) Text(key string, v *string)            { d.read(key, v) }
 func (d *Decoder) Integer(key string, v *int64)          { d.read(key, (*integer)(v)) }
+func (d *Decoder) Port(key string, v *uint16)            { d.read(key, (*port)(v)) }
 func (d *Decoder) Boolean(key string, v *bool)           { d.read(key, (*boolean)(v)) }
 func (d *Decoder) Duration(key string, v *time.Duration) { d.read(key, (*duration)(v)) }
 func (d *Decoder) Number(key string, v *float64)         { d.read(key, (*number)(v)) }

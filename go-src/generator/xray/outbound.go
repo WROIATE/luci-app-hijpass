@@ -46,7 +46,7 @@ func buildRemote(config *xr.Config, node protocol.RemoteConfig) error {
 		return err
 	}
 	if upstream := node.Endpoint().Upstream; upstream != nil {
-		port := uint16(upstream.Base().SocksPort)
+		port := upstream.Base().SocksPort
 		tag := "upstream-" + upstream.Base().Name
 		if out.StreamSetting == nil {
 			out.StreamSetting = &xr.StreamConfig{}

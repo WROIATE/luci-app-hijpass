@@ -12,14 +12,14 @@ type BaseOptions struct {
 	Name       string
 	Type       string
 	Core       string
-	ListenPort int64
-	SocksPort  int64
+	ListenPort uint16
+	SocksPort  uint16
 	LogLevel   string
 }
 
 type ServerOptions struct {
 	Server     string
-	ServerPort int64
+	ServerPort uint16
 	Upstream   Config // Linked by the generator after decoding.
 }
 
@@ -72,14 +72,14 @@ func (n *BaseOptions) decodeUCI(d *uci.Decoder) {
 	d.Text("name", &n.Name)
 	d.Text("type", &n.Type)
 	d.Text("core", &n.Core)
-	d.Integer("listen_port", &n.ListenPort)
-	d.Integer("socks_port", &n.SocksPort)
+	d.Port("listen_port", &n.ListenPort)
+	d.Port("socks_port", &n.SocksPort)
 	d.Text("log_level", &n.LogLevel)
 }
 
 func (n *ServerOptions) decodeUCI(d *uci.Decoder) {
 	d.Text("server", &n.Server)
-	d.Integer("server_port", &n.ServerPort)
+	d.Port("server_port", &n.ServerPort)
 }
 
 func (n *TLSOptions) decodeUCI(d *uci.Decoder) {

@@ -13,14 +13,14 @@ import (
 
 type rule struct {
 	Domain, Suffix, Keyword, Regex, IP, GeoIP, GeoSite, Network, Protocol, Ranges []string
-	Ports                                                                         []int
+	Ports                                                                         []uint16
 	Sets                                                                          []sb.RuleSet
 }
 
 func parseRule(s uci.Section) rule {
 	r := rule{Network: s.List("network"), Protocol: s.List("protocol")}
 	for _, p := range s.List("port") {
-		if n, e := strconv.Atoi(p); e == nil {
+		if n, e := uci.ParsePort(p); e == nil {
 			r.Ports = append(r.Ports, n)
 		}
 	}
@@ -93,7 +93,7 @@ func (r *rule) Empty(geo bool) bool {
 func (r *rule) SingBox() sb.RawDefaultRule {
 	m := sb.RawDefaultRule{Domain: r.Domain, DomainSuffix: r.Suffix, DomainKeyword: r.Keyword, DomainRegex: r.Regex, IPCIDR: r.IP, Network: r.Network, Protocol: r.Protocol, PortRange: r.Ranges}
 	for _, p := range r.Ports {
-		m.Port = append(m.Port, uint16(p))
+		m.Port = append(m.Port, p)
 	}
 	for _, s := range r.Sets {
 		m.RuleSet = append(m.RuleSet, s.Tag...)
@@ -127,7 +127,7 @@ func (r *rule) XrayRules(name, out string, version int) []xray.XrayRouteRule {
 	base := xray.XrayRouteRule{RuleTag: name, InboundTag: []string{"tproxy-in"}, OutboundTag: out, Network: r.Network, Protocol: r.Protocol}
 	var ports []string
 	for _, p := range r.Ports {
-		ports = append(ports, strconv.Itoa(p))
+		ports = append(ports, strconv.FormatUint(uint64(p), 10))
 	}
 	for _, p := range r.Ranges {
 		ports = append(ports, strings.Replace(p, ":", "-", 1))

@@ -33,7 +33,7 @@ func buildRemote(options *sb.Options, node protocol.RemoteConfig) error {
 	}
 	options.Outbounds = append(options.Outbounds, out)
 	if upstream := node.Endpoint().Upstream; upstream != nil {
-		port := uint16(upstream.Base().SocksPort)
+		port := upstream.Base().SocksPort
 		tag := "upstream-" + upstream.Base().Name
 		dialer := out.Options.(sb.DialerOptionsWrapper)
 		d := dialer.TakeDialerOptions()
@@ -47,7 +47,7 @@ func buildRemote(options *sb.Options, node protocol.RemoteConfig) error {
 func sbProtocol(node protocol.RemoteConfig) (sb.Outbound, error) {
 	o := sb.Outbound{Type: node.Base().Type, Tag: node.Base().Name}
 	endpoint := node.Endpoint()
-	server := sb.ServerOptions{Server: endpoint.Server, ServerPort: uint16(endpoint.ServerPort)}
+	server := sb.ServerOptions{Server: endpoint.Server, ServerPort: endpoint.ServerPort}
 	switch n := node.(type) {
 	case *protocol.Shadowsocks:
 		return buildShadowsocks(n, server)

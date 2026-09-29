@@ -2,7 +2,6 @@ package generator
 
 import (
 	"fmt"
-	"strconv"
 
 	"hijpass/config/generator/protocol"
 	"hijpass/config/uci"
@@ -10,8 +9,8 @@ import (
 
 // Port ranges were checked during decoding. Only cross-field conflicts remain.
 func validateListenPorts(nodes []protocol.Config, shunt *routingSettings) error {
-	owners := make(map[int64]string)
-	add := func(port int64, owner string) error {
+	owners := make(map[uint16]string)
+	add := func(port uint16, owner string) error {
 		if previous, exists := owners[port]; exists {
 			return fmt.Errorf("port %d is shared by %s and %s", port, previous, owner)
 		}
@@ -28,21 +27,20 @@ func validateListenPorts(nodes []protocol.Config, shunt *routingSettings) error 
 		}
 	}
 	if shunt != nil {
-		if err := add(int64(shunt.ListenPort), "shunt.shunt_listen_port"); err != nil {
+		if err := add(shunt.ListenPort, "shunt.shunt_listen_port"); err != nil {
 			return err
 		}
-		if err := add(int64(shunt.DNSPort), "shunt.dns_listen_port"); err != nil {
+		if err := add(shunt.DNSPort, "shunt.dns_listen_port"); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Reject invalid ports before conversion to the native uint16 representation.
+// Reject invalid rule ports before converting them to native rule options.
 func validateRulePorts(s uci.Section) error {
 	for _, p := range s.List("port") {
-		n, e := strconv.Atoi(p)
-		if e != nil || n < 1 || n > 65535 {
+		if _, err := uci.ParsePort(p); err != nil {
 			return fmt.Errorf("invalid rule port %q", p)
 		}
 	}

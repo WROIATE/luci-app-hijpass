@@ -181,14 +181,15 @@ func decodeSettings(s uci.Section, nodes map[string]protocol.Config, servers dns
 	if settings.Core != "xray" && settings.Core != "sing-box" {
 		return settings, fmt.Errorf("unsupported shunt core %q", settings.Core)
 	}
-	for _, key := range []string{"shunt_listen_port", "dns_listen_port"} {
-		if err := uci.ValidatePort(s, key); err != nil {
-			return settings, err
-		}
-	}
-	settings.ListenPort = uint16(s.Number("shunt_listen_port"))
-	settings.DNSPort = uint16(s.Number("dns_listen_port"))
 	var err error
+	settings.ListenPort, err = s.Port("shunt_listen_port")
+	if err != nil {
+		return settings, err
+	}
+	settings.DNSPort, err = s.Port("dns_listen_port")
+	if err != nil {
+		return settings, err
+	}
 	settings.Final, err = resolveExit(s.String("default_proxy_node"), true, nodes)
 	if err != nil {
 		return settings, err
@@ -362,12 +363,15 @@ func decodeDNS(sections []uci.Section) (dnsCatalog, error) {
 		if _, ok := out[tag]; ok {
 			return nil, fmt.Errorf("duplicate DNS tag %q", tag)
 		}
+		var port uint16
 		if s.String("port") != "" {
-			if err := uci.ValidatePort(s, "port"); err != nil {
+			var err error
+			port, err = s.Port("port")
+			if err != nil {
 				return nil, err
 			}
 		}
-		out[tag] = &dnsServer{Tag: tag, Type: s.String("type"), Address: s.String("server"), Port: uint16(s.Number("port"))}
+		out[tag] = &dnsServer{Tag: tag, Type: s.String("type"), Address: s.String("server"), Port: port}
 	}
 	return out, nil
 }

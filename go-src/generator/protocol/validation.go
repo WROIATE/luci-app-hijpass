@@ -9,9 +9,9 @@ import (
 func (n *BaseOptions) validateBase() error {
 	for _, p := range []struct {
 		name  string
-		value int64
+		value uint16
 	}{{"listen_port", n.ListenPort}, {"socks_port", n.SocksPort}} {
-		if p.value < 1 || p.value > 65535 {
+		if p.value == 0 {
 			return fmt.Errorf("invalid %s", p.name)
 		}
 	}
@@ -19,7 +19,7 @@ func (n *BaseOptions) validateBase() error {
 }
 
 func (n *ServerOptions) validateServer() error {
-	if n.Server == "" || n.ServerPort < 1 || n.ServerPort > 65535 {
+	if n.Server == "" || n.ServerPort == 0 {
 		return fmt.Errorf("invalid server or server_port")
 	}
 	return nil

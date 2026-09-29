@@ -42,7 +42,7 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	}
 	for _, node := range nodes {
 		base := node.Base()
-		out, e := Socks(base.Name, uint16(base.SocksPort))
+		out, e := Socks(base.Name, base.SocksPort)
 		if e != nil {
 			return nil, e
 		}

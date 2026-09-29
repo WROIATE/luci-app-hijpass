@@ -18,7 +18,7 @@ func buildLoadBalance(options *sb.Options, n *protocol.LoadBalance) {
 		Options: lb,
 	})
 	for i, member := range n.Members {
-		port := uint16(member.Base().SocksPort)
+		port := member.Base().SocksPort
 		tag := fmt.Sprintf("lb-member-%d", i)
 		lb.Outbounds = append(lb.Outbounds, tag)
 		options.Outbounds = append(options.Outbounds, Socks(tag, port))

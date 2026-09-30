@@ -6,6 +6,8 @@ import (
 	"math"
 	"strconv"
 	"time"
+
+	"hijpass/config/uci/constant"
 )
 
 // UCI's numeric/boolean options are strings on the wire. Decode them once at the
@@ -64,10 +66,10 @@ func (v *boolean) UnmarshalJSON(b []byte) error {
 	if e := json.Unmarshal(b, &s); e != nil {
 		return e
 	}
-	if s != "" && s != Disabled && s != Enabled {
+	if s != "" && s != constant.Disabled && s != constant.Enabled {
 		return fmt.Errorf("invalid UCI boolean %q", s)
 	}
-	*v = s == Enabled
+	*v = s == constant.Enabled
 	return nil
 }
 

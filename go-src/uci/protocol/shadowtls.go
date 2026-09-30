@@ -1,6 +1,9 @@
 package protocol
 
-import "hijpass/config/uci"
+import (
+	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
+)
 
 // ShadowTLS contains only the options supported by this proxy type.
 type ShadowTLS struct {
@@ -23,7 +26,7 @@ func (n *ShadowTLS) DecodeUCI(d *uci.Decoder) error {
 	n.ServerOptions.decodeUCI(d)
 
 	n.TLSOptions.decodeUCI(d)
-	d.Text("password", &n.Password)
-	d.Integer("version", &n.ShadowTLSVersion)
+	d.Text(constant.OptionPassword, &n.Password)
+	d.Integer(constant.OptionVersion, &n.ShadowTLSVersion)
 	return d.Err()
 }

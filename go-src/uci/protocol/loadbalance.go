@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
 )
 
 // LoadBalance contains only the options supported by this proxy type.
@@ -49,21 +50,21 @@ func init() { register("load_balance", func() Config { return newLoadBalance() }
 func (n *LoadBalance) DecodeUCI(d *uci.Decoder) error {
 	n.BaseOptions.decodeUCI(d)
 
-	d.Text("url", &n.URL)
-	d.Duration("interval", &n.Interval)
-	d.Integer("tolerance", &n.Tolerance)
-	d.Duration("idle_timeout", &n.IdleTimeout)
-	d.Boolean("interrupt_exist_connections", &n.InterruptConnections)
-	d.Text("strategy", &n.Strategy)
-	d.Integer("strategy_expected", &n.StrategyExpected)
-	d.Duration("strategy_max_rtt", &n.StrategyMaxRTT)
-	d.Number("strategy_tolerance", &n.StrategyTolerance)
-	d.Text("fallback_tag", &n.Fallback)
-	d.Text("probe_url", &n.ProbeURL)
-	d.Text("probe_connectivity", &n.ProbeConnectivity)
-	d.Duration("probe_interval", &n.ProbeInterval)
-	d.Duration("probe_timeout", &n.ProbeTimeout)
-	d.Integer("probe_sampling", &n.ProbeSampling)
-	d.Text("probe_http_method", &n.ProbeMethod)
+	d.Text(constant.OptionURL, &n.URL)
+	d.Duration(constant.OptionInterval, &n.Interval)
+	d.Integer(constant.OptionTolerance, &n.Tolerance)
+	d.Duration(constant.OptionIdleTimeout, &n.IdleTimeout)
+	d.Boolean(constant.OptionInterruptExistingConnections, &n.InterruptConnections)
+	d.Text(constant.OptionStrategy, &n.Strategy)
+	d.Integer(constant.OptionStrategyExpected, &n.StrategyExpected)
+	d.Duration(constant.OptionStrategyMaxRTT, &n.StrategyMaxRTT)
+	d.Number(constant.OptionStrategyTolerance, &n.StrategyTolerance)
+	d.Text(constant.OptionFallbackTag, &n.Fallback)
+	d.Text(constant.OptionProbeURL, &n.ProbeURL)
+	d.Text(constant.OptionProbeConnectivity, &n.ProbeConnectivity)
+	d.Duration(constant.OptionProbeInterval, &n.ProbeInterval)
+	d.Duration(constant.OptionProbeTimeout, &n.ProbeTimeout)
+	d.Integer(constant.OptionProbeSampling, &n.ProbeSampling)
+	d.Text(constant.OptionProbeHTTPMethod, &n.ProbeMethod)
 	return d.Err()
 }

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
 )
 
 const TypeVLESS = "vless"
@@ -47,9 +48,9 @@ func (n *VLESS) DecodeUCI(d *uci.Decoder) error {
 	n.RealityOptions.decodeUCI(d)
 	n.MultiplexOptions.decodeUCI(d)
 	n.TransportOptions.decodeUCI(d)
-	d.Text("uuid", &n.UUID)
-	d.Text("network", &n.Network)
-	d.Text("flow", &n.Flow)
-	d.Text("packet_encoding", &n.PacketEncoding)
+	d.Text(constant.OptionUUID, &n.UUID)
+	d.Text(constant.OptionNetwork, &n.Network)
+	d.Text(constant.OptionFlow, &n.Flow)
+	d.Text(constant.OptionPacketEncoding, &n.PacketEncoding)
 	return d.Err()
 }

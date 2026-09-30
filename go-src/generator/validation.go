@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
 	"hijpass/config/uci/protocol"
 )
 
@@ -19,18 +20,18 @@ func validateListenPorts(nodes []protocol.Config, shunt *routingSettings) error 
 	}
 	for _, n := range nodes {
 		base := n.Base()
-		if err := add(base.ListenPort, base.Name+".listen_port"); err != nil {
+		if err := add(base.ListenPort, base.Name+"."+constant.OptionListenPort); err != nil {
 			return err
 		}
-		if err := add(base.SocksPort, base.Name+".socks_port"); err != nil {
+		if err := add(base.SocksPort, base.Name+"."+constant.OptionSocksPort); err != nil {
 			return err
 		}
 	}
 	if shunt != nil {
-		if err := add(shunt.ListenPort, "shunt.shunt_listen_port"); err != nil {
+		if err := add(shunt.ListenPort, sectionShunt+"."+constant.OptionShuntListenPort); err != nil {
 			return err
 		}
-		if err := add(shunt.DNSPort, "shunt.dns_listen_port"); err != nil {
+		if err := add(shunt.DNSPort, sectionShunt+"."+constant.OptionDNSListenPort); err != nil {
 			return err
 		}
 	}
@@ -39,7 +40,7 @@ func validateListenPorts(nodes []protocol.Config, shunt *routingSettings) error 
 
 // Reject invalid rule ports before converting them to native rule options.
 func validateRulePorts(s uci.Section) error {
-	for _, p := range s.List("port") {
+	for _, p := range s.List(constant.OptionPort) {
 		if _, err := uci.ParsePort(p); err != nil {
 			return fmt.Errorf("invalid rule port %q", p)
 		}

@@ -8,6 +8,7 @@ import (
 	"hijpass/config/generator/singbox"
 	"hijpass/config/generator/xray"
 	"hijpass/config/uci"
+	uciconstant "hijpass/config/uci/constant"
 	"hijpass/config/uci/protocol"
 
 	C "github.com/sagernet/sing-box/constant"
@@ -35,7 +36,7 @@ func prepareRouting(c Snapshot, proxies []protocol.Config) (*routingConfig, erro
 	}
 	var entries []route
 	for _, rs := range c.Of(sectionShuntRouteRule) {
-		if rs.String(uci.OptionEnabled) != uci.Enabled {
+		if rs.String(uciconstant.OptionEnabled) != uciconstant.Enabled {
 			continue
 		}
 		entry, err := decodeRoute(rs, byName, dnsNodes, settings.DefaultDNS)
@@ -173,9 +174,11 @@ type routingSettings struct {
 
 func decodeSettings(s uci.Section, nodes map[string]protocol.Config, servers dnsCatalog) (routingSettings, error) {
 	settings := routingSettings{
-		Core: s.String(uci.OptionType), LogLevel: s.Value("log_level", "info"),
-		Strategy: s.Value("default_strategy", "64"), UseCache: s.String("use_cache") == uci.Enabled,
-		ConvertGeo: s.String("ruleset_convert") == uci.Enabled,
+		Core:       s.String(uciconstant.OptionType),
+		LogLevel:   s.Value(uciconstant.OptionLogLevel, "info"),
+		Strategy:   s.Value(uciconstant.OptionDefaultStrategy, "64"),
+		UseCache:   s.String(uciconstant.OptionUseCache) == uciconstant.Enabled,
+		ConvertGeo: s.String(uciconstant.OptionRuleSetConvert) == uciconstant.Enabled,
 	}
 	if settings.Core == protocol.CoreSingBoxLegacy {
 		settings.Core = protocol.CoreSingBox
@@ -184,26 +187,26 @@ func decodeSettings(s uci.Section, nodes map[string]protocol.Config, servers dns
 		return settings, fmt.Errorf("unsupported shunt core %q", settings.Core)
 	}
 	var err error
-	settings.ListenPort, err = s.Port("shunt_listen_port")
+	settings.ListenPort, err = s.Port(uciconstant.OptionShuntListenPort)
 	if err != nil {
 		return settings, err
 	}
-	settings.DNSPort, err = s.Port("dns_listen_port")
+	settings.DNSPort, err = s.Port(uciconstant.OptionDNSListenPort)
 	if err != nil {
 		return settings, err
 	}
-	settings.Final, err = resolveExit(s.String("default_proxy_node"), true, nodes)
+	settings.Final, err = resolveExit(s.String(uciconstant.OptionDefaultProxyNode), true, nodes)
 	if err != nil {
 		return settings, err
 	}
 	if settings.Final == constant.BlockOutbound {
 		return settings, fmt.Errorf("default DNS exit cannot be Block")
 	}
-	settings.DefaultDNS, err = servers.lookup(s.String("default_dns_node"))
+	settings.DefaultDNS, err = servers.lookup(s.String(uciconstant.OptionDefaultDNSNode))
 	if err != nil {
 		return settings, err
 	}
-	settings.RuleSetExit, err = resolveExit(s.String("ruleset_out_node"), false, nodes)
+	settings.RuleSetExit, err = resolveExit(s.String(uciconstant.OptionRuleSetOutNode), false, nodes)
 	if err != nil {
 		return settings, err
 	}
@@ -211,8 +214,8 @@ func decodeSettings(s uci.Section, nodes map[string]protocol.Config, servers dns
 		if settings.RuleSetExit == constant.BlockOutbound {
 			return settings, fmt.Errorf("rule-set download exit cannot be Block")
 		}
-		settings.RuleSetProxy = nodes[s.String("ruleset_out_node")]
-		if name := s.String("ruleset_dns_node"); name != "" {
+		settings.RuleSetProxy = nodes[s.String(uciconstant.OptionRuleSetOutNode)]
+		if name := s.String(uciconstant.OptionRuleSetDNSNode); name != "" {
 			settings.RuleSetDNS, err = servers.lookup(name)
 			if err != nil {
 				return settings, err
@@ -231,30 +234,33 @@ type route struct {
 }
 
 func decodeRoute(s uci.Section, nodes map[string]protocol.Config, servers dnsCatalog, defaultDNS *dnsServer) (route, error) {
-	r := route{Name: s.String(uci.OptionName), Split: s.String("ip_version_split") == uci.Enabled}
+	r := route{
+		Name:  s.String(uciconstant.OptionName),
+		Split: s.String(uciconstant.OptionIPVersionSplit) == uciconstant.Enabled,
+	}
 	var err error
-	r.DNSExit, err = resolveExit(s.String("dns_proxy_node"), false, nodes)
+	r.DNSExit, err = resolveExit(s.String(uciconstant.OptionDNSProxyNode), false, nodes)
 	if err != nil {
 		return r, err
 	}
 
 	if r.Split {
-		r.IPv4Exit, err = resolveExit(s.String("proxy_node_v4"), true, nodes)
+		r.IPv4Exit, err = resolveExit(s.String(uciconstant.OptionProxyNodeIPv4), true, nodes)
 		if err != nil {
 			return r, fmt.Errorf("rule %q proxy_node_v4: %w", r.Name, err)
 		}
-		r.IPv6Exit, err = resolveExit(s.String("proxy_node_v6"), true, nodes)
+		r.IPv6Exit, err = resolveExit(s.String(uciconstant.OptionProxyNodeIPv6), true, nodes)
 		if err != nil {
 			return r, fmt.Errorf("rule %q proxy_node_v6: %w", r.Name, err)
 		}
 	} else {
-		r.Exit, err = resolveExit(s.String("proxy_node"), true, nodes)
+		r.Exit, err = resolveExit(s.String(uciconstant.OptionProxyNode), true, nodes)
 		if err != nil {
 			return r, fmt.Errorf("rule %q proxy_node: %w", r.Name, err)
 		}
 	}
-	r.DNS = dnsPolicy{Server: defaultDNS, Strategy: s.String("dns_strategy")}
-	if name := s.String("dns_node"); name != "" {
+	r.DNS = dnsPolicy{Server: defaultDNS, Strategy: s.String(uciconstant.OptionDNSStrategy)}
+	if name := s.String(uciconstant.OptionDNSNode); name != "" {
 		r.DNS.Server, err = servers.lookup(name)
 		if err != nil {
 			return r, err
@@ -358,22 +364,27 @@ func (c dnsCatalog) lookup(name string) (*dnsServer, error) {
 func decodeDNS(sections []uci.Section) (dnsCatalog, error) {
 	out := dnsCatalog{}
 	for _, s := range sections {
-		if s.String(uci.OptionEnabled) == uci.Disabled {
+		if s.String(uciconstant.OptionEnabled) == uciconstant.Disabled {
 			continue
 		}
-		tag := s.String("tag")
+		tag := s.String(uciconstant.OptionTag)
 		if _, ok := out[tag]; ok {
 			return nil, fmt.Errorf("duplicate DNS tag %q", tag)
 		}
 		var port uint16
-		if s.String("port") != "" {
+		if s.String(uciconstant.OptionPort) != "" {
 			var err error
-			port, err = s.Port("port")
+			port, err = s.Port(uciconstant.OptionPort)
 			if err != nil {
 				return nil, err
 			}
 		}
-		out[tag] = &dnsServer{Tag: tag, Type: s.String(uci.OptionType), Address: s.String("server"), Port: port}
+		out[tag] = &dnsServer{
+			Tag:     tag,
+			Type:    s.String(uciconstant.OptionType),
+			Address: s.String(uciconstant.OptionServer),
+			Port:    port,
+		}
 	}
 	return out, nil
 }

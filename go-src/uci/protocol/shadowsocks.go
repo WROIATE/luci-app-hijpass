@@ -1,6 +1,9 @@
 package protocol
 
-import "hijpass/config/uci"
+import (
+	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
+)
 
 // Shadowsocks contains only the options supported by this proxy type.
 type Shadowsocks struct {
@@ -29,11 +32,11 @@ func (n *Shadowsocks) DecodeUCI(d *uci.Decoder) error {
 	n.ServerOptions.decodeUCI(d)
 
 	n.MultiplexOptions.decodeUCI(d)
-	d.Text("password", &n.Password)
-	d.Text("network", &n.Network)
-	d.Text("method", &n.Method)
-	d.Text("plugin", &n.Plugin)
-	d.Text("plugin_opts", &n.PluginOptions)
-	d.Boolean("udp_over_tcp", &n.UDPOverTCP)
+	d.Text(constant.OptionPassword, &n.Password)
+	d.Text(constant.OptionNetwork, &n.Network)
+	d.Text(constant.OptionMethod, &n.Method)
+	d.Text(constant.OptionPlugin, &n.Plugin)
+	d.Text(constant.OptionPluginOptions, &n.PluginOptions)
+	d.Boolean(constant.OptionUDPOverTCP, &n.UDPOverTCP)
 	return d.Err()
 }

@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"sort"
 	"time"
+
+	"hijpass/config/uci/constant"
 )
 
 const maxConfigSize = 4 << 20
@@ -69,13 +71,15 @@ func decodePackage(data []byte) ([]Section, error) {
 	sections := make([]Section, 0, len(response.Values))
 	indexes := make(map[float64]bool)
 	for name, s := range response.Values {
-		index, ok := s[".index"].(float64)
-		if s.String(SectionName) != name || s.String(SectionType) == "" || !ok || index < 0 || index != math.Trunc(index) || indexes[index] {
+		index, ok := s[constant.SectionIndex].(float64)
+		if s.String(constant.SectionName) != name || s.String(constant.SectionType) == "" || !ok || index < 0 || index != math.Trunc(index) || indexes[index] {
 			return nil, errors.New("invalid UCI section metadata")
 		}
 		indexes[index] = true
 		sections = append(sections, s)
 	}
-	sort.Slice(sections, func(i, j int) bool { return sections[i][".index"].(float64) < sections[j][".index"].(float64) })
+	sort.Slice(sections, func(i, j int) bool {
+		return sections[i][constant.SectionIndex].(float64) < sections[j][constant.SectionIndex].(float64)
+	})
 	return sections, nil
 }

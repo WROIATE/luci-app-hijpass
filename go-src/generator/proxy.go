@@ -7,10 +7,9 @@ import (
 	"hijpass/config/generator/singbox"
 	"hijpass/config/generator/xray"
 	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
 	"hijpass/config/uci/protocol"
 )
-
-const optionCore = "core"
 
 // buildProxy converts one prepared protocol object to its native core config.
 func buildProxy(n protocol.Config) (json.Marshaler, error) {
@@ -33,8 +32,8 @@ func buildProxy(n protocol.Config) (json.Marshaler, error) {
 }
 
 func coreName(s uci.Section) string {
-	v := s.Value(optionCore, protocol.CoreSingBox)
-	if _, ok := s[optionCore]; !ok && s.String(uci.OptionType) == protocol.TypeVLESS {
+	v := s.Value(constant.OptionCore, protocol.CoreSingBox)
+	if _, ok := s[constant.OptionCore]; !ok && s.String(constant.OptionType) == protocol.TypeVLESS {
 		v = protocol.CoreXray
 	}
 	if v == protocol.CoreSingBoxLegacy {
@@ -69,7 +68,7 @@ func decodeProxy(s uci.Section) (protocol.Config, error) {
 			return nil, err
 		}
 		n.Core = protocol.CoreCustom
-		n.Name = s.Value(uci.OptionName, s.String(uci.SectionName))
+		n.Name = s.Value(constant.OptionName, s.String(constant.SectionName))
 		return n, nil
 	}
 	n, err := protocol.Decode(data)
@@ -77,7 +76,7 @@ func decodeProxy(s uci.Section) (protocol.Config, error) {
 		return nil, err
 	}
 	n.Base().Core = core
-	n.Base().Name = s.Value(uci.OptionName, s.String(uci.SectionName))
+	n.Base().Name = s.Value(constant.OptionName, s.String(constant.SectionName))
 	return n, nil
 }
 
@@ -86,8 +85,8 @@ func decodeProxy(s uci.Section) (protocol.Config, error) {
 func resolveProxies(sections Snapshot, roots Snapshot) ([]protocol.Config, error) {
 	byName := make(map[string][]uci.Section)
 	for _, s := range sections {
-		if s.String(uci.OptionEnabled) == uci.Enabled {
-			name := s.Value(uci.OptionName, s.String(uci.SectionName))
+		if s.String(constant.OptionEnabled) == constant.Enabled {
+			name := s.Value(constant.OptionName, s.String(constant.SectionName))
 			byName[name] = append(byName[name], s)
 		}
 	}
@@ -97,13 +96,13 @@ func resolveProxies(sections Snapshot, roots Snapshot) ([]protocol.Config, error
 	references := make(map[string][]string)
 	for i := 0; i < len(pending); i++ {
 		s := pending[i]
-		id := s.String(uci.SectionName)
+		id := s.String(constant.SectionName)
 		if byID[id] != nil {
 			continue
 		}
-		name := s.Value(uci.OptionName, id)
+		name := s.Value(constant.OptionName, id)
 		for _, other := range byName[name] {
-			if other.String(uci.SectionName) != id {
+			if other.String(constant.SectionName) != id {
 				return nil, fmt.Errorf("duplicate proxy name %q", name)
 			}
 		}
@@ -126,7 +125,7 @@ func resolveProxies(sections Snapshot, roots Snapshot) ([]protocol.Config, error
 				return nil, fmt.Errorf("duplicate proxy name %q", ref)
 			}
 			target := matches[0]
-			references[id] = append(references[id], target.String(uci.SectionName))
+			references[id] = append(references[id], target.String(constant.SectionName))
 			pending = append(pending, target)
 		}
 	}
@@ -161,10 +160,10 @@ func proxyReferences(s uci.Section, n protocol.Config) ([]string, error) {
 		return nil, err
 	}
 	var upstream string
-	d.Text("upstream_proxy_node", &upstream)
+	d.Text(constant.OptionUpstreamProxyNode, &upstream)
 	var refs []string
 	if _, loadBalance := n.(*protocol.LoadBalance); loadBalance {
-		d.List("member_node", &refs)
+		d.List(constant.OptionMemberNode, &refs)
 		if upstream != "" {
 			return nil, fmt.Errorf("load balancing node cannot have an upstream: %s", n.Base().Name)
 		}

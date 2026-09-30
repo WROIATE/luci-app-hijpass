@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
 )
 
 // Hysteria2 contains only the options supported by this proxy type.
@@ -41,14 +42,14 @@ func (n *Hysteria2) DecodeUCI(d *uci.Decoder) error {
 	n.ServerOptions.decodeUCI(d)
 
 	n.TLSOptions.decodeUCI(d)
-	d.Text("password", &n.Password)
-	d.Text("network", &n.Network)
-	d.OptionalInteger("up_mbps", &n.UpMbps)
-	d.OptionalInteger("down_mbps", &n.DownMbps)
-	d.Integer("udp_idle_timeout", &n.UDPIdleTimeout)
-	d.List("server_ports", &n.ServerPorts)
-	d.Duration("hop_interval", &n.HopInterval)
-	d.Text("obfs_type", &n.ObfsType)
-	d.Text("obfs_password", &n.ObfsPassword)
+	d.Text(constant.OptionPassword, &n.Password)
+	d.Text(constant.OptionNetwork, &n.Network)
+	d.OptionalInteger(constant.OptionUpMbps, &n.UpMbps)
+	d.OptionalInteger(constant.OptionDownMbps, &n.DownMbps)
+	d.Integer(constant.OptionUDPIdleTimeout, &n.UDPIdleTimeout)
+	d.List(constant.OptionServerPorts, &n.ServerPorts)
+	d.Duration(constant.OptionHopInterval, &n.HopInterval)
+	d.Text(constant.OptionObfsType, &n.ObfsType)
+	d.Text(constant.OptionObfsPassword, &n.ObfsPassword)
 	return d.Err()
 }

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
 )
 
 // BaseOptions Shared capabilities are embedded only by protocols that support them.
@@ -68,60 +69,60 @@ type TransportOptions struct {
 }
 
 func (n *BaseOptions) decodeUCI(d *uci.Decoder) {
-	d.Text(uci.SectionName, &n.ID)
-	d.Text(uci.OptionName, &n.Name)
-	d.Text(uci.OptionType, &n.Type)
-	d.Text("core", &n.Core)
-	d.Port("listen_port", &n.ListenPort)
-	d.Port("socks_port", &n.SocksPort)
-	d.Text("log_level", &n.LogLevel)
+	d.Text(constant.SectionName, &n.ID)
+	d.Text(constant.OptionName, &n.Name)
+	d.Text(constant.OptionType, &n.Type)
+	d.Text(constant.OptionCore, &n.Core)
+	d.Port(constant.OptionListenPort, &n.ListenPort)
+	d.Port(constant.OptionSocksPort, &n.SocksPort)
+	d.Text(constant.OptionLogLevel, &n.LogLevel)
 }
 
 func (n *ServerOptions) decodeUCI(d *uci.Decoder) {
-	d.Text("server", &n.Server)
-	d.Port("server_port", &n.ServerPort)
+	d.Text(constant.OptionServer, &n.Server)
+	d.Port(constant.OptionServerPort, &n.ServerPort)
 }
 
 func (n *TLSOptions) decodeUCI(d *uci.Decoder) {
-	d.Text("tls_server_name", &n.TLSServerName)
-	d.Boolean("tls_insecure", &n.TLSInsecure)
+	d.Text(constant.OptionTLSServerName, &n.TLSServerName)
+	d.Boolean(constant.OptionTLSInsecure, &n.TLSInsecure)
 }
 
 func (n *RealityOptions) decodeUCI(d *uci.Decoder) {
-	d.Boolean("tls_reality_enabled", &n.RealityEnabled)
-	d.Text("tls_reality_public_key", &n.RealityPublicKey)
-	d.Text("tls_reality_short_id", &n.RealityShortID)
+	d.Boolean(constant.OptionTLSRealityEnabled, &n.RealityEnabled)
+	d.Text(constant.OptionTLSRealityPublicKey, &n.RealityPublicKey)
+	d.Text(constant.OptionTLSRealityShortID, &n.RealityShortID)
 }
 
 func (n *MultiplexOptions) decodeUCI(d *uci.Decoder) {
-	d.Boolean("multiplex_enabled", &n.MultiplexEnabled)
-	d.Text("multiplex_protocol", &n.MultiplexProtocol)
-	d.Integer("multiplex_max_connections", &n.MaxConnections)
-	d.Integer("multiplex_min_streams", &n.MinStreams)
-	d.Integer("multiplex_max_streams", &n.MaxStreams)
-	d.Boolean("multiplex_brutal_enabled", &n.BrutalEnabled)
-	d.Integer("multiplex_brutal_up_mbps", &n.BrutalUp)
-	d.Integer("multiplex_brutal_down_mbps", &n.BrutalDown)
+	d.Boolean(constant.OptionMultiplexEnabled, &n.MultiplexEnabled)
+	d.Text(constant.OptionMultiplexProtocol, &n.MultiplexProtocol)
+	d.Integer(constant.OptionMultiplexMaxConnections, &n.MaxConnections)
+	d.Integer(constant.OptionMultiplexMinStreams, &n.MinStreams)
+	d.Integer(constant.OptionMultiplexMaxStreams, &n.MaxStreams)
+	d.Boolean(constant.OptionMultiplexBrutalEnabled, &n.BrutalEnabled)
+	d.Integer(constant.OptionMultiplexBrutalUpMbps, &n.BrutalUp)
+	d.Integer(constant.OptionMultiplexBrutalDownMbps, &n.BrutalDown)
 }
 
 func (n *TransportOptions) decodeUCI(d *uci.Decoder) {
-	d.Text("transport_type", &n.Transport)
-	d.Text("transport_http_host", &n.HTTPHost)
-	d.Text("transport_http_path", &n.HTTPPath)
-	d.Text("transport_http_method", &n.HTTPMethod)
-	d.Duration("transport_http_idle_timeout", &n.HTTPIdle)
-	d.Duration("transport_http_ping_timeout", &n.HTTPPing)
-	d.Text("transport_ws_host", &n.WSHost)
-	d.Text("transport_ws_path", &n.WSPath)
-	d.Integer("transport_ws_max_early_data", &n.WSEarlyData)
-	d.Text("transport_ws_early_data_header_name", &n.WSEarlyHeader)
-	d.Text("transport_grpc_service_name", &n.GRPCService)
-	d.Duration("transport_grpc_idle_timeout", &n.GRPCIdle)
-	d.Duration("transport_grpc_ping_timeout", &n.GRPCPing)
-	d.Boolean("transport_grpc_permit_without_stream", &n.GRPCPermit)
-	d.Text("transport_httpupgrade_host", &n.UpgradeHost)
-	d.Text("transport_httpupgrade_path", &n.UpgradePath)
-	d.Text("transport_xhttp_host", &n.XHTTPHost)
-	d.Text("transport_xhttp_path", &n.XHTTPPath)
-	d.Text("transport_xhttp_mode", &n.XHTTPMode)
+	d.Text(constant.OptionTransportType, &n.Transport)
+	d.Text(constant.OptionTransportHTTPHost, &n.HTTPHost)
+	d.Text(constant.OptionTransportHTTPPath, &n.HTTPPath)
+	d.Text(constant.OptionTransportHTTPMethod, &n.HTTPMethod)
+	d.Duration(constant.OptionTransportHTTPIdleTimeout, &n.HTTPIdle)
+	d.Duration(constant.OptionTransportHTTPPingTimeout, &n.HTTPPing)
+	d.Text(constant.OptionTransportWSHost, &n.WSHost)
+	d.Text(constant.OptionTransportWSPath, &n.WSPath)
+	d.Integer(constant.OptionTransportWSMaxEarlyData, &n.WSEarlyData)
+	d.Text(constant.OptionTransportWSEarlyDataHeaderName, &n.WSEarlyHeader)
+	d.Text(constant.OptionTransportGRPCServiceName, &n.GRPCService)
+	d.Duration(constant.OptionTransportGRPCIdleTimeout, &n.GRPCIdle)
+	d.Duration(constant.OptionTransportGRPCPingTimeout, &n.GRPCPing)
+	d.Boolean(constant.OptionTransportGRPCPermitWithoutStream, &n.GRPCPermit)
+	d.Text(constant.OptionTransportHTTPUpgradeHost, &n.UpgradeHost)
+	d.Text(constant.OptionTransportHTTPUpgradePath, &n.UpgradePath)
+	d.Text(constant.OptionTransportXHTTPHost, &n.XHTTPHost)
+	d.Text(constant.OptionTransportXHTTPPath, &n.XHTTPPath)
+	d.Text(constant.OptionTransportXHTTPMode, &n.XHTTPMode)
 }

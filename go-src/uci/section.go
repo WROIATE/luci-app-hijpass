@@ -4,16 +4,6 @@ import "strconv"
 
 type Section map[string]any
 
-const (
-	SectionName   = ".name"
-	SectionType   = ".type"
-	OptionName    = "name"
-	OptionType    = "type"
-	OptionEnabled = "enabled"
-	Enabled       = "1"
-	Disabled      = "0"
-)
-
 func (s Section) String(k string) string { v, _ := s[k].(string); return v }
 func (s Section) Value(k, fallback string) string {
 	if v := s.String(k); v != "" {

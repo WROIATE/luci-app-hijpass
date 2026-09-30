@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
 )
 
 const (
@@ -79,7 +80,7 @@ func Decode(data []byte) (Config, error) {
 		return nil, err
 	}
 	var kind string
-	d.Text(uci.OptionType, &kind)
+	d.Text(constant.OptionType, &kind)
 	if err := d.Err(); err != nil {
 		return nil, err
 	}

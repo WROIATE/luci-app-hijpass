@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
 )
 
 // TUIC contains only the options supported by this proxy type.
@@ -33,13 +34,13 @@ func (n *TUIC) DecodeUCI(d *uci.Decoder) error {
 	n.ServerOptions.decodeUCI(d)
 
 	n.TLSOptions.decodeUCI(d)
-	d.Text("password", &n.Password)
-	d.Text("uuid", &n.UUID)
-	d.Text("network", &n.Network)
-	d.Text("congestion_control", &n.CongestionControl)
-	d.Text("udp_relay_mode", &n.UDPRelayMode)
-	d.Boolean("udp_over_stream", &n.UDPOverStream)
-	d.Boolean("zero_rtt_handshake", &n.ZeroRTT)
-	d.Duration("heartbeat", &n.Heartbeat)
+	d.Text(constant.OptionPassword, &n.Password)
+	d.Text(constant.OptionUUID, &n.UUID)
+	d.Text(constant.OptionNetwork, &n.Network)
+	d.Text(constant.OptionCongestionControl, &n.CongestionControl)
+	d.Text(constant.OptionUDPRelayMode, &n.UDPRelayMode)
+	d.Boolean(constant.OptionUDPOverStream, &n.UDPOverStream)
+	d.Boolean(constant.OptionZeroRTTHandshake, &n.ZeroRTT)
+	d.Duration(constant.OptionHeartbeat, &n.Heartbeat)
 	return d.Err()
 }

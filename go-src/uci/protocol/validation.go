@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"hijpass/config/uci/constant"
 )
 
 func (n *BaseOptions) validateBase() error {
 	for _, p := range []struct {
 		name  string
 		value uint16
-	}{{"listen_port", n.ListenPort}, {"socks_port", n.SocksPort}} {
+	}{{constant.OptionListenPort, n.ListenPort}, {constant.OptionSocksPort, n.SocksPort}} {
 		if p.value == 0 {
 			return fmt.Errorf("invalid %s", p.name)
 		}

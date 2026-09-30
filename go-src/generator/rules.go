@@ -8,6 +8,7 @@ import (
 	"hijpass/config/generator/constant"
 	"hijpass/config/generator/xray"
 	"hijpass/config/uci"
+	uciconstant "hijpass/config/uci/constant"
 
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
@@ -20,16 +21,19 @@ type rule struct {
 }
 
 func parseRule(s uci.Section) rule {
-	r := rule{Network: s.List("network"), Protocol: s.List("protocol")}
-	for _, p := range s.List("port") {
+	r := rule{
+		Network:  s.List(uciconstant.OptionNetwork),
+		Protocol: s.List(uciconstant.OptionProtocol),
+	}
+	for _, p := range s.List(uciconstant.OptionPort) {
 		if n, e := uci.ParsePort(p); e == nil {
 			r.Ports = append(r.Ports, n)
 		}
 	}
-	for _, p := range s.List("port_range") {
+	for _, p := range s.List(uciconstant.OptionPortRange) {
 		r.Ranges = append(r.Ranges, strings.Replace(p, "-", ":", 1))
 	}
-	for _, key := range []string{"domain_list", "ip_list"} {
+	for _, key := range []string{uciconstant.OptionDomainList, uciconstant.OptionIPList} {
 		for _, line := range strings.Split(s.String(key), "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" || strings.HasPrefix(line, "#") {
@@ -58,7 +62,7 @@ func parseRule(s uci.Section) rule {
 				r.Sets = append(r.Sets, rs)
 				continue
 			}
-			if key == "ip_list" {
+			if key == uciconstant.OptionIPList {
 				if strings.HasPrefix(line, "geoip:") {
 					r.GeoIP = append(r.GeoIP, line)
 				} else {

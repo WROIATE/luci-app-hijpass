@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"hijpass/config/uci"
+	"hijpass/config/uci/constant"
 	"hijpass/config/uci/protocol"
 )
 
@@ -29,13 +29,13 @@ func prepare(c Snapshot, target string) (*preparedConfig, error) {
 	switch target {
 	case "", sectionShunt:
 		for _, s := range sections {
-			if s.String(uci.OptionEnabled) == uci.Enabled {
+			if s.String(constant.OptionEnabled) == constant.Enabled {
 				roots = append(roots, s)
 			}
 		}
 	default:
 		for _, s := range sections {
-			if s.String(uci.SectionName) == target {
+			if s.String(constant.SectionName) == target {
 				roots = append(roots, s)
 				break
 			}
@@ -53,7 +53,7 @@ func prepare(c Snapshot, target string) (*preparedConfig, error) {
 	}
 	result := &preparedConfig{nodes: nodes}
 	shunt := c.First(sectionShunt)
-	if target == sectionShunt || target == "" && shunt.String(uci.OptionEnabled) != uci.Disabled && shunt.String("config_type") == configTypeTemplate {
+	if target == sectionShunt || target == "" && shunt.String(constant.OptionEnabled) != constant.Disabled && shunt.String(constant.OptionConfigType) == configTypeTemplate {
 		result.routing, err = prepareRouting(c, nodes)
 		if err != nil {
 			return nil, err
@@ -127,7 +127,7 @@ func RenderTarget(c Snapshot, target string) (json.Marshaler, error) {
 // Validate uses the generation path so it also checks core-specific constraints.
 // Disabling the service still permits saving unfinished protocol configurations.
 func Validate(c Snapshot) error {
-	if c.First(sectionService).String(uci.OptionEnabled) == uci.Disabled {
+	if c.First(sectionService).String(constant.OptionEnabled) == constant.Disabled {
 		return c.Validate()
 	}
 	_, err := Render(c)

@@ -3,8 +3,8 @@ package singbox
 import (
 	"fmt"
 
+	"hijpass/config/generator/coreconfig"
 	"hijpass/config/generator/protocol"
-	"hijpass/config/generator/wire"
 
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
@@ -24,14 +24,14 @@ func Build(node protocol.Config) (*sb.Options, error) {
 				Servers: []sb.DNSServerOptions{
 					{
 						Type:    C.DNSTypeLocal,
-						Tag:     wire.LocalDNS,
+						Tag:     coreconfig.LocalDNS,
 						Options: &sb.LocalDNSServerOptions{},
 					},
 				},
 			},
 		},
 		Route: &sb.RouteOptions{
-			DefaultDomainResolver: &sb.DomainResolveOptions{Server: wire.LocalDNS},
+			DefaultDomainResolver: &sb.DomainResolveOptions{Server: coreconfig.LocalDNS},
 		},
 	}
 	switch n := node.(type) {

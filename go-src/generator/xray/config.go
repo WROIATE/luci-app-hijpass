@@ -3,8 +3,8 @@ package xray
 import (
 	"fmt"
 
+	"hijpass/config/generator/coreconfig"
 	"hijpass/config/generator/protocol"
-	"hijpass/config/generator/wire"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 )
@@ -16,7 +16,7 @@ func Build(node protocol.Config) (*xr.Config, error) {
 	for _, p := range []struct {
 		typ, tag string
 		port     uint16
-	}{{inboundTProxy, wire.TProxyInbound, base.ListenPort}, {inboundSocks, wire.SocksInbound, base.SocksPort}} {
+	}{{inboundTProxy, coreconfig.TProxyInbound, base.ListenPort}, {inboundSocks, coreconfig.SocksInbound, base.SocksPort}} {
 		in, e := Inbound(p.typ, p.tag, p.port, false)
 		if e != nil {
 			return nil, e

@@ -1,5 +1,5 @@
-// Package wire defines fixed output values shared by the generator and core builders.
-package wire
+// Package coreconfig defines values shared when generating Xray and sing-box configurations.
+package coreconfig
 
 const (
 	TProxyInbound           = "tproxy-in"

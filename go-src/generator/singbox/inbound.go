@@ -3,8 +3,8 @@ package singbox
 import (
 	"net/netip"
 
+	"hijpass/config/generator/coreconfig"
 	"hijpass/config/generator/protocol"
-	"hijpass/config/generator/wire"
 
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
@@ -17,7 +17,7 @@ func Listen(port uint16, address string) sb.ListenOptions {
 
 func sbInbounds(n protocol.BaseOptions) []sb.Inbound {
 	return []sb.Inbound{
-		{Type: C.TypeTProxy, Tag: wire.TProxyInbound, Options: &sb.TProxyInboundOptions{ListenOptions: Listen(n.ListenPort, wire.LoopbackAddress)}},
-		{Type: C.TypeSOCKS, Tag: wire.SocksInbound, Options: &sb.SocksInboundOptions{ListenOptions: Listen(n.SocksPort, wire.LoopbackAddress)}},
+		{Type: C.TypeTProxy, Tag: coreconfig.TProxyInbound, Options: &sb.TProxyInboundOptions{ListenOptions: Listen(n.ListenPort, coreconfig.LoopbackAddress)}},
+		{Type: C.TypeSOCKS, Tag: coreconfig.SocksInbound, Options: &sb.SocksInboundOptions{ListenOptions: Listen(n.SocksPort, coreconfig.LoopbackAddress)}},
 	}
 }

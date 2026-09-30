@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"hijpass/config/generator/protocol"
 	"hijpass/config/uci"
+	"hijpass/config/uci/protocol"
 )
 
 func TestProtocolSpecificDecoding(t *testing.T) {

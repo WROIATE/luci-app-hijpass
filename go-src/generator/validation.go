@@ -3,8 +3,8 @@ package generator
 import (
 	"fmt"
 
-	"hijpass/config/generator/protocol"
 	"hijpass/config/uci"
+	"hijpass/config/uci/protocol"
 )
 
 // Port ranges were checked during decoding. Only cross-field conflicts remain.

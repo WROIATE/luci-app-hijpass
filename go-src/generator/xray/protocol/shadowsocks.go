@@ -1,14 +1,14 @@
-package xray
+package protocol
 
 import (
 	"fmt"
 
-	"hijpass/config/generator/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
-func buildShadowsocks(n *protocol.Shadowsocks) (xr.OutboundDetourConfig, error) {
+func buildShadowsocks(n *uciprotocol.Shadowsocks) (xr.OutboundDetourConfig, error) {
 	o := xr.OutboundDetourConfig{Protocol: n.Type, Tag: n.Name}
 	var e error
 	if n.UDPOverTCP {

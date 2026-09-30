@@ -1,14 +1,14 @@
-package singbox
+package protocol
 
 import (
 	"fmt"
 
-	"hijpass/config/generator/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	sb "github.com/sagernet/sing-box/option"
 )
 
-func buildVLESS(n *protocol.VLESS, server sb.ServerOptions) (sb.Outbound, error) {
+func buildVLESS(n *uciprotocol.VLESS, server sb.ServerOptions) (sb.Outbound, error) {
 	o := sb.Outbound{Type: n.Type, Tag: n.Name}
 	network := sb.NetworkList(n.Network)
 	tls := sbTLS(n.TLSOptions, n.Server)

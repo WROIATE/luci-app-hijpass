@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"hijpass/config/generator/protocol"
 	"hijpass/config/generator/singbox"
 	"hijpass/config/generator/xray"
 	"hijpass/config/uci"
+	"hijpass/config/uci/protocol"
 )
 
 const optionCore = "core"

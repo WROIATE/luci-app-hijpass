@@ -5,6 +5,8 @@ import (
 	"net"
 	"strconv"
 
+	"hijpass/config/generator/xray/protocol"
+
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
@@ -28,7 +30,7 @@ func DNSServer(kind, address string, port uint16, tag string) (*xr.NameServerCon
 	default:
 		return nil, fmt.Errorf("invalid Xray DNS type %q", kind)
 	}
-	o.Address = Address(addr)
+	o.Address = protocol.Address(addr)
 	return o, nil
 }
 

@@ -1,23 +1,23 @@
-package singbox
+package protocol
 
 import (
 	"strings"
 
-	"hijpass/config/generator/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	sb "github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common/json/badoption"
 )
 
-func buildHysteria2(n *protocol.Hysteria2, server sb.ServerOptions) (sb.Outbound, error) {
+func buildHysteria2(n *uciprotocol.Hysteria2, server sb.ServerOptions) (sb.Outbound, error) {
 	o := sb.Outbound{Type: n.Type, Tag: n.Name}
 	network := sb.NetworkList(n.Network)
 	tls := sbTLS(n.TLSOptions, n.Server)
 	p := &sb.Hysteria2OutboundOptions{
 		ServerOptions:               server,
 		Password:                    n.Password,
-		UpMbps:                      IntValue(n.UpMbps),
-		DownMbps:                    IntValue(n.DownMbps),
+		UpMbps:                      intValue(n.UpMbps),
+		DownMbps:                    intValue(n.DownMbps),
 		HopInterval:                 badoption.Duration(n.HopInterval),
 		Network:                     network,
 		OutboundTLSOptionsContainer: tls,
@@ -31,4 +31,11 @@ func buildHysteria2(n *protocol.Hysteria2, server sb.ServerOptions) (sb.Outbound
 	o.Options = p
 
 	return o, nil
+}
+
+func intValue(v *int64) int {
+	if v == nil {
+		return 0
+	}
+	return int(*v)
 }

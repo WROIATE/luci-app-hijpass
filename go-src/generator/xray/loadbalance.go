@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"hijpass/config/generator/constant"
-	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/xray/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/infra/conf/cfgcommon/duration"
@@ -18,7 +19,7 @@ type xrayLeastLoad struct {
 	Tolerance float64 `json:"tolerance"`
 }
 
-func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
+func buildLoadBalance(x *xr.Config, n *uciprotocol.LoadBalance) error {
 
 	fb := constant.LoadBalanceMemberPrefix + "0"
 	for i, member := range n.Members {
@@ -27,7 +28,7 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 		if member.Base().Name == n.Fallback {
 			fb = tag
 		}
-		o, e := Socks(tag, port)
+		o, e := protocol.Socks(tag, port)
 		if e != nil {
 			return e
 		}
@@ -35,7 +36,7 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 	}
 	strategy := xr.StrategyConfig{Type: n.Strategy}
 	if n.Strategy == "leastLoad" {
-		s, e := RawSettings(xrayLeastLoad{
+		s, e := protocol.RawSettings(xrayLeastLoad{
 			Expected:  n.StrategyExpected,
 			MaxRTT:    time.Duration(n.StrategyMaxRTT).String(),
 			Tolerance: n.StrategyTolerance,

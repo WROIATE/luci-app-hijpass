@@ -1,13 +1,13 @@
-package singbox
+package protocol
 
 import (
-	"hijpass/config/generator/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	sb "github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common/json/badoption"
 )
 
-func buildTUIC(n *protocol.TUIC, server sb.ServerOptions) (sb.Outbound, error) {
+func buildTUIC(n *uciprotocol.TUIC, server sb.ServerOptions) (sb.Outbound, error) {
 	o := sb.Outbound{Type: n.Type, Tag: n.Name}
 	network := sb.NetworkList(n.Network)
 	tls := sbTLS(n.TLSOptions, n.Server)

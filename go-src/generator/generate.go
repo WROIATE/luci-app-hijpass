@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"hijpass/config/generator/protocol"
 	"hijpass/config/uci"
+	"hijpass/config/uci/protocol"
 )
 
 type Generated struct {

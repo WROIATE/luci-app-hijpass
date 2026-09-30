@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"hijpass/config/generator/xray"
+	xrayprotocol "hijpass/config/generator/xray/protocol"
 
 	sb "github.com/sagernet/sing-box/option"
 	sj "github.com/sagernet/sing/common/json"
@@ -70,7 +70,7 @@ func canonicalCore(t *testing.T, data []byte, co string) any {
 				if e = json.Unmarshal(*out.Settings, settings); e != nil {
 					t.Fatal(e)
 				}
-				out.Settings, e = xray.RawSettings(settings)
+				out.Settings, e = xrayprotocol.RawSettings(settings)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -89,7 +89,7 @@ func canonicalCore(t *testing.T, data []byte, co string) any {
 				if e = json.Unmarshal(*in.Settings, settings); e != nil {
 					t.Fatal(e)
 				}
-				in.Settings, e = xray.RawSettings(settings)
+				in.Settings, e = xrayprotocol.RawSettings(settings)
 				if e != nil {
 					t.Fatal(e)
 				}

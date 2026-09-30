@@ -1,4 +1,4 @@
-// Package protocol defines proxy models, UCI conversion, defaults and validation.
+// Package protocol defines UCI proxy models, field conversion, defaults and validation.
 package protocol
 
 import (

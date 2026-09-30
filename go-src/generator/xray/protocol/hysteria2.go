@@ -1,14 +1,15 @@
-package xray
+package protocol
 
 import (
+	"cmp"
 	"fmt"
 
-	"hijpass/config/generator/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
-func buildHysteria2(n *protocol.Hysteria2) (xr.OutboundDetourConfig, error) {
+func buildHysteria2(n *uciprotocol.Hysteria2) (xr.OutboundDetourConfig, error) {
 	o := xr.OutboundDetourConfig{Protocol: n.Type, Tag: n.Name}
 	var e error
 	o.Protocol = "hysteria"
@@ -17,7 +18,7 @@ func buildHysteria2(n *protocol.Hysteria2) (xr.OutboundDetourConfig, error) {
 		Network:  new(xr.TransportProtocol("hysteria")),
 		Security: "tls",
 		TLSSettings: &xr.TLSConfig{
-			ServerName: Fallback(n.TLSServerName,
+			ServerName: cmp.Or(n.TLSServerName,
 				n.Server),
 			ALPN: new(xr.StringList{"h3"}),
 		},

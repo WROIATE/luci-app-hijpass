@@ -1,8 +1,11 @@
 package xray
 
 import (
+	"cmp"
+
 	"hijpass/config/generator/constant"
-	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/xray/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 )
@@ -20,14 +23,14 @@ type RoutingOptions struct {
 }
 
 // BuildRouting consumes validated proxy objects with resolved dependencies.
-func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error) {
+func BuildRouting(s RoutingOptions, nodes []uciprotocol.Config) (*xr.Config, error) {
 	final := s.Final
 	cache := s.UseCache
 	x := &xr.Config{
 		LogConfig:    Log(s.LogLevel),
 		RouterConfig: &xr.RouterConfig{DomainStrategy: new(domainStrategyAsIs)},
 		DNSConfig: &xr.DNSConfig{
-			QueryStrategy: Fallback(DNSStrategy(
+			QueryStrategy: cmp.Or(DNSStrategy(
 				s.Strategy), domainStrategyUseIP),
 			DisableCache:           !cache,
 			ServeStale:             !cache,
@@ -48,7 +51,7 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	}
 	for _, node := range nodes {
 		base := node.Base()
-		out, e := Socks(base.Name, base.SocksPort)
+		out, e := protocol.Socks(base.Name, base.SocksPort)
 		if e != nil {
 			return nil, e
 		}
@@ -58,7 +61,7 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 			x.OutboundConfigs = append(x.OutboundConfigs, out)
 		}
 	}
-	settings, e := RawSettings(xr.FreedomConfig{})
+	settings, e := protocol.RawSettings(xr.FreedomConfig{})
 	if e != nil {
 		return nil, e
 	}
@@ -75,7 +78,7 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	} else {
 		x.OutboundConfigs = append(x.OutboundConfigs, direct)
 	}
-	dnsSettings, e := RawSettings(xr.DNSOutboundConfig{Rules: []*xr.DNSOutboundRuleConfig{
+	dnsSettings, e := protocol.RawSettings(xr.DNSOutboundConfig{Rules: []*xr.DNSOutboundRuleConfig{
 		{Action: "hijack", QType: &xr.PortList{Range: []xr.PortRange{{From: 1, To: 1}, {From: 28, To: 28}}}},
 		{Action: "return", RCode: 5},
 	}})

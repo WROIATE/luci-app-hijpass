@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"hijpass/config/generator/protocol"
+	"hijpass/config/uci/protocol"
 )
 
 func decode(t *testing.T, kind string, options map[string]any) (protocol.Config, error) {

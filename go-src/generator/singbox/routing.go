@@ -2,7 +2,8 @@ package singbox
 
 import (
 	"hijpass/config/generator/constant"
-	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/singbox/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
@@ -14,13 +15,13 @@ type RoutingOptions struct {
 	UseCache            bool
 	Final               string
 	DefaultDNS          sb.DNSServerOptions
-	RuleSetProxy        protocol.Config
+	RuleSetProxy        uciprotocol.Config
 	RuleSetDirect       bool
 	RuleSetDNS          *sb.DNSServerOptions
 }
 
 // BuildRouting consumes resolved proxy objects and native DNS options.
-func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
+func BuildRouting(s RoutingOptions, nodes []uciprotocol.Config) *sb.Options {
 	final, resolver := s.Final, s.DefaultDNS.Tag
 	cache := s.UseCache
 	optionsDNS := &sb.DNSOptions{Final: resolver, Strategy: DNSStrategy(s.Strategy), DisableCache: !cache, DisableExpire: !cache}
@@ -73,13 +74,13 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
 
 	for _, node := range nodes {
 		base := node.Base()
-		o.Outbounds = append(o.Outbounds, Socks(base.Name, base.SocksPort))
+		o.Outbounds = append(o.Outbounds, protocol.Socks(base.Name, base.SocksPort))
 	}
 	optionsDNS.Servers = append(optionsDNS.Servers, s.DefaultDNS)
 	if s.RuleSetProxy != nil || s.RuleSetDirect {
 		out := sb.Outbound{Type: C.TypeDirect, Tag: constant.RuleSetOutbound, Options: &sb.DirectOutboundOptions{}}
 		if s.RuleSetProxy != nil {
-			out = Socks(constant.RuleSetOutbound, s.RuleSetProxy.Base().SocksPort)
+			out = protocol.Socks(constant.RuleSetOutbound, s.RuleSetProxy.Base().SocksPort)
 		}
 		if s.RuleSetDNS != nil {
 			dialer := out.Options.(sb.DialerOptionsWrapper)

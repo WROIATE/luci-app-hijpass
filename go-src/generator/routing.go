@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"hijpass/config/generator/constant"
-	"hijpass/config/generator/protocol"
 	"hijpass/config/generator/singbox"
 	"hijpass/config/generator/xray"
 	"hijpass/config/uci"
+	"hijpass/config/uci/protocol"
 
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"

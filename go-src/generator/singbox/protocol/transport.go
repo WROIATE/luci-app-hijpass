@@ -1,15 +1,16 @@
-package singbox
+package protocol
 
 import (
+	"cmp"
 	"fmt"
 
-	"hijpass/config/generator/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	sb "github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common/json/badoption"
 )
 
-func sbMultiplex(n protocol.MultiplexOptions) *sb.OutboundMultiplexOptions {
+func sbMultiplex(n uciprotocol.MultiplexOptions) *sb.OutboundMultiplexOptions {
 	if !n.MultiplexEnabled {
 		return nil
 	}
@@ -20,7 +21,7 @@ func sbMultiplex(n protocol.MultiplexOptions) *sb.OutboundMultiplexOptions {
 	return m
 }
 
-func sbTransport(n protocol.TransportOptions) (*sb.V2RayTransportOptions, error) {
+func sbTransport(n uciprotocol.TransportOptions) (*sb.V2RayTransportOptions, error) {
 	t := &sb.V2RayTransportOptions{Type: n.Transport}
 	switch n.Transport {
 	case "":
@@ -45,6 +46,6 @@ func sbTransport(n protocol.TransportOptions) (*sb.V2RayTransportOptions, error)
 	return t, nil
 }
 
-func sbTLS(options protocol.TLSOptions, server string) sb.OutboundTLSOptionsContainer {
-	return sb.OutboundTLSOptionsContainer{TLS: &sb.OutboundTLSOptions{Enabled: true, ServerName: Fallback(options.TLSServerName, server), Insecure: bool(options.TLSInsecure)}}
+func sbTLS(options uciprotocol.TLSOptions, server string) sb.OutboundTLSOptionsContainer {
+	return sb.OutboundTLSOptionsContainer{TLS: &sb.OutboundTLSOptions{Enabled: true, ServerName: cmp.Or(options.TLSServerName, server), Insecure: bool(options.TLSInsecure)}}
 }

@@ -1,6 +1,8 @@
 package xray
 
 import (
+	"hijpass/config/generator/xray/protocol"
+
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
@@ -15,7 +17,7 @@ func Inbound(typ, tag string, port uint16, shunt bool) (xr.InboundDetourConfig, 
 	var e error
 	if typ == inboundSocks {
 		o.Protocol = inboundSocks
-		o.Settings, e = RawSettings(xr.SocksServerConfig{UDP: true})
+		o.Settings, e = protocol.RawSettings(xr.SocksServerConfig{UDP: true})
 	} else {
 		o.Protocol = "dokodemo-door"
 		d := xr.DokodemoConfig{Network: new(xr.NetworkList{"tcp", "udp"})}
@@ -23,9 +25,9 @@ func Inbound(typ, tag string, port uint16, shunt bool) (xr.InboundDetourConfig, 
 			d.FollowRedirect = true
 			o.StreamSetting = &xr.StreamConfig{SocketSettings: &xr.SocketConfig{TProxy: inboundTProxy}}
 		} else {
-			o.ListenOn = Address("::")
+			o.ListenOn = protocol.Address("::")
 		}
-		o.Settings, e = RawSettings(d)
+		o.Settings, e = protocol.RawSettings(d)
 	}
 	if shunt && typ == inboundTProxy {
 		o.SniffingConfig = &xr.SniffingConfig{Enabled: true, DestOverride: xr.StringList{"http", "tls", "quic"}, RouteOnly: true}

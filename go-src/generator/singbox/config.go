@@ -1,21 +1,22 @@
 package singbox
 
 import (
+	"cmp"
 	"fmt"
 
 	"hijpass/config/generator/constant"
-	"hijpass/config/generator/protocol"
+	uciprotocol "hijpass/config/uci/protocol"
 
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
 )
 
 // Build consumes a validated protocol graph with resolved dependencies.
-func Build(node protocol.Config) (*sb.Options, error) {
+func Build(node uciprotocol.Config) (*sb.Options, error) {
 	base := node.Base()
 	options := &sb.Options{
 		Log: &sb.LogOptions{
-			Level:     Fallback(base.LogLevel, "info"),
+			Level:     cmp.Or(base.LogLevel, "info"),
 			Timestamp: true,
 		},
 		Inbounds: sbInbounds(*base),
@@ -35,9 +36,9 @@ func Build(node protocol.Config) (*sb.Options, error) {
 		},
 	}
 	switch n := node.(type) {
-	case *protocol.LoadBalance:
+	case *uciprotocol.LoadBalance:
 		buildLoadBalance(options, n)
-	case protocol.RemoteConfig:
+	case uciprotocol.RemoteConfig:
 		if err := buildRemote(options, n); err != nil {
 			return nil, err
 		}

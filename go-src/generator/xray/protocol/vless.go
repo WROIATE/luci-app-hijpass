@@ -1,12 +1,14 @@
-package xray
+package protocol
 
 import (
-	"hijpass/config/generator/protocol"
+	"cmp"
+
+	uciprotocol "hijpass/config/uci/protocol"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
-func buildVLESS(n *protocol.VLESS) (xr.OutboundDetourConfig, error) {
+func buildVLESS(n *uciprotocol.VLESS) (xr.OutboundDetourConfig, error) {
 	o := xr.OutboundDetourConfig{Protocol: n.Type, Tag: n.Name}
 	var e error
 	o.Settings, e = RawSettings(xr.VLessOutboundConfig{Address: Address(n.Server), Port: n.ServerPort, Id: n.UUID, Encryption: "none", Flow: n.Flow})
@@ -14,7 +16,7 @@ func buildVLESS(n *protocol.VLESS) (xr.OutboundDetourConfig, error) {
 	o.StreamSetting = st
 	if n.RealityEnabled {
 		st.Security = "reality"
-		st.REALITYSettings = &xr.REALITYConfig{Fingerprint: "chrome", ServerName: Fallback(n.TLSServerName, n.Server), Password: n.RealityPublicKey, ShortId: n.RealityShortID}
+		st.REALITYSettings = &xr.REALITYConfig{Fingerprint: "chrome", ServerName: cmp.Or(n.TLSServerName, n.Server), Password: n.RealityPublicKey, ShortId: n.RealityShortID}
 	} else if n.TLSServerName != "" {
 		st.Security = "tls"
 		st.TLSSettings = &xr.TLSConfig{ServerName: n.TLSServerName, ALPN: new(xr.StringList{"h2", "http/1.1"})}

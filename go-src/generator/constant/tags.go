@@ -1,5 +1,5 @@
-// Package tags defines output tag names and prefixes shared by the config generators.
-package tags
+// Package constant defines values shared by the configuration generators.
+package constant
 
 const (
 	TProxyInbound           = "tproxy-in"

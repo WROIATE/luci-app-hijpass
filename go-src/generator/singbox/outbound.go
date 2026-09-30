@@ -3,15 +3,15 @@ package singbox
 import (
 	"fmt"
 
+	"hijpass/config/generator/constant"
 	"hijpass/config/generator/protocol"
-	"hijpass/config/generator/tags"
 
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
 )
 
 func Socks(tag string, port uint16) sb.Outbound {
-	return sb.Outbound{Type: C.TypeSOCKS, Tag: tag, Options: &sb.SOCKSOutboundOptions{Server: loopbackAddress, ServerPort: port, Version: "5"}}
+	return sb.Outbound{Type: C.TypeSOCKS, Tag: tag, Options: &sb.SOCKSOutboundOptions{Server: constant.LoopbackAddress, ServerPort: port, Version: "5"}}
 }
 
 func Fallback(s, defaultValue string) string {
@@ -36,7 +36,7 @@ func buildRemote(options *sb.Options, node protocol.RemoteConfig) error {
 	options.Outbounds = append(options.Outbounds, out)
 	if upstream := node.Endpoint().Upstream; upstream != nil {
 		port := upstream.Base().SocksPort
-		tag := tags.UpstreamPrefix + upstream.Base().Name
+		tag := constant.UpstreamPrefix + upstream.Base().Name
 		dialer := out.Options.(sb.DialerOptionsWrapper)
 		d := dialer.TakeDialerOptions()
 		d.Detour = tag

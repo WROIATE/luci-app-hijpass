@@ -3,7 +3,7 @@ package singbox
 import (
 	"fmt"
 
-	"hijpass/config/generator/tags"
+	"hijpass/config/generator/constant"
 
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
@@ -27,7 +27,7 @@ func DNSServer(kind, address string, port uint16, tag, detour string) (sb.DNSSer
 	o := sb.DNSServerOptions{Tag: tag}
 	o.Type = kind
 	remote := sb.RemoteDNSServerOptions{Server: address, ServerPort: port}
-	if detour != tags.DirectOutbound {
+	if detour != constant.DirectOutbound {
 		remote.Detour = detour
 	}
 	switch o.Type {

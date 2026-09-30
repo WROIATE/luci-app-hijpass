@@ -1,8 +1,8 @@
 package xray
 
 import (
+	"hijpass/config/generator/constant"
 	"hijpass/config/generator/protocol"
-	"hijpass/config/generator/tags"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 )
@@ -39,7 +39,7 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	for _, p := range []struct {
 		typ, tag string
 		port     uint16
-	}{{inboundTProxy, tags.TProxyInbound, s.ListenPort}, {"direct", tags.DNSInbound, s.DNSPort}} {
+	}{{inboundTProxy, constant.TProxyInbound, s.ListenPort}, {"direct", constant.DNSInbound, s.DNSPort}} {
 		in, e := Inbound(p.typ, p.tag, p.port, true)
 		if e != nil {
 			return nil, e
@@ -64,13 +64,13 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	}
 	direct := xr.OutboundDetourConfig{
 		Protocol: "freedom",
-		Tag:      tags.DirectOutbound,
+		Tag:      constant.DirectOutbound,
 		Settings: settings,
 		StreamSetting: &xr.StreamConfig{
 			SocketSettings: &xr.SocketConfig{DomainStrategy: domainStrategyUseIP},
 		},
 	}
-	if final == tags.DirectOutbound {
+	if final == constant.DirectOutbound {
 		x.OutboundConfigs = append([]xr.OutboundDetourConfig{direct}, x.OutboundConfigs...)
 	} else {
 		x.OutboundConfigs = append(x.OutboundConfigs, direct)
@@ -82,7 +82,7 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) (*xr.Config, error)
 	if e != nil {
 		return nil, e
 	}
-	x.OutboundConfigs = append(x.OutboundConfigs, xr.OutboundDetourConfig{Protocol: "blackhole", Tag: tags.BlockOutbound}, xr.OutboundDetourConfig{Protocol: "dns", Tag: tags.DNSOutbound, Settings: dnsSettings})
+	x.OutboundConfigs = append(x.OutboundConfigs, xr.OutboundDetourConfig{Protocol: "blackhole", Tag: constant.BlockOutbound}, xr.OutboundDetourConfig{Protocol: "dns", Tag: constant.DNSOutbound, Settings: dnsSettings})
 	return x, nil
 }
 

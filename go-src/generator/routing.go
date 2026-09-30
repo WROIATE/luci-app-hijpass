@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"hijpass/config/generator/constant"
 	"hijpass/config/generator/protocol"
 	"hijpass/config/generator/singbox"
-	"hijpass/config/generator/tags"
 	"hijpass/config/generator/xray"
 	"hijpass/config/uci"
 
@@ -106,7 +106,7 @@ func buildRouting(proxies []protocol.Config, prepared *routingConfig) (json.Mars
 				}
 				b.xrRoutes = append(b.xrRoutes, r.XrayRules(name, out, version)...)
 			}
-			if out == tags.BlockOutbound {
+			if out == constant.BlockOutbound {
 				continue
 			}
 			if split {
@@ -149,9 +149,9 @@ func resolveExit(name string, required bool, nodes map[string]protocol.Config) (
 		}
 		return "", fmt.Errorf("proxy exit is required")
 	case "hijpass-direct":
-		return tags.DirectOutbound, nil
+		return constant.DirectOutbound, nil
 	case "hijpass-block":
-		return tags.BlockOutbound, nil
+		return constant.BlockOutbound, nil
 	default:
 		if node := nodes[name]; node != nil {
 			return node.Base().Name, nil
@@ -196,7 +196,7 @@ func decodeSettings(s uci.Section, nodes map[string]protocol.Config, servers dns
 	if err != nil {
 		return settings, err
 	}
-	if settings.Final == tags.BlockOutbound {
+	if settings.Final == constant.BlockOutbound {
 		return settings, fmt.Errorf("default DNS exit cannot be Block")
 	}
 	settings.DefaultDNS, err = servers.lookup(s.String("default_dns_node"))
@@ -208,7 +208,7 @@ func decodeSettings(s uci.Section, nodes map[string]protocol.Config, servers dns
 		return settings, err
 	}
 	if settings.Core == protocol.CoreSingBox && settings.RuleSetExit != "" {
-		if settings.RuleSetExit == tags.BlockOutbound {
+		if settings.RuleSetExit == constant.BlockOutbound {
 			return settings, fmt.Errorf("rule-set download exit cannot be Block")
 		}
 		settings.RuleSetProxy = nodes[s.String("ruleset_out_node")]
@@ -284,10 +284,10 @@ func newBuilder(nodes []protocol.Config, s routingSettings) (*builder, error) {
 		}
 		options := singbox.RoutingOptions{
 			ListenPort: s.ListenPort, DNSPort: s.DNSPort, LogLevel: s.LogLevel, Strategy: s.Strategy, UseCache: s.UseCache,
-			Final: s.Final, DefaultDNS: dns, RuleSetProxy: s.RuleSetProxy, RuleSetDirect: s.RuleSetExit == tags.DirectOutbound,
+			Final: s.Final, DefaultDNS: dns, RuleSetProxy: s.RuleSetProxy, RuleSetDirect: s.RuleSetExit == constant.DirectOutbound,
 		}
 		if s.RuleSetDNS != nil {
-			server, err := singBoxDNS(s.RuleSetDNS, tags.RuleSetDNSResolver, tags.RuleSetOutbound)
+			server, err := singBoxDNS(s.RuleSetDNS, constant.RuleSetDNSResolver, constant.RuleSetOutbound)
 			if err != nil {
 				return nil, err
 			}
@@ -309,7 +309,7 @@ func newBuilder(nodes []protocol.Config, s routingSettings) (*builder, error) {
 }
 func (b *builder) addSet(set sb.RuleSet) {
 	if set.Type == C.RuleSetTypeRemote && b.settings.RuleSetExit != "" {
-		set.RemoteOptions.HTTPClient = &sb.HTTPClientOptions{Detour: tags.RuleSetOutbound}
+		set.RemoteOptions.HTTPClient = &sb.HTTPClientOptions{Detour: constant.RuleSetOutbound}
 	}
 	tag := set.Tag[0]
 	sets := &b.config.(*SingBoxConfig).Route.RuleSet
@@ -392,7 +392,7 @@ type dnsPlan struct {
 }
 
 func (b *dnsPlan) Add(policy dnsPolicy, name, out string, r rule) error {
-	if out == tags.BlockOutbound {
+	if out == constant.BlockOutbound {
 		return fmt.Errorf("rule %q DNS exit cannot be Block", name)
 	}
 	tag := name + "-dns"
@@ -431,7 +431,7 @@ func (b *dnsPlan) Finish() ([]xray.XrayRouteRule, error) {
 	}
 	d.SkipFallback = false
 	config.DNSConfig.Servers = append(config.DNSConfig.Servers, d)
-	routes := []xray.XrayRouteRule{{InboundTag: []string{tags.DNSInbound}, OutboundTag: tags.DNSOutbound}}
+	routes := []xray.XrayRouteRule{{InboundTag: []string{constant.DNSInbound}, OutboundTag: constant.DNSOutbound}}
 	for _, out := range b.exitOrder {
 		routes = append(routes, xray.XrayRouteRule{InboundTag: b.dnsExits[out], OutboundTag: out})
 	}

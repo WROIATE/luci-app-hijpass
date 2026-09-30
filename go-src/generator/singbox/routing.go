@@ -1,8 +1,8 @@
 package singbox
 
 import (
-	"hijpass/config/generator/coreconfig"
 	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/tags"
 
 	C "github.com/sagernet/sing-box/constant"
 	sb "github.com/sagernet/sing-box/option"
@@ -53,19 +53,19 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
 		Inbounds: []sb.Inbound{
 			{
 				Type:    C.TypeTProxy,
-				Tag:     coreconfig.TProxyInbound,
+				Tag:     tags.TProxyInbound,
 				Options: &sb.TProxyInboundOptions{ListenOptions: Listen(s.ListenPort, "::")},
 			},
 			{
 				Type:    C.TypeDirect,
-				Tag:     coreconfig.DNSInbound,
+				Tag:     tags.DNSInbound,
 				Options: &sb.DirectInboundOptions{ListenOptions: Listen(s.DNSPort, "::")},
 			},
 		},
 		Outbounds: []sb.Outbound{
 			{
 				Type:    C.TypeDirect,
-				Tag:     coreconfig.DirectOutbound,
+				Tag:     tags.DirectOutbound,
 				Options: &sb.DirectOutboundOptions{},
 			},
 		},
@@ -77,9 +77,9 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
 	}
 	optionsDNS.Servers = append(optionsDNS.Servers, s.DefaultDNS)
 	if s.RuleSetProxy != nil || s.RuleSetDirect {
-		out := sb.Outbound{Type: C.TypeDirect, Tag: coreconfig.RuleSetOutbound, Options: &sb.DirectOutboundOptions{}}
+		out := sb.Outbound{Type: C.TypeDirect, Tag: tags.RuleSetOutbound, Options: &sb.DirectOutboundOptions{}}
 		if s.RuleSetProxy != nil {
-			out = Socks(coreconfig.RuleSetOutbound, s.RuleSetProxy.Base().SocksPort)
+			out = Socks(tags.RuleSetOutbound, s.RuleSetProxy.Base().SocksPort)
 		}
 		if s.RuleSetDNS != nil {
 			dialer := out.Options.(sb.DialerOptionsWrapper)
@@ -97,7 +97,7 @@ func BuildRouting(s RoutingOptions, nodes []protocol.Config) *sb.Options {
 func AddRule(options *sb.Options, match sb.RawDefaultRule, out string, version int) {
 	match.IPVersion = version
 	action := sb.RuleAction{Action: C.RuleActionTypeRoute, RouteOptions: sb.RouteActionOptions{Outbound: out}}
-	if out == coreconfig.BlockOutbound {
+	if out == tags.BlockOutbound {
 		action = sb.RuleAction{Action: C.RuleActionTypeReject}
 	}
 	options.Route.Rules = append(options.Route.Rules, sb.Rule{Type: C.RuleTypeDefault, DefaultOptions: sb.DefaultRule{RawDefaultRule: match, RuleAction: action}})

@@ -1,5 +1,5 @@
-// Package coreconfig defines values shared when generating Xray and sing-box configurations.
-package coreconfig
+// Package tags defines output tag names and prefixes shared by the config generators.
+package tags
 
 const (
 	TProxyInbound           = "tproxy-in"
@@ -13,6 +13,5 @@ const (
 	RuleSetOutbound         = "ruleset-out"
 	RuleSetDNSResolver      = "ruleset-dns-resolver"
 	LocalDNS                = "local"
-	LoopbackAddress         = "127.0.0.1"
 	UpstreamPrefix          = "upstream-"
 )

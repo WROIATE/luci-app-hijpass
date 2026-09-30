@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"hijpass/config/generator/coreconfig"
 	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/tags"
 
 	xr "github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/infra/conf/cfgcommon/duration"
@@ -20,10 +20,10 @@ type xrayLeastLoad struct {
 
 func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 
-	fb := coreconfig.LoadBalanceMemberPrefix + "0"
+	fb := tags.LoadBalanceMemberPrefix + "0"
 	for i, member := range n.Members {
 		port := member.Base().SocksPort
-		tag := fmt.Sprintf("%s%d", coreconfig.LoadBalanceMemberPrefix, i)
+		tag := fmt.Sprintf("%s%d", tags.LoadBalanceMemberPrefix, i)
 		if member.Base().Name == n.Fallback {
 			fb = tag
 		}
@@ -46,8 +46,8 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 		strategy.Settings = s
 	}
 	rr, e := json.Marshal(XrayRouteRule{
-		InboundTag:  []string{coreconfig.TProxyInbound, coreconfig.SocksInbound},
-		BalancerTag: coreconfig.LoadBalance,
+		InboundTag:  []string{tags.TProxyInbound, tags.SocksInbound},
+		BalancerTag: tags.LoadBalance,
 	})
 	if e != nil {
 		return e
@@ -57,15 +57,15 @@ func buildLoadBalance(x *xr.Config, n *protocol.LoadBalance) error {
 		RuleList:       []json.RawMessage{rr},
 		Balancers: []*xr.BalancingRule{
 			{
-				Tag:         coreconfig.LoadBalance,
-				Selectors:   xr.StringList{coreconfig.LoadBalanceMemberPrefix},
+				Tag:         tags.LoadBalance,
+				Selectors:   xr.StringList{tags.LoadBalanceMemberPrefix},
 				FallbackTag: fb,
 				Strategy:    strategy,
 			},
 		},
 	}
 	x.BurstObservatory = &xr.BurstObservatoryConfig{
-		SubjectSelector: []string{coreconfig.LoadBalanceMemberPrefix},
+		SubjectSelector: []string{tags.LoadBalanceMemberPrefix},
 		HealthCheck: &xr.HealthCheckSettings{
 			Destination:   n.ProbeURL,
 			Connectivity:  n.ProbeConnectivity,

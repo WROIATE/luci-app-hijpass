@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"hijpass/config/generator/coreconfig"
 	"hijpass/config/generator/protocol"
+	"hijpass/config/generator/tags"
 
 	xn "github.com/xtls/xray-core/common/net"
 	xr "github.com/xtls/xray-core/infra/conf"
 )
+
+const loopbackAddress = "127.0.0.1"
 
 func Address(host string) *xr.Address { return &xr.Address{Address: xn.ParseAddress(host)} }
 
@@ -21,7 +23,7 @@ func Log(level string) *xr.LogConfig {
 }
 
 func Socks(tag string, port uint16) (xr.OutboundDetourConfig, error) {
-	s, e := RawSettings(xr.SocksClientConfig{Address: Address(coreconfig.LoopbackAddress), Port: port})
+	s, e := RawSettings(xr.SocksClientConfig{Address: Address(loopbackAddress), Port: port})
 	return xr.OutboundDetourConfig{Protocol: "socks", Tag: tag, Settings: s}, e
 }
 
@@ -48,7 +50,7 @@ func buildRemote(config *xr.Config, node protocol.RemoteConfig) error {
 	}
 	if upstream := node.Endpoint().Upstream; upstream != nil {
 		port := upstream.Base().SocksPort
-		tag := coreconfig.UpstreamPrefix + upstream.Base().Name
+		tag := tags.UpstreamPrefix + upstream.Base().Name
 		if out.StreamSetting == nil {
 			out.StreamSetting = &xr.StreamConfig{}
 		}

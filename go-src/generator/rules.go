@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"hijpass/config/generator/coreconfig"
+	"hijpass/config/generator/tags"
 	"hijpass/config/generator/xray"
 	"hijpass/config/uci"
 
@@ -126,7 +126,7 @@ func (r *rule) ConvertGeo() {
 }
 
 func (r *rule) XrayRules(name, out string, version int) []xray.XrayRouteRule {
-	base := xray.XrayRouteRule{RuleTag: name, InboundTag: []string{coreconfig.TProxyInbound}, OutboundTag: out, Network: r.Network, Protocol: r.Protocol}
+	base := xray.XrayRouteRule{RuleTag: name, InboundTag: []string{tags.TProxyInbound}, OutboundTag: out, Network: r.Network, Protocol: r.Protocol}
 	var ports []string
 	for _, p := range r.Ports {
 		ports = append(ports, strconv.FormatUint(uint64(p), 10))

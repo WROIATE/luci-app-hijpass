@@ -1,6 +1,16 @@
 package constant
 
 const (
+	TypeCustom      = "custom"
+	TypeHysteria2   = "hysteria2"
+	TypeLoadBalance = "load_balance"
+	TypeShadowsocks = "shadowsocks"
+	TypeShadowTLS   = "shadowtls"
+	TypeTUIC        = "tuic"
+	TypeVLESS       = "vless"
+)
+
+const (
 	OptionCore                    = "core"
 	OptionListenPort              = "listen_port"
 	OptionSocksPort               = "socks_port"

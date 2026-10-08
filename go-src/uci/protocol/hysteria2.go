@@ -34,7 +34,7 @@ func (n *Hysteria2) Validate() error {
 	return nil
 }
 
-func init() { register("hysteria2", func() Config { return &Hysteria2{} }) }
+func init() { register(constant.TypeHysteria2, func() Config { return &Hysteria2{} }) }
 
 // DecodeUCI reads only options supported by Hysteria2.
 func (n *Hysteria2) DecodeUCI(d *uci.Decoder) error {

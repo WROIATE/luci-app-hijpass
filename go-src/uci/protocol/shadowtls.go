@@ -18,7 +18,7 @@ func (n *ShadowTLS) Validate() error { return validateInt32(n.ShadowTLSVersion) 
 
 func newShadowTLS() *ShadowTLS { return &ShadowTLS{ShadowTLSVersion: 1} }
 
-func init() { register("shadowtls", func() Config { return newShadowTLS() }) }
+func init() { register(constant.TypeShadowTLS, func() Config { return newShadowTLS() }) }
 
 // DecodeUCI reads only options supported by ShadowTLS.
 func (n *ShadowTLS) DecodeUCI(d *uci.Decoder) error {

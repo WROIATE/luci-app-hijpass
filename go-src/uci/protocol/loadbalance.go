@@ -44,7 +44,7 @@ func newLoadBalance() *LoadBalance {
 	}
 }
 
-func init() { register("load_balance", func() Config { return newLoadBalance() }) }
+func init() { register(constant.TypeLoadBalance, func() Config { return newLoadBalance() }) }
 
 // DecodeUCI reads only options supported by LoadBalance.
 func (n *LoadBalance) DecodeUCI(d *uci.Decoder) error {

@@ -33,7 +33,7 @@ func buildProxy(n protocol.Config) (json.Marshaler, error) {
 
 func coreName(s uci.Section) string {
 	v := s.Value(constant.OptionCore, protocol.CoreSingBox)
-	if _, ok := s[constant.OptionCore]; !ok && s.String(constant.OptionType) == protocol.TypeVLESS {
+	if _, ok := s[constant.OptionCore]; !ok && s.String(constant.OptionType) == constant.TypeVLESS {
 		v = protocol.CoreXray
 	}
 	if v == protocol.CoreSingBoxLegacy {

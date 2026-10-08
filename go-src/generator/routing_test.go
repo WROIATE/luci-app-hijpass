@@ -188,11 +188,11 @@ func TestShuntResolvedOutput(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				want, err := json.Marshal(full.Shunt)
+				want, err := full.Shunt.Serialize()
 				if err != nil {
 					t.Fatal(err)
 				}
-				got, err := json.Marshal(preview)
+				got, err := preview.Serialize()
 				if err != nil {
 					t.Fatal(err)
 				}

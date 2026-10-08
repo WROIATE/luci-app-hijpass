@@ -1,7 +1,6 @@
 package generator
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -10,8 +9,8 @@ import (
 )
 
 type Generated struct {
-	Nodes map[string]json.Marshaler `json:"nodes"`
-	Shunt json.Marshaler            `json:"shunt,omitempty"`
+	Nodes map[string]CoreConfig
+	Shunt CoreConfig
 }
 
 // preparedConfig holds a decoded, linked and prechecked generation scope.
@@ -72,7 +71,7 @@ func prepare(c Snapshot, target string) (*preparedConfig, error) {
 // buildPrepared runs each selected node through its own core builder, including
 // dependencies of a preview. This keeps core compatibility checks in one place.
 func buildPrepared(c *preparedConfig) (Generated, error) {
-	out := Generated{Nodes: map[string]json.Marshaler{}}
+	out := Generated{Nodes: map[string]CoreConfig{}}
 	for _, node := range c.nodes {
 		if _, custom := node.(*protocol.Custom); custom {
 			continue
@@ -103,7 +102,7 @@ func Render(c Snapshot) (Generated, error) {
 
 // RenderTarget checks the target and its reachable dependencies. A shunt preview
 // includes every enabled proxy because all are emitted as local SOCKS outbounds.
-func RenderTarget(c Snapshot, target string) (json.Marshaler, error) {
+func RenderTarget(c Snapshot, target string) (CoreConfig, error) {
 	if target == "" {
 		return nil, errors.New("node not found")
 	}

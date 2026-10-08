@@ -9,13 +9,20 @@ import (
 	xr "github.com/xtls/xray-core/infra/conf"
 )
 
-// Each output keeps its native schema and supplies the appropriate serializer.
+// CoreConfig is a generated core configuration with its native JSON serializer.
+type CoreConfig interface {
+	Serialize() ([]byte, error)
+}
+
+// XrayConfig retains the native Xray schema.
 type XrayConfig xr.Config
+
+// SingBoxConfig retains the native sing-box schema.
 type SingBoxConfig sb.Options
 
-func (c *XrayConfig) MarshalJSON() ([]byte, error) {
+func (c *XrayConfig) Serialize() ([]byte, error) {
 	return json.Marshal((*xr.Config)(c))
 }
-func (c *SingBoxConfig) MarshalJSON() ([]byte, error) {
+func (c *SingBoxConfig) Serialize() ([]byte, error) {
 	return sj.MarshalContext(context.Background(), (*sb.Options)(c))
 }

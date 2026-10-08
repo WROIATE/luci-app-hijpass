@@ -1,20 +1,13 @@
 package generator
 
-import (
-	"encoding/json"
-	"testing"
-)
+import "testing"
 
-func TestOutputNullAndOmission(t *testing.T) {
-	for _, output := range []json.Marshaler{(*XrayConfig)(nil), (*SingBoxConfig)(nil)} {
-		data, err := output.MarshalJSON()
+func TestOutputNullSerialization(t *testing.T) {
+	for _, output := range []CoreConfig{(*XrayConfig)(nil), (*SingBoxConfig)(nil)} {
+		data, err := output.Serialize()
 		if err != nil || string(data) != "null" {
 			t.Fatalf("%T: got %s, %v", output, data, err)
 		}
-	}
-	data, err := json.Marshal(Generated{Nodes: map[string]json.Marshaler{}})
-	if err != nil || string(data) != `{"nodes":{}}` {
-		t.Fatalf("absent shunt must be omitted: %s, %v", data, err)
 	}
 }
 

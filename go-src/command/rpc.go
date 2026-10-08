@@ -30,22 +30,18 @@ func rpc(method string, in io.Reader) any {
 		}
 		return rpcResponse{OK: true}
 	}
-	if req.Target != "" {
-		o, err := generator.RenderTarget(c, req.Target)
-		if err != nil {
-			return fail(err)
-		}
-		return rpcResponse{Config: o}
-	}
-	out, err := generator.Render(c)
+	out, err := renderConfig(c, req.Target)
 	if err != nil {
 		return fail(err)
+	}
+	if req.Target != "" {
+		return rpcResponse{Config: out}
 	}
 	return out
 }
 
 type rpcResponse struct {
-	Error  string         `json:"error,omitempty"`
-	OK     bool           `json:"ok,omitempty"`
-	Config json.Marshaler `json:"config,omitempty"`
+	Error  string          `json:"error,omitempty"`
+	OK     bool            `json:"ok,omitempty"`
+	Config json.RawMessage `json:"config,omitempty"`
 }

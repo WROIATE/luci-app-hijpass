@@ -48,7 +48,7 @@ func prepareRouting(c Snapshot, proxies []protocol.Config) (*routingConfig, erro
 	return &routingConfig{settings: settings, entries: entries}, nil
 }
 
-func buildRouting(proxies []protocol.Config, prepared *routingConfig) (json.Marshaler, error) {
+func buildRouting(proxies []protocol.Config, prepared *routingConfig) (CoreConfig, error) {
 	settings, entries := prepared.settings, prepared.entries
 	co := settings.Core
 	b, err := newBuilder(proxies, settings)
@@ -274,7 +274,7 @@ func decodeRoute(s uci.Section, nodes map[string]protocol.Config, servers dnsCat
 }
 
 type builder struct {
-	config   json.Marshaler
+	config   CoreConfig
 	settings routingSettings
 	dns      *dnsPlan
 	xrRoutes []xray.XrayRouteRule
@@ -330,7 +330,7 @@ func (b *builder) addSingBoxRule(r rule, out string, version int) {
 	singbox.AddRule((*sb.Options)(b.config.(*SingBoxConfig)), r.SingBox(), out, version)
 }
 
-func (b *builder) finish() (json.Marshaler, error) {
+func (b *builder) finish() (CoreConfig, error) {
 	routes, err := b.dns.Finish()
 	if err != nil {
 		return nil, err
@@ -396,7 +396,7 @@ type dnsPolicy struct {
 }
 
 type dnsPlan struct {
-	config    json.Marshaler
+	config    CoreConfig
 	resolver  *dnsServer
 	dnsExits  map[string][]string
 	exitOrder []string

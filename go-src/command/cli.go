@@ -5,8 +5,6 @@ import (
 	"errors"
 	"flag"
 	"io"
-
-	"hijpass/config/generator"
 )
 
 // Run dispatches the CLI and rpcd entry points.
@@ -46,12 +44,7 @@ func Run(args []string, in io.Reader, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		var result any
-		if *target != "" {
-			result, err = generator.RenderTarget(c, *target)
-		} else {
-			result, err = generator.Render(c)
-		}
+		result, err := renderConfig(c, *target)
 		if err != nil {
 			return err
 		}

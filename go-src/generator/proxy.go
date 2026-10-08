@@ -12,7 +12,7 @@ import (
 )
 
 // buildProxy converts one prepared protocol object to its native core config.
-func buildProxy(n protocol.Config) (json.Marshaler, error) {
+func buildProxy(n protocol.Config) (CoreConfig, error) {
 	switch n.Base().Core {
 	case protocol.CoreSingBox:
 		options, err := singbox.Build(n)

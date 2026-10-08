@@ -83,7 +83,7 @@ func TestXrayNativeBuild(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			configs := []json.Marshaler{}
+			configs := []CoreConfig{}
 			for _, o := range g.Nodes {
 				configs = append(configs, o)
 			}
@@ -91,7 +91,7 @@ func TestXrayNativeBuild(t *testing.T) {
 				configs = append(configs, g.Shunt)
 			}
 			for _, o := range configs {
-				data, e := json.Marshal(o)
+				data, e := o.Serialize()
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -118,7 +118,7 @@ func TestPinnedSchemaMigrations(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			data, e := json.Marshal(g.Shunt)
+			data, e := g.Shunt.Serialize()
 			if e != nil {
 				t.Fatal(e)
 			}

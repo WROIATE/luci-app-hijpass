@@ -8,8 +8,8 @@ export const fields = {
 	...RealityOptions,
 	...MultiplexOptions,
 	...TransportOptions,
-	uuid: ["text", ""], // 字符串，UUID
-	network: ["text", "tcp"], // 字符串，Network
-	flow: ["text", ""], // 字符串，Flow
-	packet_encoding: ["text", ""], // 字符串，PacketEncoding
+	uuid: ["text", ""], // 远端用户 UUID
+	network: ["text", "tcp"], // 允许的网络（tcp/udp 或组合）；空值使用核心默认值
+	flow: ["text", ""], // VLESS flow，例如 xtls-rprx-vision
+	packet_encoding: ["text", ""], // sing-box UDP 包封装（xudp/packetaddr）
 };

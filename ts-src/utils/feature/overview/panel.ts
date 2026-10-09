@@ -56,7 +56,7 @@ function restartService(statusElement: HTMLElement) {
 function reloadFirewall(statusElement: HTMLElement) {
     updateActionStatus(statusElement, _('Refreshing Firewall'), 'neutral');
 
-    fs.exec('/usr/lib/hijpass/nft.sh', ['reset']).then(function (result) {
+    fs.exec('/usr/lib/hijpass/nft.uc', ['reset']).then(function (result) {
         if (result.code === 0) {
             updateActionStatus(statusElement, _('Firewall Refreshed'), 'success');
         } else {
@@ -119,7 +119,7 @@ function testConnectivity(url: string, buttonElement: HTMLElement, resultElement
     buttonElement.dataset.loading = '1';
     buttonElement.style.opacity = '0.7';
 
-    fs.exec_direct("/usr/lib/hijpass/connect.sh", [url, '5'], 'json')
+    fs.exec_direct("/usr/lib/hijpass/connect.uc", [url, '5'], 'json')
         .then(r => {
             updateTestResult(buttonElement, resultElement, r.success, r);
         })

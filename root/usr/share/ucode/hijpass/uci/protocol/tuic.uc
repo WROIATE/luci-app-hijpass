@@ -5,12 +5,12 @@ export const fields = {
 	...BaseOptions,
 	...ServerOptions,
 	...TLSOptions,
-	password: ["text", ""], // 字符串，Password
-	uuid: ["text", ""], // 字符串，UUID
-	network: ["text", ""], // 字符串，Network
-	congestion_control: ["text", "cubic"], // 字符串，CongestionControl
-	udp_relay_mode: ["text", ""], // 字符串，UDPRelayMode
-	udp_over_stream: ["bool", false], // UCI 0/1 开关，UDPOverStream
-	zero_rtt_handshake: ["bool", false], // UCI 0/1 开关，ZeroRTT
-	heartbeat: ["duration", 10], // 时长字符串，解码后单位为秒，Heartbeat
+	password: ["text", ""], // 远端认证密码
+	uuid: ["text", ""], // 远端用户 UUID
+	network: ["text", ""], // 允许的网络（tcp/udp 或组合）；空值使用核心默认值
+	congestion_control: ["text", "cubic"], // TUIC 拥塞控制（cubic/new_reno/bbr），默认 cubic
+	udp_relay_mode: ["text", ""], // TUIC UDP 转发模式（native/quic）
+	udp_over_stream: ["bool", false], // 0/1；使用 QUIC stream 转发 UDP
+	zero_rtt_handshake: ["bool", false], // 0/1；启用 TUIC 0-RTT 握手
+	heartbeat: ["duration", 10], // TUIC 心跳间隔，解码后为秒；默认 10 秒
 };

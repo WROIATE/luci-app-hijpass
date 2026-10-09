@@ -1,60 +1,60 @@
 // 共享字段只由支持该能力的协议组合；每个对象均是明确的字段声明。
 export const BaseOptions = {
-	".name": ["text", ""], // 字符串，ID
-	name: ["text", ""], // 字符串，Name
-	type: ["text", ""], // 字符串，Type
-	core: ["text", ""], // 字符串，Core
-	listen_port: ["port", 0], // 端口 1–65535，ListenPort
-	socks_port: ["port", 0], // 端口 1–65535，SocksPort
-	log_level: ["text", "info"], // 字符串，LogLevel
+	".name": ["text", ""], // UCI section ID；用于文件名和依赖索引，不是显示名称
+	name: ["text", ""], // 节点名称；其它节点通过此名称引用它
+	type: ["text", ""], // 协议名，决定选用哪份字段声明和生成器
+	core: ["text", ""], // 核心名：sing-box/xray/custom；空值使用该协议默认核心
+	listen_port: ["port", 0], // 本机透明代理监听端口，1–65535
+	socks_port: ["port", 0], // 本机 SOCKS 监听端口，供代理链/分流访问，1–65535
+	log_level: ["text", "info"], // 核心日志级别；默认 info
 };
 
 export const ServerOptions = {
-	server: ["text", ""], // 字符串，Server
-	server_port: ["port", 0], // 端口 1–65535，ServerPort
+	server: ["text", ""], // 远端域名或 IP；链式代理启动前会解析域名
+	server_port: ["port", 0], // 远端服务监听端口，1–65535
 };
 
 export const TLSOptions = {
-	tls_server_name: ["text", ""], // 字符串，TLSServerName
-	tls_insecure: ["bool", false], // UCI 0/1 开关，TLSInsecure
+	tls_server_name: ["text", ""], // TLS SNI 与证书校验名称；解析 server 不会改写此字段
+	tls_insecure: ["bool", false], // 0/1；允许跳过 TLS 证书校验
 };
 
 export const RealityOptions = {
-	tls_reality_enabled: ["bool", false], // UCI 0/1 开关，RealityEnabled
-	tls_reality_public_key: ["text", ""], // 字符串，RealityPublicKey
-	tls_reality_short_id: ["text", ""], // 字符串，RealityShortID
+	tls_reality_enabled: ["bool", false], // 0/1；启用 Reality 握手
+	tls_reality_public_key: ["text", ""], // Reality 服务端公钥
+	tls_reality_short_id: ["text", ""], // Reality short ID，十六进制字符串
 };
 
 export const MultiplexOptions = {
-	multiplex_enabled: ["bool", false], // UCI 0/1 开关，MultiplexEnabled
-	multiplex_protocol: ["text", "h2mux"], // 字符串，MultiplexProtocol
-	multiplex_max_connections: ["integer", 0, 2147483647], // 非负整数，MaxConnections
-	multiplex_min_streams: ["integer", 0, 2147483647], // 非负整数，MinStreams
-	multiplex_max_streams: ["integer", 0, 2147483647], // 非负整数，MaxStreams
-	multiplex_brutal_enabled: ["bool", false], // UCI 0/1 开关，BrutalEnabled
-	multiplex_brutal_up_mbps: ["integer", 0, 2147483647], // 非负整数，单位 Mbps，BrutalUp
-	multiplex_brutal_down_mbps: ["integer", 0, 2147483647], // 非负整数，单位 Mbps，BrutalDown
+	multiplex_enabled: ["bool", false], // 0/1；启用连接复用
+	multiplex_protocol: ["text", "h2mux"], // sing-box 复用协议（h2mux/smux/yamux）
+	multiplex_max_connections: ["integer", 0, 2147483647], // sing-box 最大底层连接数；0 使用核心默认值
+	multiplex_min_streams: ["integer", 0, 2147483647], // sing-box 每连接最小流数；0 使用核心默认值
+	multiplex_max_streams: ["integer", 0, 2147483647], // sing-box 每连接最大流数；Xray 用作 mux concurrency
+	multiplex_brutal_enabled: ["bool", false], // 0/1；启用 sing-box Brutal 复用拥塞控制
+	multiplex_brutal_up_mbps: ["integer", 0, 2147483647], // Brutal 上行带宽，单位 Mbps
+	multiplex_brutal_down_mbps: ["integer", 0, 2147483647], // Brutal 下行带宽，单位 Mbps
 };
 
 export const TransportOptions = {
-	transport_type: ["text", ""], // 字符串，Transport
-	transport_http_host: ["text", ""], // 字符串，HTTPHost
-	transport_http_path: ["text", ""], // 字符串，HTTPPath
-	transport_http_method: ["text", ""], // 字符串，HTTPMethod
-	transport_http_idle_timeout: ["duration", 15], // 时长字符串，解码后单位为秒，HTTPIdle
-	transport_http_ping_timeout: ["duration", 15], // 时长字符串，解码后单位为秒，HTTPPing
-	transport_ws_host: ["text", ""], // 字符串，WSHost
-	transport_ws_path: ["text", ""], // 字符串，WSPath
-	transport_ws_max_early_data: ["integer", 0, 4294967295], // 非负整数，WSEarlyData
-	transport_ws_early_data_header_name: ["text", ""], // 字符串，WSEarlyHeader
-	transport_grpc_service_name: ["text", ""], // 字符串，GRPCService
-	transport_grpc_idle_timeout: ["duration", 15], // 时长字符串，解码后单位为秒，GRPCIdle
-	transport_grpc_ping_timeout: ["duration", 15], // 时长字符串，解码后单位为秒，GRPCPing
-	transport_grpc_permit_without_stream: ["bool", false], // UCI 0/1 开关，GRPCPermit
-	transport_httpupgrade_host: ["text", ""], // 字符串，UpgradeHost
-	transport_httpupgrade_path: ["text", ""], // 字符串，UpgradePath
-	transport_xhttp_host: ["text", ""], // 字符串，XHTTPHost
-	transport_xhttp_path: ["text", ""], // 字符串，XHTTPPath
-	transport_xhttp_mode: ["text", ""], // 字符串，XHTTPMode
+	transport_type: ["text", ""], // 传输封装类型；空值为协议默认传输
+	transport_http_host: ["text", ""], // HTTP 传输的 Host 头
+	transport_http_path: ["text", ""], // HTTP 传输请求路径
+	transport_http_method: ["text", ""], // HTTP 传输请求方法
+	transport_http_idle_timeout: ["duration", 15], // HTTP 空闲时长；UCI 写时长字符串，解码后为秒
+	transport_http_ping_timeout: ["duration", 15], // HTTP ping 等待时长，解码后为秒
+	transport_ws_host: ["text", ""], // WebSocket Host 头
+	transport_ws_path: ["text", ""], // WebSocket 请求路径
+	transport_ws_max_early_data: ["integer", 0, 4294967295], // WebSocket early data 最大字节数
+	transport_ws_early_data_header_name: ["text", ""], // 承载 WebSocket early data 的 HTTP 头名
+	transport_grpc_service_name: ["text", ""], // gRPC service 名称
+	transport_grpc_idle_timeout: ["duration", 15], // gRPC 空闲时长，解码后为秒
+	transport_grpc_ping_timeout: ["duration", 15], // gRPC ping 等待时长，解码后为秒
+	transport_grpc_permit_without_stream: ["bool", false], // 0/1；没有活跃流时仍发送 gRPC ping
+	transport_httpupgrade_host: ["text", ""], // HTTPUpgrade Host 头
+	transport_httpupgrade_path: ["text", ""], // HTTPUpgrade 请求路径
+	transport_xhttp_host: ["text", ""], // Xray XHTTP Host 头
+	transport_xhttp_path: ["text", ""], // Xray XHTTP 请求路径
+	transport_xhttp_mode: ["text", ""], // Xray XHTTP 模式（auto/packet-up/stream-up/stream-one）
 };
 

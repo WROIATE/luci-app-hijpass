@@ -173,7 +173,7 @@ const FirewallFormUtils = {
                 textarea.style.cursor = 'progress';
                 textarea.value = _('Loading');
 
-                fs.exec_direct('/usr/lib/hijpass/nft.sh', ['show'], 'text')
+                fs.exec_direct('/usr/lib/hijpass/nft.uc', ['show'], 'text')
                     .then((res: any) => {
                         textarea.value = res?.trim() || _('No Rules');
                         textarea.setAttribute('aria-label', _('Firewall Rules'));

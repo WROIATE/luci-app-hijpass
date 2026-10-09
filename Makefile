@@ -14,10 +14,11 @@ PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_tuic_client
 
-LUCI_DEPENDS:= +hijpass-config +ca-bundle +curl +file +firewall4 +ip-full +luci-lua-runtime \
+LUCI_DEPENDS:= +ca-bundle +curl +firewall4 +ip-full +rpcd +ubus \
 	+sing-box +unzip +xray-core \
 	+kmod-nft-socket +kmod-nft-tproxy +kmod-nft-nat \
-	+v2ray-geosite +v2ray-geoip +geoview +chinadns-ng +jq
+	+v2ray-geosite +v2ray-geoip +geoview +chinadns-ng \
+	+ucode +ucode-mod-fs +ucode-mod-uci +ucode-mod-resolv
 
 define Package/$(PKG_NAME)/config
 menu "Configuration"
@@ -94,40 +95,7 @@ EOF
 exit 0
 endef
 
-# Build one architecture-specific backend alongside the architecture-neutral UI.
-PKG_BUILD_DEPENDS+=golang/host
-PKG_BUILD_FLAGS+=no-mips16
-GO_PKG:=hijpass/config
-GO_PKG_BUILD_PKG:=hijpass/config
-GO_PKG_TAGS:=netgo osusergo
-include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
-
-define Package/hijpass-config
-  SECTION:=net
-  CATEGORY:=Network
-  TITLE:=Hijpass configuration generator
-  DEPENDS:=$(GO_ARCH_DEPENDS) +rpcd +ubus
-endef
-
-define Build/Prepare/$(notdir $(CURDIR))
-	$(CP) ./go-src/*.go ./go-src/go.mod ./go-src/go.sum $(PKG_BUILD_DIR)/
-	$(CP) ./go-src/command ./go-src/generator ./go-src/uci $(PKG_BUILD_DIR)/
-endef
-
-define HijpassConfig/Compile
-	$(call GoPackage/Build/Configure)
-	$(call GoPackage/Build/Compile)
-endef
-Hooks/Compile/Post:=$(filter-out Go/CacheCleanup,$(Hooks/Compile/Post)) HijpassConfig/Compile Go/CacheCleanup
-Build/InstallDev:=
-
-define Package/hijpass-config/install
-	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/libexec/rpcd
-	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/config $(1)/usr/bin/hijpass-config
-	$(LN) /usr/bin/hijpass-config $(1)/usr/libexec/rpcd/hijpass-config
-endef
-
+# ucode 源文件由 LuCI 的 root 安装流程直接复制，整个包保持架构无关。
 include $(TOPDIR)/feeds/luci/luci.mk
-$(eval $(call BuildPackage,hijpass-config))
 
 # call BuildPackage - OpenWrt buildroot signature

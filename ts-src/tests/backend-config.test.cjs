@@ -9,21 +9,16 @@ const ts = require('typescript');
 const root = path.resolve(__dirname, '../..');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hijpass-backend-test-'));
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
-const binary = path.join(dir, 'hijpass-config');
-const build = spawnSync('go', ['build', '-o', binary, '.'], {
-    cwd: path.join(root, 'go-src'), encoding: 'utf8',
-    env: { ...process.env, GOCACHE: process.env.GOCACHE || path.join(os.tmpdir(), 'hijpass-go-cache') }
-});
-assert.equal(build.status, 0, build.stderr);
-const fixtures = JSON.parse(fs.readFileSync(path.join(root, 'go-src/generator/testdata/compatibility.json')));
+const { config } = require('../../ucode-src/tests/helpers.cjs');
+const fixtures = require('../../ucode-src/tests/testdata/compatibility.json');
 function rpc(method, request) {
-    const result = spawnSync(binary, ['call', method], { input: JSON.stringify(request), encoding: 'utf8' });
+    const result = config(['call', method], request);
     assert.equal(result.status, 0, result.stderr);
     return JSON.parse(result.stdout);
 }
 
 test('rpcd advertises only read-only snapshot operations', () => {
-    const result = spawnSync(binary, ['list'], { encoding: 'utf8' });
+    const result = config(['list']);
     assert.deepEqual(JSON.parse(result.stdout), { render: { sections: '', target: '' }, validate: { sections: '' } });
     assert.match(rpc('generate', {}).error, /unknown method/);
 });
@@ -31,10 +26,6 @@ test('RPC renders the submitted snapshot and validates references', () => {
     const fixture = fixtures.find(f => f.name === 'sing-box-chain');
     const sections = JSON.stringify(fixture.sections);
     const expected = structuredClone(fixture.expected.nodes.downstream);
-    // Native serializers omit false/zero defaults and add the required resolver.
-    expected.route = { default_domain_resolver: 'local' };
-    delete expected.log.disabled;
-    if (expected.outbounds[0].tls) delete expected.outbounds[0].tls.insecure;
     assert.deepEqual(rpc('render', { sections, target: 'downstream' }).config, expected);
     assert.deepEqual(rpc('validate', { sections }), { ok: true });
     const broken = structuredClone(fixture.sections);
@@ -77,12 +68,10 @@ function loadTS(relative, modules) {
 
 test('CLI renders supplied input without runtime commands and rejects generate', () => {
     const fixture = fixtures.find(f => f.name === 'sing-box-chain');
-    const rendered = spawnSync(binary, ['render', '--stdin'], {
-        input: JSON.stringify(fixture.sections), encoding: 'utf8', env: { ...process.env, PATH: '' }
-    });
+    const rendered = config(['render', '--stdin'], fixture.sections, { env: { ...process.env, PATH: '' } });
     assert.equal(rendered.status, 0, rendered.stderr);
     assert.ok(JSON.parse(rendered.stdout).nodes.downstream);
-    const rejected = spawnSync(binary, ['generate'], { encoding: 'utf8' });
+    const rejected = config(['generate']);
     assert.notEqual(rejected.status, 0);
     assert.match(rejected.stderr, /unknown command/);
 });
@@ -100,7 +89,7 @@ function fileUtils(sections, resolve) {
     return { utils, writes, hashes };
 }
 
-test('LuCI writes Go output, preserves custom files and TLS when resolving chains', async () => {
+test('LuCI writes ucode output, preserves custom files and TLS when resolving chains', async () => {
     for (const core of ['sing-box', 'xray']) {
         const sections = [
             { '.name': 'downstream', server: 'proxy.example.org', upstream_proxy_node: 'upstream' },
@@ -116,7 +105,7 @@ test('LuCI writes Go output, preserves custom files and TLS when resolving chain
             : { settings: { address: 'proxy.example.org' }, streamSettings: { tlsSettings: { serverName: 'tls.example.org' } } };
         const config = { outbounds: [outbound] };
         await utils.writeGeneratedConfigs({ nodes: { downstream: config }, shunt: { route: { final: 'direct' } } });
-        assert.equal(calls[0][0], '/usr/lib/hijpass/net.sh');
+        assert.equal(calls[0][0], '/usr/lib/hijpass/net.uc');
         assert.deepEqual(Array.from(calls[0][1]), ['resolve', 'proxy.example.org']);
         assert.deepEqual(writes.map(w => w[0]), ['/client/downstream.json', '/shunt.json']);
         const written = writes[0][1].outbounds[0];
@@ -163,32 +152,17 @@ test('Save & Apply consumes backend output before applying UCI and stops on gene
     }
 });
 
-test('Shell retains Geo conversion and service launch without calling Go generation', () => {
+test('init delegates preparation and activation to ucode before handing argv to procd', () => {
     const source = fs.readFileSync(path.join(root, 'root/etc/init.d/hijpass'), 'utf8');
-    assert.doesNotMatch(source, /hijpass-config|HIJPASS_CONFIG_READY/);
-    const script = path.join(dir, 'init-shell');
-    fs.writeFileSync(script, source.replace('. /usr/lib/hijpass/app-logger.sh', 'log_info() { :; }'));
-    const geo = path.join(dir, 'geo');
-    fs.writeFileSync(geo, '#!/bin/sh\necho geo\n', { mode: 0o700 });
-    const result = spawnSync('/bin/sh', ['-c', `
-uci() { :; }
-. "$1"
-GEOVIEW_SCRIPT="$2"
-config_get() {
- case "$3" in
- enabled|ruleset_convert) eval "$1=1" ;;
- type) eval "$1=sing-box" ;;
- log_path) eval "$1=" ;;
- esac
-}
-open_instance() { echo launch; }
-run_shunt shunt
-`, 'test', script, geo], { encoding: 'utf8' });
-    assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(result.stdout.trim().split('\n'), ['geo', 'launch']);
+    const bridge = fs.readFileSync(path.join(root, 'root/usr/lib/hijpass/procd.sh'), 'utf8');
+    assert.match(source, /service[.]uc/);
+    assert.ok(source.indexOf('$RUNTIME prepare') < source.indexOf('hijpass_start_instances "$plan"'));
+    assert.ok(source.indexOf('hijpass_start_instances "$plan"') < source.indexOf('$RUNTIME activate'));
+    assert.match(bridge, /set -- "\$@" "\$value"/);
+    assert.doesNotMatch(source + bridge, /uci -q|config_foreach|geoview[.]sh/);
 });
 
-test('Geo metadata remains in UCI for the existing Shell converter', () => {
+test('Geo metadata remains in UCI for the native converter', () => {
     const writes = [];
     const utils = loadTS('utils/feature/shunt/georules.ts', {
         uci: {

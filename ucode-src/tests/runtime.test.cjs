@@ -1,0 +1,197 @@
+const assert = require('node:assert/strict');
+const { test } = require('node:test');
+const fs = require('node:fs');
+const path = require('node:path');
+const net = require('node:net');
+const { spawnSync } = require('node:child_process');
+const { root, run } = require('./helpers.cjs');
+
+function invoke(request, env) {
+    return run('ucode-src/tests/runtime.uc', [], request, env ? { env: { ...process.env, ...env } } : {});
+}
+function value(request, env) {
+    const result = invoke(request, env);
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(result.stdout);
+}
+function fixture(t) {
+    const directory = fs.mkdtempSync('/tmp/hijpass-runtime-test-');
+    t.after(() => fs.rmSync(directory, { force: true, recursive: true }));
+    return directory;
+}
+function script(directory, name, body) {
+    fs.writeFileSync(path.join(directory, name), '#!/bin/sh\n' + body + '\n', { mode: 0o755 });
+}
+function node(id, options = {}) {
+    return { '.name': id, '.type': 'proxy_node', name: id, enabled: '1', core: 'sing-box', type: 'shadowsocks',
+        server: '192.0.2.10', server_port: '443', listen_port: '10001', socks_port: '10002', ...options };
+}
+const global = { '.name': 'global', '.type': 'hijpass', enabled: '1' };
+
+test('firewall handles shipped comma protocols, DNS/local toggles and removes dangling references', t => {
+    const directory = fixture(t), ip = path.join(directory, 'ips');
+    fs.writeFileSync(ip, '192.0.2.0/24\n2001:db8::/32\ninvalid\n192.0.2.0/99\n');
+    const state = { wan: ['pppoe-wan'], local4: ['192.168.1.1/24'], local6: ['fe80::1/64'], dns4: ['1.1.1.1'], dns6: [] };
+    const firewall = { '.name': 'fw', '.type': 'firewall', shunt_port: '18081', tproxy_proto: 'tcp,udp', proxy_local: '0', acl_default_allow: '1' };
+    const dns = { '.name': 'dns', '.type': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653' };
+    for (const forward of ['none', 'pre-routing', 'routing']) for (const local of ['0', '1']) {
+        const result = value({ action: 'firewall', template: path.join(root, 'root/etc/hijpass/fw4-template.nft'), state,
+            sections: [{ ...global, ip_direct: ip }, { ...firewall, dns_forward: forward, proxy_local: local }, dns,
+                { '.type': 'shunt', enabled: '1', dns_listen_port: '10153' }] });
+        assert.match(result, /define TPROXY_PROTO = \{ tcp, udp \}/);
+        assert.doesNotMatch(result, /^define \w+ =\s*$/m);
+        // Empty static sets must have no nested empty elements macro; nft can abort on that expansion.
+        for (const m of result.matchAll(/^define (\w+) = \{\s*\}$/gm))
+            assert.doesNotMatch(result, new RegExp('elements = \\{\\s*\\$' + m[1] + '\\s*\\}'));
+        assert.equal(result.includes('chain dns-forward {'), forward !== 'none');
+        assert.equal(result.includes('chain dns-forward-output {'), forward !== 'none' && local === '1');
+        assert.equal(result.includes('chain out-route {'), local === '1');
+        assert.match(result, /192\.0\.2\.0\/24/);
+        assert.doesNotMatch(result, /invalid|192\.0\.2\.0\/99/);
+        const sets = new Set([...result.matchAll(/^    set (\S+)/gm)].map(m => m[1]));
+        for (const m of result.matchAll(/@(\w+)/g)) assert.ok(sets.has(m[1]), 'missing set ' + m[1]);
+        const used = new Set([...result.matchAll(/\$(\w+)/g)].map(m => m[1]));
+        const definitions = new Set([...result.matchAll(/^define (\w+)/gm)].map(m => m[1]));
+        for (const name of used) assert.ok(definitions.has(name), 'missing define ' + name);
+        fs.writeFileSync(path.join(directory, 'test.nft'), result);
+        // nft parses without applying rules; hosts lacking netlink privileges still report grammar errors.
+        const check = spawnSync('nft', ['-c', '-f', path.join(directory, 'test.nft')], { encoding: 'utf8' });
+        if (!check.error) assert.doesNotMatch(check.stderr, /syntax error/);
+    }
+    const rejected = invoke({ action: 'firewall', template: path.join(root, 'root/etc/hijpass/fw4-template.nft'), state,
+        sections: [global, { ...firewall, proxy_iface_list: ['br-lan;flush ruleset'] }, dns] });
+    assert.notEqual(rejected.status, 0);
+});
+
+test('service plans preserve argv, custom config paths, environments and nesting users', t => {
+    const directory = fixture(t);
+    const sections = [{ ...global, client_dir: directory }, node('sb', { name: 'space name', procd_env: ['A=a b', 'B=two'] }),
+        node('xr', { core: 'xray', listen_port: '10003', socks_port: '10004', nest_proxy: '1' }),
+        node('custom', { core: 'custom', type: 'custom', command: 'program --conf {conf_path}' }),
+        node('off', { enabled: '0' })];
+    const result = value({ action: 'plan', sections });
+    assert.equal(result.instances.length, 3);
+    assert.deepEqual(result.instances[0].command, ['sing-box', '-c', directory + '/space name-sb.json', 'run']);
+    assert.deepEqual(result.instances[0].env, ['A=a b', 'B=two']);
+    assert.equal(result.instances[0].user, 'hijpass');
+    assert.equal(result.instances[1].user, 'root');
+    assert.equal(result.instances[2].command[2], `program --conf '${directory}/custom-custom.json'`);
+    assert.deepEqual(value({ action: 'plan', sections: [{ ...global, enabled: '0' }] }), { instances: [] });
+    assert.notEqual(invoke({ action: 'plan', sections: [global, node('bad', { name: '../file' })] }).status, 0);
+    assert.notEqual(invoke({ action: 'plan', sections: [global, node('bad', { procd_env: ['bad entry'] })] }).status, 0);
+});
+
+test('server plan validates allowed ports and leaves manually edited JSON untouched', t => {
+    const directory = fixture(t);
+    const file = path.join(directory, 'server-a.json'); fs.writeFileSync(file, 'custom JSON');
+    const sections = [{ '.type': 'hijserver', enabled: '1', server_dir: directory },
+        { '.name': 'a', '.type': 'server_node', enabled: '1', name: 'server', command: 'server -c {conf_path}', allow_firewall: '1', listen_port: '443' }];
+    const result = value({ action: 'server-plan', sections });
+    assert.deepEqual(result.ports, [443]);
+    assert.equal(fs.readFileSync(file, 'utf8'), 'custom JSON');
+    sections[1].listen_port = '0';
+    assert.notEqual(invoke({ action: 'server-plan', sections }).status, 0);
+});
+
+test('native configuration writes are private and staging failure preserves every existing file', t => {
+    const directory = fixture(t), client = path.join(directory, 'client'); fs.mkdirSync(client);
+    const custom = path.join(client, 'manual-c.json'); fs.writeFileSync(custom, 'manual');
+    const sections = [{ ...global, client_dir: client, shunt_conf: path.join(directory, 'shunt.json') }, node('a'),
+        node('c', { name: 'manual', core: 'custom', type: 'custom', listen_port: '10003', socks_port: '10004' })];
+    const result = value({ action: 'write', sections });
+    assert.equal(result.length, 1);
+    const file = path.join(client, 'a-a.json'), original = fs.readFileSync(file, 'utf8');
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+    assert.equal(fs.readFileSync(custom, 'utf8'), 'manual');
+    const generated = { nodes: { a: { changed: true } }, shunt: { outbounds: [] } };
+    const failed = invoke({ action: 'write', sections: [{ ...sections[0], shunt_conf: file + '/blocked.json' }, ...sections.slice(1)], generated });
+    assert.notEqual(failed.status, 0);
+    assert.equal(fs.readFileSync(file, 'utf8'), original);
+    assert.equal(fs.readdirSync(client).some(name => name.includes('.new-')), false);
+});
+
+test('native UCI migration is idempotent and moves legacy balance references without resetting fields', t => {
+    const directory = fixture(t);
+    fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass 'global'\n option enabled '1'\nconfig proxy_node 'a'\n option name 'member'\n option core 'singbox'\n option listen_port '7890'\n option socks_port '7891'\nconfig shunt 's'\n option type 'singbox'\n list lb_node_list 'member'\n option default_proxy_node 'hijpass-slb'\n option lb_strategy 'urltest'\nconfig dns 'dns'\n option direct_dns 'system'\nconfig firewall 'fw'\n`);
+    const result = value({ action: 'migrate', directory });
+    const balance = result.find(s => s.type === 'load_balance');
+    assert.equal(balance.listen_port, '7892'); assert.equal(balance.socks_port, '7893');
+    assert.deepEqual(balance.member_node, ['member']);
+    assert.equal(result.find(s => s['.name'] === 's').default_proxy_node, balance.name);
+    assert.equal(result.find(s => s['.name'] === 'a').core, 'sing-box');
+    assert.equal(result.find(s => s['.name'] === 'dns').direct_dns, 'dnsmasq');
+    assert.equal(result.find(s => s['.name'] === 'fw').proxy_local, '0');
+    const text = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
+    value({ action: 'migrate', directory });
+    assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), text);
+});
+
+test('domain/IP normalization and CIDR lookup use native address validation', () => {
+    assert.deepEqual(value({ action: 'normalize', kind: 'domain', text: 'server=/Example.org/1.1.1.1\n+.example.net\n@@||allowed.org^\nfull:exact.com\n! comment\ninvalid\n' }), ['allowed.org', 'exact.com', 'example.net', 'example.org']);
+    assert.deepEqual(value({ action: 'normalize', kind: 'ip6', text: '2001:db8::/32\n2001:db8::/129\ninvalid\n' }), ['2001:db8::/32']);
+    assert.deepEqual(value({ action: 'contains', cases: [['192.0.2.5', '192.0.2.0/24'], ['192.0.3.1', '192.0.2.0/24'],
+        ['2001:db8::123', '2001:db8::/32'], ['2001:db9::1', '2001:db8::/32'], ['::1', '::/invalid']] }), [true, false, true, false, false]);
+});
+
+test('rule updates preserve old files on HTTP/format failure and merge valid sources', t => {
+    const directory = fixture(t), file = path.join(directory, 'domains'); fs.writeFileSync(file, 'old.example.org\n');
+    const env = { PATH: directory + ':' + process.env.PATH };
+    script(directory, 'curl', 'exit 22');
+    const sections = [{ ...global, chn_list: file, enabled: '0' }, { '.type': 'rule', retry_count: '1', chn_domain_list: ['https://example.org/1', 'https://example.org/2'] }];
+    assert.equal(value({ action: 'update', sections, group: 'chnlist' }, env).success, false);
+    assert.equal(fs.readFileSync(file, 'utf8'), 'old.example.org\n');
+    script(directory, 'curl', `while [ "$#" -gt 0 ]; do if [ "$1" = -o ]; then output=$2; shift; fi; shift; done\nprintf '%s\\n' 'not a domain' 'some HTML error text' >"$output"`);
+    assert.equal(value({ action: 'update', sections, group: 'chnlist' }, env).success, false);
+    assert.equal(fs.readFileSync(file, 'utf8'), 'old.example.org\n');
+    script(directory, 'curl', `while [ "$#" -gt 0 ]; do if [ "$1" = -o ]; then output=$2; shift; fi; shift; done\ni=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); done >"$output"`);
+    assert.equal(value({ action: 'update', sections, group: 'chnlist' }, env).success, true);
+    assert.equal(fs.readFileSync(file, 'utf8'), 'example.org\n');
+});
+
+test('subprocess arguments and connection JSON survive quotes and reject malformed timeouts', t => {
+    const directory = fixture(t), valueWithQuotes = "a 'quote'; $(touch " + directory + "/injected)";
+    assert.deepEqual(value({ action: 'exec', args: ['printf', '%s', valueWithQuotes] }), { code: 0, stdout: valueWithQuotes });
+    assert.equal(fs.existsSync(path.join(directory, 'injected')), false);
+    script(directory, 'curl', "printf '204\\n192.0.2.1\\n443\\n0.001\\n0.002\\n0.003\\n0.004\\n0.005\\n'");
+    const result = value({ action: 'connect', url: 'https://example.org', timeout: '5' }, { PATH: directory + ':' + process.env.PATH });
+    assert.equal(result.total_time_ms, 5); assert.equal(result.server_processing_time_ms, 4); assert.equal(result.success, true);
+    assert.notEqual(invoke({ action: 'connect', url: 'https://example.org', timeout: '5oops' }).status, 0);
+});
+
+test('file cleanup matches exact section suffix and log truncation keeps the last 30000 lines', t => {
+    const directory = fixture(t), keep = path.join(directory, 'new-a.json');
+    for (const name of ['old-a.json', 'new-a.json', 'other-aa.json']) fs.writeFileSync(path.join(directory, name), name);
+    value({ action: 'cleanup', sections: [{ ...global, client_dir: directory }], kind: 'proxy', id: 'a', keep });
+    assert.deepEqual(fs.readdirSync(directory).sort(), ['new-a.json', 'other-aa.json']);
+    const log = path.join(directory, 'service.log'); fs.writeFileSync(log, Array.from({ length: 30005 }, (_, i) => i + '\n').join(''));
+    value({ action: 'clean-log', sections: [{ log_path: log }], operation: 'hijpass' });
+    const contents = fs.readFileSync(log, 'utf8'); assert.ok(contents.startsWith('5\n')); assert.ok(contents.endsWith('30004\n'));
+    assert.equal(contents.split('\n').length, 30001);
+});
+
+test('native TCP port lookup sees actual host listeners', async t => {
+    const server = net.createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    t.after(() => new Promise(resolve => server.close(resolve)));
+    const port = String(server.address().port);
+    const result = run('root/usr/lib/hijpass/net.uc', ['port', port]);
+    assert.equal(result.status, 0, result.stderr); assert.equal(JSON.parse(result.stdout)[port], true);
+});
+
+test('capture parsing rejects injected/invalid targets and counts TCP payload without counting UDP bytes', () => {
+    const config = value({ action: 'trace-parse', args: ['https://[2001:db8::1]:8443/a?b=1'] });
+    assert.equal(config.host, '2001:db8::1'); assert.equal(config.targetPort, 8443);
+    for (const args of [['-c', '::1;id'], ['-c', '2001:::1'], ['-c', '192.0.2.1', '-P', '0'], ['https://bad;id'], ['https://example.org:65536']])
+        assert.notEqual(invoke({ action: 'trace-parse', args }).status, 0);
+    const summary = value({ action: 'packet-summary', packets: ['1.0 br-lan In IP 192.0.2.1.1 > 1.1.1.1.443: Flags [S], length 0',
+        '1.1 br-lan In IP 192.0.2.1.1 > 1.1.1.1.443: Flags [P.], length 42', '1.2 br-lan In IP 192.0.2.1.1 > 1.1.1.1.53: UDP, length 20'] });
+    assert.equal(summary.counts.syn, 1); assert.equal(summary.counts.payload_bytes, 42); assert.equal(summary.counts.udp, 1);
+});
+
+test('client report uses IP addresses when nft includes Ethernet headers and excludes foreign trace IDs', t => {
+    const directory = fixture(t);
+    fs.writeFileSync(path.join(directory, 'nft.trace'), 'trace id 123 inet hijpass trace-1 packet: ether saddr 02:00:00:00:00:01 ether daddr 02:00:00:00:00:02 ip saddr 192.0.2.10 ip daddr 8.8.8.8 udp sport 50000 udp dport 53\n' +
+        'trace id 123 inet hijpass trace-1 rule meta nftrace set 1\ntrace id 999 inet hijpass other packet: ip saddr 192.0.2.99\n');
+    const result = value({ action: 'trace-report', directory, capture: { mode: 'client', client: '192.0.2.10', chain: 'trace-1', comment: 'hijpass-trace-1', addresses: [], protocol: 'udp', port: '53', seconds: 2 } });
+    assert.match(result, /udp \[192\.0\.2\.10\]:50000 -> \[8\.8\.8\.8\]:53/);
+    assert.doesNotMatch(result, /02:00:00:00:00|192\.0\.2\.99/);
+});

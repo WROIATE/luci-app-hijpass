@@ -5,10 +5,10 @@ export const fields = {
 	...BaseOptions,
 	...ServerOptions,
 	...MultiplexOptions,
-	password: ["text", ""], // 字符串，Password
-	network: ["text", ""], // 字符串，Network
-	method: ["text", ""], // 字符串，Method
-	plugin: ["text", ""], // 字符串，Plugin
-	plugin_opts: ["text", ""], // 字符串，PluginOptions
-	udp_over_tcp: ["bool", false], // UCI 0/1 开关，UDPOverTCP
+	password: ["text", ""], // 远端认证密码
+	network: ["text", ""], // 允许的网络（tcp/udp 或组合）；空值使用核心默认值
+	method: ["text", ""], // Shadowsocks 加密方法
+	plugin: ["text", ""], // sing-box SIP003 插件名称
+	plugin_opts: ["text", ""], // SIP003 插件参数字符串
+	udp_over_tcp: ["bool", false], // 0/1；sing-box UDP-over-TCP；新版 Xray 已不支持
 };

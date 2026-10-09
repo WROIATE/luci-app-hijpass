@@ -432,7 +432,7 @@ const ProxyFormUtils = {
                     el.textContent = '...';
                     el.style.backgroundColor = '#1a6a8a';
                     el.style.borderColor = '#1a6a8a';
-                    fs.exec_direct('/usr/lib/hijpass/net.sh', ['ping', port], 'json')
+                    fs.exec_direct('/usr/lib/hijpass/net.uc', ['ping', port], 'json')
                         .then((res: any) => {
                             if (res && res.ms != null) {
                                 updateLatencyButton(el, res.ms);

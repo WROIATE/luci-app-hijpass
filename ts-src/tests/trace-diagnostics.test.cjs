@@ -7,6 +7,8 @@ const path = require('node:path');
 const ts = require('typescript');
 
 const root = path.resolve(__dirname, '../..');
+const { interpreter } = require('../../ucode-src/tests/helpers.cjs');
+const shellQuote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 const defaults = {
     mode: 'client', clientIp: '192.168.1.100', protocol: 'all', port: '',
     url: '', method: 'HEAD', timeout: '30', tcpdump: false, tcpdumpInterface: 'any', verbose: false,
@@ -47,13 +49,13 @@ for (const seconds of [30, 120]) {
         const fs = {
             async exec(command, args) {
                 calls.push([command, ...args]);
-                // Reproduces the previous fs.exec(trace-url.sh) failure.
-                if (command.endsWith('/trace-url.sh')) throw new Error('XHR request timed out');
+                // Reproduces the previous fs.exec(trace-url.uc) failure.
+                if (command.endsWith('/trace-url.uc')) throw new Error('XHR request timed out');
                 if (args[0] === 'start') return { code: 0, stdout: 'ABcd1234\n', stderr: '' };
                 return { code: 0, stdout: '', stderr: '' };
             },
             async exec_direct(command, args) {
-                assert.equal(command, '/usr/lib/hijpass/trace-task.sh');
+                assert.equal(command, '/usr/lib/hijpass/trace-task.uc');
                 assert.deepEqual(Array.from(args), ['status', 'ABcd1234']);
                 const running = clock.now < seconds * 1000;
                 return { running, code: running ? null : 0, stdout: running ? 'Trace is active' : 'capture complete', stderr: '' };
@@ -93,10 +95,17 @@ function fixture(t) {
         writeFileSync(file, '#!/bin/sh\n' + body + '\n');
         chmodSync(file, 0o755);
     }
-    for (const name of ['trace-url.sh', 'trace-task.sh']) {
-        copyFileSync(path.join(root, 'root/usr/lib/hijpass', name), path.join(dir, name));
-        chmodSync(path.join(dir, name), 0o755);
+    for (const name of ['trace-config.uc', 'trace-task.uc']) {
+        // Host tests use the actual ucode VM and the installed-layout modules.
+        // The worker path is relative to the task entry, just as on OpenWrt.
+        const entry = path.join(dir, 'entry-' + name);
+        copyFileSync(path.join(root, 'root/usr/lib/hijpass', name), entry);
+        script(name, `exec ${shellQuote(interpreter)} -S -L ${shellQuote(path.join(root, 'root/usr/share/ucode'))} ${shellQuote(entry)} "$@"`);
     }
+    copyFileSync(path.join(root, 'root/usr/lib/hijpass/trace-worker.sh'), path.join(dir, 'trace-worker.sh'));
+    chmodSync(path.join(dir, 'trace-worker.sh'), 0o755);
+    const shellSource = readFileSync(path.join(root, 'root/usr/lib/hijpass/trace-url.sh'), 'utf8');
+    writeFileSync(path.join(dir, 'trace-url.sh'), shellSource.replace('/usr/share/libubox/jshn.sh', process.env.JSHN_SH || '/usr/share/libubox/jshn.sh').replace('#!/bin/sh', '#!/usr/bin/busybox ash').replaceAll('sleep ', '"${0%/*}/sleep" '), { mode: 0o755 });
     script('id', 'echo 0');
     script('uci', 'exit 0');
     script('nslookup', 'echo unexpected-nslookup >>"$TRACE_TEST_LOG"; exit 1');
@@ -106,11 +115,12 @@ function fixture(t) {
     script('nft', `printf 'nft %s\\n' "$*" >>"$TRACE_TEST_LOG"
 case "$*" in
     'monitor trace')
-        printf 'trace id 123 inet hijpass trace-%s packet: ip saddr 192.168.1.100 ip daddr 8.8.8.8 udp sport 12345 udp dport 53\\n' \"$PPID\"
+        trace_pid="$(sed -n 's/.*add chain inet hijpass trace-\\([0-9]*\\).*/\\1/p' "$TRACE_TEST_LOG" | tail -n 1)"
+        printf 'trace id 123 inet hijpass trace-%s packet: ip saddr 192.168.1.100 ip daddr 8.8.8.8 udp sport 12345 udp dport 53\\n' \"$trace_pid\"
         if [ \"$TRACE_UNKNOWN_RULE\" = 1 ]; then
-            printf 'trace id 123 inet hijpass trace-%s unknown rule handle 6 (verdict continue)\\n' \"$PPID\"
+            printf 'trace id 123 inet hijpass trace-%s unknown rule handle 6 (verdict continue)\\n' \"$trace_pid\"
         else
-            printf 'trace id 123 inet hijpass trace-%s rule meta nftrace set 1 comment \"hijpass-trace-%s\" (verdict continue)\\n' \"$PPID\" \"$PPID\"
+            printf 'trace id 123 inet hijpass trace-%s rule meta nftrace set 1 comment \"hijpass-trace-%s\" (verdict continue)\\n' \"$trace_pid\" \"$trace_pid\"
         fi
         printf 'trace id 999 inet hijpass other packet: ip saddr 192.168.1.200 ip daddr 1.1.1.1\\n'
         exec /bin/sleep 180 ;;
@@ -121,13 +131,11 @@ esac`);
     script('tcpdump', `printf 'tcpdump %s\\n' "$*" >>"$TRACE_TEST_LOG"
 printf '1.0 br-lan In IP 192.168.1.100.12345 > 8.8.8.8.53: UDP, length 20\\n'
 exec /bin/sleep 180`);
-    return { dir, env, trace: path.join(dir, 'trace-url.sh'), task: path.join(dir, 'trace-task.sh') };
+    return { dir, env, trace: path.join(dir, 'trace-url.sh'), task: path.join(dir, 'trace-task.uc') };
 }
 
-test('BusyBox client capture filters all/TCP/UDP and cleans its nft rule without DNS or curl', t => {
+test('Shell capture with ucode parsing filters all/TCP/UDP and cleans its nft rule without DNS or curl', t => {
     const f = fixture(t);
-    // BusyBox ash prefers built-in applets to PATH; override only in the test shell.
-    const ash = ['ash', '-c', 'id() { echo 0; }; sleep() { /bin/sleep 0.01; }; trace_script="$1"; shift; . "$trace_script"', 'test'];
     for (const [protocol, port, expr, filter] of [
         ['all', 'all', 'ip saddr 192.168.1.100 meta nftrace', 'host 192.168.1.100'],
         ['all', '53', 'meta l4proto { tcp, udp } th dport 53', '((src host 192.168.1.100 and dst port 53) or (dst host 192.168.1.100 and src port 53)) and (tcp or udp)'],
@@ -135,7 +143,7 @@ test('BusyBox client capture filters all/TCP/UDP and cleans its nft rule without
         ['udp', 'all', 'meta l4proto udp meta nftrace', 'host 192.168.1.100 and udp'],
     ]) {
         writeFileSync(f.env.TRACE_TEST_LOG, '');
-        const out = execFileSync('busybox', [...ash, f.trace, '-c', '192.168.1.100', '-t', '30', '-n', protocol, '-P', port, '-p'], { env: f.env, encoding: 'utf8' });
+        const out = execFileSync(f.trace, ['-c', '192.168.1.100', '-t', '30', '-n', protocol, '-P', port, '-p'], { env: f.env, encoding: 'utf8' });
         const calls = readFileSync(f.env.TRACE_TEST_LOG, 'utf8');
         assert.ok(calls.includes(expr), calls);
         assert.ok(calls.includes(filter), calls);
@@ -149,7 +157,7 @@ test('BusyBox client capture filters all/TCP/UDP and cleans its nft rule without
         assert.match(calls, /priority -301/);
     }
     f.env.TRACE_UNKNOWN_RULE = '1';
-    const out = execFileSync('busybox', [...ash, f.trace, '-c', '2001:db8::123', '-t', '1'], { env: f.env, encoding: 'utf8' });
+    const out = execFileSync(f.trace, ['-c', '2001:db8::123', '-t', '1'], { env: f.env, encoding: 'utf8' });
     assert.match(readFileSync(f.env.TRACE_TEST_LOG, 'utf8'), /ip6 saddr 2001:db8::123/);
     assert.match(out, /client=2001:db8::123/);
     assert.match(out, /client_flows_total: 1/);

@@ -5,6 +5,6 @@ export const fields = {
 	...BaseOptions,
 	...ServerOptions,
 	...TLSOptions,
-	password: ["text", ""], // 字符串，Password
-	version: ["integer", 1, 2147483647], // 非负整数，ShadowTLSVersion
+	password: ["text", ""], // 远端认证密码
+	version: ["integer", 1, 2147483647], // ShadowTLS 协议版本（1/2/3），默认 1
 };

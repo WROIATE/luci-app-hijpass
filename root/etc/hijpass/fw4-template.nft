@@ -107,7 +107,8 @@ table inet hijpass {
     }
 
     chain dns-forward-output {
-        type nat hook output priority dstnat - 1; policy accept;
+        # output 用数值优先级，兼容不接受 output/dstnat 命名优先级的 nft 版本。
+        type nat hook output priority -101; policy accept;
 
         # DNS 服务和代理核心的上游查询不参与转发，避免递归
         meta skgid $HIJPASS_USER counter return

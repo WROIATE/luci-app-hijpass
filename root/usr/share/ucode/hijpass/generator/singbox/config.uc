@@ -1,0 +1,57 @@
+import { build as shadowsocks } from './protocol/shadowsocks.uc';
+import { build as vless } from './protocol/vless.uc';
+import { build as hysteria2 } from './protocol/hysteria2.uc';
+import { build as tuic } from './protocol/tuic.uc';
+import { build as shadowtls } from './protocol/shadowtls.uc';
+import { TYPE } from '../../uci/protocol/config.uc';
+import { TAG, optional } from '../constants.uc';
+import { durationText } from '../../uci/config.uc';
+
+const builders = {
+	[TYPE.shadowsocks]: shadowsocks, [TYPE.vless]: vless, [TYPE.hysteria2]: hysteria2,
+	[TYPE.tuic]: tuic, [TYPE.shadowtls]: shadowtls,
+};
+
+export function socks(tag, port) {
+	return { type: 'socks', tag, server: '127.0.0.1', server_port: port, version: '5' };
+}
+export function inbound(kind, tag, port, address) {
+	return { type: kind, tag, listen: address || '127.0.0.1', listen_port: port };
+}
+
+// Config 字段：log 日志；dns DNS 服务器和规则；inbounds 本地监听；
+// outbounds 远端出口；route 匹配规则及默认出口。返回普通 JSON 对象。
+export function build(n) {
+	let config = {
+		log: { level: n.log_level || 'info', timestamp: true },
+		dns: { servers: [{ type: 'local', tag: 'local' }] },
+		inbounds: [inbound('tproxy', TAG.tproxy, n.listen_port), inbound('socks', TAG.socks, n.socks_port)],
+		outbounds: [],
+		route: { default_domain_resolver: 'local' },
+	};
+	if (n.type == TYPE.balance) {
+		let balance = { type: 'urltest', tag: TAG.balance, outbounds: [] };
+		for (let key in ['url', 'tolerance']) optional(balance, key, n[key]);
+		optional(balance, 'interrupt_exist_connections', n.interrupt_exist_connections);
+		for (let key in ['interval', 'idle_timeout']) optional(balance, key, n[key] ? durationText(n[key]) : null);
+		push(config.outbounds, balance);
+		for (let i, member in n.members) {
+			let tag = `${TAG.member}${i}`;
+			push(balance.outbounds, tag);
+			push(config.outbounds, socks(tag, member.socks_port));
+		}
+		config.route.final = TAG.balance;
+	}
+	else {
+		let builder = builders[n.type];
+		if (!builder) die(`unsupported sing-box protocol "${n.type}"`);
+		let outbound = builder(n);
+		push(config.outbounds, outbound);
+		// 上游是已经连接的对象，不需要在构建阶段再次查询节点或做类型断言。
+		if (n.upstream) {
+			outbound.detour = TAG.upstream + n.upstream.name;
+			push(config.outbounds, socks(outbound.detour, n.upstream.socks_port));
+		}
+	}
+	return config;
+}

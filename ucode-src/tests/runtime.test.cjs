@@ -195,3 +195,70 @@ test('client report uses IP addresses when nft includes Ethernet headers and exc
     assert.match(result, /udp \[192\.0\.2\.10\]:50000 -> \[8\.8\.8\.8\]:53/);
     assert.doesNotMatch(result, /02:00:00:00:00|192\.0\.2\.99/);
 });
+
+test('文本工具正常退出，参数错误保持 JSON 工具的错误契约', t => {
+    for (const [address, family] of [['192.0.2.1', '4\n'], ['2001:db8::1/64', '6\n']]) {
+        const result = run('root/usr/lib/hijpass/iptype.uc', [address]);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout, family);
+        assert.equal(result.stderr, '');
+    }
+    const directory = fixture(t);
+    fs.writeFileSync(path.join(directory, 'hijpass'), "config hijpass 'global'\n option delay_time '7'\n");
+    const delay = run('root/usr/lib/hijpass/service.uc', ['delay', '--configdir', directory]);
+    assert.equal(delay.status, 0, delay.stderr);
+    assert.equal(delay.stdout, '7\n');
+    const invalid = run('root/usr/lib/hijpass/net.uc', ['resolve', 'example.org', '--configdir']);
+    assert.equal(invalid.status, 1);
+    assert.match(JSON.parse(invalid.stdout).error, /missing --configdir/);
+    assert.equal(invalid.stderr, '');
+});
+
+test('启用防火墙时，缺失模板不会生成缺少规则的配置', t => {
+    const directory = fixture(t);
+    const result = invoke({ action: 'firewall', template: path.join(directory, 'missing.nft'),
+        state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] },
+        sections: [global, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp' }] });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /template is empty or unreadable/);
+    assert.equal(result.stdout, '');
+});
+
+test('捕获元数据缺失或损坏时仍删除临时 nft 规则与任务目录', t => {
+    const directory = fixture(t), commands = path.join(directory, 'commands');
+    script(directory, 'nft', `printf '%s\\n' "$*" >>"$TRACE_TEST_LOG"
+case "$*" in
+    '-a list chain inet hijpass pre-filter')
+        printf 'meta nftrace set 1 comment "hijpass-trace-%s" # handle 42\\n' "$TRACE_TEST_PID" ;;
+esac`);
+    for (const [i, metadata] of [undefined, '{broken', '{}'].entries()) {
+        const pid = `${process.pid}99${i}`, capture = '/tmp/hijpass-trace.' + pid;
+        fs.mkdirSync(capture, { mode: 0o700 });
+        t.after(() => fs.rmSync(capture, { recursive: true, force: true }));
+        if (metadata !== undefined) fs.writeFileSync(path.join(capture, 'metadata.json'), metadata);
+        fs.writeFileSync(commands, '');
+        const result = run('root/usr/lib/hijpass/trace-config.uc', ['finish', capture], undefined,
+            { env: { ...process.env, PATH: directory + ':' + process.env.PATH, TRACE_TEST_LOG: commands, TRACE_TEST_PID: pid } });
+        assert.equal(result.status, 1);
+        assert.ok(result.stderr);
+        const calls = fs.readFileSync(commands, 'utf8');
+        assert.ok(calls.includes('delete chain inet hijpass trace-' + pid));
+        assert.ok(calls.includes('delete rule inet hijpass pre-filter handle 42'));
+        assert.equal(fs.existsSync(capture), false);
+    }
+});
+
+test('核心版本查询将损坏的上游 JSON 转为带来源的错误', t => {
+    const directory = fixture(t), env = { ...process.env, PATH: directory + ':' + process.env.PATH };
+    for (const response of ['{broken', 'null', '[]', '{}']) {
+        script(directory, 'curl', `printf '%s' '${response}'`);
+        const result = run('root/usr/lib/hijpass/core-update.uc', ['latest', 'xray'], undefined, { env });
+        assert.equal(result.status, 1);
+        assert.match(JSON.parse(result.stdout).error, /invalid xray release response/);
+        assert.equal(result.stderr, '');
+    }
+    script(directory, 'curl', `printf '%s' '{"tag_name":"v1.2.3","assets":[]}'`);
+    const result = run('root/usr/lib/hijpass/core-update.uc', ['latest', 'xray'], undefined, { env });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { core: 'xray', version: 'v1.2.3' });
+});

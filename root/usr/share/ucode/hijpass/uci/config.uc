@@ -3,8 +3,14 @@ import { cursor } from 'uci';
 // Section 是原生 UCI section 对象：.name 为稳定 ID，.type 为配置段类型，
 // .index 为排序位置；其余 option 为字符串，list 为字符串数组。
 // LuCI 的待保存快照与 cursor.foreach() 的结果使用相同结构。
+/**
+ * @param {string} [packageName] UCI 配置包名，默认 hijpass。
+ * @param {string} [directory] 配置目录，默认 /etc/config。
+ * @returns {object[]} 按 UCI 顺序读取的 section。
+ */
 export function read(packageName, directory) {
 	let ctx = cursor(directory);
+	if (!ctx) die('cannot create UCI cursor');
 	let sections = [];
 	if (!ctx.load(packageName || 'hijpass'))
 		die(`cannot load UCI ${packageName || 'hijpass'}: ${ctx.error()}`);
@@ -12,16 +18,24 @@ export function read(packageName, directory) {
 	return sections;
 };
 
+/** @param {object[]} sections @param {string} kind */
 export function of(sections, kind) {
 	return filter(sections, s => s['.type'] == kind);
 };
 
+/** @param {object[]} sections @param {string} kind */
 export function first(sections, kind) {
 	return of(sections, kind)[0] || {};
 };
 
+/**
+ * @param {string|string[]|null} value UCI option 或 list；缺失值转换为空数组。
+ * @returns {string[]}
+ */
 export function list(value) {
-	return type(value) == 'array' ? value : value ? [value] : [];
+	if (type(value) == 'array') return value;
+	if (type(value) == 'string' && value) return [value];
+	return [];
 };
 
 export function validate(sections) {
@@ -49,6 +63,7 @@ export function port(value) {
 };
 
 // 校验时长并按需换算成秒（例如 Xray gRPC）；其它核心字段保留 UCI 原字符串。
+/** @param {string} value @returns {number} 秒数，仅用于需要换算的核心字段。 */
 export function duration(value) {
 	if (value == '' || value == '0') return 0;
 	let remaining = value, seconds = 0;

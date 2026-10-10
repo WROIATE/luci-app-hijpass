@@ -7,6 +7,7 @@ import { atomic, mkdir, removeTree } from './system.uc';
 
 // 安装迁移只调整已知旧字段：singbox/system 名称和旧分流负载均衡选项。
 // 现有用户配置、凭据及自定义 Hook 不重置；执行多次仍得到同一份结果。
+/** @param {uci.cursor} ctx 原生 UCI 游标。 */
 export function migrate(ctx) {
 	if (!ctx.load('hijpass')) die(`cannot load hijpass: ${ctx.error()}`);
 	let shunt, dns, firewall, names = {}, ports = {};
@@ -62,6 +63,7 @@ export function install() {
 		if (!match(text, /(^|\n)hijpass:/)) atomic(path, text + (text && substr(text, -1) != '\n' ? '\n' : '') + entry + '\n', path == '/etc/shadow' ? 0o600 : 0o644);
 	}
 	let ctx = cursor();
+	if (!ctx) die('cannot create UCI cursor');
 	migrate(ctx);
 	if (!ctx.load('firewall')) die('cannot load firewall');
 	ctx.delete('firewall', 'hijpass');

@@ -3,7 +3,8 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { config } = require('./helpers.cjs');
+const { spawnSync } = require('node:child_process');
+const { config, root, interpreter } = require('./helpers.cjs');
 const fixtures = require('./testdata/compatibility.json');
 
 function rpc(method, sections, target) {
@@ -87,4 +88,32 @@ test('RPC 保持契约，非法显式快照不会退回本机 UCI', () => {
     assert.match(rpc('render', {}).error, /unmarshal/);
     assert.match(rpc('render', [node('a')], 'missing').error, /not found/);
     assert.match(rpc('render', [node('a', { core: 'custom' })], 'a').error, /custom/);
+});
+
+test('输入读取与 JSON 解析失败保留 RPC/CLI 错误格式，并限制输入大小', () => {
+    for (const input of ['', '{broken', 'null', '[]', JSON.stringify({ sections: '{}' }), JSON.stringify({ sections: 1 })]) {
+        const result = config(['call', 'render'], undefined, { input });
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(typeof JSON.parse(result.stdout).error, 'string');
+        assert.equal(result.stderr, '');
+    }
+    const invalid = config(['render', '--stdin'], undefined, { input: '{broken' });
+    assert.equal(invalid.status, 1);
+    assert.equal(invalid.stdout, '');
+    assert.ok(invalid.stderr);
+
+    const limit = 4 * 1024 * 1024;
+    const input = JSON.stringify([{ '.name': 'global', '.type': 'hijpass', enabled: '0' }]);
+    const accepted = config(['validate', '--stdin'], undefined, { input: input.padEnd(limit), maxBuffer: limit });
+    assert.equal(accepted.status, 0, accepted.stderr);
+    assert.deepEqual(JSON.parse(accepted.stdout), { ok: true });
+    const oversized = config(['call', 'render'], undefined, { input: ' '.repeat(limit + 1), maxBuffer: limit });
+    assert.match(JSON.parse(oversized.stdout).error, /exceeds 4 MiB/);
+
+    // 关闭 stdin，验证读取失败不会被当成空快照，也不会绕过 RPC 错误边界。
+    const closed = spawnSync('/bin/sh', ['-c', 'exec "$@" <&-', 'sh', interpreter,
+        '-S', '-L', path.join(root, 'root/usr/share/ucode'), '--', path.join(root, 'root/usr/bin/hijpass-config'), 'call', 'render'],
+        { encoding: 'utf8' });
+    assert.equal(closed.status, 0, closed.stderr);
+    assert.match(JSON.parse(closed.stdout).error, /cannot read input/);
 });

@@ -6,17 +6,24 @@ import { exec, checked, lines, atomic, temporary } from './system.uc';
 // tproxy_proto 为 tcp/udp 列表，dns_forward 为 none/pre-routing/routing；
 // proxy_local 控制路由器本机，acl_default_allow 与 MAC/接口列表控制客户端。
 // NetworkState：wan 为 WAN 设备名；local4/local6/dns4/dns6 为本地绕过地址数组。
+/**
+ * @param {object[]} sections
+ */
 export function networkState(sections) {
 	let state = { wan: lines(exec(['fw4', 'zone', 'wan'], true).stdout), local4: [], local6: [], dns4: [], dns6: [] };
 	let addresses = exec(['ip', '-j', 'address', 'show'], true);
-	if (!addresses.code) for (let iface in json(addresses.stdout)) {
-		for (let addr in iface.addr_info || []) push(addr.family == 'inet6' ? state.local6 : state.local4, `${addr.local}/${addr.prefixlen}`);
-	}
 	let interfaces = exec(['ubus', 'call', 'network.interface', 'dump'], true);
-	if (!interfaces.code) for (let iface in json(interfaces.stdout).interface || []) {
-		if (!length(filter(iface.route || [], route => route.mask == 0))) continue;
-		for (let name in [iface.device, iface.l3_device]) if (name && name != 'br-lan') push(state.wan, name);
+	// 命令的 JSON 解析失败时报告来源；不能用残缺网络状态继续生成绕过规则。
+	try {
+		if (!addresses.code) for (let iface in json(addresses.stdout)) {
+			for (let addr in iface.addr_info || []) push(addr.family == 'inet6' ? state.local6 : state.local4, `${addr.local}/${addr.prefixlen}`);
+		}
+		if (!interfaces.code) for (let iface in json(interfaces.stdout).interface || []) {
+			if (!length(filter(iface.route || [], route => route.mask == 0))) continue;
+			for (let name in [iface.device, iface.l3_device]) if (name && name != 'br-lan') push(state.wan, name);
+		}
 	}
+	catch (e) { die(`invalid network state JSON: ${e.message}`); }
 	let dhcp = first(read('dhcp'), 'dnsmasq');
 	for (let line in lines(fs.readfile(dhcp.resolvfile))) {
 		let fields = split(line, /[ \t]+/), address = split(fields[1] || '', '%')[0], bytes = iptoarr(address);
@@ -26,6 +33,10 @@ export function networkState(sections) {
 	state.wan = uniq(state.wan);
 	return state;
 };
+/**
+ * @param {string} path
+ * @param {integer} version
+ */
 function ipList(path, version) {
 	return filter(lines(fs.readfile(path)), value => {
 		let parts = split(value, '/'), bytes = iptoarr(parts[0]);
@@ -34,9 +45,16 @@ function ipList(path, version) {
 	});
 }
 
+/**
+ * @param {object[]} sections
+ * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
+ * @param {string|null} template
+ */
 export function generate(sections, state, template) {
 	let f = first(sections, 'firewall'), global = first(sections, 'hijpass'), dns = first(sections, 'dns'), shunt = first(sections, 'shunt');
 	if (!f.proxy_port && !f.shunt_port) return '';
+	// 模板读取失败时停止生成，不能把只有 define、没有规则的文本当成成功。
+	if (type(template) != 'string' || !length(template)) die('firewall template is empty or unreadable');
 	if (f.proxy_port) port(f.proxy_port);
 	if (f.shunt_port) port(f.shunt_port);
 	let forward = '';
@@ -107,6 +125,9 @@ export function generate(sections, state, template) {
 	return join('\n', map(filter(keys(definitions), key => definitions[key] != ''), key => `define ${key} = ${definitions[key]}`)) + '\n\n' + join('\n', result) + '\n';
 };
 const RULES = '/etc/hijpass/fw4-rules.nft';
+/**
+ * @param {object[]} sections
+ */
 export function reset(sections) {
 	let text = generate(sections, networkState(sections), fs.readfile(first(sections, 'hijpass').nft || '/etc/hijpass/fw4-template.nft'));
 	if (!text) { fs.unlink(RULES); checked(['fw4', 'reload']); return; }
@@ -120,6 +141,9 @@ export function reset(sections) {
 	catch (e) { fs.unlink(temp); die(e.message); }
 };
 export function remove() { fs.unlink(RULES); checked(['fw4', 'reload']); };
+/**
+ * @param {object[]} sections
+ */
 export function apply(sections) {
 	if (!exec(['nft', 'list', 'table', 'inet', 'hijpass'], true).code) checked(['nft', 'delete', 'table', 'inet', 'hijpass']);
 	if (!fs.access(RULES)) return;
@@ -128,6 +152,9 @@ export function apply(sections) {
 	if (hook && fs.access(hook, 'x')) checked([hook]);
 };
 
+/**
+ * @param {string} action
+ */
 export function route(action) {
 	const table = '233', mark = '0x1';
 	if (index(['reset_hijpass_route', 'remove_hijpass_route'], action) < 0) die('unknown route action');

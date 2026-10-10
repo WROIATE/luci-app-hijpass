@@ -6,6 +6,9 @@ import { parse } from '../generator/rules.uc';
 
 // RuleSource：key 为 UCI 下载地址字段，path 为目标文件，kind 为 domain/ip4/ip6/geo。
 // 同类多个 URL 分别下载后合并去重；至少一个完整、有效来源成功后才替换旧文件。
+/**
+ * @param {object[]} sections
+ */
 function sources(sections) {
 	let g = first(sections, 'hijpass');
 	return {
@@ -14,6 +17,10 @@ function sources(sections) {
 		geoip: { path: '/usr/share/v2ray/geoip.dat', kind: 'geo' }, geosite: { path: '/usr/share/v2ray/geosite.dat', kind: 'geo' },
 	};
 }
+/**
+ * @param {string} line
+ * @returns {string|null}
+ */
 export function domain(line) {
 	line = lc(trim(line));
 	if (!line || substr(line, 0, 1) == '#' || substr(line, 0, 1) == '!') return null;
@@ -24,6 +31,11 @@ export function domain(line) {
 	else line = replace(line, /^(domain|full):/, '');
 	return match(line, /^[a-z0-9.-]+[.][a-z]{2,}$/) ? line : null;
 };
+/**
+ * @param {string|null} text
+ * @param {string} kind
+ * @returns {string[]}
+ */
 export function normalize(text, kind) {
 	let result = [];
 	for (let line in lines(text)) {
@@ -35,10 +47,19 @@ export function normalize(text, kind) {
 	}
 	return sort(uniq(result));
 };
+/**
+ * @param {string} url
+ * @param {string} path
+ * @param {integer} timeout
+ */
 function download(url, path, timeout) {
 	if (!match(url || '', /^https?:\/\//)) die(`invalid download URL: ${url}`);
 	return !exec(['curl', '-f', '-sS', '-L', '--connect-timeout', `${timeout}`, '--max-time', `${timeout * 2}`, '-o', path, '--', url]).code;
 }
+/**
+ * @param {object[]} sections
+ * @param {string} action
+ */
 export function update(sections, action) {
 	let settings = first(sections, 'rule'), catalog = sources(sections);
 	let groups = { chnlist: ['chn_domain_list'], gfw: ['gfw_list'], chnroute: ['chn_v4_route', 'chn_v6_route'], geo: ['geoip', 'geosite'] };
@@ -82,15 +103,21 @@ export function update(sections, action) {
 	}
 	return { success: !length(failed), ...(length(failed) ? { failed } : {}) };
 };
+/**
+ * @param {string} action
+ * @param {string|null} kind
+ * @param {string[]} args
+ * @param {object[]} [sections]
+ */
 export function geo(action, kind, args, sections) {
 	if (action == '-t' || action == '--convert') {
 		mkdir('/etc/hijpass/ruleset');
 		// 直接编辑 /etc/config 也能启动：标签来自启用的规则，不依赖前端写回缓存字段。
 		let tags = { geoip: [], geosite: [] };
 		for (let rule in of(sections, 'shunt_route_rule')) if (rule.enabled == '1') {
-			let match = parse(rule);
-			push(tags.geoip, ...map(match.geoip, value => substr(value, 6)));
-			push(tags.geosite, ...map(match.geosite, value => substr(value, 8)));
+			let conditions = parse(rule);
+			push(tags.geoip, ...map(conditions.geoip, value => substr(value, 6)));
+			push(tags.geosite, ...map(conditions.geosite, value => substr(value, 8)));
 		}
 		for (let type in ['geoip', 'geosite']) for (let tag in uniq(tags[type])) {
 			if (!match(tag, /^[A-Za-z0-9_.:@!-]+$/)) die('invalid Geo tag');
@@ -104,7 +131,15 @@ export function geo(action, kind, args, sections) {
 	if (!extract && action != '-l' && action != '--lookup') die('unknown Geo action');
 	return lc(checked(['geoview', '-type', kind, '-action', extract ? 'extract' : 'lookup', '-input', `/usr/share/v2ray/${kind}.dat`, extract ? '-list' : '-value', ...args]));
 };
+/**
+ * @param {string} host
+ * @param {string} rule
+ */
 function suffix(host, rule) { return host == rule || substr(host, -length(rule) - 1) == '.' + rule; }
+/**
+ * @param {string} target
+ * @returns {string}
+ */
 export function queryFiles(target) {
 	if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
 	let ip = iptoarr(target), matched = [];
@@ -116,6 +151,11 @@ export function queryFiles(target) {
 	}
 	return join('\n', sort(uniq(matched))) + '\n';
 };
+/**
+ * @param {object[]} sections
+ * @param {string} target
+ * @returns {string}
+ */
 export function routeMatch(sections, target) {
 	if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
 	let ip = !!iptoarr(target), tags = null;

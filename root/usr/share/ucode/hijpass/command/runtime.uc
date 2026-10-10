@@ -11,13 +11,22 @@ import { exec } from '../runtime/system.uc';
 
 // 每个可执行 .uc 只指定自己的工具名；参数校验、错误协议和功能分派集中在这里。
 // --configdir 可对独立 UCI 目录离线运行，默认直接使用系统 /etc/config。
+/**
+ * @param {string} tool 工具名。
+ * @param {string[]} args 命令行参数；由解释器 ARGV 提供。
+ */
 export function main(tool, args) {
 	let directory, sections;
-	let position = index(args, '--configdir');
-	if (position >= 0) { directory = args[position + 1]; if (!directory) die('missing --configdir'); splice(args, position, 2); }
 	function config(packageName) { return read(packageName || 'hijpass', directory); }
 	let result, jsonOutput = index(['net', 'connect', 'core-update'], tool) >= 0 || tool == 'rules' && args[0] == 'update';
 	try {
+		// 参数错误也交给下面的命令错误边界处理，保持 JSON 工具的返回格式。
+		let position = index(args, '--configdir');
+		if (position != null && position >= 0) {
+			directory = args[position + 1];
+			if (!directory) die('missing --configdir');
+			splice(args, position, 2);
+		}
 		switch (tool) {
 		case 'net':
 			if (args[0] == 'resolve') result = { address: network.resolve(args[1]) };
@@ -81,7 +90,8 @@ export function main(tool, args) {
 		if (result != null) {
 			if (jsonOutput || type(result) == 'object') printf('%J\n', result);
 			else print(result);
-			if (result.success === false) exit(result.exit_code || 1);
+			// 文本工具没有 success 字段；ucode 不允许读取字符串的对象属性。
+			if (type(result) == 'object' && result.success === false) exit(result.exit_code || 1);
 		}
 	}
 	catch (e) {

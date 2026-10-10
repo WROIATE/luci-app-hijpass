@@ -4,15 +4,29 @@ import { lines } from '../runtime/system.uc';
 // Capture：mode/client/protocol/port/seconds/url/method/host/targetPort/addresses，
 // verbose/tcpdump/iface/chain/comment 为捕获设置；所有日志位于独立任务目录。
 // LogPosition：path/offset/inode，用字节位置读取本次新增日志，兼容日志轮转。
+/**
+ * @param {string} path
+ * @param {integer} [offset]
+ * @returns {string} 最多 4 MiB 的日志尾部。
+ */
 function tail(path, offset) {
 	let file = fs.open(path, 'r');
 	if (!file) return '';
-	let size = fs.stat(path).size;
-	file.seek(max(offset || 0, size - 4 * 1024 * 1024));
-	let data = file.read('all') || '';
+	// 检查已打开的文件，避免日志轮转使路径消失或指向另一份日志。
+	let limit = 4 * 1024 * 1024;
+	if (!file.seek(0, 2)) { file.close(); return ''; }
+	let size = file.tell();
+	if (size == null || !file.seek(max(offset || 0, size - limit))) { file.close(); return ''; }
+	// 日志可能仍在增长，读取长度也要限制，不能只限制起始位置。
+	let data = file.read(limit) || '';
 	file.close();
 	return data;
 }
+/**
+ * @param {string} text
+ * @param {string} chain
+ * @returns {string[]}
+ */
 export function filteredTrace(text, chain) {
 	let entries = lines(text), ids = {};
 	for (let line in entries) {
@@ -24,7 +38,15 @@ export function filteredTrace(text, chain) {
 		return m && ids[m[1]];
 	});
 };
+/**
+ * @param {string[]} values
+ * @param {integer} limit
+ * @param {string} [spaces]
+ */
 function indent(values, limit, spaces) { return join('\n', map(slice(uniq(values), 0, limit), line => (spaces || '  ') + line)); }
+/**
+ * @param {string[]} packets
+ */
 export function packetSummary(packets) {
 	let counts = { syn: 0, syn_ack: 0, fin: 0, rst: 0, udp: 0, payload_packets: 0, payload_bytes: 0 }, interfaces = {}, flows = {};
 	for (let line in packets) {
@@ -43,6 +65,10 @@ export function packetSummary(packets) {
 	}
 	return { counts, interfaces, flows };
 };
+/**
+ * @param {string} text
+ * @param {array} targets 可含缺失地址；匹配前过滤空值。
+ */
 function relatedLogs(text, targets) {
 	let all = lines(text), seeds = slice(uniq(filter(all, line => length(filter(targets, target => target && index(line, target) >= 0)))), 0, 80), ids = [];
 	for (let line in seeds) {
@@ -53,6 +79,11 @@ function relatedLogs(text, targets) {
 	}
 	return slice(uniq([...seeds, ...filter(all, line => length(filter(ids, id => index(line, id) >= 0)))]), 0, 100);
 }
+/**
+ * @param {object} c
+ * @param {string} directory
+ * @param {object[]} [positions]
+ */
 export function report(c, directory, positions) {
 	let output = ['\n== Trace summary =='];
 	let curl = {};

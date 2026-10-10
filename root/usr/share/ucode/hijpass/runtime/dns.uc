@@ -6,6 +6,10 @@ import { lines, atomic } from './system.uc';
 // ChinadnsOptions：direct_dns/proxy_dns 为上游（custom/system/dnsmasq/地址），
 // cdg_port 为监听端口，use_chn/use_gfw 决定域名列表及默认 tag。
 // 自定义域名文件可以包含 geosite: 标签，启动时提取为 chinadns 的纯域名文件。
+/**
+ * @param {string} path
+ * @param {string} output
+ */
 function domains(path, output) {
 	let result = [], tags = [];
 	for (let line in lines(fs.readfile(path))) {
@@ -15,6 +19,9 @@ function domains(path, output) {
 	if (length(tags)) push(result, ...lines(geo('-e', 'geosite', [join(',', tags)])));
 	atomic(output, join('\n', uniq(result)) + '\n', 0o644);
 }
+/**
+ * @param {object[]} sections
+ */
 export function prepare(sections) {
 	let dns = first(sections, 'dns'), global = first(sections, 'hijpass');
 	if (dns.dns_service != 'chinadns-ng') return null;

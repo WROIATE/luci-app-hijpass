@@ -8,6 +8,11 @@ import { report } from './report.uc';
 // port 为目标端口或 all，seconds 为捕获时长。router 模式的 url/method/host/targetPort
 // 描述 curl 请求；addresses 为解析结果。tcpdump/iface/verbose/keep 控制报告与文件保留。
 // chain/comment 以当前 PID 隔离 nft 规则；filter 为已校验字段生成的 BPF 表达式。
+/**
+ * @param {string[]} args
+ * @param {string} [pid]
+ * @returns {object} 已校验的捕获参数。
+ */
 export function parse(args, pid) {
 	let c = { mode: 'router', client: '', protocol: 'all', port: 'all', seconds: '8', method: 'HEAD',
 		tcpdump: false, iface: 'any', verbose: false, keep: false, addresses: [] }, urls = [];
@@ -52,6 +57,9 @@ export function parse(args, pid) {
 	return c;
 };
 
+/**
+ * @param {string} name
+ */
 function available(name) { return exec(['/bin/sh', '-c', 'command -v ' + quote(name)], true).code == 0; }
 function positions() {
 	let sections;
@@ -97,6 +105,10 @@ function addRules(c, directory) {
 
 // PreparedCapture：包含所有已校验的 Capture 字段及 directory（任务目录）。
 // metadata.json 额外保存日志位置快照；Shell 无需解析 UCI 或拼装 nft 表达式。
+/**
+ * @param {string} pid
+ * @param {string[]} args
+ */
 export function prepare(pid, args) {
     if (!match(pid || '', /^[0-9]+$/)) die('invalid capture PID');
     let c = parse(args, pid);
@@ -114,14 +126,29 @@ export function prepare(pid, args) {
     catch (e) { deleteRules(c); removeTree(c.directory); die(e.message); }
     return c;
 };
+/**
+ * @param {string} directory 捕获目录 /tmp/hijpass-trace.PID。
+ */
 export function finish(directory) {
     if (!match(directory || '', /^\/tmp\/hijpass-trace[.][0-9]+$/)) die('invalid capture directory');
-    let metadata = json(fs.readfile(directory + '/metadata.json')), c = metadata.capture;
-    // 先删临时规则，再输出报告。报告解析失败也不会留下 nftrace 开关。
-    deleteRules(c);
-    let error;
-    try { print(report(c, directory, metadata.positions)); } catch (e) { error = e.message; }
-    if (c.keep) print(`Temporary files kept: ${directory}\n`);
+    // 清理标识来自已校验的目录名，metadata 缺失或损坏也能删除本次捕获规则。
+    let pid = substr(directory, length('/tmp/hijpass-trace.'));
+    let identity = { chain: `trace-${pid}`, comment: `hijpass-trace-${pid}` };
+    deleteRules({ ...identity, mode: 'client' });
+    deleteRules({ ...identity, mode: 'router' });
+    let error, keep = false;
+    try {
+        let text = fs.readfile(directory + '/metadata.json');
+        if (type(text) != 'string') die('cannot read capture metadata');
+        let metadata = json(text);
+        if (type(metadata) != 'object' || type(metadata.capture) != 'object') die('invalid capture metadata');
+        let c = metadata.capture;
+        if (c.chain != identity.chain || c.comment != identity.comment || (c.mode != 'client' && c.mode != 'router')) die('invalid capture identity');
+        keep = c.keep === true;
+        print(report(c, directory, metadata.positions));
+    }
+    catch (e) { error = e.message; }
+    if (keep) print(`Temporary files kept: ${directory}\n`);
     else removeTree(directory);
     if (error) die(error);
 };

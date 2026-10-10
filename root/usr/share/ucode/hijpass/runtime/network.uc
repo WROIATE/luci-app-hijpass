@@ -4,6 +4,10 @@ import { exec } from './system.uc';
 import { port } from '../uci/config.uc';
 
 // 地址解析返回 IP 字符串，不改动 TLS 的 server_name，代理链仍可验证原始域名证书。
+/**
+ * @param {string} host
+ * @returns {string}
+ */
 export function resolve(host) {
 	if (iptoarr(host)) return host;
 	if (!match(host || '', /^[A-Za-z0-9.-]+$/)) die('invalid argument');
@@ -11,8 +15,13 @@ export function resolve(host) {
 	let addresses = answer?.[host]?.A || answer?.A || [];
 	if (!length(addresses)) addresses = answer?.[host]?.AAAA || answer?.AAAA || [];
 	if (!length(addresses)) die(`resolve failed: ${host}`);
-	return addresses[0];
+	let address = addresses[0];
+	if (type(address) != 'string' || !iptoarr(address)) die(`invalid DNS answer: ${host}`);
+	return address;
 };
+/**
+ * @param {string[]} values
+ */
 export function ports(values) {
 	let occupied = {};
 	// /proc 的 TCP 表由内核提供，避免为每个端口重复执行 netstat 和 jq。
@@ -30,6 +39,11 @@ export function ports(values) {
 
 // CurlReport：success/exit_code/http_code/remote_ip/remote_port/url，
 // 所有 *_time_ms 均为毫秒整数。connect/ping 共用同一份安全的 curl 输出解析。
+/**
+ * @param {string} url
+ * @param {string} [timeout]
+ * @param {string} [socks]
+ */
 export function connect(url, timeout, socks) {
 	if (!match(url || '', /^https?:\/\//)) die('only http:// and https:// URLs are supported');
 	if (!match(timeout || '5', /^[0-9]+$/)) die('timeout must be an integer');
@@ -50,6 +64,10 @@ export function connect(url, timeout, socks) {
 	}
 	return result;
 };
+/**
+ * @param {string} socks
+ * @param {string} [host]
+ */
 export function ping(socks, host) {
 	let result = connect(`https://${host || 'www.google.com'}`, '5', socks);
 	if (!result.success && result.exit_code != 56) return { error: 'timeout' };
@@ -57,6 +75,10 @@ export function ping(socks, host) {
 };
 
 // IPv4/IPv6 CIDR 比较使用内建字节地址，不需要 Lua/luci.ip。
+/**
+ * @param {string} address
+ * @param {string} cidr
+ */
 export function contains(address, cidr) {
 	let parts = split(cidr, '/'), host = iptoarr(address), range = iptoarr(parts[0]);
 	if (!host || !range || length(host) != length(range)) return false;

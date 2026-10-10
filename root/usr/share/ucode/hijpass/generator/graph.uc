@@ -3,6 +3,10 @@ import { proxy, TYPE } from '../uci/protocol/config.uc';
 
 // Graph.nodes 保持 UCI 根节点和依赖的发现顺序，byID/byName 仅用于查找。
 // 解析、连接引用、校验分别执行，查询过程没有隐藏的配置校验副作用。
+/**
+ * @param {object[]} sections
+ * @param {string} [target]
+ */
 export function resolve(sections, target) {
 	let all = of(sections, 'proxy_node'), enabled = {}, selected = [];
 	for (let s in all) {
@@ -15,6 +19,7 @@ export function resolve(sections, target) {
 	}
 	if (target && target != 'shunt' && !length(selected)) die('node not found');
 	let nodes = [], byID = {}, byName = {}, references = {};
+	// selected 是待解析队列：依赖追加到末尾；每个 ID 只展开一次，因此循环有界。
 	for (let i = 0; i < length(selected); i++) {
 		let s = selected[i], id = s['.name'], name = s.name || id;
 		if (byID[id]) continue;
@@ -44,6 +49,9 @@ export function resolve(sections, target) {
 	return { nodes, byID, byName };
 };
 
+/**
+ * @param {{nodes: object[]}} graph
+ */
 export function validateGraph(graph) {
 	let active = {}, heights = {};
 	function visit(n) {
@@ -71,6 +79,10 @@ export function validateGraph(graph) {
 	for (let n in graph.nodes) visit(n);
 };
 
+/**
+ * @param {object[]} nodes
+ * @param {object|null} shunt
+ */
 export function validatePorts(nodes, shunt) {
 	let owners = {};
 	function add(port, owner) {

@@ -8,6 +8,10 @@ import * as xr from './xray/config.uc';
 // final/rulesetExit 为已解析出口标签；dns/rulesetDNS 为服务器对象，entries 为规则数组。
 // DNSServer：tag（名称）、type（传输）、address、port（null 表示未设置）。
 // Entry：name/split，exit/v4/v6/dnsExit 出口，dns/strategy DNS 策略，match 匹配条件。
+/**
+ * @param {object[]} sections
+ * @param {{nodes: object[], byName: object}} graph
+ */
 export function prepare(sections, graph) {
 	function exit(name, required) {
 		if (!name && !required) return '';
@@ -53,10 +57,20 @@ export function prepare(sections, graph) {
 	}
 	return settings;
 };
+/**
+ * @param {string} value
+ * @param {boolean} singbox
+ */
 function strategy(value, singbox) {
 	return (singbox ? { '4': 'ipv4_only', '6': 'ipv6_only', '46': 'prefer_ipv4', '64': 'prefer_ipv6' }
 		: { '4': 'UseIPv4', '6': 'UseIPv6', '46': 'UseIP', '64': 'UseIP' })[value] || '';
 }
+/**
+ * @param {object} s
+ * @param {string} tag
+ * @param {string} detour
+ * @param {boolean} singbox
+ */
 function dnsServer(s, tag, detour, singbox) {
 	if (singbox) {
 		if (index(['udp', 'tcp', 'tls', 'quic', 'https', 'local'], s.type) < 0) die(`invalid sing-box DNS type "${s.type}"`);
@@ -79,8 +93,12 @@ function dnsServer(s, tag, detour, singbox) {
 	return out;
 }
 
+/**
+ * @param {object} settings
+ * @param {{nodes: object[], byName: object}} graph
+ */
 export function build(settings, graph) {
-	let s = settings, singbox = s.core == CORE.singbox, config;
+	let s = settings, singbox = s.core == CORE.singbox, config = {};
 	if (singbox) {
 		config = {
 			log: { disabled: false, level: s.log, timestamp: true },

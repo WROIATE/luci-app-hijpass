@@ -6,11 +6,14 @@ import { render, validate } from '../generator/render.uc';
 // 未给 sections 时直接读取 /etc/config/hijpass，支持脱离 LuCI 的命令行运行。
 // RPC Response：render 返回 {nodes, shunt?} 或 {config}；validate 返回 {ok:true}；
 // 错误统一为 {error}，供 LuCI 展示；CLI 错误输出到 stderr 并返回非零状态。
-function stdinJSON() {
-	let data = fs.stdin.read('all');
-	if (length(data) > 4 * 1024 * 1024) die('input exceeds 4 MiB');
-	return json(data);
+function stdinText() {
+	// 多读一个字节即可判断超限，避免先把任意大小的输入全部载入内存。
+	let limit = 4 * 1024 * 1024, data = fs.stdin.read(limit + 1);
+	if (type(data) != 'string') die(`cannot read input: ${fs.error()}`);
+	if (length(data) > limit) die('input exceeds 4 MiB');
+	return data;
 }
+/** @param {string[]} args 命令行参数；由解释器 ARGV 提供。 */
 export function main(args) {
 	if (args[0] == 'list') {
 		printf('%J\n', { render: { sections: '', target: '' }, validate: { sections: '' } });
@@ -22,7 +25,8 @@ export function main(args) {
 		if (method != 'render' && method != 'validate') die(`unknown ${rpc ? 'method' : 'command'} "${method}"`);
 		let sections, target = '';
 		if (rpc) {
-			let request = stdinJSON();
+			// 读取、解析及使用外部 JSON 都处于同一个错误边界内。
+			let request = json(stdinText());
 			if (type(request) != 'object') die('request must be an object');
 			if (request.sections != null && type(request.sections) != 'string') die('sections must be a string');
 			if (request.target != null && type(request.target) != 'string') die('target must be a string');
@@ -37,7 +41,7 @@ export function main(args) {
 				else if (args[i] == '--configdir' && args[i + 1]) directory = args[++i];
 				else die(`unknown argument "${args[i]}"`);
 			}
-			sections = useStdin ? stdinJSON() : read('hijpass', directory);
+			sections = useStdin ? json(stdinText()) : read('hijpass', directory);
 		}
 		let result = method == 'validate' ? validate(sections) : render(sections, target);
 		printf('%.2J\n', rpc && target && method == 'render' ? { config: result } : result);

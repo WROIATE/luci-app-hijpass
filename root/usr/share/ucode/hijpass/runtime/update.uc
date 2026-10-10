@@ -4,6 +4,10 @@ import { exec, checked, temporary, removeTree } from './system.uc';
 // CoreRelease：tag_name 为官方版本，assets 含 name/state/browser_download_url/digest。
 // digest 必须为 sha256，先校验归档，再验证可执行文件，最后原子替换目标。
 const repos = { 'sing-box': 'SagerNet/sing-box', xray: 'XTLS/Xray-core' };
+/**
+ * @param {string} core
+ * @param {string} machine
+ */
 export function architecture(core, machine) {
 	const suffixes = {
 		'sing-box': { x86_64: 'amd64', aarch64: 'arm64', arm64: 'arm64', armv7l: 'armv7', armv6l: 'armv6', mips: 'mips-softfloat', mipsle: 'mipsle-softfloat', mips64: 'mips64', mips64le: 'mips64le' },
@@ -13,18 +17,33 @@ export function architecture(core, machine) {
 	if (!suffix) die(`unsupported architecture: ${machine}`);
 	return 'linux-' + suffix;
 };
+/**
+ * @param {string} core
+ * @param {string} path
+ */
 function version(core, path) {
 	let result = exec([path, 'version'], true);
 	let matchVersion = match(result.stdout, core == 'xray' ? /Xray ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/ : /sing-box version ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/);
 	return !result.code && matchVersion ? matchVersion[1] : null;
 }
+/**
+ * @param {string} core
+ */
 export function release(core) {
 	if (!repos[core]) die('unknown core');
 	let response = checked(['curl', '-f', '-sS', '-L', '--max-time', '10', `https://api.github.com/repos/${repos[core]}/releases/latest`]);
-	let info = json(response);
-	if (!match(info.tag_name || '', /^v?[0-9]+[.][0-9]+[.][0-9]+[A-Za-z0-9.+-]*$/)) die('invalid release version');
-	return info;
+	try {
+		let info = json(response);
+		if (type(info) != 'object') die('release response must be an object');
+		if (!match(info.tag_name || '', /^v?[0-9]+[.][0-9]+[.][0-9]+[A-Za-z0-9.+-]*$/)) die('invalid release version');
+		return info;
+	}
+	catch (e) { die(`invalid ${core} release response: ${e.message}`); }
 };
+/**
+ * @param {string} action
+ * @param {string} core
+ */
 export function run(action, core) {
 	if (!repos[core]) die('unknown core');
 	let destination = `/usr/bin/${core}`;

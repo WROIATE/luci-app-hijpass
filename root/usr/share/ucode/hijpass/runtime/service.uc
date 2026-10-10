@@ -3,7 +3,7 @@ import { first, of, list } from '../uci/config.uc';
 import { render } from '../generator/render.uc';
 import { CORE, core } from '../generator/constants.uc';
 import { resolve } from './network.uc';
-import { atomic, checked, exec, command, mkdir, temporary } from './system.uc';
+import { atomic, checked, command, mkdir, temporary } from './system.uc';
 import { reset, remove, route } from './firewall.uc';
 import { geo, update } from './rules.uc';
 import { prepare as prepareDNS } from './dns.uc';
@@ -123,12 +123,6 @@ function cron(sections, enabled) {
 	atomic(path, join('\n', entries) + '\n');
 	checked(['/etc/init.d/cron', 'restart']);
 }
-export function activate(sections) {
-	if (first(sections, 'hijpass').enabled != '1') return;
-	try { reset(sections); route('reset_hijpass_route'); hook(sections, 'start'); cron(sections, true); }
-	catch (e) { deactivate(sections); die(e.message); }
-	logger(sections)('INFO', 'Service started');
-};
 export function deactivate(sections) {
 	// 停止时继续执行其它清理步骤，最后统一报告失败，避免单个 hook 留下透明路由。
 	let failures = [];
@@ -138,6 +132,12 @@ export function deactivate(sections) {
 	fs.unlink('/etc/hijpass/chinadns-ng.conf');
 	if (length(failures)) die(join('; ', failures));
 	logger(sections)('INFO', 'Service stopped');
+};
+export function activate(sections) {
+	if (first(sections, 'hijpass').enabled != '1') return;
+	try { reset(sections); route('reset_hijpass_route'); hook(sections, 'start'); cron(sections, true); }
+	catch (e) { deactivate(sections); die(e.message); }
+	logger(sections)('INFO', 'Service started');
 };
 export function autoUpdate(sections) {
 	let interval = int(first(sections, 'rule').update_interval || '0');
@@ -176,6 +176,12 @@ export function serverPrepare(sections) {
 	for (let instance in output.instances) if (instance.log) mkdir(fs.dirname(instance.log));
 	return output;
 };
+function serverCron(instances) {
+	let path = '/etc/crontabs/root';
+	let entries = filter(split(fs.readfile(path) || '', '\n'), line => line && !match(line, /\/hijpass\/clean-service-log[.](sh|uc) hijserver/));
+	if (length(filter(instances, instance => instance.log))) push(entries, '*/10 * * * * /usr/lib/hijpass/clean-service-log.uc hijserver');
+	atomic(path, join('\n', entries) + '\n'); checked(['/etc/init.d/cron', 'restart']);
+}
 export function serverActivate(sections) {
 	let output = serverPlan(sections);
 	// 只开放明确选中的端口；没有端口时删除旧 include，避免旧服务端仍对 WAN 开放。
@@ -187,12 +193,6 @@ export function serverActivate(sections) {
 	else { fs.unlink(SERVER_TABLE); fs.unlink(SERVER_CHAIN); }
 	checked(['fw4', 'reload']); serverCron(output.instances);
 };
-function serverCron(instances) {
-	let path = '/etc/crontabs/root';
-	let entries = filter(split(fs.readfile(path) || '', '\n'), line => line && !match(line, /\/hijpass\/clean-service-log[.](sh|uc) hijserver/));
-	if (length(filter(instances, instance => instance.log))) push(entries, '*/10 * * * * /usr/lib/hijpass/clean-service-log.uc hijserver');
-	atomic(path, join('\n', entries) + '\n'); checked(['/etc/init.d/cron', 'restart']);
-}
 export function serverDeactivate() {
 	fs.unlink(SERVER_TABLE); fs.unlink(SERVER_CHAIN);
 	let errors = [];

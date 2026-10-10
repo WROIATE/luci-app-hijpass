@@ -4,6 +4,25 @@ import { optional, TAG } from './constants.uc';
 // Match 字段均为数组：domain/suffix/keyword/regex 域名条件，ip 为地址或 CIDR，
 // geoip/geosite 为 Geo 标签，network/protocol/ports/ranges 为传输限制。
 // sets 元素：{type, tag, path|url}，表示本地或远端 sing-box 规则集。
+/**
+ * @typedef {object} Match
+ * @property {string[]} domain 完整域名。
+ * @property {string[]} suffix 域名后缀。
+ * @property {string[]} keyword 域名关键字。
+ * @property {string[]} regex 域名正则表达式。
+ * @property {string[]} ip IP 或 CIDR。
+ * @property {string[]} geoip GeoIP 标签。
+ * @property {string[]} geosite GeoSite 标签。
+ * @property {object[]} sets 本地或远端规则集。
+ * @property {string[]} network 传输层协议。
+ * @property {string[]} protocol 应用层协议。
+ * @property {integer[]} ports 目标端口。
+ * @property {string[]} ranges 目标端口范围，使用冒号分隔。
+ */
+/**
+ * @param {object} section UCI shunt_route_rule。
+ * @returns {Match}
+ */
 export function parse(section) {
 	let r = {
 		domain: [], suffix: [], keyword: [], regex: [], ip: [], geoip: [], geosite: [], sets: [],
@@ -34,17 +53,27 @@ export function parse(section) {
 	}
 	return r;
 };
+/** @param {Match} r */
 export function hasDomain(r) { return length(r.domain) + length(r.suffix) + length(r.keyword) + length(r.regex) > 0; };
+/**
+ * @param {Match} r
+ * @param {boolean} geo 是否按 Xray Geo 标签判断匹配条件。
+ */
 export function empty(r, geo) {
 	return !hasDomain(r) && !length(r.ip) && !length(r.network) && !length(r.protocol)
 		&& !length(r.ports) && !length(r.ranges) && !(geo ? length(r.geoip) + length(r.geosite) : length(r.sets));
 };
+/** @param {Match} r */
 export function convertGeo(r) {
 	for (let value in [...r.geosite, ...r.geoip]) {
 		let tag = replace(value, ':', '-');
 		push(r.sets, { type: 'local', tag, format: 'binary', path: `/etc/hijpass/ruleset/${tag}.srs` });
 	}
 };
+/**
+ * @param {Match} r
+ * @param {boolean} dnsOnly
+ */
 export function singboxMatch(r, dnsOnly) {
 	let out = {};
 	for (let key, values in { domain: r.domain, domain_suffix: r.suffix, domain_keyword: r.keyword, domain_regex: r.regex })
@@ -56,9 +85,16 @@ export function singboxMatch(r, dnsOnly) {
 	}
 	return out;
 };
+/** @param {Match} r */
 export function xrayDomains(r) {
 	return [...map(r.domain, d => 'full:' + d), ...map(r.suffix, d => 'domain:' + d), ...r.keyword, ...map(r.regex, d => 'regexp:' + d), ...r.geosite];
 };
+/**
+ * @param {Match} r
+ * @param {string} name
+ * @param {string} exit
+ * @param {integer} version 0 表示不限制地址族，4/6 表示 IPv4/IPv6。
+ */
 export function xrayRules(r, name, exit, version) {
 	let base = { inboundTag: [TAG.tproxy], outboundTag: exit };
 	optional(base, 'ruleTag', name);

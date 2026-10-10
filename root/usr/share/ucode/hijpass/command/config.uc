@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { read } from '../uci/config.uc';
+import { read } from '../uci/read.uc';
 import { render, validate } from '../generator/render.uc';
 
 // RPC Request：sections 为可选的 JSON 快照字符串，target 为可选 section ID。

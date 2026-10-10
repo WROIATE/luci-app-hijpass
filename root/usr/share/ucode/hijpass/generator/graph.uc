@@ -1,5 +1,6 @@
-import { of, list } from '../uci/config.uc';
-import { proxy, TYPE } from '../uci/protocol/config.uc';
+import { of } from '../config/sections.uc';
+import { list } from '../config/values.uc';
+import { proxy, TYPE } from '../config/protocol/proxy.uc';
 
 // Graph.nodes 保持 UCI 根节点和依赖的发现顺序，byID/byName 仅用于查找。
 // 解析、连接引用、校验分别执行，查询过程没有隐藏的配置校验副作用。

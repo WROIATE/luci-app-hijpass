@@ -308,3 +308,38 @@ test('连接失败的 curl 输出仍转换为完整报告，核心与诊断命�
         assert.equal(missing.stdout, '');
     }
 });
+
+test('UCI 读取仅返回原生字段，业务类型和协议校验由生成阶段处理', t => {
+    const directory = fixture(t);
+    fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass
+ option enabled '0'
+ option description 'a name with spaces'
+config proxy_node 'sample'
+ option enabled '1'
+ option type 'hysteria2'
+ option core 'sing-box'
+ option server 'example.org'
+ option server_port 'not-a-port'
+ option listen_port '10001'
+ option socks_port '10002'
+ list server_ports '443-445'
+ list server_ports '8443'
+ list server_ports '443-445'
+`);
+    const sections = value({ action: 'read', directory });
+    assert.deepEqual(sections.map(s => s['.type']), ['hijpass', 'proxy_node']);
+    assert.deepEqual(sections.map(s => s['.index']), [0, 1]);
+    assert.equal(sections[0]['.anonymous'], true);
+    assert.equal(typeof sections[0]['.name'], 'string');
+    assert.equal(sections[0].enabled, '0');
+    assert.equal(sections[0].description, 'a name with spaces');
+    assert.equal(sections[1]['.name'], 'sample');
+    assert.equal(sections[1]['.anonymous'], false);
+    assert.equal(sections[1].server_port, 'not-a-port');
+    assert.equal(sections[1].listen_port, '10001');
+    assert.deepEqual(sections[1].server_ports, ['443-445', '8443', '443-445']);
+    const rendered = run('root/usr/bin/hijpass-config', ['render', '--configdir', directory]);
+    assert.equal(rendered.status, 1);
+    assert.match(rendered.stderr, /invalid port/);
+    assert.equal(rendered.stdout, '');
+});

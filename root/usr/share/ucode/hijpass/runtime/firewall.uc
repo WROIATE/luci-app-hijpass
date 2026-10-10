@@ -1,5 +1,7 @@
 import * as fs from 'fs';
-import { read, first, list, port } from '../uci/config.uc';
+import { read } from '../uci/read.uc';
+import { first } from '../config/sections.uc';
+import { list, port } from '../config/values.uc';
 import { exec, checked, lines, atomic, temporary } from './system.uc';
 
 // Firewall 的输入仍使用 UCI 字段：proxy_port/shunt_port 为透明代理入口，

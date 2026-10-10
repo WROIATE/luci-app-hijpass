@@ -1,4 +1,4 @@
-import { duration } from '../../../uci/config.uc';
+import { duration } from '../../../config/values.uc';
 
 // streamSettings.network 为 Xray 原生传输名；HTTP 已迁移到 XHTTP stream-one。
 // WS 的 early data 通过 URL 的 ed 参数传递，必须保留已有 query 和 fragment。

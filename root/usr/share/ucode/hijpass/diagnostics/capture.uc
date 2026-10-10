@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { read } from '../uci/config.uc';
+import { read } from '../uci/read.uc';
 import { resolve } from '../runtime/network.uc';
 import { exec, quote, atomic, mkdir, removeTree, lines } from '../runtime/system.uc';
 import { report } from './report.uc';

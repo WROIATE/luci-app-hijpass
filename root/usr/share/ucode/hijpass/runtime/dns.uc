@@ -1,5 +1,7 @@
 import * as fs from 'fs';
-import { read, first, port } from '../uci/config.uc';
+import { read } from '../uci/read.uc';
+import { first } from '../config/sections.uc';
+import { port } from '../config/values.uc';
 import { geo, domain } from './rules.uc';
 import { lines, atomic } from './system.uc';
 

@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import { cursor } from 'uci';
-import { list } from '../uci/config.uc';
-import { fields as balanceFields } from '../uci/protocol/loadbalance.uc';
-import { BaseOptions } from '../uci/protocol/options.uc';
+import { list } from '../config/values.uc';
+import { fields as balanceFields } from '../config/protocol/loadbalance.uc';
+import { BaseOptions } from '../config/protocol/options.uc';
 import { atomic, mkdir, removeTree } from './system.uc';
 
 // 安装迁移只调整已知旧字段：singbox/system 名称和旧分流负载均衡选项。

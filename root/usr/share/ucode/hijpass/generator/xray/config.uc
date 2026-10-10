@@ -1,7 +1,7 @@
 import { build as shadowsocks } from './protocol/shadowsocks.uc';
 import { build as vless } from './protocol/vless.uc';
 import { build as hysteria2 } from './protocol/hysteria2.uc';
-import { TYPE } from '../../uci/protocol/config.uc';
+import { TYPE } from '../../config/protocol/proxy.uc';
 import { TAG } from '../constants.uc';
 
 const builders = { [TYPE.shadowsocks]: shadowsocks, [TYPE.vless]: vless, [TYPE.hysteria2]: hysteria2 };

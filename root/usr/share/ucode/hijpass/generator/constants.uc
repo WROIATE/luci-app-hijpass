@@ -5,8 +5,6 @@ export const TAG = {
 	upstream: 'upstream-', balance: 'slb', member: 'lb-member-',
 	ruleset: 'ruleset-out', rulesetDNS: 'ruleset-dns-resolver',
 };
-export const CORE = { singbox: 'sing-box', xray: 'xray', custom: 'custom' };
-export function core(value) { return value == 'singbox' ? CORE.singbox : value; };
 
 export function optional(object, key, value) {
 	// 未设置与明确设置 false/0 不同；只省略空值，与 TS 的 JsonUtils 一致。

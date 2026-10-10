@@ -1,5 +1,6 @@
 import * as fs from 'fs';
-import { first, of, list } from '../uci/config.uc';
+import { first, of } from '../config/sections.uc';
+import { list } from '../config/values.uc';
 import { exec, checked, lines, atomic, temporary, mkdir } from './system.uc';
 import { contains } from './network.uc';
 

@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { first } from '../uci/config.uc';
+import { first } from '../config/sections.uc';
 import { mkdir } from './system.uc';
 
 /**

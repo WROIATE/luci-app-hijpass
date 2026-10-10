@@ -1,4 +1,4 @@
-import { list, port } from '../uci/config.uc';
+import { list, port } from '../config/values.uc';
 import { optional, TAG } from './constants.uc';
 
 // Match 字段均为数组：domain/suffix/keyword/regex 域名条件，ip 为地址或 CIDR，

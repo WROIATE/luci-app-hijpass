@@ -1,5 +1,7 @@
-import { of, first, port } from '../uci/config.uc';
-import { TAG, CORE, core, optional } from './constants.uc';
+import { of, first } from '../config/sections.uc';
+import { port } from '../config/values.uc';
+import { CORE, core } from '../config/protocol/proxy.uc';
+import { TAG, optional } from './constants.uc';
 import { parse, hasDomain, empty, convertGeo, singboxMatch, xrayDomains, xrayRules } from './rules.uc';
 import * as sb from './singbox/config.uc';
 import * as xr from './xray/config.uc';

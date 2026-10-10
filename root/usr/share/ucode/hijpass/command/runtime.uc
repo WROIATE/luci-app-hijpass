@@ -1,5 +1,6 @@
 import * as fs from 'fs';
-import { read, first } from '../uci/config.uc';
+import { read } from '../uci/read.uc';
+import { first } from '../config/sections.uc';
 import * as network from '../runtime/network.uc';
 import * as firewall from '../runtime/firewall.uc';
 import * as rules from '../runtime/rules.uc';

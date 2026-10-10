@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import { query } from 'resolv';
+import { port } from '../config/values.uc';
 import { exec } from './system.uc';
-import { port } from '../uci/config.uc';
 
 // 地址解析返回 IP 字符串，不改动 TLS 的 server_name，代理链仍可验证原始域名证书。
 /**

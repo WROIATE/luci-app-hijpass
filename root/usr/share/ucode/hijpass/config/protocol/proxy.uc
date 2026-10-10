@@ -5,8 +5,11 @@ import { fields as tuic } from './tuic.uc';
 import { fields as shadowtls } from './shadowtls.uc';
 import { fields as loadbalance } from './loadbalance.uc';
 import { fields as custom } from './custom.uc';
-import { decode, duration } from '../config.uc';
-import { CORE, core } from '../../generator/constants.uc';
+import { decode, duration } from '../values.uc';
+
+// 核心与协议都是输入字段；生成器及服务启动共用相同的名称规范化。
+export const CORE = { singbox: 'sing-box', xray: 'xray', custom: 'custom' };
+export function core(value) { return value == 'singbox' ? CORE.singbox : value; };
 
 export const TYPE = {
 	shadowsocks: 'shadowsocks', vless: 'vless', hysteria2: 'hysteria2',
@@ -17,7 +20,7 @@ const protocols = {
 	[TYPE.tuic]: tuic, [TYPE.shadowtls]: shadowtls, [TYPE.balance]: loadbalance, [TYPE.custom]: custom,
 };
 
-// Proxy 为所属协议 fields 的解码结果，额外包含：
+// Proxy 为对应协议 fields 的解码结果，只包含该协议声明的字段，额外包含：
 // id/name/type/core（标识），upstream（上游 Proxy 或 null），members（成员 Proxy 数组）。
 // upstream/members 在 graph.uc 中连接，生成器不再根据名字查询和重复解码。
 export function proxy(section) {

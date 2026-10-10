@@ -1,14 +1,14 @@
 import * as fs from 'fs';
-import { first, of, list } from '../uci/config.uc';
+import { first, of } from '../config/sections.uc';
+import { list, port } from '../config/values.uc';
 import { render } from '../generator/render.uc';
-import { CORE, core } from '../generator/constants.uc';
+import { CORE, core } from '../config/protocol/proxy.uc';
 import { resolve } from './network.uc';
 import { atomic, checked, command, mkdir, temporary } from './system.uc';
 import { reset, remove, route } from './firewall.uc';
 import { geo, update } from './rules.uc';
 import { prepare as prepareDNS } from './dns.uc';
 import { logger } from './files.uc';
-import { port } from '../uci/config.uc';
 
 // Instance 为 procd 的输入：id/name（标识），command（argv），env（KEY=VALUE 数组），
 // user（进程用户），log（文件路径或空），shunt（是否设置核心/no-file 资源限制）。

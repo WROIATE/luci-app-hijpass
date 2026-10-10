@@ -1,6 +1,7 @@
-import * as uci from '../uci/config.uc';
+import { first, validateSections } from '../config/sections.uc';
+import { CORE } from '../config/protocol/proxy.uc';
 import { resolve, validateGraph, validatePorts } from './graph.uc';
-import { CORE, clean } from './constants.uc';
+import { clean } from './constants.uc';
 import { build as singbox } from './singbox/config.uc';
 import { build as xray } from './xray/config.uc';
 import { prepare as prepareRouting, build as buildRouting } from './routing.uc';
@@ -12,10 +13,10 @@ import { prepare as prepareRouting, build as buildRouting } from './routing.uc';
  * @param {string} [target]
  */
 export function render(sections, target) {
-	uci.validate(sections);
+	validateSections(sections);
 	let graph = resolve(sections, target);
 	validateGraph(graph);
-	let shunt = uci.first(sections, 'shunt'), routing = null;
+	let shunt = first(sections, 'shunt'), routing = null;
 	if (target == 'shunt' || !target && shunt.enabled != '0' && shunt.config_type == 'tmpl')
 		routing = prepareRouting(sections, graph);
 	validatePorts(graph.nodes, routing);
@@ -36,7 +37,7 @@ export function render(sections, target) {
  */
 export function validate(sections) {
 	// 服务关闭时允许保存未完成表单，但输入的 UCI 结构仍必须有效。
-	if (uci.first(sections, 'hijpass').enabled == '0') uci.validate(sections);
+	if (first(sections, 'hijpass').enabled == '0') validateSections(sections);
 	else render(sections);
 	return { ok: true };
 };

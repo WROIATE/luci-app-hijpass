@@ -3,7 +3,7 @@ import { build as vless } from './protocol/vless.uc';
 import { build as hysteria2 } from './protocol/hysteria2.uc';
 import { build as tuic } from './protocol/tuic.uc';
 import { build as shadowtls } from './protocol/shadowtls.uc';
-import { TYPE } from '../../uci/protocol/config.uc';
+import { TYPE } from '../../config/protocol/proxy.uc';
 import { TAG, optional } from '../constants.uc';
 
 const builders = {

@@ -9,13 +9,14 @@ import * as files from '../../root/usr/share/ucode/hijpass/runtime/files.uc';
 import * as system from '../../root/usr/share/ucode/hijpass/runtime/system.uc';
 import { architecture } from '../../root/usr/share/ucode/hijpass/runtime/update.uc';
 import { migrate } from '../../root/usr/share/ucode/hijpass/runtime/defaults.uc';
-import { read } from '../../root/usr/share/ucode/hijpass/uci/config.uc';
+import { read } from '../../root/usr/share/ucode/hijpass/uci/read.uc';
 import { render } from '../../root/usr/share/ucode/hijpass/generator/render.uc';
 import { parse } from '../../root/usr/share/ucode/hijpass/diagnostics/capture.uc';
 import { packetSummary, report } from '../../root/usr/share/ucode/hijpass/diagnostics/report.uc';
 
 let request = json(fs.stdin.read('all')), result;
 switch (request.action) {
+case 'read': result = read('hijpass', request.directory); break;
 case 'firewall': result = firewall.generate(request.sections, request.state, fs.readfile(request.template)); break;
 case 'plan': result = service.plan(request.sections); break;
 case 'server-plan': result = service.serverPlan(request.sections); break;

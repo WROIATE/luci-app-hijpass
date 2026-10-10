@@ -4,7 +4,7 @@ export function build(n) {
 	let stream = {
 		network: 'hysteria', security: 'tls',
 		tlsSettings: { serverName: n.tls_server_name || n.server, alpn: ['h3'] },
-		hysteriaSettings: { version: 2, auth: n.password, udpIdleTimeout: n.udp_idle_timeout, masquerade: {} },
+		hysteriaSettings: { version: 2, auth: n.password, udpIdleTimeout: n.udp_idle_timeout },
 	};
 	if (n.up_mbps != null || n.down_mbps != null) {
 		function bandwidth(value) { return value == null ? '' : value ? `${value} mbps` : '0'; }

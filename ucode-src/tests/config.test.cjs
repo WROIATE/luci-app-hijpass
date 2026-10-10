@@ -6,23 +6,6 @@ const path = require('node:path');
 const { config } = require('./helpers.cjs');
 const fixtures = require('./testdata/compatibility.json');
 
-// Go 的 Xray 原生结构体输出大量 null/零值字段，它们与未设置等价。
-// 对照只去除这些默认值，数组顺序、非默认值和所有 sing-box 字段均保持严格比较。
-function xrayDefaults(value) {
-    if (Array.isArray(value)) return value.map(xrayDefaults);
-    if (value && typeof value === 'object') {
-        // Xray Int32Range 的默认零值编码为字符串；仅这些字段的 "0" 可以省略。
-        const zeroRanges = new Set(['scMaxEachPostBytes', 'scMinPostsIntervalMs', 'scStreamUpServerSecs',
-            'sessionIDLength', 'uplinkChunkSize', 'xPaddingBytes', 'cMaxReuseTimes', 'hMaxRequestTimes',
-            'hMaxReusableSecs', 'maxConcurrency', 'maxConnections']);
-        const entries = Object.entries(value).map(([key, val]) => [key, xrayDefaults(val)])
-            .filter(([key, val]) => !(zeroRanges.has(key) && val === '0') && val !== null && val !== false && val !== '' && val !== 0
-                && !(Array.isArray(val) && !val.length) && !(val && typeof val === 'object' && !Object.keys(val).length));
-        return Object.fromEntries(entries);
-    }
-    return value;
-}
-function canonical(config) { return config.inbounds?.[0]?.protocol ? xrayDefaults(config) : config; }
 function rpc(method, sections, target) {
     const result = config(['call', method], { sections: JSON.stringify(sections), target });
     assert.equal(result.status, 0, result.stderr);
@@ -33,10 +16,8 @@ for (const fixture of fixtures) {
         const result = config(['render', '--stdin'], fixture.sections);
         assert.equal(result.status, 0, result.stderr);
         const generated = JSON.parse(result.stdout);
-        assert.deepEqual(Object.keys(generated.nodes).sort(), Object.keys(fixture.expected.nodes).sort());
-        for (const [id, expected] of Object.entries(fixture.expected.nodes))
-            assert.deepEqual(canonical(generated.nodes[id]), canonical(expected));
-        assert.deepEqual(canonical(generated.shunt || {}), canonical(fixture.expected.shunt || {}));
+        // 样本直接来自迁移前的 TS；严格比较默认值、数组、时长和规则顺序。
+        assert.deepEqual(generated, fixture.expected);
         assert.deepEqual(rpc('render', fixture.sections), generated);
         assert.deepEqual(rpc('validate', fixture.sections), { ok: true });
         for (const [id, expected] of [...Object.entries(generated.nodes), ...(generated.shunt ? [['shunt', generated.shunt]] : [])]) {
@@ -44,11 +25,6 @@ for (const fixture of fixtures) {
             const preview = config(['render', '--stdin', '--target', id], fixture.sections);
             assert.equal(preview.status, 0, preview.stderr);
             assert.deepEqual(JSON.parse(preview.stdout), expected);
-        }
-        if (fixture.error) {
-            const sections = structuredClone(fixture.sections);
-            sections.find(s => s.type === 'shadowsocks').udp_over_tcp = '1';
-            assert.match(rpc('render', sections).error, /no longer supports.*udp_over_tcp/);
         }
     });
 }
@@ -80,6 +56,11 @@ test('预检拒绝缺失引用、重复名称、循环、过长代理链及监�
         assert.equal(result.stdout, '');
         assert.match(result.stderr, pattern);
     }
+});
+
+test('最新版 Xray 不再支持 Shadowsocks UDP-over-TCP', () => {
+    assert.match(rpc('render', [node('a', { core: 'xray', udp_over_tcp: '1' })]).error,
+        /no longer supports.*udp_over_tcp/);
 });
 test('单节点预览只校验可达依赖，关闭服务仍可保存未完成配置', () => {
     const sections = [node('a'), node('broken', { type: 'invalid' })];

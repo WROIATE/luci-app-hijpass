@@ -5,7 +5,6 @@ import { build as tuic } from './protocol/tuic.uc';
 import { build as shadowtls } from './protocol/shadowtls.uc';
 import { TYPE } from '../../uci/protocol/config.uc';
 import { TAG, optional } from '../constants.uc';
-import { durationText } from '../../uci/config.uc';
 
 const builders = {
 	[TYPE.shadowsocks]: shadowsocks, [TYPE.vless]: vless, [TYPE.hysteria2]: hysteria2,
@@ -23,7 +22,7 @@ export function inbound(kind, tag, port, address) {
 // outbounds 远端出口；route 匹配规则及默认出口。返回普通 JSON 对象。
 export function build(n) {
 	let config = {
-		log: { level: n.log_level || 'info', timestamp: true },
+		log: { disabled: false, level: n.log_level || 'info', timestamp: true },
 		dns: { servers: [{ type: 'local', tag: 'local' }] },
 		inbounds: [inbound('tproxy', TAG.tproxy, n.listen_port), inbound('socks', TAG.socks, n.socks_port)],
 		outbounds: [],
@@ -32,8 +31,8 @@ export function build(n) {
 	if (n.type == TYPE.balance) {
 		let balance = { type: 'urltest', tag: TAG.balance, outbounds: [] };
 		for (let key in ['url', 'tolerance']) optional(balance, key, n[key]);
-		optional(balance, 'interrupt_exist_connections', n.interrupt_exist_connections);
-		for (let key in ['interval', 'idle_timeout']) optional(balance, key, n[key] ? durationText(n[key]) : null);
+		if (n.interrupt_exist_connections) balance.interrupt_exist_connections = true;
+		for (let key in ['interval', 'idle_timeout']) optional(balance, key, n[key]);
 		push(config.outbounds, balance);
 		for (let i, member in n.members) {
 			let tag = `${TAG.member}${i}`;

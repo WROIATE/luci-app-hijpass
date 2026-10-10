@@ -1,3 +1,5 @@
+import { duration } from '../../../uci/config.uc';
+
 // streamSettings.network 为 Xray 原生传输名；HTTP 已迁移到 XHTTP stream-one。
 // WS 的 early data 通过 URL 的 ed 参数传递，必须保留已有 query 和 fragment。
 export function apply(stream, n) {
@@ -28,10 +30,10 @@ export function apply(stream, n) {
 		stream.network = 'grpc';
 		stream.grpcSettings = {
 			serviceName: n.transport_grpc_service_name || 'TunService',
-			idle_timeout: int(n.transport_grpc_idle_timeout),
-			health_check_timeout: int(n.transport_grpc_ping_timeout),
-			permit_without_stream: n.transport_grpc_permit_without_stream,
+			idle_timeout: int(duration(n.transport_grpc_idle_timeout)) || null,
+			health_check_timeout: int(duration(n.transport_grpc_ping_timeout)) || null,
 		};
+		if (n.transport_grpc_permit_without_stream) stream.grpcSettings.permit_without_stream = true;
 		break;
 	default: die(`unsupported Xray transport "${n.transport_type}"`);
 	}

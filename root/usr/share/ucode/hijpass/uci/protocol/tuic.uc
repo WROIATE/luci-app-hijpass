@@ -12,5 +12,5 @@ export const fields = {
 	udp_relay_mode: ["text", ""], // TUIC UDP 转发模式（native/quic）
 	udp_over_stream: ["bool", false], // 0/1；使用 QUIC stream 转发 UDP
 	zero_rtt_handshake: ["bool", false], // 0/1；启用 TUIC 0-RTT 握手
-	heartbeat: ["duration", 10], // TUIC 心跳间隔，解码后为秒；默认 10 秒
+	heartbeat: ["duration", "10s"], // TUIC 心跳间隔，保留时长字符串；默认 10 秒
 };

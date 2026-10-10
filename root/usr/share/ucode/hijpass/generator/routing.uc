@@ -6,7 +6,7 @@ import * as xr from './xray/config.uc';
 
 // Routing：core/listen/dnsPort/log/strategy/cache/convert 为模板选项，
 // final/rulesetExit 为已解析出口标签；dns/rulesetDNS 为服务器对象，entries 为规则数组。
-// DNSServer：tag（名称）、type（传输）、address、port（0 表示核心默认端口）。
+// DNSServer：tag（名称）、type（传输）、address、port（null 表示未设置）。
 // Entry：name/split，exit/v4/v6/dnsExit 出口，dns/strategy DNS 策略，match 匹配条件。
 export function prepare(sections, graph) {
 	function exit(name, required) {
@@ -20,7 +20,7 @@ export function prepare(sections, graph) {
 	for (let s in of(sections, 'shunt_dns_node')) {
 		if (s.enabled == '0') continue;
 		if (servers[s.tag]) die(`duplicate DNS tag "${s.tag}"`);
-		servers[s.tag] = { tag: s.tag, type: s.type, address: s.server, port: s.port ? port(s.port) : 0 };
+		servers[s.tag] = { tag: s.tag, type: s.type, address: s.server, port: s.port ? port(s.port) : null };
 	}
 	function server(name) {
 		if (!servers[name]) die(`DNS node "${name}" missing or disabled`);
@@ -42,10 +42,11 @@ export function prepare(sections, graph) {
 	for (let r in of(sections, 'shunt_route_rule')) {
 		if (r.enabled != '1') continue;
 		let split = r.ip_version_split == '1';
+		if (split && !r.proxy_node_v4 && !r.proxy_node_v6) die(`split rule "${r.name}" requires a proxy exit`);
 		push(settings.entries, {
 			name: r.name || '', split,
 			exit: split ? '' : exit(r.proxy_node, true),
-			v4: split ? exit(r.proxy_node_v4, true) : '', v6: split ? exit(r.proxy_node_v6, true) : '',
+			v4: split ? exit(r.proxy_node_v4, false) : '', v6: split ? exit(r.proxy_node_v6, false) : '',
 			dnsExit: exit(r.dns_proxy_node, false), dns: r.dns_node ? server(r.dns_node) : settings.dns,
 			strategy: r.dns_strategy || '', match: parse(r),
 		});
@@ -82,14 +83,14 @@ export function build(settings, graph) {
 	let s = settings, singbox = s.core == CORE.singbox, config;
 	if (singbox) {
 		config = {
-			log: { level: s.log, timestamp: true },
-			dns: { servers: [dnsServer(s.dns, s.dns.tag, s.final, true)], final: s.dns.tag },
+			log: { disabled: false, level: s.log, timestamp: true },
+			dns: { servers: [dnsServer(s.dns, s.dns.tag, s.final, true)], final: s.dns.tag,
+				disable_cache: !s.cache, disable_expire: !s.cache },
 			inbounds: [sb.inbound('tproxy', TAG.tproxy, s.listen, '::'), sb.inbound('direct', TAG.dnsInbound, s.dnsPort, '::')],
 			outbounds: [{ type: 'direct', tag: TAG.direct }, ...map(graph.nodes, n => sb.socks(n.name, n.socks_port))],
-			route: { rules: [{ action: 'sniff' }, { protocol: 'dns', action: 'hijack-dns' }], final: s.final, default_domain_resolver: s.dns.tag },
+			route: { rules: [{ action: 'sniff' }, { protocol: ['dns'], action: 'hijack-dns' }], final: s.final, default_domain_resolver: s.dns.tag },
 		};
 		optional(config.dns, 'strategy', strategy(s.strategy, true));
-		if (!s.cache) { config.dns.disable_cache = true; config.dns.disable_expire = true; }
 		if (s.rulesetExit) {
 			let out = s.rulesetExit == TAG.direct ? { type: 'direct', tag: TAG.ruleset } : sb.socks(TAG.ruleset, graph.byName[s.rulesetExit].socks_port);
 			if (s.rulesetDNS) {
@@ -112,9 +113,9 @@ export function build(settings, graph) {
 			log: xr.log(s.log), outbounds,
 			inbounds: [xr.inbound('tproxy', TAG.tproxy, s.listen, true), xr.inbound('direct', TAG.dnsInbound, s.dnsPort)],
 			routing: { domainStrategy: 'AsIs', rules: [] },
-			dns: { servers: [], queryStrategy: strategy(s.strategy, false) || 'UseIP', serveExpiredTTL: 3600, disableFallbackIfMatch: true },
+			dns: { servers: [], queryStrategy: strategy(s.strategy, false) || 'UseIP', serveExpiredTTL: 3600,
+				disableCache: !s.cache, serveStale: !s.cache, disableFallback: false, disableFallbackIfMatch: true },
 		};
-		if (!s.cache) { config.dns.disableCache = true; config.dns.serveStale = true; }
 	}
 	let routes = [], dnsExits = {}, exitOrder = [], sets = {}, setOrder = [];
 	function addDNS(entry, r, exit) {
@@ -123,7 +124,7 @@ export function build(settings, graph) {
 		push(config.dns.servers, server);
 		if (singbox) {
 			config.dns.rules ||= [];
-			let rule = { ...singboxMatch(r, true), server: tag, disable_cache: true };
+			let rule = { ...singboxMatch(r, true), action: 'route', server: tag, disable_cache: true };
 			optional(rule, 'strategy', strategy(entry.strategy, true));
 			push(config.dns.rules, rule);
 		}
@@ -136,7 +137,9 @@ export function build(settings, graph) {
 	}
 	for (let entry in s.entries) {
 		let splitMatch = null;
-		for (let version in entry.split ? [4, 6] : [0]) {
+		// 与 TS 的 getRouteRuleVariants 一致：只为已选择出口的地址族创建规则。
+		let versions = entry.split ? filter([4, 6], v => v == 4 ? entry.v4 : entry.v6) : [0];
+		for (let version in versions) {
 			let r = { ...entry.match, sets: [...entry.match.sets] };
 			let name = entry.name + (version && entry.name ? `-ipv${version}` : '');
 			let exit = version == 4 ? entry.v4 : version == 6 ? entry.v6 : entry.exit;
@@ -155,7 +158,7 @@ export function build(settings, graph) {
 				let rule = singboxMatch(r, false);
 				if (version) rule.ip_version = version;
 				if (exit == TAG.block) rule.action = 'reject';
-				else rule.outbound = exit;
+				else { rule.action = 'route'; rule.outbound = exit; }
 				push(config.route.rules, rule);
 			}
 			else {
@@ -181,7 +184,7 @@ export function build(settings, graph) {
 	}
 	else {
 		let server = dnsServer(s.dns, 'default-dns', '', false);
-		delete server.skipFallback;
+		server.skipFallback = false;
 		push(config.dns.servers, server);
 		config.routing.rules = [{ inboundTag: [TAG.dnsInbound], outboundTag: TAG.dns }];
 		for (let exit in exitOrder) push(config.routing.rules, { inboundTag: dnsExits[exit], outboundTag: exit });

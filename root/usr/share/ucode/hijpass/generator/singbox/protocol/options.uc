@@ -1,5 +1,4 @@
-import { optional, compact } from '../../constants.uc';
-import { durationText } from '../../../uci/config.uc';
+import { optional } from '../../constants.uc';
 
 // Native outbound 公共字段：type/tag 标识协议与出口，server/server_port 远端地址。
 // tls 只由支持 TLS 的协议添加；detour 由调用者从已连接的 upstream 设置。
@@ -8,7 +7,7 @@ export function endpoint(n) {
 	return optional(out, 'network', n.network);
 };
 export function tls(n) {
-	return optional({ enabled: true, server_name: n.tls_server_name || n.server }, 'insecure', n.tls_insecure);
+	return { enabled: true, server_name: n.tls_server_name || n.server, insecure: n.tls_insecure };
 };
 export function multiplex(n) {
 	if (!n.multiplex_enabled) return null;
@@ -30,8 +29,8 @@ export function transport(n) {
 		optional(out, 'host', n.transport_http_host);
 		optional(out, 'path', n.transport_http_path);
 		optional(out, 'method', n.transport_http_method);
-		optional(out, 'idle_timeout', n.transport_http_idle_timeout ? durationText(n.transport_http_idle_timeout) : null);
-		optional(out, 'ping_timeout', n.transport_http_ping_timeout ? durationText(n.transport_http_ping_timeout) : null);
+		optional(out, 'idle_timeout', n.transport_http_idle_timeout);
+		optional(out, 'ping_timeout', n.transport_http_ping_timeout);
 		break;
 	case 'ws':
 		optional(out, 'path', n.transport_ws_path);
@@ -41,9 +40,9 @@ export function transport(n) {
 		break;
 	case 'grpc':
 		optional(out, 'service_name', n.transport_grpc_service_name);
-		optional(out, 'idle_timeout', n.transport_grpc_idle_timeout ? durationText(n.transport_grpc_idle_timeout) : null);
-		optional(out, 'ping_timeout', n.transport_grpc_ping_timeout ? durationText(n.transport_grpc_ping_timeout) : null);
-		optional(out, 'permit_without_stream', n.transport_grpc_permit_without_stream);
+		optional(out, 'idle_timeout', n.transport_grpc_idle_timeout);
+		optional(out, 'ping_timeout', n.transport_grpc_ping_timeout);
+		if (n.transport_grpc_permit_without_stream) out.permit_without_stream = true;
 		break;
 	case 'httpupgrade':
 		optional(out, 'host', n.transport_httpupgrade_host);

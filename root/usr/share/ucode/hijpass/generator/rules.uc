@@ -1,5 +1,5 @@
 import { list, port } from '../uci/config.uc';
-import { optional, compact, TAG } from './constants.uc';
+import { optional, TAG } from './constants.uc';
 
 // Match 字段均为数组：domain/suffix/keyword/regex 域名条件，ip 为地址或 CIDR，
 // geoip/geosite 为 Geo 标签，network/protocol/ports/ranges 为传输限制。
@@ -18,7 +18,8 @@ export function parse(section) {
 			if (set) {
 				let filename = split(set[2], '/')[-1];
 				let tag = replace(filename, /[.][^.]*$/, '');
-				let entry = { type: set[1], tag };
+				// source JSON 与 binary SRS 必须明确区分，不能使用核心的 binary 默认值。
+				let entry = { type: set[1], tag, format: match(set[2], /srs$/) ? 'binary' : 'source' };
 				entry[set[1] == 'remote' ? 'url' : 'path'] = set[2];
 				push(r.sets, entry);
 				continue;
@@ -41,17 +42,17 @@ export function empty(r, geo) {
 export function convertGeo(r) {
 	for (let value in [...r.geosite, ...r.geoip]) {
 		let tag = replace(value, ':', '-');
-		push(r.sets, { type: 'local', tag, path: `/etc/hijpass/ruleset/${tag}.srs` });
+		push(r.sets, { type: 'local', tag, format: 'binary', path: `/etc/hijpass/ruleset/${tag}.srs` });
 	}
 };
 export function singboxMatch(r, dnsOnly) {
 	let out = {};
 	for (let key, values in { domain: r.domain, domain_suffix: r.suffix, domain_keyword: r.keyword, domain_regex: r.regex })
-		if (length(values)) out[key] = compact(values);
-	if (length(r.sets)) out.rule_set = compact(map(r.sets, s => s.tag));
+		if (length(values)) out[key] = values;
+	if (length(r.sets)) out.rule_set = map(r.sets, s => s.tag);
 	if (!dnsOnly) {
 		for (let key, values in { ip_cidr: r.ip, network: r.network, protocol: r.protocol, port: r.ports, port_range: r.ranges })
-			if (length(values)) out[key] = compact(values);
+			if (length(values)) out[key] = values;
 	}
 	return out;
 };
@@ -65,7 +66,14 @@ export function xrayRules(r, name, exit, version) {
 	optional(base, 'protocol', r.protocol);
 	optional(base, 'port', join(',', [...map(r.ports, p => `${p}`), ...map(r.ranges, p => replace(p, ':', '-'))]));
 	let domains = xrayDomains(r);
-	let ips = [...filter(r.ip, ip => !version || (index(ip, ':') >= 0 ? version == 6 : version == 4)), ...r.geoip];
+	let ips = [...filter(r.ip, ip => {
+		if (!version) return true;
+		let value = replace(ip, /^!/, '');
+		// ext: 文件规则和 geoip: 标签可能同时包含 IPv4/IPv6；冒号并不总是 IPv6 地址。
+		if (match(value, /^(ext|geoip):/)) return true;
+		if (index(value, ':') >= 0) return version == 6;
+		return match(value, /^[0-9]{1,3}([.][0-9]{1,3}){3}(\/[0-9]+)?$/) ? version == 4 : true;
+	}), ...r.geoip];
 	let family = version == 4 ? '0.0.0.0/0' : version == 6 ? '::/0' : null;
 	let result = [];
 	// Xray 的域名和 IP 条件分成两条规则，避免在单条规则中意外变成 AND。

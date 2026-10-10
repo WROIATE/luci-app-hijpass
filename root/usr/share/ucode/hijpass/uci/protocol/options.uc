@@ -28,12 +28,12 @@ export const RealityOptions = {
 export const MultiplexOptions = {
 	multiplex_enabled: ["bool", false], // 0/1；启用连接复用
 	multiplex_protocol: ["text", "h2mux"], // sing-box 复用协议（h2mux/smux/yamux）
-	multiplex_max_connections: ["integer", 0, 2147483647], // sing-box 最大底层连接数；0 使用核心默认值
-	multiplex_min_streams: ["integer", 0, 2147483647], // sing-box 每连接最小流数；0 使用核心默认值
-	multiplex_max_streams: ["integer", 0, 2147483647], // sing-box 每连接最大流数；Xray 用作 mux concurrency
+	multiplex_max_connections: ["integer", null, 2147483647], // sing-box 最大底层连接数；0 使用核心默认值
+	multiplex_min_streams: ["integer", null, 2147483647], // sing-box 每连接最小流数；0 使用核心默认值
+	multiplex_max_streams: ["integer", null, 2147483647], // sing-box 每连接最大流数；Xray 用作 mux concurrency
 	multiplex_brutal_enabled: ["bool", false], // 0/1；启用 sing-box Brutal 复用拥塞控制
-	multiplex_brutal_up_mbps: ["integer", 0, 2147483647], // Brutal 上行带宽，单位 Mbps
-	multiplex_brutal_down_mbps: ["integer", 0, 2147483647], // Brutal 下行带宽，单位 Mbps
+	multiplex_brutal_up_mbps: ["integer", null, 2147483647], // Brutal 上行带宽，单位 Mbps
+	multiplex_brutal_down_mbps: ["integer", null, 2147483647], // Brutal 下行带宽，单位 Mbps
 };
 
 export const TransportOptions = {
@@ -41,15 +41,15 @@ export const TransportOptions = {
 	transport_http_host: ["text", ""], // HTTP 传输的 Host 头
 	transport_http_path: ["text", ""], // HTTP 传输请求路径
 	transport_http_method: ["text", ""], // HTTP 传输请求方法
-	transport_http_idle_timeout: ["duration", 15], // HTTP 空闲时长；UCI 写时长字符串，解码后为秒
-	transport_http_ping_timeout: ["duration", 15], // HTTP ping 等待时长，解码后为秒
+	transport_http_idle_timeout: ["duration", "15s"], // HTTP 空闲时长；UCI 写时长字符串，保留时长字符串
+	transport_http_ping_timeout: ["duration", "15s"], // HTTP ping 等待时长，保留时长字符串
 	transport_ws_host: ["text", ""], // WebSocket Host 头
 	transport_ws_path: ["text", ""], // WebSocket 请求路径
-	transport_ws_max_early_data: ["integer", 0, 4294967295], // WebSocket early data 最大字节数
+	transport_ws_max_early_data: ["integer", null, 4294967295], // WebSocket early data 最大字节数
 	transport_ws_early_data_header_name: ["text", ""], // 承载 WebSocket early data 的 HTTP 头名
 	transport_grpc_service_name: ["text", ""], // gRPC service 名称
-	transport_grpc_idle_timeout: ["duration", 15], // gRPC 空闲时长，解码后为秒
-	transport_grpc_ping_timeout: ["duration", 15], // gRPC ping 等待时长，解码后为秒
+	transport_grpc_idle_timeout: ["duration", "15s"], // gRPC 空闲时长，保留时长字符串
+	transport_grpc_ping_timeout: ["duration", "15s"], // gRPC ping 等待时长，保留时长字符串
 	transport_grpc_permit_without_stream: ["bool", false], // 0/1；没有活跃流时仍发送 gRPC ping
 	transport_httpupgrade_host: ["text", ""], // HTTPUpgrade Host 头
 	transport_httpupgrade_path: ["text", ""], // HTTPUpgrade 请求路径

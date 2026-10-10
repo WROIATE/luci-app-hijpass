@@ -5,7 +5,7 @@ import { fields as tuic } from './tuic.uc';
 import { fields as shadowtls } from './shadowtls.uc';
 import { fields as loadbalance } from './loadbalance.uc';
 import { fields as custom } from './custom.uc';
-import { decode } from '../config.uc';
+import { decode, duration } from '../config.uc';
 import { CORE, core } from '../../generator/constants.uc';
 
 export const TYPE = {
@@ -35,7 +35,8 @@ export function proxy(section) {
 	if (!n.listen_port || !n.socks_port) die('invalid listen_port or socks_port');
 	if (n.type != TYPE.balance && n.type != TYPE.custom && (!n.server || !n.server_port))
 		die('invalid server or server_port');
-	if (n.transport_grpc_idle_timeout > 2147483647 || n.transport_grpc_ping_timeout > 2147483647)
+	if (n.type == TYPE.vless && engine == CORE.xray && n.transport_type == 'grpc'
+		&& (duration(n.transport_grpc_idle_timeout) > 2147483647 || duration(n.transport_grpc_ping_timeout) > 2147483647))
 		die('gRPC timeout exceeds 32-bit range');
 	return n;
 };

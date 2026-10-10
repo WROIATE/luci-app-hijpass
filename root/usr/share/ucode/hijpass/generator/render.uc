@@ -1,6 +1,6 @@
 import * as uci from '../uci/config.uc';
 import { resolve, validateGraph, validatePorts } from './graph.uc';
-import { CORE } from './constants.uc';
+import { CORE, clean } from './constants.uc';
 import { build as singbox } from './singbox/config.uc';
 import { build as xray } from './xray/config.uc';
 import { prepare as prepareRouting, build as buildRouting } from './routing.uc';
@@ -18,10 +18,10 @@ export function render(sections, target) {
 	let result = { nodes: {} };
 	for (let n in graph.nodes) {
 		if (n.core == CORE.custom || n.type == 'custom') continue;
-		try { result.nodes[n.id] = n.core == CORE.xray ? xray(n) : singbox(n); }
+		try { result.nodes[n.id] = clean(n.core == CORE.xray ? xray(n) : singbox(n)); }
 		catch (e) { die(`node "${n.name}": ${e.message}`); }
 	}
-	if (routing) result.shunt = buildRouting(routing, graph);
+	if (routing) result.shunt = clean(buildRouting(routing, graph));
 	if (!target) return result;
 	if (target == 'shunt') return result.shunt;
 	if (!result.nodes[target]) die('custom node configuration is not generated');

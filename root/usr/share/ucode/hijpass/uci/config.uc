@@ -48,7 +48,7 @@ export function port(value) {
 	return int(value);
 };
 
-// 时长统一转换为秒；输出核心字段时再使用 durationText()，避免直接传 UCI 字符串。
+// 校验时长并按需换算成秒（例如 Xray gRPC）；其它核心字段保留 UCI 原字符串。
 export function duration(value) {
 	if (value == '' || value == '0') return 0;
 	let remaining = value, seconds = 0;
@@ -61,13 +61,6 @@ export function duration(value) {
 	}
 	if (seconds > 9223372036) die('duration out of range');
 	return seconds;
-};
-
-export function durationText(seconds) {
-	if (!seconds) return '0s';
-	if (seconds < 1) return sprintf('%gms', seconds * 1000);
-	let hours = int(seconds / 3600), minutes = int(seconds % 3600 / 60);
-	return (hours ? `${hours}h` : '') + (hours || minutes ? `${minutes}m` : '') + sprintf('%gs', seconds % 60);
 };
 
 // 字段声明格式：option: [类型, 默认值, 最大值（可选）]。
@@ -85,7 +78,7 @@ export function decode(section, declarations) {
 		case 'bool':
 			if (value != '' && value != '0' && value != '1') die(`invalid UCI boolean "${value}"`);
 			result[key] = value == '1'; break;
-		case 'duration': result[key] = duration(value); break;
+		case 'duration': duration(value); result[key] = value; break;
 		case 'integer':
 			if (value && !match(value, /^[+]?[0-9]+$/)) die(`invalid nonnegative integer "${value}"`);
 			result[key] = value ? int(value) : 0;

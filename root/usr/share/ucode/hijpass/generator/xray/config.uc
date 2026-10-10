@@ -3,24 +3,23 @@ import { build as vless } from './protocol/vless.uc';
 import { build as hysteria2 } from './protocol/hysteria2.uc';
 import { TYPE } from '../../uci/protocol/config.uc';
 import { TAG } from '../constants.uc';
-import { durationText } from '../../uci/config.uc';
 
 const builders = { [TYPE.shadowsocks]: shadowsocks, [TYPE.vless]: vless, [TYPE.hysteria2]: hysteria2 };
 export function socks(tag, port) {
 	return { protocol: 'socks', tag, settings: { address: '127.0.0.1', port } };
 };
-export function log(level) { return { loglevel: level == 'warn' ? 'warning' : level || 'info' }; };
+export function log(level) { return { loglevel: level == 'warn' ? 'warning' : level || 'info', dnsLog: false }; };
 export function inbound(kind, tag, port, shunt) {
 	let out = { protocol: kind == 'socks' ? 'socks' : 'dokodemo-door', port, tag };
 	if (kind == 'socks') out.settings = { udp: true };
 	else {
-		out.settings = { network: ['tcp', 'udp'] };
+		out.settings = { network: 'tcp,udp' };
 		if (kind == 'tproxy') {
 			out.settings.followRedirect = true;
 			out.streamSettings = { sockopt: { tproxy: 'tproxy' } };
 			if (shunt) out.sniffing = { enabled: true, destOverride: ['http', 'tls', 'quic'], routeOnly: true };
 		}
-		else out.listen = '[::]';
+		else out.listen = '::';
 	}
 	return out;
 };
@@ -40,9 +39,9 @@ export function build(n) {
 			if (member.name == n.fallback_tag) fallback = tag;
 			push(config.outbounds, socks(tag, member.socks_port));
 		}
-		let strategy = { type: n.strategy };
-		if (n.strategy == 'leastLoad') strategy.settings = {
-			expected: n.strategy_expected, maxRTT: durationText(n.strategy_max_rtt), tolerance: n.strategy_tolerance,
+		let strategy = { type: n.strategy || 'leastLoad' };
+		if (strategy.type == 'leastLoad') strategy.settings = {
+			expected: n.strategy_expected ?? 1, maxRTT: n.strategy_max_rtt || '1s', tolerance: n.strategy_tolerance ?? 0.05,
 		};
 		config.routing = {
 			domainStrategy: 'AsIs',
@@ -52,9 +51,9 @@ export function build(n) {
 		config.burstObservatory = {
 			subjectSelector: [TAG.member],
 			pingConfig: {
-				destination: n.probe_url, connectivity: n.probe_connectivity,
-				interval: durationText(n.probe_interval), timeout: durationText(n.probe_timeout),
-				sampling: n.probe_sampling, httpMethod: n.probe_http_method,
+				destination: n.probe_url || 'https://connectivitycheck.gstatic.com/generate_204', connectivity: n.probe_connectivity,
+				interval: n.probe_interval || '60s', timeout: n.probe_timeout || '2s',
+				sampling: n.probe_sampling || 3, httpMethod: n.probe_http_method,
 			},
 		};
 	}

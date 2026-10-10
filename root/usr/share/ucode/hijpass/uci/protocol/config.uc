@@ -38,4 +38,4 @@ export function proxy(section) {
 	if (n.transport_grpc_idle_timeout > 2147483647 || n.transport_grpc_ping_timeout > 2147483647)
 		die('gRPC timeout exceeds 32-bit range');
 	return n;
-}
+};

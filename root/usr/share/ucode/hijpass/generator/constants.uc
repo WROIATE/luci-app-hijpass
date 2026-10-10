@@ -6,12 +6,12 @@ export const TAG = {
 	ruleset: 'ruleset-out', rulesetDNS: 'ruleset-dns-resolver',
 };
 export const CORE = { singbox: 'sing-box', xray: 'xray', custom: 'custom' };
-export function core(value) { return value == 'singbox' ? CORE.singbox : value; }
+export function core(value) { return value == 'singbox' ? CORE.singbox : value; };
 
 // sing-box 的 Listable 字段允许单值和数组；只有多个元素时才输出数组。
-export function compact(values) { return length(values) == 1 ? values[0] : values; }
+export function compact(values) { return length(values) == 1 ? values[0] : values; };
 export function optional(object, key, value) {
 	if (value != null && value !== '' && value !== false && value !== 0 && (type(value) != 'array' || length(value)))
 		object[key] = value;
 	return object;
-}
+};

@@ -100,7 +100,7 @@ function fixture(t) {
         // The worker path is relative to the task entry, just as on OpenWrt.
         const entry = path.join(dir, 'entry-' + name);
         copyFileSync(path.join(root, 'root/usr/lib/hijpass', name), entry);
-        script(name, `exec ${shellQuote(interpreter)} -S -L ${shellQuote(path.join(root, 'root/usr/share/ucode'))} ${shellQuote(entry)} "$@"`);
+        script(name, `exec ${shellQuote(interpreter)} -S -L ${shellQuote(path.join(root, 'root/usr/share/ucode'))} -- ${shellQuote(entry)} "$@"`);
     }
     copyFileSync(path.join(root, 'root/usr/lib/hijpass/trace-worker.sh'), path.join(dir, 'trace-worker.sh'));
     chmodSync(path.join(dir, 'trace-worker.sh'), 0o755);

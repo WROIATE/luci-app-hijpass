@@ -12,4 +12,4 @@ export function build(n) {
 	optional(out, 'multiplex', multiplex(n));
 	if (n.udp_over_tcp) out.udp_over_tcp = true;
 	return out;
-}
+};

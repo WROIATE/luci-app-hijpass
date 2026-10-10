@@ -15,4 +15,4 @@ export function build(n) {
 		settings: { version: 2, address: n.server, port: n.server_port },
 		streamSettings: stream,
 	};
-}
+};

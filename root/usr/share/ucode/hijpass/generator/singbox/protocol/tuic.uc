@@ -11,4 +11,4 @@ export function build(n) {
 		optional(out, key, n[key]);
 	optional(out, 'heartbeat', n.heartbeat ? durationText(n.heartbeat) : null);
 	return out;
-}
+};

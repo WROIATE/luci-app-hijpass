@@ -8,4 +8,4 @@ export function build(n) {
 	optional(out, 'version', n.version);
 	optional(out, 'password', n.password);
 	return out;
-}
+};

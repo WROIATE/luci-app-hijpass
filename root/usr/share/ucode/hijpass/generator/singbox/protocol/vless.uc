@@ -18,4 +18,4 @@ export function build(n) {
 	optional(out, 'transport', transport(n));
 	optional(out, 'multiplex', multiplex(n));
 	return out;
-}
+};

@@ -21,4 +21,4 @@ export function build(n) {
 		settings: { address: n.server, port: n.server_port, id: n.uuid, encryption: 'none', flow: n.flow },
 		streamSettings: stream,
 	};
-}
+};

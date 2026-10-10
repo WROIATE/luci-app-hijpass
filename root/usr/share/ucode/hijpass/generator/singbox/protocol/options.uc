@@ -6,10 +6,10 @@ import { durationText } from '../../../uci/config.uc';
 export function endpoint(n) {
 	let out = { type: n.type, tag: n.name, server: n.server, server_port: n.server_port };
 	return optional(out, 'network', n.network);
-}
+};
 export function tls(n) {
 	return optional({ enabled: true, server_name: n.tls_server_name || n.server }, 'insecure', n.tls_insecure);
-}
+};
 export function multiplex(n) {
 	if (!n.multiplex_enabled) return null;
 	let out = { enabled: true, protocol: n.multiplex_protocol };
@@ -20,7 +20,7 @@ export function multiplex(n) {
 		optional(out.brutal, 'down_mbps', n.multiplex_brutal_down_mbps);
 	}
 	return out;
-}
+};
 export function transport(n) {
 	let kind = n.transport_type;
 	if (!kind) return null;
@@ -52,4 +52,4 @@ export function transport(n) {
 	default: die(`unsupported sing-box transport "${kind}"`);
 	}
 	return out;
-}
+};

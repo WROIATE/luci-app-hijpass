@@ -13,7 +13,7 @@ export function cleanup(sections, kind, id, keep) {
 		if (substr(name, -length(id) - 6) == `-${id}.json` && path != keep && fs.lstat(path)?.type != 'directory')
 			if (!fs.unlink(path)) die(`cannot remove ${path}`);
 	}
-}
+};
 
 // Logger 返回一个 (level, message) 函数，保留应用日志级别与多行排版。
 // global.log_path 为目标，global.log_level 为 DEBUG/INFO/WARN/ERROR。
@@ -32,7 +32,7 @@ export function logger(sections) {
 		file.write(sprintf('[%s]   %-8s%s\n', stamp, level, replace(message, '\n', '\n                               ')));
 		file.close();
 	};
-}
+};
 function trimLog(path) {
 	let file = fs.open(path, 'r');
 	if (!file) return;
@@ -49,4 +49,4 @@ function trimLog(path) {
 export function cleanLogs(sections, action, path) {
 	if (action == 'clean') { if (fs.writefile(path, '') == null) die(`cannot clear ${path}`); return; }
 	for (let s in sections) if (s.log_path) trimLog(s.log_path);
-}
+};

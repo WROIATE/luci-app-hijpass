@@ -42,7 +42,7 @@ export function start(args, worker) {
 		removeTree(directory); die('Cannot start trace worker');
 	}
 	return id;
-}
+};
 export function status(id) {
 	let directory = task(id), active = running(directory), code = null;
 	if (!active) {
@@ -53,9 +53,9 @@ export function status(id) {
 		code = int(fs.readfile(directory + '/exit'));
 	}
 	return { running: active, code, stdout: fs.readfile(directory + '/stdout') || '', stderr: fs.readfile(directory + '/stderr') || '' };
-}
+};
 export function release(id) {
 	let directory = task(id);
 	if (!fs.access(directory + '/exit')) die('Trace task has not finished');
 	removeTree(directory);
-}
+};

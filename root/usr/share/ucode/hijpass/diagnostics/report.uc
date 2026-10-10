@@ -23,7 +23,7 @@ export function filteredTrace(text, chain) {
 		let m = match(line, /^trace id ([^ ]+)/);
 		return m && ids[m[1]];
 	});
-}
+};
 function indent(values, limit, spaces) { return join('\n', map(slice(uniq(values), 0, limit), line => (spaces || '  ') + line)); }
 export function packetSummary(packets) {
 	let counts = { syn: 0, syn_ack: 0, fin: 0, rst: 0, udp: 0, payload_packets: 0, payload_bytes: 0 }, interfaces = {}, flows = {};
@@ -42,7 +42,7 @@ export function packetSummary(packets) {
 		if (index(line, 'Flags ') >= 0 && lengthMatch && int(lengthMatch[1]) > 0) { counts.payload_packets++; counts.payload_bytes += int(lengthMatch[1]); }
 	}
 	return { counts, interfaces, flows };
-}
+};
 function relatedLogs(text, targets) {
 	let all = lines(text), seeds = slice(uniq(filter(all, line => length(filter(targets, target => target && index(line, target) >= 0)))), 0, 80), ids = [];
 	for (let line in seeds) {
@@ -145,4 +145,4 @@ export function report(c, directory, positions) {
 	}
 	if (!printed) push(output, 'no related core/system log lines captured', 'hint: enable proxy/shunt logs or raise core log level for more detail');
 	return join('\n', output) + '\n';
-}
+};

@@ -35,4 +35,4 @@ export function apply(stream, n) {
 		break;
 	default: die(`unsupported Xray transport "${n.transport_type}"`);
 	}
-}
+};

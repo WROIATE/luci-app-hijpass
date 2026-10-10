@@ -15,4 +15,4 @@ export function build(n) {
 	if (n.obfs_type == 'salamander' && n.obfs_password)
 		out.obfs = { type: n.obfs_type, password: n.obfs_password };
 	return out;
-}
+};

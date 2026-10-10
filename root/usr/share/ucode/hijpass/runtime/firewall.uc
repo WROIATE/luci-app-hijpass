@@ -25,7 +25,7 @@ export function networkState(sections) {
 	}
 	state.wan = uniq(state.wan);
 	return state;
-}
+};
 function ipList(path, version) {
 	return filter(lines(fs.readfile(path)), value => {
 		let parts = split(value, '/'), bytes = iptoarr(parts[0]);
@@ -105,7 +105,7 @@ export function generate(sections, state, template) {
 	}
 	// 未启用的端口没有值，不能输出空的 nft define（即使模板已不引用它）。
 	return join('\n', map(filter(keys(definitions), key => definitions[key] != ''), key => `define ${key} = ${definitions[key]}`)) + '\n\n' + join('\n', result) + '\n';
-}
+};
 const RULES = '/etc/hijpass/fw4-rules.nft';
 export function reset(sections) {
 	let text = generate(sections, networkState(sections), fs.readfile(first(sections, 'hijpass').nft || '/etc/hijpass/fw4-template.nft'));
@@ -118,15 +118,15 @@ export function reset(sections) {
 		checked(['fw4', 'reload']);
 	}
 	catch (e) { fs.unlink(temp); die(e.message); }
-}
-export function remove() { fs.unlink(RULES); checked(['fw4', 'reload']); }
+};
+export function remove() { fs.unlink(RULES); checked(['fw4', 'reload']); };
 export function apply(sections) {
 	if (!exec(['nft', 'list', 'table', 'inet', 'hijpass'], true).code) checked(['nft', 'delete', 'table', 'inet', 'hijpass']);
 	if (!fs.access(RULES)) return;
 	checked(['nft', '-f', RULES]);
 	let hook = first(sections, 'hijpass').nft_hook;
 	if (hook && fs.access(hook, 'x')) checked([hook]);
-}
+};
 
 export function route(action) {
 	const table = '233', mark = '0x1';
@@ -140,4 +140,4 @@ export function route(action) {
 			checked(['ip', ...family, 'rule', 'add', 'fwmark', mark, 'table', table]);
 		}
 	}
-}
+};

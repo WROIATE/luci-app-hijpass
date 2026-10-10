@@ -6,4 +6,4 @@ export function build(n) {
 		protocol: n.type, tag: n.name,
 		settings: { address: n.server, port: n.server_port, method: n.method, password: n.password },
 	};
-}
+};

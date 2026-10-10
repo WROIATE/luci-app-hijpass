@@ -12,7 +12,7 @@ export function architecture(core, machine) {
 	let suffix = suffixes[core]?.[machine];
 	if (!suffix) die(`unsupported architecture: ${machine}`);
 	return 'linux-' + suffix;
-}
+};
 function version(core, path) {
 	let result = exec([path, 'version'], true);
 	let matchVersion = match(result.stdout, core == 'xray' ? /Xray ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/ : /sing-box version ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/);
@@ -24,7 +24,7 @@ export function release(core) {
 	let info = json(response);
 	if (!match(info.tag_name || '', /^v?[0-9]+[.][0-9]+[.][0-9]+[A-Za-z0-9.+-]*$/)) die('invalid release version');
 	return info;
-}
+};
 export function run(action, core) {
 	if (!repos[core]) die('unknown core');
 	let destination = `/usr/bin/${core}`;
@@ -71,4 +71,4 @@ export function run(action, core) {
 	catch (e) { fs.unlink(temp); removeTree(dir); die(e.message); }
 	removeTree(dir);
 	return { success: true, version: info.tag_name };
-}
+};

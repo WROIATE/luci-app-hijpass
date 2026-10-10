@@ -10,19 +10,19 @@ export function read(packageName, directory) {
 		die(`cannot load UCI ${packageName || 'hijpass'}: ${ctx.error()}`);
 	ctx.foreach(packageName || 'hijpass', null, section => push(sections, section));
 	return sections;
-}
+};
 
 export function of(sections, kind) {
 	return filter(sections, s => s['.type'] == kind);
-}
+};
 
 export function first(sections, kind) {
 	return of(sections, kind)[0] || {};
-}
+};
 
 export function list(value) {
 	return type(value) == 'array' ? value : value ? [value] : [];
-}
+};
 
 export function validate(sections) {
 	if (type(sections) != 'array' || !length(sections))
@@ -40,13 +40,13 @@ export function validate(sections) {
 			die(`${s['.name']}: ${key} must be a string or string list`);
 		}
 	}
-}
+};
 
 export function port(value) {
 	if (type(value) != 'string' || !match(value, /^[0-9]+$/) || int(value) < 1 || int(value) > 65535)
 		die(`invalid port "${value}"`);
 	return int(value);
-}
+};
 
 // 时长统一转换为秒；输出核心字段时再使用 durationText()，避免直接传 UCI 字符串。
 export function duration(value) {
@@ -61,14 +61,14 @@ export function duration(value) {
 	}
 	if (seconds > 9223372036) die('duration out of range');
 	return seconds;
-}
+};
 
 export function durationText(seconds) {
 	if (!seconds) return '0s';
 	if (seconds < 1) return sprintf('%gms', seconds * 1000);
 	let hours = int(seconds / 3600), minutes = int(seconds % 3600 / 60);
 	return (hours ? `${hours}h` : '') + (hours || minutes ? `${minutes}m` : '') + sprintf('%gs', seconds % 60);
-}
+};
 
 // 字段声明格式：option: [类型, 默认值, 最大值（可选）]。
 // 只解码当前协议声明的字段，残留的其它协议字段不会误触发校验或进入输出。
@@ -99,4 +99,4 @@ export function decode(section, declarations) {
 		}
 	}
 	return result;
-}
+};

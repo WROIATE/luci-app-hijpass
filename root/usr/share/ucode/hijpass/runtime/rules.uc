@@ -23,7 +23,7 @@ export function domain(line) {
 	else if (substr(line, 0, 4) == '@@||') line = split(substr(line, 4), '^')[0];
 	else line = replace(line, /^(domain|full):/, '');
 	return match(line, /^[a-z0-9.-]+[.][a-z]{2,}$/) ? line : null;
-}
+};
 export function normalize(text, kind) {
 	let result = [];
 	for (let line in lines(text)) {
@@ -34,7 +34,7 @@ export function normalize(text, kind) {
 		}
 	}
 	return sort(uniq(result));
-}
+};
 function download(url, path, timeout) {
 	if (!match(url || '', /^https?:\/\//)) die(`invalid download URL: ${url}`);
 	return !exec(['curl', '-f', '-sS', '-L', '--connect-timeout', `${timeout}`, '--max-time', `${timeout * 2}`, '-o', path, '--', url]).code;
@@ -81,7 +81,7 @@ export function update(sections, action) {
 		if (exec(['/etc/init.d/hijpass', 'restart']).code) push(failed, 'restart');
 	}
 	return { success: !length(failed), ...(length(failed) ? { failed } : {}) };
-}
+};
 export function geo(action, kind, args, sections) {
 	if (action == '-t' || action == '--convert') {
 		mkdir('/etc/hijpass/ruleset');
@@ -103,7 +103,7 @@ export function geo(action, kind, args, sections) {
 	let extract = action == '-e' || action == '--extract';
 	if (!extract && action != '-l' && action != '--lookup') die('unknown Geo action');
 	return lc(checked(['geoview', '-type', kind, '-action', extract ? 'extract' : 'lookup', '-input', `/usr/share/v2ray/${kind}.dat`, extract ? '-list' : '-value', ...args]));
-}
+};
 function suffix(host, rule) { return host == rule || substr(host, -length(rule) - 1) == '.' + rule; }
 export function queryFiles(target) {
 	if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
@@ -115,7 +115,7 @@ export function queryFiles(target) {
 		if (length(filter(lines(fs.readfile(path)), line => ip ? contains(target, line) : suffix(lc(target), lc(line))))) push(matched, name);
 	}
 	return join('\n', sort(uniq(matched))) + '\n';
-}
+};
 export function routeMatch(sections, target) {
 	if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
 	let ip = !!iptoarr(target), tags = null;
@@ -137,4 +137,4 @@ export function routeMatch(sections, target) {
 		}
 	}
 	return `未匹配到任何自定义规则，除去协议、端口等规则外，将使用全局默认策略\n\n规则名称 (Name) : 全局默认\n匹配类型 (Type) : ${ip ? 'IP' : '域名'}\n匹配内容 (Item) : * (全部)\n代理策略 (Node) : ${first(sections, 'shunt').default_proxy_node || ''}\n`;
-}
+};

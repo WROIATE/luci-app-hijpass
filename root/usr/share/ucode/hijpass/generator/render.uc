@@ -26,10 +26,10 @@ export function render(sections, target) {
 	if (target == 'shunt') return result.shunt;
 	if (!result.nodes[target]) die('custom node configuration is not generated');
 	return result.nodes[target];
-}
+};
 export function validate(sections) {
 	// 服务关闭时允许保存未完成表单，但输入的 UCI 结构仍必须有效。
 	if (uci.first(sections, 'hijpass').enabled == '0') uci.validate(sections);
 	else render(sections);
 	return { ok: true };
-}
+};

@@ -42,7 +42,7 @@ export function resolve(sections, target) {
 		else n.upstream = refs[0];
 	}
 	return { nodes, byID, byName };
-}
+};
 
 export function validateGraph(graph) {
 	let active = {}, heights = {};
@@ -69,7 +69,7 @@ export function validateGraph(graph) {
 		return height;
 	}
 	for (let n in graph.nodes) visit(n);
-}
+};
 
 export function validatePorts(nodes, shunt) {
 	let owners = {};
@@ -85,4 +85,4 @@ export function validatePorts(nodes, shunt) {
 		add(shunt.listen, 'shunt.shunt_listen_port');
 		add(shunt.dnsPort, 'shunt.dns_listen_port');
 	}
-}
+};

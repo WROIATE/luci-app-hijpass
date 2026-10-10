@@ -51,7 +51,7 @@ export function prepare(sections, graph) {
 		});
 	}
 	return settings;
-}
+};
 function strategy(value, singbox) {
 	return (singbox ? { '4': 'ipv4_only', '6': 'ipv6_only', '46': 'prefer_ipv4', '64': 'prefer_ipv6' }
 		: { '4': 'UseIPv4', '6': 'UseIPv6', '46': 'UseIP', '64': 'UseIP' })[value] || '';
@@ -188,4 +188,4 @@ export function build(settings, graph) {
 		push(config.routing.rules, ...routes);
 	}
 	return config;
-}
+};

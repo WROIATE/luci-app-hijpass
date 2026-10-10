@@ -44,4 +44,4 @@ export function prepare(sections) {
 		'ipset-name4 inet@hijpass@chnroute4list', 'ipset-name6 inet@hijpass@chnroute6list', 'verdict-cache 4096');
 	atomic('/etc/hijpass/chinadns-ng.conf', join('\n', config) + '\n', 0o644);
 	return { id: dns['.name'], name: 'chinadns-ng', command: ['chinadns-ng', '-C', '/etc/hijpass/chinadns-ng.conf'], env: [], user: 'hijpass' };
-}
+};

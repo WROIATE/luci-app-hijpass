@@ -12,7 +12,7 @@ export function resolve(host) {
 	if (!length(addresses)) addresses = answer?.[host]?.AAAA || answer?.AAAA || [];
 	if (!length(addresses)) die(`resolve failed: ${host}`);
 	return addresses[0];
-}
+};
 export function ports(values) {
 	let occupied = {};
 	// /proc 的 TCP 表由内核提供，避免为每个端口重复执行 netstat 和 jq。
@@ -26,7 +26,7 @@ export function ports(values) {
 	let result = {};
 	for (let value in values) { port(value); result[value] = !!occupied[int(value)]; }
 	return result;
-}
+};
 
 // CurlReport：success/exit_code/http_code/remote_ip/remote_port/url，
 // 所有 *_time_ms 均为毫秒整数。connect/ping 共用同一份安全的 curl 输出解析。
@@ -49,12 +49,12 @@ export function connect(url, timeout, socks) {
 		}) result[key] = int(value * 1000);
 	}
 	return result;
-}
+};
 export function ping(socks, host) {
 	let result = connect(`https://${host || 'www.google.com'}`, '5', socks);
 	if (!result.success && result.exit_code != 56) return { error: 'timeout' };
 	return { ms: result.first_byte_time_ms - result.dns_lookup_time_ms, total_ms: result.total_time_ms };
-}
+};
 
 // IPv4/IPv6 CIDR 比较使用内建字节地址，不需要 Lua/luci.ip。
 export function contains(address, cidr) {
@@ -67,4 +67,4 @@ export function contains(address, cidr) {
 		if ((host[i] & mask) != (range[i] & mask)) return false;
 	}
 	return true;
-}
+};

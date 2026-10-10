@@ -89,4 +89,4 @@ export function main(tool, args) {
 		else warn(`${e.message}\n`);
 		exit(1);
 	}
-}
+};

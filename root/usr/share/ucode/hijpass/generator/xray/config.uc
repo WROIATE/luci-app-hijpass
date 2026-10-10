@@ -8,8 +8,8 @@ import { durationText } from '../../uci/config.uc';
 const builders = { [TYPE.shadowsocks]: shadowsocks, [TYPE.vless]: vless, [TYPE.hysteria2]: hysteria2 };
 export function socks(tag, port) {
 	return { protocol: 'socks', tag, settings: { address: '127.0.0.1', port } };
-}
-export function log(level) { return { loglevel: level == 'warn' ? 'warning' : level || 'info' }; }
+};
+export function log(level) { return { loglevel: level == 'warn' ? 'warning' : level || 'info' }; };
 export function inbound(kind, tag, port, shunt) {
 	let out = { protocol: kind == 'socks' ? 'socks' : 'dokodemo-door', port, tag };
 	if (kind == 'socks') out.settings = { udp: true };
@@ -23,7 +23,7 @@ export function inbound(kind, tag, port, shunt) {
 		else out.listen = '[::]';
 	}
 	return out;
-}
+};
 
 // Config 字段：log/inbounds/outbounds 为核心基础配置；routing 为路由表。
 // burstObservatory.pingConfig 为负载均衡探测参数，时长使用核心字符串格式。
@@ -71,4 +71,4 @@ export function build(n) {
 		}
 	}
 	return config;
-}
+};

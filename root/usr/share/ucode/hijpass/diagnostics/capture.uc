@@ -50,7 +50,7 @@ export function parse(args, pid) {
 	}
 	pid ||= fs.readlink('/proc/self'); c.chain = `trace-${pid}`; c.comment = `hijpass-trace-${pid}`;
 	return c;
-}
+};
 
 function available(name) { return exec(['/bin/sh', '-c', 'command -v ' + quote(name)], true).code == 0; }
 function positions() {
@@ -113,7 +113,7 @@ export function prepare(pid, args) {
     }
     catch (e) { deleteRules(c); removeTree(c.directory); die(e.message); }
     return c;
-}
+};
 export function finish(directory) {
     if (!match(directory || '', /^\/tmp\/hijpass-trace[.][0-9]+$/)) die('invalid capture directory');
     let metadata = json(fs.readfile(directory + '/metadata.json')), c = metadata.capture;
@@ -124,4 +124,4 @@ export function finish(directory) {
     if (c.keep) print(`Temporary files kept: ${directory}\n`);
     else removeTree(directory);
     if (error) die(error);
-}
+};

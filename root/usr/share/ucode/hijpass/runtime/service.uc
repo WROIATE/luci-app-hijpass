@@ -50,7 +50,7 @@ export function plan(sections) {
 		push(instances, instance(shunt, 'shunt', engine == CORE.xray ? ['xray', '-c', path] : ['sing-box', 'run', '-c', path], true));
 	}
 	return { instances };
-}
+};
 
 // ConfigFile：path 为目标路径，data 为已完整生成和解析上游域名的 JSON 文本。
 // 单次生成先完成全部转换/DNS，再创建临时文件；已提交的文件在后续错误时恢复。
@@ -91,7 +91,7 @@ export function writeConfigs(sections, generated) {
 		die(e.message);
 	}
 	return files;
-}
+};
 export function prepare(sections) {
 	let output = plan(sections);
 	if (first(sections, 'hijpass').enabled != '1') return output;
@@ -104,7 +104,7 @@ export function prepare(sections) {
 	if (dns) push(output.instances, dns);
 	for (let instance in output.instances) if (instance.log) mkdir(fs.dirname(instance.log));
 	return output;
-}
+};
 function hook(sections, action) {
 	let path = first(sections, 'hijpass').dns_hook;
 	if (path) checked([path, action]);
@@ -128,7 +128,7 @@ export function activate(sections) {
 	try { reset(sections); route('reset_hijpass_route'); hook(sections, 'start'); cron(sections, true); }
 	catch (e) { deactivate(sections); die(e.message); }
 	logger(sections)('INFO', 'Service started');
-}
+};
 export function deactivate(sections) {
 	// 停止时继续执行其它清理步骤，最后统一报告失败，避免单个 hook 留下透明路由。
 	let failures = [];
@@ -138,7 +138,7 @@ export function deactivate(sections) {
 	fs.unlink('/etc/hijpass/chinadns-ng.conf');
 	if (length(failures)) die(join('; ', failures));
 	logger(sections)('INFO', 'Service stopped');
-}
+};
 export function autoUpdate(sections) {
 	let interval = int(first(sections, 'rule').update_interval || '0');
 	const last = '/tmp/hijpass_last_update';
@@ -147,7 +147,7 @@ export function autoUpdate(sections) {
 	if (!result.success) die('automatic rule update failed');
 	atomic(last, `${time()}\n`);
 	if (first(sections, 'hijpass').enabled == '1') checked(['/etc/init.d/hijpass', 'restart']);
-}
+};
 
 // 服务端配置为用户编辑的原生 JSON，保留原文件；这里只声明进程与开放端口。
 // ServerPlan 使用相同的 Instance 字段；ports 为显式 allow_firewall 的监听端口数组。
@@ -168,14 +168,14 @@ export function serverPlan(sections) {
 		if (section.allow_firewall == '1') push(ports, port(section.listen_port));
 	}
 	return { instances, ports: uniq(ports) };
-}
+};
 const SERVER_TABLE = '/usr/share/nftables.d/table-post/hijserver.nft';
 const SERVER_CHAIN = '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft';
 export function serverPrepare(sections) {
 	let output = serverPlan(sections);
 	for (let instance in output.instances) if (instance.log) mkdir(fs.dirname(instance.log));
 	return output;
-}
+};
 export function serverActivate(sections) {
 	let output = serverPlan(sections);
 	// 只开放明确选中的端口；没有端口时删除旧 include，避免旧服务端仍对 WAN 开放。
@@ -186,7 +186,7 @@ export function serverActivate(sections) {
 	}
 	else { fs.unlink(SERVER_TABLE); fs.unlink(SERVER_CHAIN); }
 	checked(['fw4', 'reload']); serverCron(output.instances);
-}
+};
 function serverCron(instances) {
 	let path = '/etc/crontabs/root';
 	let entries = filter(split(fs.readfile(path) || '', '\n'), line => line && !match(line, /\/hijpass\/clean-service-log[.](sh|uc) hijserver/));
@@ -198,4 +198,4 @@ export function serverDeactivate() {
 	let errors = [];
 	for (let cleanup in [() => checked(['fw4', 'reload']), () => serverCron([])]) try { cleanup(); } catch (e) { push(errors, e.message); }
 	if (length(errors)) die(join('; ', errors));
-}
+};

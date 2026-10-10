@@ -32,18 +32,18 @@ export function parse(section) {
 		}
 	}
 	return r;
-}
-export function hasDomain(r) { return length(r.domain) + length(r.suffix) + length(r.keyword) + length(r.regex) > 0; }
+};
+export function hasDomain(r) { return length(r.domain) + length(r.suffix) + length(r.keyword) + length(r.regex) > 0; };
 export function empty(r, geo) {
 	return !hasDomain(r) && !length(r.ip) && !length(r.network) && !length(r.protocol)
 		&& !length(r.ports) && !length(r.ranges) && !(geo ? length(r.geoip) + length(r.geosite) : length(r.sets));
-}
+};
 export function convertGeo(r) {
 	for (let value in [...r.geosite, ...r.geoip]) {
 		let tag = replace(value, ':', '-');
 		push(r.sets, { type: 'local', tag, path: `/etc/hijpass/ruleset/${tag}.srs` });
 	}
-}
+};
 export function singboxMatch(r, dnsOnly) {
 	let out = {};
 	for (let key, values in { domain: r.domain, domain_suffix: r.suffix, domain_keyword: r.keyword, domain_regex: r.regex })
@@ -54,10 +54,10 @@ export function singboxMatch(r, dnsOnly) {
 			if (length(values)) out[key] = compact(values);
 	}
 	return out;
-}
+};
 export function xrayDomains(r) {
 	return [...map(r.domain, d => 'full:' + d), ...map(r.suffix, d => 'domain:' + d), ...r.keyword, ...map(r.regex, d => 'regexp:' + d), ...r.geosite];
-}
+};
 export function xrayRules(r, name, exit, version) {
 	let base = { inboundTag: [TAG.tproxy], outboundTag: exit };
 	optional(base, 'ruleTag', name);
@@ -80,4 +80,4 @@ export function xrayRules(r, name, exit, version) {
 		push(result, base);
 	}
 	return result;
-}
+};

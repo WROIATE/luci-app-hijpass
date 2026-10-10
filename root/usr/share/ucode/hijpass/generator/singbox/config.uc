@@ -14,10 +14,10 @@ const builders = {
 
 export function socks(tag, port) {
 	return { type: 'socks', tag, server: '127.0.0.1', server_port: port, version: '5' };
-}
+};
 export function inbound(kind, tag, port, address) {
 	return { type: kind, tag, listen: address || '127.0.0.1', listen_port: port };
-}
+};
 
 // Config 字段：log 日志；dns DNS 服务器和规则；inbounds 本地监听；
 // outbounds 远端出口；route 匹配规则及默认出口。返回普通 JSON 对象。
@@ -54,4 +54,4 @@ export function build(n) {
 		}
 	}
 	return config;
-}
+};

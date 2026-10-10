@@ -50,7 +50,7 @@ export function migrate(ctx) {
 		for (let key in ['lb_node_list', ...keysToMove]) ctx.delete('hijpass', shunt['.name'], key);
 	}
 	if (!ctx.commit('hijpass')) die(`cannot commit hijpass: ${ctx.error()}`);
-}
+};
 export function install() {
 	// 保留原有 UID 0 / 独立 GID 的账户模型，nft 根据 GID 排除代理核心上游连接。
 	for (let path, entry in {
@@ -71,4 +71,4 @@ export function install() {
 	if (!ctx.commit('firewall')) die('cannot commit firewall include');
 	for (let path in ['/etc/hijpass/client', '/etc/hijpass/server', '/tmp/hijpass/log', '/tmp/hijserver/log']) mkdir(path);
 	for (let path in fs.glob('/tmp/luci-*cache') || []) removeTree(path);
-}
+};

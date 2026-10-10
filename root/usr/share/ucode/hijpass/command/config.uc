@@ -46,4 +46,4 @@ export function main(args) {
 		if (rpc) printf('%J\n', { error: e.message });
 		else { fs.stderr.write(`${e.message}\n`); exit(1); }
 	}
-}
+};

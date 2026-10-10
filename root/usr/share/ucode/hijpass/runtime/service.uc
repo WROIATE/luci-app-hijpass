@@ -115,7 +115,7 @@ function cron(sections, enabled) {
 	if (enabled) {
 		let schedule = first(sections, 'rule').update_schedule;
 		if (schedule) {
-			if (!match(schedule, /^[A-Za-z0-9*\/,? -]+$/) || length(split(trim(schedule), /[ \t]+/)) != 5) die('invalid update schedule');
+			if (!match(schedule, /^[A-Za-z0-9*\/,? -]+$/) || length(split(trim(schedule) || '', /[ \t]+/)) != 5) die('invalid update schedule');
 			push(entries, `${schedule} /usr/lib/hijpass/rules.uc update`);
 		}
 		if (length(filter(sections, section => !!section.log_path))) push(entries, '*/10 * * * * /usr/lib/hijpass/clean-service-log.uc hijpass');

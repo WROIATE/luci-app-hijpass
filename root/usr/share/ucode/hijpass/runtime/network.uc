@@ -29,13 +29,30 @@ export function ports(values) {
 		for (let line in split(fs.readfile(path) || '', '\n')) {
 			let fields = split(trim(line), /[ \t]+/);
 			if (fields[3] != '0A') continue;
-			occupied[hex(split(fields[1], ':')[1])] = true;
+			occupied[hex(split(fields[1] || '', ':')[1])] = true;
 		}
 	}
 	let result = {};
 	for (let value in values) { port(value); result[value] = !!occupied[int(value)]; }
 	return result;
 };
+
+/**
+ * @param {{stdout: string, code: integer}} response exec() 已校验的标准输出及退出状态。
+ * @param {string} url 原始 URL，用于报告。
+ */
+function curlReport(response, url) {
+	let fields = split(response.stdout, '\n');
+	let result = { url, success: response.code == 0, exit_code: response.code };
+	if (length(fields) >= 8) {
+		result.http_code = int(fields[0]); result.remote_ip = fields[1]; result.remote_port = int(fields[2]);
+		for (let key, value in {
+			dns_lookup_time_ms: +fields[3], tcp_connect_time_ms: +fields[4], tls_handshake_time_ms: +fields[5],
+			server_processing_time_ms: +fields[6], total_time_ms: +fields[7], first_byte_time_ms: +fields[6],
+		}) result[key] = int(value * 1000);
+	}
+	return result;
+}
 
 // CurlReport：success/exit_code/http_code/remote_ip/remote_port/url，
 // 所有 *_time_ms 均为毫秒整数。connect/ping 共用同一份安全的 curl 输出解析。
@@ -53,17 +70,9 @@ export function connect(url, timeout, socks) {
 	let args = ['curl', '-I', '-sS', '-o', '/dev/null', '--max-time', `${seconds}`, '-w', format];
 	if (socks) push(args, '--socks5', `127.0.0.1:${port(socks)}`);
 	push(args, '--', url);
-	let response = exec(args, true), fields = split(response.stdout, '\n');
-	let result = { url, success: response.code == 0, exit_code: response.code };
-	if (length(fields) >= 8) {
-		result.http_code = int(fields[0]); result.remote_ip = fields[1]; result.remote_port = int(fields[2]);
-		for (let key, value in {
-			dns_lookup_time_ms: +fields[3], tcp_connect_time_ms: +fields[4], tls_handshake_time_ms: +fields[5],
-			server_processing_time_ms: +fields[6], total_time_ms: +fields[7], first_byte_time_ms: +fields[6],
-		}) result[key] = int(value * 1000);
-	}
-	return result;
+	return curlReport(exec(args, true), url);
 };
+
 /**
  * @param {string} socks
  * @param {string} [host]
@@ -80,10 +89,11 @@ export function ping(socks, host) {
  * @param {string} cidr
  */
 export function contains(address, cidr) {
-	let parts = split(cidr, '/'), host = iptoarr(address), range = iptoarr(parts[0]);
+	let parts = split(cidr, '/'), host = iptoarr(address), range = iptoarr(parts[0] || '');
+	let prefix = parts[1] || '';
 	if (!host || !range || length(host) != length(range)) return false;
 	let bits = parts[1] == null ? length(host) * 8 : int(parts[1]);
-	if (bits < 0 || bits > length(host) * 8 || parts[1] != null && !match(parts[1], /^[0-9]+$/)) return false;
+	if (bits < 0 || bits > length(host) * 8 || parts[1] != null && !match(prefix, /^[0-9]+$/)) return false;
 	for (let i = 0; i < length(host) && bits > 0; i++, bits -= 8) {
 		let mask = (0xff << (8 - min(bits, 8))) & 0xff;
 		if ((host[i] & mask) != (range[i] & mask)) return false;

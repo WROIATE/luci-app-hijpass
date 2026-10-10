@@ -262,3 +262,49 @@ test('核心版本查询将损坏的上游 JSON 转为带来源的错误', t => 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(JSON.parse(result.stdout), { core: 'xray', version: 'v1.2.3' });
 });
+
+test('规则下载拒绝非整数参数，校验失败时保留原文件且不执行 curl', t => {
+    const directory = fixture(t), file = path.join(directory, 'domains'), calls = path.join(directory, 'curl-calls');
+    fs.writeFileSync(file, 'old.example.org\n');
+    script(directory, 'curl', 'printf called >>"$RULE_TEST_CALLS"\nexit 22');
+    const env = { PATH: directory + ':' + process.env.PATH, RULE_TEST_CALLS: calls };
+    const invalid = [
+        { download_timeout: 'invalid' }, { download_timeout: '3oops' },
+        { download_timeout: '1.5' }, { download_timeout: '0' }, { download_timeout: '601' },
+        { retry_count: 'invalid' }, { retry_count: '1oops' },
+        { retry_count: '-1' }, { retry_count: '11' },
+    ];
+    for (const options of invalid) {
+        const sections = [{ ...global, enabled: '0', chn_list: file },
+            { '.type': 'rule', download_timeout: '30', retry_count: '1',
+                chn_domain_list: ['https://example.org/domains'], ...options }];
+        const result = invoke({ action: 'update', sections, group: 'chnlist' }, env);
+        assert.notEqual(result.status, 0, JSON.stringify(options));
+        assert.match(result.stderr, /invalid download timeout or retry count/);
+        assert.equal(fs.readFileSync(file, 'utf8'), 'old.example.org\n');
+        assert.equal(fs.existsSync(calls), false);
+    }
+});
+
+test('连接失败的 curl 输出仍转换为完整报告，核心与诊断命令拒绝缺失参数', t => {
+    const directory = fixture(t);
+    script(directory, 'curl', "printf '000\\n\\n0\\n0.001\\n0.002\\n0.003\\n0.004\\n0.005\\n'\nexit 28");
+    const result = value({ action: 'connect', url: 'https://example.org', timeout: '5' },
+        { PATH: directory + ':' + process.env.PATH });
+    assert.equal(result.success, false);
+    assert.equal(result.exit_code, 28);
+    assert.equal(result.http_code, 0);
+    assert.equal(result.remote_ip, '');
+    assert.equal(result.total_time_ms, 5);
+    for (const args of [[], ['latest']]) {
+        const missing = run('root/usr/lib/hijpass/core-update.uc', args);
+        assert.equal(missing.status, 1);
+        assert.match(JSON.parse(missing.stdout).error, /core action and name are required/);
+    }
+    for (const args of [['prepare'], ['finish']]) {
+        const missing = run('root/usr/lib/hijpass/trace-config.uc', args);
+        assert.equal(missing.status, 1);
+        assert.match(missing.stderr, /invalid capture (PID|directory)/);
+        assert.equal(missing.stdout, '');
+    }
+});

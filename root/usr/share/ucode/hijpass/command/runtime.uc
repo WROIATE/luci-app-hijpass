@@ -36,7 +36,7 @@ export function main(tool, args) {
 			break;
 		case 'connect': result = network.connect(args[0], args[1]); break;
 		case 'iptype':
-			let bytes = iptoarr(split(args[0] || '', '/')[0]);
+			let bytes = iptoarr(split(args[0] || '', '/')[0] || '');
 			if (!bytes) exit(1);
 			result = `${length(bytes) == 4 ? 4 : 6}\n`; break;
 		case 'core-update': result = coreUpdate(args[0], args[1]); break;

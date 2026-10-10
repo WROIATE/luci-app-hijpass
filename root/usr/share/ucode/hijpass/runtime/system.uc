@@ -28,12 +28,14 @@ export function exec(args, quiet) {
 };
 /**
  * @param {array} args
+ * @param {boolean} [quiet] 是否隐藏标准错误。
  * @returns {string} 非零退出状态抛异常，成功时返回输出。
  */
-export function checked(args) {
-	let result = exec(args);
+export function checked(args, quiet) {
+	let result = exec(args, quiet);
 	if (result.code) die(`${args[0]} failed (${result.code})`);
-	return result.stdout;
+	// exec 已校验读取成功；空标准输出也应作为有效字符串返回。
+	return result.stdout || '';
 };
 /**
  * @param {string|null} text
@@ -48,10 +50,11 @@ export function lines(text) {
 	return result;
 };
 /**
- * @param {string} path
+ * @param {string|null} path 路径解析失败返回 null；拒绝无效目录。
  * @param {integer} [mode]
  */
 export function mkdir(path, mode) {
+	if (type(path) != 'string' || !length(path)) die('directory path is empty or invalid');
 	if (fs.stat(path)?.type == 'directory') return;
 	let parent = fs.dirname(path);
 	if (parent != path && parent != '.') mkdir(parent, mode);

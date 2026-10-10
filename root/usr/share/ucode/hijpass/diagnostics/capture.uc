@@ -18,7 +18,7 @@ export function parse(args, pid) {
 		tcpdump: false, iface: 'any', verbose: false, keep: false, addresses: [] }, urls = [];
 	const options = { '-c': 'client', '-n': 'protocol', '-P': 'port', '-t': 'seconds', '-X': 'method', '-i': 'iface' };
 	for (let i = 0; i < length(args); i++) {
-		let arg = args[i];
+		let arg = args[i] || '';
 		if (options[arg]) { if (args[i + 1] == null) die(`missing value for ${arg}`); c[options[arg]] = args[++i]; }
 		else if (arg == '-p') c.tcpdump = true;
 		else if (arg == '-v') c.verbose = true;
@@ -46,8 +46,10 @@ export function parse(args, pid) {
 	}
 	else {
 		if (length(urls) != 1) die('router mode requires one URL');
-		c.url = urls[0];
-		let m = match(c.url, /^(https?):\/\/(\[[A-Fa-f0-9:.]+\]|[A-Za-z0-9_.-]+)(:([0-9]+))?([/?#]|$)/);
+		let url = urls[0];
+		if (type(url) != 'string') die('invalid HTTP URL');
+		c.url = url;
+		let m = match(url, /^(https?):\/\/(\[[A-Fa-f0-9:.]+\]|[A-Za-z0-9_.-]+)(:([0-9]+))?([/?#]|$)/);
 		if (!m) die('invalid HTTP URL');
 		c.host = replace(m[2], /^\[|\]$/g, ''); c.targetPort = int(m[4] || (m[1] == 'https' ? '443' : '80'));
 		if (c.targetPort < 1 || c.targetPort > 65535) die('invalid URL port');
@@ -62,7 +64,7 @@ export function parse(args, pid) {
  */
 function available(name) { return exec(['/bin/sh', '-c', 'command -v ' + quote(name)], true).code == 0; }
 function positions() {
-	let sections;
+	let sections = [];
 	// 诊断本身不依赖服务已配置；缺少 UCI 时仍可提供 nft/系统日志报告。
 	try { sections = read(); } catch (e) { return []; }
 	return filter(map(uniq(map(sections, s => s.log_path)), path => {
@@ -106,7 +108,7 @@ function addRules(c, directory) {
 // PreparedCapture：包含所有已校验的 Capture 字段及 directory（任务目录）。
 // metadata.json 额外保存日志位置快照；Shell 无需解析 UCI 或拼装 nft 表达式。
 /**
- * @param {string} pid
+ * @param {string|null} pid 命令参数，可缺失；入口拒绝空值。
  * @param {string[]} args
  */
 export function prepare(pid, args) {
@@ -127,10 +129,10 @@ export function prepare(pid, args) {
     return c;
 };
 /**
- * @param {string} directory 捕获目录 /tmp/hijpass-trace.PID。
+ * @param {string|null} directory 捕获目录 /tmp/hijpass-trace.PID。
  */
 export function finish(directory) {
-    if (!match(directory || '', /^\/tmp\/hijpass-trace[.][0-9]+$/)) die('invalid capture directory');
+    if (type(directory) != 'string' || !match(directory, /^\/tmp\/hijpass-trace[.][0-9]+$/)) die('invalid capture directory');
     // 清理标识来自已校验的目录名，metadata 缺失或损坏也能删除本次捕获规则。
     let pid = substr(directory, length('/tmp/hijpass-trace.'));
     let identity = { chain: `trace-${pid}`, comment: `hijpass-trace-${pid}` };

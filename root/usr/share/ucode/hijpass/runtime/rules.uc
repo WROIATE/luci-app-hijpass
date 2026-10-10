@@ -2,7 +2,6 @@ import * as fs from 'fs';
 import { first, of, list } from '../uci/config.uc';
 import { exec, checked, lines, atomic, temporary, mkdir } from './system.uc';
 import { contains } from './network.uc';
-import { parse } from '../generator/rules.uc';
 
 // RuleSource：key 为 UCI 下载地址字段，path 为目标文件，kind 为 domain/ip4/ip6/geo。
 // 同类多个 URL 分别下载后合并去重；至少一个完整、有效来源成功后才替换旧文件。
@@ -41,8 +40,8 @@ export function normalize(text, kind) {
 	for (let line in lines(text)) {
 		if (kind == 'domain') { let value = domain(line); if (value) push(result, value); }
 		else {
-			let parts = split(line, '/'), bytes = iptoarr(parts[0]);
-			if (bytes && length(bytes) == (kind == 'ip4' ? 4 : 16) && (parts[1] == null || match(parts[1], /^[0-9]+$/) && int(parts[1]) <= length(bytes) * 8)) push(result, line);
+			let parts = split(line, '/'), bytes = iptoarr(parts[0] || ''), prefix = parts[1] || '';
+			if (bytes && length(bytes) == (kind == 'ip4' ? 4 : 16) && (parts[1] == null || match(prefix, /^[0-9]+$/) && int(parts[1]) <= length(bytes) * 8)) push(result, line);
 		}
 	}
 	return sort(uniq(result));
@@ -66,7 +65,9 @@ export function update(sections, action) {
 	let selected = groups[action] || (action == 'all' || action == 'update' ? keys(catalog) : null);
 	if (!selected) die('unknown rule action');
 	let timeout = int(settings.download_timeout || '30'), retries = int(settings.retry_count || '3');
-	if (timeout < 1 || timeout > 600 || retries < 1 || retries > 10) die('invalid download timeout or retry count');
+	// int() 接受数字前缀；先拒绝尾随文本及 NaN，再限制实际范围。
+	if (!match(settings.download_timeout || '30', /^[0-9]+$/) || !match(settings.retry_count || '3', /^[0-9]+$/)
+		|| type(timeout) != 'int' || type(retries) != 'int' || timeout < 1 || timeout > 600 || retries < 1 || retries > 10) die('invalid download timeout or retry count');
 	let failed = [];
 	for (let key in selected) {
 		let source = catalog[key], urls = list(settings[key]), temp;
@@ -111,17 +112,22 @@ export function update(sections, action) {
  */
 export function geo(action, kind, args, sections) {
 	if (action == '-t' || action == '--convert') {
+		if (type(sections) != 'array') die('Geo conversion requires configuration sections');
 		mkdir('/etc/hijpass/ruleset');
 		// 直接编辑 /etc/config 也能启动：标签来自启用的规则，不依赖前端写回缓存字段。
-		let tags = { geoip: [], geosite: [] };
-		for (let rule in of(sections, 'shunt_route_rule')) if (rule.enabled == '1') {
-			let conditions = parse(rule);
-			push(tags.geoip, ...map(conditions.geoip, value => substr(value, 6)));
-			push(tags.geosite, ...map(conditions.geosite, value => substr(value, 8)));
-		}
-		for (let type in ['geoip', 'geosite']) for (let tag in uniq(tags[type])) {
-			if (!match(tag, /^[A-Za-z0-9_.:@!-]+$/)) die('invalid Geo tag');
-			checked(['geoview', '-type', type, '-action', 'convert', '-format', 'ruleset', '-input', `/usr/share/v2ray/${type}.dat`, '-regex', '-list', tag, '-output', `/etc/hijpass/ruleset/${type}-${tag}.srs`]);
+		for (let database in ['geoip', 'geosite']) {
+			let tags = [];
+			let key = database == 'geoip' ? 'ip_list' : 'domain_list';
+			for (let rule in of(sections, 'shunt_route_rule')) {
+				if (rule.enabled != '1') continue;
+				for (let line in lines(rule[key])) {
+					if (substr(line, 0, length(database) + 1) == database + ':') push(tags, substr(line, length(database) + 1));
+				}
+			}
+			for (let tag in uniq(tags)) {
+				if (!match(tag, /^[A-Za-z0-9_.:@!-]+$/)) die('invalid Geo tag');
+				checked(['geoview', '-type', database, '-action', 'convert', '-format', 'ruleset', '-input', `/usr/share/v2ray/${database}.dat`, '-regex', '-list', tag, '-output', `/etc/hijpass/ruleset/${database}-${tag}.srs`]);
+			}
 		}
 		return '';
 	}
@@ -158,14 +164,14 @@ export function queryFiles(target) {
  */
 export function routeMatch(sections, target) {
 	if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
-	let ip = !!iptoarr(target), tags = null;
+	let ip = !!iptoarr(target), tags = [], loaded = false;
 	for (let rule in of(sections, 'shunt_route_rule')) {
 		if (rule.enabled != '1') continue;
 		for (let line in lines(rule[ip ? 'ip_list' : 'domain_list'])) {
 			if (substr(line, 0, 9) == 'rule-set:') continue;
 			let matched = false, kind = ip ? 'geoip' : 'geosite';
 			if (substr(line, 0, length(kind) + 1) == kind + ':') {
-				if (tags == null) tags = split(trim(geo('-l', kind, [target])), /[ \t\n]+/);
+				if (!loaded) { tags = split(trim(geo('-l', kind, [target])) || '', /[ \t\n]+/); loaded = true; }
 				matched = index(tags, substr(line, length(kind) + 1)) >= 0;
 			}
 			else if (ip) matched = contains(target, line);

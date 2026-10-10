@@ -20,7 +20,16 @@ import { optional, TAG } from './constants.uc';
  * @property {string[]} ranges 目标端口范围，使用冒号分隔。
  */
 /**
- * @param {object} section UCI shunt_route_rule。
+ * @typedef {object} RuleOptions
+ * @property {string|string[]|null} network 传输层协议，兼容 option 和 list。
+ * @property {string|string[]|null} protocol 应用层协议，兼容 option 和 list。
+ * @property {string|string[]|null} port 目标端口，解码时校验 1–65535。
+ * @property {string|string[]|null} port_range 目标端口范围，UCI 使用横线分隔。
+ * @property {string|null} domain_list 按行填写的域名、GeoSite 或规则集。
+ * @property {string|null} ip_list 按行填写的 IP/CIDR、GeoIP 或规则集。
+ */
+/**
+ * @param {RuleOptions} section UCI shunt_route_rule 的匹配字段。
  * @returns {Match}
  */
 export function parse(section) {
@@ -47,14 +56,27 @@ export function parse(section) {
 			else {
 				let prefix = match(line, /^(full|domain|regexp|geosite):(.*)$/);
 				if (!prefix) push(r.keyword, line);
-				else push(r[{ full: 'domain', domain: 'suffix', regexp: 'regex', geosite: 'geosite' }[prefix[1]]], prefix[1] == 'geosite' ? line : prefix[2]);
+				else {
+					switch (prefix[1]) {
+					case 'full': push(r.domain, prefix[2]); break;
+					case 'domain': push(r.suffix, prefix[2]); break;
+					case 'regexp': push(r.regex, prefix[2]); break;
+					case 'geosite': push(r.geosite, line); break;
+					}
+				}
 			}
 		}
 	}
 	return r;
 };
-/** @param {Match} r */
-export function hasDomain(r) { return length(r.domain) + length(r.suffix) + length(r.keyword) + length(r.regex) > 0; };
+/**
+ * @param {Match} r
+ * @param {boolean} [includeGeoSite] 核心支持 GeoSite 或先转换规则集时纳入 GeoSite。
+ */
+export function hasDomain(r, includeGeoSite) {
+	return length(r.domain) + length(r.suffix) + length(r.keyword) + length(r.regex)
+		+ (includeGeoSite ? length(r.geosite) : 0) > 0;
+};
 /**
  * @param {Match} r
  * @param {boolean} geo 是否按 Xray Geo 标签判断匹配条件。

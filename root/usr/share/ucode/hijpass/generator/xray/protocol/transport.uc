@@ -2,6 +2,37 @@ import { duration } from '../../../uci/config.uc';
 
 // streamSettings.network 为 Xray 原生传输名；HTTP 已迁移到 XHTTP stream-one。
 // WS 的 early data 通过 URL 的 ed 参数传递，必须保留已有 query 和 fragment。
+/**
+ * @typedef {object} TransportOptions
+ * @property {string} transport_type 传输类型；空值使用协议默认传输。
+ * @property {string} transport_xhttp_host XHTTP Host 头。
+ * @property {string} transport_xhttp_path XHTTP 路径。
+ * @property {string} transport_xhttp_mode XHTTP 模式。
+ * @property {string} transport_http_host 旧 HTTP 传输 Host 头。
+ * @property {string} transport_http_path 旧 HTTP 路径，转换为 XHTTP stream-one。
+ * @property {string} transport_http_method HTTP 上行请求方法。
+ * @property {string} transport_httpupgrade_host HTTPUpgrade Host 头。
+ * @property {string} transport_httpupgrade_path HTTPUpgrade 路径。
+ * @property {string} transport_ws_host WebSocket Host 头。
+ * @property {string} transport_ws_path WebSocket 路径，空值使用 /。
+ * @property {integer|null} transport_ws_max_early_data early data 字节数；null 表示未设置。
+ * @property {string} transport_grpc_service_name gRPC 服务名称。
+ * @property {string} transport_grpc_idle_timeout 空闲时长，生成时转换为秒。
+ * @property {string} transport_grpc_ping_timeout ping 等待时长，生成时转换为秒。
+ * @property {boolean} transport_grpc_permit_without_stream 没有活动流时是否发送 ping。
+ */
+/**
+ * @typedef {object} StreamSettings
+ * @property {string|null} network 传输名称，选中传输后填充。
+ * @property {object|null} xhttpSettings XHTTP/旧 HTTP 的传输选项。
+ * @property {object|null} httpupgradeSettings HTTPUpgrade 的传输选项。
+ * @property {object|null} wsSettings WebSocket 的传输选项。
+ * @property {object|null} grpcSettings gRPC 的传输选项。
+ */
+/**
+ * @param {StreamSettings} stream Xray streamSettings，原地填充传输选项。
+ * @param {TransportOptions} n 已经 UCI 解码并校验的传输字段。
+ */
 export function apply(stream, n) {
 	switch (n.transport_type) {
 	case '': break;
@@ -20,7 +51,7 @@ export function apply(stream, n) {
 	case 'ws':
 		let path = n.transport_ws_path || '/';
 		if (n.transport_ws_max_early_data) {
-			let hash = index(path, '#'), base = hash < 0 ? path : substr(path, 0, hash);
+			let hash = index(path, '#') ?? -1, base = hash < 0 ? path : substr(path, 0, hash);
 			path = base + (index(base, '?') < 0 ? '?' : '&') + `ed=${n.transport_ws_max_early_data}` + (hash < 0 ? '' : substr(path, hash));
 		}
 		stream.network = 'websocket';

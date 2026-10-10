@@ -19,30 +19,37 @@ export function resolve(sections, target) {
 	}
 	if (target && target != 'shunt' && !length(selected)) die('node not found');
 	let nodes = [], byID = {}, byName = {}, references = {};
-	// selected 是待解析队列：依赖追加到末尾；每个 ID 只展开一次，因此循环有界。
-	for (let i = 0; i < length(selected); i++) {
-		let s = selected[i], id = s['.name'], name = s.name || id;
-		if (byID[id]) continue;
-		if (length(filter(enabled[name] || [], other => other['.name'] != id))) die(`duplicate proxy name "${name}"`);
-		let n;
-		try { n = proxy(s); }
-		catch (e) { die(`node "${name}": ${e.message}`); }
-		byID[id] = n;
-		byName[name] = n;
-		push(nodes, n);
-		if (n.type == TYPE.balance && s.upstream_proxy_node) die(`load balancing node cannot have an upstream: ${name}`);
-		let refs = n.type == TYPE.balance ? list(s.member_node) : s.upstream_proxy_node ? [s.upstream_proxy_node] : [];
-		references[id] = [];
-		for (let ref in refs) {
-			let matches = enabled[ref] || [];
-			if (!length(matches)) die(`proxy node "${ref}" missing or disabled`);
-			if (length(matches) > 1) die(`duplicate proxy name "${ref}"`);
-			push(references[id], matches[0]['.name']);
-			push(selected, matches[0]);
+	// 按批次展开依赖，保持发现顺序；每个 ID 只展开一次，循环有界。
+	let pending = selected;
+	while (length(pending)) {
+		let next = [];
+		for (let s in pending) {
+			let id = s['.name'], name = s.name || id;
+			if (byID[id]) continue;
+			if (length(filter(enabled[name] || [], other => other['.name'] != id))) die(`duplicate proxy name "${name}"`);
+			let n;
+			try { n = proxy(s); }
+			catch (e) { die(`node "${name}": ${e.message}`); }
+			byID[id] = n;
+			byName[name] = n;
+			push(nodes, n);
+			if (n.type == TYPE.balance && s.upstream_proxy_node) die(`load balancing node cannot have an upstream: ${name}`);
+			let refs = n.type == TYPE.balance ? list(s.member_node) : s.upstream_proxy_node ? [s.upstream_proxy_node] : [];
+			let dependencies = [];
+			references[id] = dependencies;
+			for (let ref in refs) {
+				let matches = enabled[ref] || [];
+				if (!length(matches)) die(`proxy node "${ref}" missing or disabled`);
+				if (length(matches) > 1) die(`duplicate proxy name "${ref}"`);
+				push(dependencies, matches[0]['.name']);
+				push(next, matches[0]);
+			}
 		}
+		pending = next;
 	}
 	for (let n in nodes) {
-		let refs = map(references[n.id], id => byID[id]);
+		let refs = [];
+		for (let id in references[n.id]) push(refs, byID[id]);
 		if (n.type == TYPE.balance) n.members = refs;
 		else n.upstream = refs[0];
 	}

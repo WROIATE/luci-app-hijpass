@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { exec, checked, temporary, removeTree } from './system.uc';
+import { checked, temporary, removeTree } from './system.uc';
 
 // CoreRelease：tag_name 为官方版本，assets 含 name/state/browser_download_url/digest。
 // digest 必须为 sha256，先校验归档，再验证可执行文件，最后原子替换目标。
@@ -22,9 +22,13 @@ export function architecture(core, machine) {
  * @param {string} path
  */
 function version(core, path) {
-	let result = exec([path, 'version'], true);
-	let matchVersion = match(result.stdout, core == 'xray' ? /Xray ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/ : /sing-box version ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/);
-	return !result.code && matchVersion ? matchVersion[1] : null;
+	try {
+		let output = checked([path, 'version'], true);
+		let matchVersion = match(output, core == 'xray' ? /Xray ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/ : /sing-box version ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/);
+		return matchVersion ? matchVersion[1] : null;
+	}
+	// 核心尚未安装或版本命令失败时没有可用版本；安装验证同样会因此失败。
+	catch (e) { return null; }
 }
 /**
  * @param {string} core
@@ -41,10 +45,11 @@ export function release(core) {
 	catch (e) { die(`invalid ${core} release response: ${e.message}`); }
 };
 /**
- * @param {string} action
- * @param {string} core
+ * @param {string} [action]
+ * @param {string} [core]
  */
 export function run(action, core) {
+	if (type(action) != 'string' || type(core) != 'string') die('core action and name are required');
 	if (!repos[core]) die('unknown core');
 	let destination = `/usr/bin/${core}`;
 	if (action == 'version') return { core, version: version(core, destination) || 'unknown' };
@@ -66,12 +71,13 @@ export function run(action, core) {
 	try {
 		let archive = `${dir}/${asset.name}`;
 		checked(['curl', '-f', '-sS', '-L', '--max-time', '120', '-o', archive, expectedURL]);
-		let checksum = split(trim(checked(['sha256sum', archive])), /[ \t]+/)[0];
-		if (lc(checksum) != lc(substr(asset.digest, 7))) die('archive checksum verification failed');
-		let binary;
+		let checksum = split(trim(checked(['sha256sum', archive])), /[ \t]+/)[0] || '';
+		let digest = asset.digest;
+		if (type(digest) != 'string') die('release checksum is missing');
+		if (lc(checksum) != lc(substr(digest, 7))) die('archive checksum verification failed');
+		let binary = dir + '/xray';
 		if (core == 'xray') {
 			checked(['unzip', '-q', archive, 'xray', '-d', dir]);
-			binary = dir + '/xray';
 		}
 		else {
 			// 只提取明确的核心路径，不展开归档里的其它文件。

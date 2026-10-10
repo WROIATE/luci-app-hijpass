@@ -26,7 +26,7 @@ export function networkState(sections) {
 	catch (e) { die(`invalid network state JSON: ${e.message}`); }
 	let dhcp = first(read('dhcp'), 'dnsmasq');
 	for (let line in lines(fs.readfile(dhcp.resolvfile))) {
-		let fields = split(line, /[ \t]+/), address = split(fields[1] || '', '%')[0], bytes = iptoarr(address);
+		let fields = split(line, /[ \t]+/), address = split(fields[1] || '', '%')[0] || '', bytes = iptoarr(address);
 		if (fields[0] != 'nameserver' || !bytes || index(['0.0.0.0', '127.0.0.1', '::', '::1'], address) >= 0) continue;
 		push(length(bytes) == 4 ? state.dns4 : state.dns6, address);
 	}
@@ -39,9 +39,9 @@ export function networkState(sections) {
  */
 function ipList(path, version) {
 	return filter(lines(fs.readfile(path)), value => {
-		let parts = split(value, '/'), bytes = iptoarr(parts[0]);
+		let parts = split(value, '/'), bytes = iptoarr(parts[0] || ''), prefix = parts[1] || '';
 		if (!bytes || length(bytes) != (version == 4 ? 4 : 16)) return false;
-		return parts[1] == null || match(parts[1], /^[0-9]+$/) && int(parts[1]) <= length(bytes) * 8;
+		return parts[1] == null || match(prefix, /^[0-9]+$/) && int(parts[1]) <= length(bytes) * 8;
 	});
 }
 
@@ -65,10 +65,12 @@ export function generate(sections, state, template) {
 	let proto = filter(split(join(',', list(f.tproxy_proto)), /[, \t]+/), value => value != '');
 	if (!length(proto)) die('tproxy_proto is required');
 	for (let value in proto) if (index(['tcp', 'udp'], value) < 0) die('invalid tproxy_proto');
+	/** @param {string[]} values */
 	function mac(values) {
 		for (let value in values) if (!match(value, /^[A-Fa-f0-9]{2}(:[A-Fa-f0-9]{2}){5}$/)) die('invalid proxy MAC');
 		return join(', ', values);
 	}
+	/** @param {string[]} values */
 	function interfaces(values) {
 		for (let value in values) if (!match(value, /^[A-Za-z0-9_.:@-]+$/)) die('invalid proxy interface');
 		return join(', ', map(values, v => sprintf('%J', v)));
@@ -105,7 +107,7 @@ export function generate(sections, state, template) {
 	// 模板按完整 chain/set 删除；引用已删除集合的规则同时移除，不留下悬空引用。
 	let templateLines = split(template, '\n');
 	for (let i = 0; i < length(templateLines); i++) {
-		let line = templateLines[i];
+		let line = templateLines[i] || '';
 		let block = match(line, /^    (chain|set) ([A-Za-z0-9_-]+) \{/);
 		if (block) skip = !!disabled[block[2]];
 		if (skip) { if (match(line, /^    \}/)) skip = false; continue; }

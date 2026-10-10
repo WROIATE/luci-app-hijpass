@@ -66,7 +66,7 @@ function strategy(value, singbox) {
 		: { '4': 'UseIPv4', '6': 'UseIPv6', '46': 'UseIP', '64': 'UseIP' })[value] || '';
 }
 /**
- * @param {object} s
+ * @param {{tag: string, type: string, address: string, port: integer|null}} s 已解析的 DNS 节点。
  * @param {string} tag
  * @param {string} detour
  * @param {boolean} singbox
@@ -99,27 +99,31 @@ function dnsServer(s, tag, detour, singbox) {
  */
 export function build(settings, graph) {
 	let s = settings, singbox = s.core == CORE.singbox, config = {};
+	let dnsServers = [], dnsRules = [], routeRules = [], outbounds = [];
 	if (singbox) {
+		push(dnsServers, dnsServer(s.dns, s.dns.tag, s.final, true));
+		outbounds = [{ type: 'direct', tag: TAG.direct }, ...map(graph.nodes, n => sb.socks(n.name, n.socks_port))];
+		routeRules = [{ action: 'sniff' }, { protocol: ['dns'], action: 'hijack-dns' }];
 		config = {
 			log: { disabled: false, level: s.log, timestamp: true },
-			dns: { servers: [dnsServer(s.dns, s.dns.tag, s.final, true)], final: s.dns.tag,
+			dns: { servers: dnsServers, final: s.dns.tag,
 				disable_cache: !s.cache, disable_expire: !s.cache },
 			inbounds: [sb.inbound('tproxy', TAG.tproxy, s.listen, '::'), sb.inbound('direct', TAG.dnsInbound, s.dnsPort, '::')],
-			outbounds: [{ type: 'direct', tag: TAG.direct }, ...map(graph.nodes, n => sb.socks(n.name, n.socks_port))],
-			route: { rules: [{ action: 'sniff' }, { protocol: ['dns'], action: 'hijack-dns' }], final: s.final, default_domain_resolver: s.dns.tag },
+			outbounds,
+			route: { rules: routeRules, final: s.final, default_domain_resolver: s.dns.tag },
 		};
 		optional(config.dns, 'strategy', strategy(s.strategy, true));
 		if (s.rulesetExit) {
 			let out = s.rulesetExit == TAG.direct ? { type: 'direct', tag: TAG.ruleset } : sb.socks(TAG.ruleset, graph.byName[s.rulesetExit].socks_port);
 			if (s.rulesetDNS) {
 				out.domain_resolver = TAG.rulesetDNS;
-				push(config.dns.servers, dnsServer(s.rulesetDNS, TAG.rulesetDNS, TAG.ruleset, true));
+				push(dnsServers, dnsServer(s.rulesetDNS, TAG.rulesetDNS, TAG.ruleset, true));
 			}
-			push(config.outbounds, out);
+			push(outbounds, out);
 		}
 	}
 	else {
-		let outbounds = map(graph.nodes, n => xr.socks(n.name, n.socks_port));
+		outbounds = map(graph.nodes, n => xr.socks(n.name, n.socks_port));
 		push(outbounds, { protocol: 'freedom', tag: TAG.direct, settings: {}, streamSettings: { sockopt: { domainStrategy: 'UseIP' } } });
 		// Xray 的默认出口由第一项决定，稳定保持其余出口的原顺序。
 		let final = filter(outbounds, o => o.tag == s.final)[0];
@@ -131,7 +135,7 @@ export function build(settings, graph) {
 			log: xr.log(s.log), outbounds,
 			inbounds: [xr.inbound('tproxy', TAG.tproxy, s.listen, true), xr.inbound('direct', TAG.dnsInbound, s.dnsPort)],
 			routing: { domainStrategy: 'AsIs', rules: [] },
-			dns: { servers: [], queryStrategy: strategy(s.strategy, false) || 'UseIP', serveExpiredTTL: 3600,
+			dns: { servers: dnsServers, queryStrategy: strategy(s.strategy, false) || 'UseIP', serveExpiredTTL: 3600,
 				disableCache: !s.cache, serveStale: !s.cache, disableFallback: false, disableFallbackIfMatch: true },
 		};
 	}
@@ -139,18 +143,17 @@ export function build(settings, graph) {
 	function addDNS(entry, r, exit) {
 		if (exit == TAG.block) die(`rule "${entry.name}" DNS exit cannot be Block`);
 		let tag = entry.name + '-dns', server = dnsServer(entry.dns, tag, exit, singbox);
-		push(config.dns.servers, server);
+		push(dnsServers, server);
 		if (singbox) {
-			config.dns.rules ||= [];
 			let rule = { ...singboxMatch(r, true), action: 'route', server: tag, disable_cache: true };
 			optional(rule, 'strategy', strategy(entry.strategy, true));
-			push(config.dns.rules, rule);
+			push(dnsRules, rule);
 		}
 		else {
 			optional(server, 'domains', xrayDomains(r));
 			optional(server, 'queryStrategy', strategy(entry.strategy, false));
 			if (!dnsExits[exit]) { dnsExits[exit] = []; push(exitOrder, exit); }
-			push(dnsExits[exit], tag);
+			dnsExits[exit] = [...dnsExits[exit], tag];
 		}
 	}
 	for (let entry in s.entries) {
@@ -161,9 +164,9 @@ export function build(settings, graph) {
 			let r = { ...entry.match, sets: [...entry.match.sets] };
 			let name = entry.name + (version && entry.name ? `-ipv${version}` : '');
 			let exit = version == 4 ? entry.v4 : version == 6 ? entry.v6 : entry.exit;
-			let hasDNS = hasDomain(r);
+			// Xray 原生处理 GeoSite；sing-box 仅在启用转换时将其视为域名条件。
+			let hasDNS = hasDomain(r, !singbox || s.convert) || singbox && length(r.sets) > 0;
 			if (singbox) {
-				hasDNS ||= length(r.sets) > 0 || s.convert && length(r.geosite) > 0;
 				if (s.convert) convertGeo(r);
 				else if (length(r.geoip) + length(r.geosite) && !hasDomain(r) && !length(r.ip) && !length(r.sets)) continue;
 				if (empty(r, false)) continue;
@@ -177,10 +180,9 @@ export function build(settings, graph) {
 				if (version) rule.ip_version = version;
 				if (exit == TAG.block) rule.action = 'reject';
 				else { rule.action = 'route'; rule.outbound = exit; }
-				push(config.route.rules, rule);
+				push(routeRules, rule);
 			}
 			else {
-				hasDNS ||= length(r.geosite) > 0;
 				if (empty(r, true) || length(r.sets) && !hasDomain(r) && !length(r.ip) && !length(r.geosite) && !length(r.geoip)) continue;
 				for (let proto in r.protocol) if (index(['http', 'tls', 'quic', 'bittorrent'], proto) < 0) die(`unsupported Xray route protocol "${proto}"`);
 				push(routes, ...xrayRules(r, name, exit, version));
@@ -198,15 +200,17 @@ export function build(settings, graph) {
 		}
 	}
 	if (singbox) {
+		if (length(dnsRules)) config.dns.rules = dnsRules;
 		if (length(setOrder)) config.route.rule_set = map(setOrder, tag => sets[tag]);
 	}
 	else {
 		let server = dnsServer(s.dns, 'default-dns', '', false);
 		server.skipFallback = false;
-		push(config.dns.servers, server);
-		config.routing.rules = [{ inboundTag: [TAG.dnsInbound], outboundTag: TAG.dns }];
-		for (let exit in exitOrder) push(config.routing.rules, { inboundTag: dnsExits[exit], outboundTag: exit });
-		push(config.routing.rules, ...routes);
+		push(dnsServers, server);
+		routeRules = [{ inboundTag: [TAG.dnsInbound], outboundTag: TAG.dns }];
+		config.routing.rules = routeRules;
+		for (let exit in exitOrder) push(routeRules, { inboundTag: dnsExits[exit], outboundTag: exit });
+		push(routeRules, ...routes);
 	}
 	return config;
 };

@@ -5,7 +5,7 @@ import { render } from '../generator/render.uc';
 import { CORE, core } from '../config/protocol/proxy.uc';
 import { resolve } from './network.uc';
 import { atomic, checked, command, mkdir, temporary } from './system.uc';
-import { reset, remove, route } from './firewall.uc';
+import { reset, remove } from './firewall.uc';
 import { geo, update } from './rules.uc';
 import { prepare as prepareDNS } from './dns.uc';
 import { logger } from './files.uc';
@@ -126,7 +126,7 @@ function cron(sections, enabled) {
 export function deactivate(sections) {
 	// 停止时继续执行其它清理步骤，最后统一报告失败，避免单个 hook 留下透明路由。
 	let failures = [];
-	for (let cleanup in [() => hook(sections, 'stop'), () => route('remove_hijpass_route'), () => remove(), () => cron(sections, false)]) {
+	for (let cleanup in [() => hook(sections, 'stop'), () => checked(['/usr/lib/hijpass/route.sh', 'remove']), () => remove(), () => cron(sections, false)]) {
 		try { cleanup(); } catch (e) { push(failures, e.message); }
 	}
 	fs.unlink('/etc/hijpass/chinadns-ng.conf');
@@ -135,7 +135,12 @@ export function deactivate(sections) {
 };
 export function activate(sections) {
 	if (first(sections, 'hijpass').enabled != '1') return;
-	try { reset(sections); route('reset_hijpass_route'); hook(sections, 'start'); cron(sections, true); }
+	try {
+		reset(sections);
+		checked(['/usr/lib/hijpass/route.sh', 'reset']);
+		hook(sections, 'start');
+		cron(sections, true);
+	}
 	catch (e) { deactivate(sections); die(e.message); }
 	logger(sections)('INFO', 'Service started');
 };

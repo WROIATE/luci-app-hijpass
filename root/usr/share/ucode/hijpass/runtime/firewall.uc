@@ -155,20 +155,3 @@ export function apply(sections) {
 	let hook = first(sections, 'hijpass').nft_hook;
 	if (hook && fs.access(hook, 'x')) checked([hook]);
 };
-
-/**
- * @param {string} action
- */
-export function route(action) {
-	const table = '233', mark = '0x1';
-	if (index(['reset_hijpass_route', 'remove_hijpass_route'], action) < 0) die('unknown route action');
-	// 使用固定表号，无需增删共享 rt_tables 文件；仅清理 Hijpass 自己的标记规则。
-	for (let family in [[], ['-6']]) {
-		while (!exec(['ip', ...family, 'rule', 'del', 'fwmark', mark, 'table', table], true).code) {}
-		exec(['ip', ...family, 'route', 'del', 'local', 'default', 'dev', 'lo', 'table', table], true);
-		if (action == 'reset_hijpass_route') {
-			checked(['ip', ...family, 'route', 'add', 'local', 'default', 'dev', 'lo', 'table', table]);
-			checked(['ip', ...family, 'rule', 'add', 'fwmark', mark, 'table', table]);
-		}
-	}
-};

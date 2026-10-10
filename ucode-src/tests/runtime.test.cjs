@@ -28,6 +28,65 @@ function node(id, options = {}) {
 }
 const global = { '.name': 'global', '.type': 'hijpass', enabled: '1' };
 
+// 模拟内核路由状态，执行真实 route.sh；不触碰宿主机的路由或规则。
+function routeFixture(t) {
+    const directory = fixture(t), state = path.join(directory, 'state'), calls = path.join(directory, 'calls');
+    fs.writeFileSync(path.join(directory, 'ip'), '#!' + process.execPath + '\n' + String.raw`
+const fs = require('node:fs');
+const [family, kind, action, ...args] = process.argv.slice(2);
+fs.appendFileSync(process.env.ROUTE_TEST_CALLS, JSON.stringify(process.argv.slice(2)) + '\n');
+if (process.env.ROUTE_TEST_FAIL === [family, kind, action].join(' ')) process.exit(5);
+const state = JSON.parse(fs.readFileSync(process.env.ROUTE_TEST_STATE));
+const entries = state[family]?.[kind];
+if (!entries || !['add', 'del'].includes(action)) process.exit(2);
+const key = args.join(' '), position = entries.indexOf(key);
+if (action === 'del') {
+    if (position < 0) process.exit(1);
+    entries.splice(position, 1);
+} else {
+    if (position >= 0) process.exit(2);
+    entries.push(key);
+}
+fs.writeFileSync(process.env.ROUTE_TEST_STATE, JSON.stringify(state));
+`, { mode: 0o755 });
+    const env = { ...process.env, PATH: directory + ':' + process.env.PATH, ROUTE_TEST_STATE: state, ROUTE_TEST_CALLS: calls };
+    return {
+        write: value => fs.writeFileSync(state, JSON.stringify(value)),
+        read: () => JSON.parse(fs.readFileSync(state)),
+        calls: () => fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').trim().split('\n').map(JSON.parse) : [],
+        run: (args, failure) => spawnSync(path.join(root, 'root/usr/lib/hijpass/route.sh'), args,
+            { encoding: 'utf8', env: { ...env, ROUTE_TEST_FAIL: failure || '' } }),
+    };
+}
+
+test('路由脚本重复重置或移除时仅修改 Hijpass 的 IPv4/IPv6 路由', t => {
+    const route = routeFixture(t), ownRule = 'fwmark 0x1 table 233', ownRoute = 'local default dev lo table 233';
+    const foreignRule = 'fwmark 0x2 table 234', foreignRoute = 'local default dev lo table 234';
+    route.write(Object.fromEntries(['-4', '-6'].map(family => [family,
+        { rule: [foreignRule, ownRule, ownRule], route: [foreignRoute, ownRoute] }])));
+    for (const action of ['reset', 'reset', 'remove', 'remove']) {
+        const result = route.run([action]);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout, '');
+        const expected = { rule: [foreignRule], route: [foreignRoute] };
+        if (action === 'reset') { expected.rule.push(ownRule); expected.route.push(ownRoute); }
+        assert.deepEqual(route.read(), { '-4': expected, '-6': expected });
+    }
+});
+
+test('路由脚本拒绝无效动作，添加失败时停止并返回命令错误', t => {
+    const route = routeFixture(t);
+    route.write({ '-4': { rule: [], route: [] }, '-6': { rule: [], route: [] } });
+    for (const args of [[], ['flush'], ['reset', '233']]) {
+        assert.equal(route.run(args).status, 1);
+        assert.deepEqual(route.calls(), []);
+    }
+    const result = route.run(['reset'], '-4 route add');
+    assert.equal(result.status, 5);
+    assert.deepEqual(route.read(), { '-4': { rule: [], route: [] }, '-6': { rule: [], route: [] } });
+    assert.equal(route.calls().some(args => args[0] === '-6' || args[1] === 'rule' && args[2] === 'add'), false);
+});
+
 test('firewall handles shipped comma protocols, DNS/local toggles and removes dangling references', t => {
     const directory = fixture(t), ip = path.join(directory, 'ips');
     fs.writeFileSync(ip, '192.0.2.0/24\n2001:db8::/32\ninvalid\n192.0.2.0/99\n');

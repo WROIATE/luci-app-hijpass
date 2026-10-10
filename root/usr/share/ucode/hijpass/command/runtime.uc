@@ -41,7 +41,6 @@ export function main(tool, args) {
 			if (!bytes) exit(1);
 			result = `${length(bytes) == 4 ? 4 : 6}\n`; break;
 		case 'core-update': result = coreUpdate(args[0], args[1]); break;
-		case 'route': firewall.route(args[0]); break;
 		case 'nft':
 			if (args[0] == 'show') {
 				result = exec(['nft', 'list', 'table', 'inet', 'hijpass'], true).stdout;

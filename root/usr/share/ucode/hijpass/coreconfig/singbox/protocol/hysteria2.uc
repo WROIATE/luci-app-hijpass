@@ -1,5 +1,5 @@
 import { endpoint, tls } from './options.uc';
-import { optional } from '../../constants.uc';
+import { optional } from '../../json.uc';
 
 // up_mbps/down_mbps 为带宽；server_ports 为端口跳跃范围，核心使用冒号分隔。
 // hop_interval 为跳跃间隔；obfs 仅支持有密码的 salamander。

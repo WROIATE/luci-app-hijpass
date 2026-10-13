@@ -1,5 +1,5 @@
 import { endpoint, tls, transport, multiplex } from './options.uc';
-import { optional } from '../../constants.uc';
+import { optional } from '../../json.uc';
 
 // uuid 标识用户；flow/packet_encoding 为 VLESS 扩展，transport 为传输层。
 // Reality 必须有公钥，并同时启用 uTLS，使用 chrome 指纹。

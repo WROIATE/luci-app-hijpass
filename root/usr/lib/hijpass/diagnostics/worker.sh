@@ -4,7 +4,7 @@
 directory=$1
 shift
 trap '' HUP
-"${0%/*}/capture.sh" "$@" >"$directory/stdout" 2>"$directory/stderr"
+"/usr/lib/hijpass/diagnostics/capture.sh" "$@" >"$directory/stdout" 2>"$directory/stderr"
 code=$?
 printf '%s\n' "$code" >"$directory/exit.tmp"
 mv "$directory/exit.tmp" "$directory/exit"

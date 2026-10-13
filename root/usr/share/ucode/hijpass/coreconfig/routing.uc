@@ -1,7 +1,8 @@
 import { of, first } from '../config/sections.uc';
 import { port } from '../config/values.uc';
 import { CORE, core } from '../config/protocol/proxy.uc';
-import { TAG, optional } from './constants.uc';
+import { TAG } from './constants.uc';
+import { optional } from './json.uc';
 import { parse, hasDomain, empty, convertGeo, singboxMatch, xrayDomains, xrayRules } from './rules.uc';
 import * as sb from './singbox/config.uc';
 import * as xr from './xray/config.uc';
@@ -12,14 +13,14 @@ import * as xr from './xray/config.uc';
 // Entry：name/split，exit/v4/v6/dnsExit 出口，dns/strategy DNS 策略，match 匹配条件。
 /**
  * @param {object[]} sections
- * @param {{nodes: object[], byName: object}} graph
+ * @param {{nodes: object[], byName: object}} dependencies
  */
-export function prepare(sections, graph) {
+export function prepare(sections, dependencies) {
 	function exit(name, required) {
 		if (!name && !required) return '';
 		if (name == 'hijpass-direct') return TAG.direct;
 		if (name == 'hijpass-block') return TAG.block;
-		if (graph.byName[name]) return name;
+		if (dependencies.byName[name]) return name;
 		die(name ? `proxy node "${name}" missing or disabled` : 'proxy exit is required');
 	}
 	let servers = {};
@@ -97,14 +98,14 @@ function dnsServer(s, tag, detour, singbox) {
 
 /**
  * @param {object} settings
- * @param {{nodes: object[], byName: object}} graph
+ * @param {{nodes: object[], byName: object}} dependencies
  */
-export function build(settings, graph) {
+export function build(settings, dependencies) {
 	let s = settings, singbox = s.core == CORE.singbox, config = {};
 	let dnsServers = [], dnsRules = [], routeRules = [], outbounds = [];
 	if (singbox) {
 		push(dnsServers, dnsServer(s.dns, s.dns.tag, s.final, true));
-		outbounds = [{ type: 'direct', tag: TAG.direct }, ...map(graph.nodes, n => sb.socks(n.name, n.socks_port))];
+		outbounds = [{ type: 'direct', tag: TAG.direct }, ...map(dependencies.nodes, n => sb.socks(n.name, n.socks_port))];
 		routeRules = [{ action: 'sniff' }, { protocol: ['dns'], action: 'hijack-dns' }];
 		config = {
 			log: { disabled: false, level: s.log, timestamp: true },
@@ -116,7 +117,7 @@ export function build(settings, graph) {
 		};
 		optional(config.dns, 'strategy', strategy(s.strategy, true));
 		if (s.rulesetExit) {
-			let out = s.rulesetExit == TAG.direct ? { type: 'direct', tag: TAG.ruleset } : sb.socks(TAG.ruleset, graph.byName[s.rulesetExit].socks_port);
+			let out = s.rulesetExit == TAG.direct ? { type: 'direct', tag: TAG.ruleset } : sb.socks(TAG.ruleset, dependencies.byName[s.rulesetExit].socks_port);
 			if (s.rulesetDNS) {
 				out.domain_resolver = TAG.rulesetDNS;
 				push(dnsServers, dnsServer(s.rulesetDNS, TAG.rulesetDNS, TAG.ruleset, true));
@@ -125,7 +126,7 @@ export function build(settings, graph) {
 		}
 	}
 	else {
-		outbounds = map(graph.nodes, n => xr.socks(n.name, n.socks_port));
+		outbounds = map(dependencies.nodes, n => xr.socks(n.name, n.socks_port));
 		push(outbounds, { protocol: 'freedom', tag: TAG.direct, settings: {}, streamSettings: { sockopt: { domainStrategy: 'UseIP' } } });
 		// Xray 的默认出口由第一项决定，稳定保持其余出口的原顺序。
 		let final = filter(outbounds, o => o.tag == s.final)[0];

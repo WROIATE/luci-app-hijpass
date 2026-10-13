@@ -1,8 +1,20 @@
 #!/bin/sh
 # All network changes below run in a new user/network namespace.
 set -eu
-trace_script="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)/root/usr/lib/hijpass/diagnostics/capture.sh"
-exec unshare -Urn sh -s -- "$trace_script" <<'NAMESPACE'
+trace_repository="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+trace_runtime="$(mktemp -d /tmp/hijpass-trace-runtime-XXXXXXXX)"
+trap 'rm -rf "$trace_runtime"' EXIT
+# 固定安装路径只在测试副本中重写，原脚本保持与路由器上的安装行为一致。
+cp -R "$trace_repository/root/usr/lib/hijpass/." "$trace_runtime/"
+find "$trace_runtime" -name '*.sh' -exec sed -i \
+    -e "s#/usr/lib/hijpass#$trace_runtime#g" \
+    -e 's@#!/bin/sh$@#!/usr/bin/busybox ash@' {} +
+sed -i \
+    -e "s#ucode -S --#'${UCODE:-ucode}' -S -L '$trace_repository/root/usr/share/ucode' --#" \
+    -e "s#/usr/share/libubox/jshn.sh#${JSHN_SH:-/usr/share/libubox/jshn.sh}#" \
+    "$trace_runtime/common.sh"
+trace_script="$trace_runtime/diagnostics/capture.sh"
+unshare -Urn sh -s -- "$trace_script" <<'NAMESPACE'
 set -eu
 trace_check_dir="$(mktemp -d /tmp/hijpass-trace-netns-XXXXXXXX)"
 trap 'rm -rf "$trace_check_dir"' EXIT

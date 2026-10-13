@@ -11,8 +11,11 @@ function shellRuntime() {
     fs.cpSync(path.join(root, 'root/usr/lib/hijpass'), shellDirectory, { recursive: true });
     for (const folder of fs.readdirSync(shellDirectory, { withFileTypes: true })) {
         const files = folder.isDirectory() ? fs.readdirSync(path.join(shellDirectory, folder.name)).map(name => path.join(shellDirectory, folder.name, name)) : [path.join(shellDirectory, folder.name)];
+        // 在测试安装副本中映射固定路径，生产脚本无需支持可变安装目录。
         for (const file of files) if (file.endsWith('.sh'))
-            fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('#!/bin/sh', '#!/usr/bin/busybox ash'));
+            fs.writeFileSync(file, fs.readFileSync(file, 'utf8')
+                .replace('#!/bin/sh', '#!/usr/bin/busybox ash')
+                .replaceAll('/usr/lib/hijpass', shellDirectory));
     }
     const common = path.join(shellDirectory, 'common.sh');
     fs.writeFileSync(common, fs.readFileSync(common, 'utf8').replace('/usr/share/libubox/jshn.sh',

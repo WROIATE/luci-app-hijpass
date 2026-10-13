@@ -1,4 +1,4 @@
-import { optional } from '../../constants.uc';
+import { optional } from '../../json.uc';
 
 // Native outbound 公共字段：type/tag 标识协议与出口，server/server_port 远端地址。
 // tls 只由支持 TLS 的协议添加；detour 由调用者从已连接的 upstream 设置。

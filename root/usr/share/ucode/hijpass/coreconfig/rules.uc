@@ -1,5 +1,6 @@
 import { list, port } from '../config/values.uc';
-import { optional, TAG } from './constants.uc';
+import { TAG } from './constants.uc';
+import { optional } from './json.uc';
 
 // Match 字段均为数组：domain/suffix/keyword/regex 域名条件，ip 为地址或 CIDR，
 // geoip/geosite 为 Geo 标签，network/protocol/ports/ranges 为传输限制。

@@ -2,7 +2,8 @@ import { of } from '../config/sections.uc';
 import { list } from '../config/values.uc';
 import { proxy, TYPE } from '../config/protocol/proxy.uc';
 
-// Graph.nodes 保持 UCI 根节点和依赖的发现顺序，byID/byName 仅用于查找。
+// ResolvedDependencies：nodes 为按发现顺序排列的节点，byID/byName 为查找索引。
+// 每个节点的 upstream/members 直接引用其依赖节点，供核心配置生成使用。
 // 解析、连接引用、校验分别执行，查询过程没有隐藏的配置校验副作用。
 /**
  * @param {object[]} sections
@@ -58,9 +59,9 @@ export function resolve(sections, target) {
 };
 
 /**
- * @param {{nodes: object[]}} graph
+ * @param {{nodes: object[]}} dependencies
  */
-export function validateGraph(graph) {
+export function validate(dependencies) {
 	let active = {}, heights = {};
 	function visit(n) {
 		if (active[n.id]) die(`proxy dependency cycle at "${n.name}"`);
@@ -84,25 +85,5 @@ export function validateGraph(graph) {
 		heights[n.id] = height;
 		return height;
 	}
-	for (let n in graph.nodes) visit(n);
-};
-
-/**
- * @param {object[]} nodes
- * @param {object|null} shunt
- */
-export function validatePorts(nodes, shunt) {
-	let owners = {};
-	function add(port, owner) {
-		if (owners[port]) die(`port ${port} is shared by ${owners[port]} and ${owner}`);
-		owners[port] = owner;
-	}
-	for (let n in nodes) {
-		add(n.listen_port, `${n.name}.listen_port`);
-		add(n.socks_port, `${n.name}.socks_port`);
-	}
-	if (shunt) {
-		add(shunt.listen, 'shunt.shunt_listen_port');
-		add(shunt.dnsPort, 'shunt.dns_listen_port');
-	}
+	for (let n in dependencies.nodes) visit(n);
 };

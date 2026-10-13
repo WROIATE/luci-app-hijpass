@@ -101,7 +101,9 @@ function fixture(t) {
     for (const folder of readdirSync(runtime, { withFileTypes: true })) {
         const files = folder.isDirectory() ? readdirSync(path.join(runtime, folder.name)).map(name => path.join(runtime, folder.name, name)) : [path.join(runtime, folder.name)];
         for (const file of files) if (file.endsWith('.sh'))
-            writeFileSync(file, readFileSync(file, 'utf8').replace('#!/bin/sh', '#!/usr/bin/busybox ash'));
+            writeFileSync(file, readFileSync(file, 'utf8')
+                .replace('#!/bin/sh', '#!/usr/bin/busybox ash')
+                .replaceAll('/usr/lib/hijpass', runtime));
     }
     const capture = path.join(runtime, 'diagnostics/capture.sh');
     writeFileSync(capture, readFileSync(capture, 'utf8').replaceAll('sleep ', shellQuote(path.join(dir, 'sleep')) + ' ').replace('$(id -u)', '$(' + shellQuote(path.join(dir, 'id')) + ' -u)'));

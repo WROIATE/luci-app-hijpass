@@ -1,8 +1,7 @@
 #!/bin/sh
 
 # 功能入口负责命令执行；相邻 ucode 脚本只校验、转换及生成数据。
-HIJPASS_LIB=$(CDPATH= cd -- "${0%/*}/.." && pwd) || exit 1
-. "$HIJPASS_LIB/common.sh"
+. /usr/lib/hijpass/common.sh
 
 # 账户、目录及缓存是安装动作；UCI 的字段迁移仍由原生 ucode 数据模块完成。
 for file in group passwd shadow; do
@@ -17,6 +16,6 @@ for file in group passwd shadow; do
         printf '%s\n' "$entry" >>"/etc/$file" || exit 1
     fi
 done
-hijpass_data "${0%/*}/migratecli.uc" || exit 1
+hijpass_data "$HIJPASS_LIB/maintenance/migratecli.uc" || exit 1
 mkdir -p /etc/hijpass/client /etc/hijpass/server /tmp/hijpass/log /tmp/hijserver/log || exit 1
 rm -rf /tmp/luci-*cache

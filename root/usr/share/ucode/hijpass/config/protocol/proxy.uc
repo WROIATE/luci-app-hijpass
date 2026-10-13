@@ -22,7 +22,7 @@ const protocols = {
 
 // Proxy 为对应协议 fields 的解码结果，只包含该协议声明的字段，额外包含：
 // id/name/type/core（标识），upstream（上游 Proxy 或 null），members（成员 Proxy 数组）。
-// upstream/members 在 graph.uc 中连接，生成器不再根据名字查询和重复解码。
+// upstream/members 在 dependencies.uc 中连接，生成器不再根据名字查询和重复解码。
 export function proxy(section) {
 	let engine = core(section.core ?? (section.type == TYPE.vless ? CORE.xray : CORE.singbox));
 	if (index(values(CORE), engine) < 0) die(`unsupported core "${engine}"`);

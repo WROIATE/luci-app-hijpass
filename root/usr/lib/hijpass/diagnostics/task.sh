@@ -1,8 +1,7 @@
 #!/bin/sh
 
 # 功能入口负责命令执行；相邻 ucode 脚本只校验、转换及生成数据。
-HIJPASS_LIB=$(CDPATH= cd -- "${0%/*}/.." && pwd) || exit 1
-. "$HIJPASS_LIB/common.sh"
+. /usr/lib/hijpass/common.sh
 
 root=/tmp/hijpass-trace-tasks
 action=${1:-}
@@ -41,7 +40,7 @@ case "$action" in
                 # eval 仅用于 Shell 的数字描述符语法，不解释配置或请求内容。
                 eval "exec $descriptor>&-"
             done
-            exec start-stop-daemon -S -b -m -p "$directory/pid" -x "${0%/*}/worker.sh" -- "$directory" "$@"
+            exec start-stop-daemon -S -b -m -p "$directory/pid" -x "$HIJPASS_LIB/diagnostics/worker.sh" -- "$directory" "$@"
         ); then
             rm -rf -- "$directory"
             echo 'Cannot start trace worker' >&2
@@ -56,7 +55,7 @@ case "$action" in
             printf 'Trace worker exited without a result\n' >>"$directory/stderr"
             printf '1\n' >"$directory/exit"
         fi
-        hijpass_data "${0%/*}/capturecli.uc" task-status "$directory" "$active" ;;
+        hijpass_data "$HIJPASS_LIB/diagnostics/capturecli.uc" task-status "$directory" "$active" ;;
     release)
         task_path "${1:-}" || exit 1
         [ -f "$directory/exit" ] || { echo 'Trace task has not finished' >&2; exit 1; }

@@ -1,10 +1,9 @@
 #!/bin/sh
 
 # 功能入口负责命令执行；相邻 ucode 脚本只校验、转换及生成数据。
-HIJPASS_LIB=$(CDPATH= cd -- "${0%/*}/.." && pwd) || exit 1
-. "$HIJPASS_LIB/common.sh"
+. /usr/lib/hijpass/common.sh
 
-data="${0%/*}/rulescli.uc"
+data="$HIJPASS_LIB/rules/rulescli.uc"
 action=${1:-update}
 [ "$#" -eq 0 ] || shift
 if [ "$action" = query ]; then hijpass_data "$data" query "$@"; exit $?; fi

@@ -10,7 +10,13 @@ const { root, shellRuntime, withConfig } = require('./helpers.cjs');
 function fixture(t) {
     const directory = fs.mkdtempSync('/tmp/hijpass-execution-test-');
     const runtime = path.join(directory, 'runtime');
-    fs.cpSync(shellRuntime(), runtime, { recursive: true });
+    const sourceRuntime = shellRuntime();
+    fs.cpSync(sourceRuntime, runtime, { recursive: true });
+    // 各场景使用独立的安装副本，避免路径仍指向共享测试目录。
+    for (const file of fs.readdirSync(runtime, { recursive: true })) if (file.endsWith('.sh')) {
+        const target = path.join(runtime, file);
+        fs.writeFileSync(target, fs.readFileSync(target, 'utf8').replaceAll(sourceRuntime, runtime));
+    }
     t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
     function patch(file, before, after) {
         const target = path.join(runtime, file);

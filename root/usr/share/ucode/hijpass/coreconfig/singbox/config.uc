@@ -4,7 +4,8 @@ import { build as hysteria2 } from './protocol/hysteria2.uc';
 import { build as tuic } from './protocol/tuic.uc';
 import { build as shadowtls } from './protocol/shadowtls.uc';
 import { TYPE } from '../../config/protocol/proxy.uc';
-import { TAG, optional } from '../constants.uc';
+import { TAG } from '../constants.uc';
+import { optional } from '../json.uc';
 
 const builders = {
 	[TYPE.shadowsocks]: shadowsocks, [TYPE.vless]: vless, [TYPE.hysteria2]: hysteria2,

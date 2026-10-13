@@ -1,5 +1,5 @@
 import { endpoint, tls } from './options.uc';
-import { optional } from '../../constants.uc';
+import { optional } from '../../json.uc';
 
 // UUID/password 为认证；congestion_control 为拥塞算法，udp_relay_mode 为 UDP 模式。
 // udp_over_stream/zero_rtt_handshake 为开关，heartbeat 为 QUIC 心跳间隔。

@@ -1,10 +1,9 @@
 #!/bin/sh
 
 # 功能入口负责命令执行；相邻 ucode 脚本只校验、转换及生成数据。
-HIJPASS_LIB=$(CDPATH= cd -- "${0%/*}/.." && pwd) || exit 1
-. "$HIJPASS_LIB/common.sh"
+. /usr/lib/hijpass/common.sh
 
-data="${0%/*}/generatecli.uc"
+data="$HIJPASS_LIB/firewall/generatecli.uc"
 rules=/etc/hijpass/fw4-rules.nft
 action=${1:-}
 [ "$#" -eq 0 ] || shift

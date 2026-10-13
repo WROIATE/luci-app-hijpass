@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { readFileSync, writeFileSync, mkdtempSync, copyFileSync, chmodSync, rmSync, existsSync } = require('node:fs');
+const { readFileSync, writeFileSync, mkdtempSync, cpSync, readdirSync, chmodSync, rmSync, existsSync } = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const { test } = require('node:test');
 const vm = require('node:vm');
@@ -55,7 +55,7 @@ for (const seconds of [30, 120]) {
                 return { code: 0, stdout: '', stderr: '' };
             },
             async exec_direct(command, args) {
-                assert.equal(command, '/usr/lib/hijpass/trace-task.uc');
+                assert.equal(command, '/usr/lib/hijpass/diagnostics/task.sh');
                 assert.deepEqual(Array.from(args), ['status', 'ABcd1234']);
                 const running = clock.now < seconds * 1000;
                 return { running, code: running ? null : 0, stdout: running ? 'Trace is active' : 'capture complete', stderr: '' };
@@ -95,17 +95,19 @@ function fixture(t) {
         writeFileSync(file, '#!/bin/sh\n' + body + '\n');
         chmodSync(file, 0o755);
     }
-    for (const name of ['trace-config.uc', 'trace-task.uc']) {
-        // Host tests use the actual ucode VM and the installed-layout modules.
-        // The worker path is relative to the task entry, just as on OpenWrt.
-        const entry = path.join(dir, 'entry-' + name);
-        copyFileSync(path.join(root, 'root/usr/lib/hijpass', name), entry);
-        script(name, `exec ${shellQuote(interpreter)} -S -L ${shellQuote(path.join(root, 'root/usr/share/ucode'))} -- ${shellQuote(entry)} "$@"`);
+    // 按真实安装结构运行 Shell 与数据模块；宿主机使用 OpenWrt 同款 ash。
+    const runtime = path.join(dir, 'runtime');
+    cpSync(path.join(root, 'root/usr/lib/hijpass'), runtime, { recursive: true });
+    for (const folder of readdirSync(runtime, { withFileTypes: true })) {
+        const files = folder.isDirectory() ? readdirSync(path.join(runtime, folder.name)).map(name => path.join(runtime, folder.name, name)) : [path.join(runtime, folder.name)];
+        for (const file of files) if (file.endsWith('.sh'))
+            writeFileSync(file, readFileSync(file, 'utf8').replace('#!/bin/sh', '#!/usr/bin/busybox ash'));
     }
-    copyFileSync(path.join(root, 'root/usr/lib/hijpass/trace-worker.sh'), path.join(dir, 'trace-worker.sh'));
-    chmodSync(path.join(dir, 'trace-worker.sh'), 0o755);
-    const shellSource = readFileSync(path.join(root, 'root/usr/lib/hijpass/trace-url.sh'), 'utf8');
-    writeFileSync(path.join(dir, 'trace-url.sh'), shellSource.replace('/usr/share/libubox/jshn.sh', process.env.JSHN_SH || '/usr/share/libubox/jshn.sh').replace('#!/bin/sh', '#!/usr/bin/busybox ash').replaceAll('sleep ', '"${0%/*}/sleep" '), { mode: 0o755 });
+    const capture = path.join(runtime, 'diagnostics/capture.sh');
+    writeFileSync(capture, readFileSync(capture, 'utf8').replaceAll('sleep ', shellQuote(path.join(dir, 'sleep')) + ' ').replace('$(id -u)', '$(' + shellQuote(path.join(dir, 'id')) + ' -u)'));
+    const common = path.join(runtime, 'common.sh');
+    writeFileSync(common, readFileSync(common, 'utf8').replace('/usr/share/libubox/jshn.sh', process.env.JSHN_SH || '/usr/share/libubox/jshn.sh'));
+    script('ucode', `exec ${shellQuote(interpreter)} -L ${shellQuote(path.join(root, 'root/usr/share/ucode'))} "$@"`);
     script('id', 'echo 0');
     script('uci', 'exit 0');
     script('nslookup', 'echo unexpected-nslookup >>"$TRACE_TEST_LOG"; exit 1');
@@ -113,6 +115,9 @@ function fixture(t) {
     script('logread', 'exec /bin/sleep 180');
     script('sleep', '[ "$TRACE_REAL_SLEEP" = 1 ] && exec /bin/sleep "$@"; exec /bin/sleep 0.01');
     script('nft', `printf 'nft %s\\n' "$*" >>"$TRACE_TEST_LOG"
+if [ "$1" = -f ]; then
+    sed 's/"//g; s/^/nft /' "$2" >>"$TRACE_TEST_LOG"
+fi
 case "$*" in
     'monitor trace')
         trace_pid="$(sed -n 's/.*add chain inet hijpass trace-\\([0-9]*\\).*/\\1/p' "$TRACE_TEST_LOG" | tail -n 1)"
@@ -131,7 +136,7 @@ esac`);
     script('tcpdump', `printf 'tcpdump %s\\n' "$*" >>"$TRACE_TEST_LOG"
 printf '1.0 br-lan In IP 192.168.1.100.12345 > 8.8.8.8.53: UDP, length 20\\n'
 exec /bin/sleep 180`);
-    return { dir, env, trace: path.join(dir, 'trace-url.sh'), task: path.join(dir, 'trace-task.uc') };
+    return { dir, env, trace: path.join(runtime, 'diagnostics/capture.sh'), task: path.join(runtime, 'diagnostics/task.sh') };
 }
 
 test('Shell capture with ucode parsing filters all/TCP/UDP and cleans its nft rule without DNS or curl', t => {

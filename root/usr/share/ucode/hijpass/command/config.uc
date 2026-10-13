@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { read } from '../uci/read.uc';
-import { render, validate } from '../generator/render.uc';
+import { render, validate } from '../coreconfig/render.uc';
 
 // RPC Request：sections 为可选的 JSON 快照字符串，target 为可选 section ID。
 // 未给 sections 时直接读取 /etc/config/hijpass，支持脱离 LuCI 的命令行运行。

@@ -1,7 +1,7 @@
 #!/bin/sh
 # All network changes below run in a new user/network namespace.
 set -eu
-trace_script="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)/root/usr/lib/hijpass/trace-url.sh"
+trace_script="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)/root/usr/lib/hijpass/diagnostics/capture.sh"
 exec unshare -Urn sh -s -- "$trace_script" <<'NAMESPACE'
 set -eu
 trace_check_dir="$(mktemp -d /tmp/hijpass-trace-netns-XXXXXXXX)"

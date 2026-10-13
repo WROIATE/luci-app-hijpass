@@ -14,7 +14,7 @@ PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Shadow_TLS \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_tuic_client
 
-LUCI_DEPENDS:= +ca-bundle +curl +firewall4 +ip-full +rpcd +ubus \
+LUCI_DEPENDS:= +ca-bundle +curl +firewall4 +ip-full +rpcd +ubus +jshn \
 	+sing-box +unzip +xray-core \
 	+kmod-nft-socket +kmod-nft-tproxy +kmod-nft-nat \
 	+v2ray-geosite +v2ray-geoip +geoview +chinadns-ng \

@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# 功能入口负责命令执行；相邻 ucode 脚本只校验、转换及生成数据。
+HIJPASS_LIB=$(CDPATH= cd -- "${0%/*}/.." && pwd) || exit 1
+. "$HIJPASS_LIB/common.sh"
+
+data="${0%/*}/networkcli.uc"
+action=${1:-}
+[ "$#" -eq 0 ] || shift
+case "$action" in
+    resolve|port|iptype) hijpass_data "$data" "$action" "$@"; exit $? ;;
+    connect) url=${1:-}; timeout=${2:-5}; socks=${3:-} ;;
+    ping) socks=${1:-}; url="https://${2:-www.google.com}"; timeout=5 ;;
+    *) hijpass_error 'unknown network action'; exit 1 ;;
+esac
+plan=$(hijpass_data "$data" request "$url" "$timeout" "$socks") || { printf '%s\n' "$plan"; exit 1; }
+json_load "$plan" || exit 1
+json_get_vars url timeout socks
+output=$(mktemp /tmp/hijpass-connect.XXXXXX) || exit 1
+trap 'rm -f "$output"' EXIT
+# 单次请求保留真实退出码；curl 失败仍交给 ucode 返回完整测速报告。
+set -- curl -I -sS -o /dev/null --max-time "$timeout" -w '%{http_code}\n%{remote_ip}\n%{remote_port}\n%{time_namelookup}\n%{time_connect}\n%{time_appconnect}\n%{time_starttransfer}\n%{time_total}\n'
+[ -z "$socks" ] || set -- "$@" --socks5 "127.0.0.1:$socks"
+"$@" -- "$url" >"$output" 2>/dev/null
+code=$?
+if [ "$action" = ping ]; then
+    hijpass_data "$data" ping-report "$output" "$code" "$url"
+else
+    hijpass_data "$data" report "$output" "$code" "$url"
+fi

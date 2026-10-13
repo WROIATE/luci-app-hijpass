@@ -3,10 +3,10 @@
 USE_PROCD=1
 START=99
 STOP=15
-RUNTIME=/usr/lib/hijpass/service.uc
+RUNTIME=/usr/lib/hijpass/service/service.sh
 
-# 此层只桥接 rc.common/procd。UCI 解析、配置文件、DNS、防火墙和定时任务由 ucode 完成。
-. /usr/lib/hijpass/procd.sh
+# Shell 组织完整服务生命周期；ucode 只生成配置、进程描述和定时任务内容。
+. /usr/lib/hijpass/service/procd.sh
 
 start_service() {
     local plan

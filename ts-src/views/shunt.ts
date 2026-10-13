@@ -255,7 +255,7 @@ function createGeoRuleQuery(
                 return;
             }
 
-            const result = await fs.exec('/usr/lib/hijpass/geoview.uc',
+            const result = await fs.exec('/usr/lib/hijpass/rules/geoview.sh',
                 [isTagQuery ? '-e' : '-l', queryType, queryValue]);
             if (result.code !== 0) {
                 throw new Error(result.stderr || _('Query Failed'));

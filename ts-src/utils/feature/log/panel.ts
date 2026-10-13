@@ -334,7 +334,7 @@ async function runTraceDiagnostics(
     runButton.disabled = true;
     setTraceStatus(statusElement, _('Running Trace Diagnostics'));
 
-    const command = '/usr/lib/hijpass/trace-task.uc';
+    const command = '/usr/lib/hijpass/diagnostics/task.sh';
     let taskId: string | undefined;
     let completed = false;
     try {

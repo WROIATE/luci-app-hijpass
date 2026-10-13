@@ -105,7 +105,7 @@ test('LuCI writes ucode output, preserves custom files and TLS when resolving ch
             : { settings: { address: 'proxy.example.org' }, streamSettings: { tlsSettings: { serverName: 'tls.example.org' } } };
         const config = { outbounds: [outbound] };
         await utils.writeGeneratedConfigs({ nodes: { downstream: config }, shunt: { route: { final: 'direct' } } });
-        assert.equal(calls[0][0], '/usr/lib/hijpass/net.uc');
+        assert.equal(calls[0][0], '/usr/lib/hijpass/network/network.sh');
         assert.deepEqual(Array.from(calls[0][1]), ['resolve', 'proxy.example.org']);
         assert.deepEqual(writes.map(w => w[0]), ['/client/downstream.json', '/shunt.json']);
         const written = writes[0][1].outbounds[0];
@@ -152,10 +152,10 @@ test('Save & Apply consumes backend output before applying UCI and stops on gene
     }
 });
 
-test('init delegates preparation and activation to ucode before handing argv to procd', () => {
+test('init delegates lifecycle to Shell while preserving argv passed to procd', () => {
     const source = fs.readFileSync(path.join(root, 'root/etc/init.d/hijpass'), 'utf8');
-    const bridge = fs.readFileSync(path.join(root, 'root/usr/lib/hijpass/procd.sh'), 'utf8');
-    assert.match(source, /service[.]uc/);
+    const bridge = fs.readFileSync(path.join(root, 'root/usr/lib/hijpass/service/procd.sh'), 'utf8');
+    assert.match(source, /service[.]sh/);
     assert.ok(source.indexOf('$RUNTIME prepare') < source.indexOf('hijpass_start_instances "$plan"'));
     assert.ok(source.indexOf('hijpass_start_instances "$plan"') < source.indexOf('$RUNTIME activate'));
     assert.match(bridge, /set -- "\$@" "\$value"/);

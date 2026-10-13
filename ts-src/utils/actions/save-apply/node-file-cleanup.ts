@@ -6,7 +6,7 @@ import { FilePathUtils } from "../../base/files/paths";
 async function cleanupChangedNodeFiles(changes: any) {
     async function cleanup(type: string, sectionId: string, keepPath?: string) {
         const args = keepPath ? [type, sectionId, keepPath] : [type, sectionId];
-        await fs.exec('/usr/lib/hijpass/rm.uc', args);
+        await fs.exec('/usr/lib/hijpass/maintenance/cleanup.sh', args);
     }
 
     if (changes?.hijpass) {

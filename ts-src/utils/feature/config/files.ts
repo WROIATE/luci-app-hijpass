@@ -10,7 +10,7 @@ async function prepareProxy(section: any, config: any) {
     const host = section.server;
     if (section.upstream_proxy_node && host
         && !/^(\d{1,3}\.){3}\d{1,3}$/.test(host) && !/^[0-9a-fA-F:]+$/.test(host)) {
-        const result = await fs.exec_direct('/usr/lib/hijpass/net.uc', ['resolve', host], 'json');
+        const result = await fs.exec_direct('/usr/lib/hijpass/network/network.sh', ['resolve', host], 'json');
         if (!result?.address) throw new Error(_('Resolve proxy server failed: %s').format(host));
         const outbound = config.outbounds?.[0];
         if (outbound?.server) outbound.server = result.address;

@@ -45,10 +45,10 @@
         "/etc/init.d/hijpass restart": [
           "exec"
         ],
-        "/usr/lib/hijpass/nft.uc reset": [
+        "/usr/lib/hijpass/firewall/firewall.sh reset": [
           "exec"
         ],
-        "/usr/lib/hijpass/nft.uc show": [
+        "/usr/lib/hijpass/firewall/firewall.sh show": [
           "exec"
         ],
         "/usr/bin/tail -n [0-9]* /tmp/hijpass/log/*.log": [
@@ -57,109 +57,109 @@
         "/usr/bin/tail -n [0-9]* /tmp/hijserver/log/*.log": [
           "exec"
         ],
-        "/usr/lib/hijpass/rules.uc update": [
+        "/usr/lib/hijpass/rules/update.sh update": [
           "exec"
         ],
-        "/usr/lib/hijpass/rules.uc query [A-Za-z0-9._:/-]*": [
+        "/usr/lib/hijpass/rules/update.sh query [A-Za-z0-9._:/-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/iptype.uc [A-Za-z0-9._:/-]*": [
+        "/usr/lib/hijpass/network/network.sh iptype [A-Za-z0-9._:/-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/connect.uc https://www.baidu.com [0-9]*": [
+        "/usr/lib/hijpass/network/network.sh connect https://www.baidu.com [0-9]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/connect.uc https://www.google.com/ncr [0-9]*": [
+        "/usr/lib/hijpass/network/network.sh connect https://www.google.com/ncr [0-9]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/connect.uc https://github.com [0-9]*": [
+        "/usr/lib/hijpass/network/network.sh connect https://github.com [0-9]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/connect.uc https://www.bilibili.com [0-9]*": [
+        "/usr/lib/hijpass/network/network.sh connect https://www.bilibili.com [0-9]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/net.uc port [0-9]*": [
+        "/usr/lib/hijpass/network/network.sh port [0-9]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/net.uc ping [0-9]*": [
+        "/usr/lib/hijpass/network/network.sh ping [0-9]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/geoview.uc -e geosite [A-Za-z0-9_.:,/!-]*": [
+        "/usr/lib/hijpass/rules/geoview.sh -e geosite [A-Za-z0-9_.:,/!-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/geoview.uc -e geoip [A-Za-z0-9_.:,/!-]*": [
+        "/usr/lib/hijpass/rules/geoview.sh -e geoip [A-Za-z0-9_.:,/!-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/geoview.uc -l geosite [A-Za-z0-9._:/-]*": [
+        "/usr/lib/hijpass/rules/geoview.sh -l geosite [A-Za-z0-9._:/-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/geoview.uc -l geoip [A-Za-z0-9._:/-]*": [
+        "/usr/lib/hijpass/rules/geoview.sh -l geoip [A-Za-z0-9._:/-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/route-match.uc [A-Za-z0-9._:/-]*": [
+        "/usr/lib/hijpass/rules/route-match.sh [A-Za-z0-9._:/-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/rm.uc proxy [A-Za-z0-9_-]*": [
+        "/usr/lib/hijpass/maintenance/cleanup.sh proxy [A-Za-z0-9_-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/rm.uc proxy [A-Za-z0-9_-]* /etc/hijpass/client/*": [
+        "/usr/lib/hijpass/maintenance/cleanup.sh proxy [A-Za-z0-9_-]* /etc/hijpass/client/*": [
           "exec"
         ],
-        "/usr/lib/hijpass/rm.uc server [A-Za-z0-9_-]*": [
+        "/usr/lib/hijpass/maintenance/cleanup.sh server [A-Za-z0-9_-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/rm.uc server [A-Za-z0-9_-]* /etc/hijpass/server/*": [
+        "/usr/lib/hijpass/maintenance/cleanup.sh server [A-Za-z0-9_-]* /etc/hijpass/server/*": [
           "exec"
         ],
         "/bin/cat /proc/net/arp": [
           "exec"
         ],
-        "/usr/lib/hijpass/core-update.uc version sing-box": [
+        "/usr/lib/hijpass/core/update.sh version sing-box": [
           "exec"
         ],
-        "/usr/lib/hijpass/core-update.uc version xray": [
+        "/usr/lib/hijpass/core/update.sh version xray": [
           "exec"
         ],
-        "/usr/lib/hijpass/core-update.uc latest sing-box": [
+        "/usr/lib/hijpass/core/update.sh latest sing-box": [
           "exec"
         ],
-        "/usr/lib/hijpass/core-update.uc latest xray": [
+        "/usr/lib/hijpass/core/update.sh latest xray": [
           "exec"
         ],
-        "/usr/lib/hijpass/core-update.uc update sing-box": [
+        "/usr/lib/hijpass/core/update.sh update sing-box": [
           "exec"
         ],
-        "/usr/lib/hijpass/core-update.uc update xray": [
+        "/usr/lib/hijpass/core/update.sh update xray": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc start -t [0-9]* -X [A-Z]* [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
+        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -X [A-Z]* [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc start -t [0-9]* -X [A-Z]* -v [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
+        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -X [A-Z]* -v [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc start -t [0-9]* -X [A-Z]* -p -i [A-Za-z0-9_.:@-]* [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
+        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -X [A-Z]* -p -i [A-Za-z0-9_.:@-]* [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc start -t [0-9]* -X [A-Z]* -p -i [A-Za-z0-9_.:@-]* -v [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
+        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -X [A-Z]* -p -i [A-Za-z0-9_.:@-]* -v [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]*": [
+        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]* -v": [
+        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]* -v": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]* -p -i [A-Za-z0-9_.:@-]*": [
+        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]* -p -i [A-Za-z0-9_.:@-]*": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]* -p -i [A-Za-z0-9_.:@-]* -v": [
+        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]* -p -i [A-Za-z0-9_.:@-]* -v": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc status [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]": [
+        "/usr/lib/hijpass/diagnostics/task.sh status [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]": [
           "exec"
         ],
-        "/usr/lib/hijpass/trace-task.uc release [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]": [
+        "/usr/lib/hijpass/diagnostics/task.sh release [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]": [
           "exec"
         ]
       },

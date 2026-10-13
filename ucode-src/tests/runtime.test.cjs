@@ -4,14 +4,37 @@ const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
 const { spawnSync } = require('node:child_process');
-const { root, run } = require('./helpers.cjs');
+const { root, run, runShell, withConfig } = require('./helpers.cjs');
 
 function invoke(request, env) {
+    const extra = env ? { env: { ...process.env, ...env } } : {};
+    if (request.action === 'connect') return runShell('root/usr/lib/hijpass/network/network.sh',
+        ['connect', request.url, request.timeout || '5'], extra);
+    if (request.action === 'update') return withConfig(request.sections, directory =>
+        runShell('root/usr/lib/hijpass/rules/update.sh', [request.group, '--configdir', directory], extra));
+    if (request.action === 'clean-log') return withConfig(request.sections, directory =>
+        runShell('root/usr/lib/hijpass/maintenance/logs.sh', [request.operation, ...(request.path ? [request.path] : []), '--configdir', directory], extra));
+    if (request.action === 'cleanup') {
+        const directory = fs.mkdtempSync('/tmp/hijpass-cleanup-test-');
+        const target = request.sections[0].client_dir;
+        script(directory, 'uci', 'printf "%s\\n" "$CLEANUP_TEST_DIRECTORY"');
+        try {
+            return runShell('root/usr/lib/hijpass/maintenance/cleanup.sh',
+                [request.kind, request.id, request.keep || ''],
+                { env: { ...process.env, PATH: directory + ':' + process.env.PATH, CLEANUP_TEST_DIRECTORY: target } });
+        } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+    }
     return run('ucode-src/tests/runtime.uc', [], request, env ? { env: { ...process.env, ...env } } : {});
 }
 function value(request, env) {
     const result = invoke(request, env);
+    if ((request.action === 'update' || request.action === 'connect') && result.stdout) {
+        const report = JSON.parse(result.stdout);
+        assert.equal(result.status, report.success ? 0 : report.exit_code || 1, result.stderr);
+        return report;
+    }
     assert.equal(result.status, 0, result.stderr);
+    if (!result.stdout) return true;
     return JSON.parse(result.stdout);
 }
 function fixture(t) {
@@ -54,7 +77,7 @@ fs.writeFileSync(process.env.ROUTE_TEST_STATE, JSON.stringify(state));
         write: value => fs.writeFileSync(state, JSON.stringify(value)),
         read: () => JSON.parse(fs.readFileSync(state)),
         calls: () => fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').trim().split('\n').map(JSON.parse) : [],
-        run: (args, failure) => spawnSync(path.join(root, 'root/usr/lib/hijpass/route.sh'), args,
+        run: (args, failure) => spawnSync(path.join(root, 'root/usr/lib/hijpass/firewall/route.sh'), args,
             { encoding: 'utf8', env: { ...env, ROUTE_TEST_FAIL: failure || '' } }),
     };
 }
@@ -209,7 +232,9 @@ test('rule updates preserve old files on HTTP/format failure and merge valid sou
 
 test('subprocess arguments and connection JSON survive quotes and reject malformed timeouts', t => {
     const directory = fixture(t), valueWithQuotes = "a 'quote'; $(touch " + directory + "/injected)";
-    assert.deepEqual(value({ action: 'exec', args: ['printf', '%s', valueWithQuotes] }), { code: 0, stdout: valueWithQuotes });
+    const command = value({ action: 'command', args: ['printf', '%s', valueWithQuotes] });
+    const quoted = spawnSync('/bin/sh', ['-c', command], { encoding: 'utf8' });
+    assert.deepEqual({ code: quoted.status, stdout: quoted.stdout }, { code: 0, stdout: valueWithQuotes });
     assert.equal(fs.existsSync(path.join(directory, 'injected')), false);
     script(directory, 'curl', "printf '204\\n192.0.2.1\\n443\\n0.001\\n0.002\\n0.003\\n0.004\\n0.005\\n'");
     const result = value({ action: 'connect', url: 'https://example.org', timeout: '5' }, { PATH: directory + ':' + process.env.PATH });
@@ -232,7 +257,7 @@ test('native TCP port lookup sees actual host listeners', async t => {
     const server = net.createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     t.after(() => new Promise(resolve => server.close(resolve)));
     const port = String(server.address().port);
-    const result = run('root/usr/lib/hijpass/net.uc', ['port', port]);
+    const result = run('root/usr/lib/hijpass/network/network.sh', ['port', port]);
     assert.equal(result.status, 0, result.stderr); assert.equal(JSON.parse(result.stdout)[port], true);
 });
 
@@ -257,17 +282,17 @@ test('client report uses IP addresses when nft includes Ethernet headers and exc
 
 test('文本工具正常退出，参数错误保持 JSON 工具的错误契约', t => {
     for (const [address, family] of [['192.0.2.1', '4\n'], ['2001:db8::1/64', '6\n']]) {
-        const result = run('root/usr/lib/hijpass/iptype.uc', [address]);
+        const result = run('root/usr/lib/hijpass/network/network.sh', ['iptype', address]);
         assert.equal(result.status, 0, result.stderr);
         assert.equal(result.stdout, family);
         assert.equal(result.stderr, '');
     }
     const directory = fixture(t);
     fs.writeFileSync(path.join(directory, 'hijpass'), "config hijpass 'global'\n option delay_time '7'\n");
-    const delay = run('root/usr/lib/hijpass/service.uc', ['delay', '--configdir', directory]);
+    const delay = run('root/usr/lib/hijpass/service/service.sh', ['delay', '--configdir', directory]);
     assert.equal(delay.status, 0, delay.stderr);
     assert.equal(delay.stdout, '7\n');
-    const invalid = run('root/usr/lib/hijpass/net.uc', ['resolve', 'example.org', '--configdir']);
+    const invalid = run('root/usr/lib/hijpass/network/network.sh', ['resolve', 'example.org', '--configdir']);
     assert.equal(invalid.status, 1);
     assert.match(JSON.parse(invalid.stdout).error, /missing --configdir/);
     assert.equal(invalid.stderr, '');
@@ -296,7 +321,7 @@ esac`);
         t.after(() => fs.rmSync(capture, { recursive: true, force: true }));
         if (metadata !== undefined) fs.writeFileSync(path.join(capture, 'metadata.json'), metadata);
         fs.writeFileSync(commands, '');
-        const result = run('root/usr/lib/hijpass/trace-config.uc', ['finish', capture], undefined,
+        const result = run('root/usr/lib/hijpass/diagnostics/capture.sh', ['finish', capture], undefined,
             { env: { ...process.env, PATH: directory + ':' + process.env.PATH, TRACE_TEST_LOG: commands, TRACE_TEST_PID: pid } });
         assert.equal(result.status, 1);
         assert.ok(result.stderr);
@@ -311,13 +336,13 @@ test('核心版本查询将损坏的上游 JSON 转为带来源的错误', t => 
     const directory = fixture(t), env = { ...process.env, PATH: directory + ':' + process.env.PATH };
     for (const response of ['{broken', 'null', '[]', '{}']) {
         script(directory, 'curl', `printf '%s' '${response}'`);
-        const result = run('root/usr/lib/hijpass/core-update.uc', ['latest', 'xray'], undefined, { env });
+        const result = run('root/usr/lib/hijpass/core/update.sh', ['latest', 'xray'], undefined, { env });
         assert.equal(result.status, 1);
         assert.match(JSON.parse(result.stdout).error, /invalid xray release response/);
         assert.equal(result.stderr, '');
     }
     script(directory, 'curl', `printf '%s' '{"tag_name":"v1.2.3","assets":[]}'`);
-    const result = run('root/usr/lib/hijpass/core-update.uc', ['latest', 'xray'], undefined, { env });
+    const result = run('root/usr/lib/hijpass/core/update.sh', ['latest', 'xray'], undefined, { env });
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(JSON.parse(result.stdout), { core: 'xray', version: 'v1.2.3' });
 });
@@ -356,12 +381,12 @@ test('连接失败的 curl 输出仍转换为完整报告，核心与诊断命�
     assert.equal(result.remote_ip, '');
     assert.equal(result.total_time_ms, 5);
     for (const args of [[], ['latest']]) {
-        const missing = run('root/usr/lib/hijpass/core-update.uc', args);
+        const missing = run('root/usr/lib/hijpass/core/update.sh', args);
         assert.equal(missing.status, 1);
         assert.match(JSON.parse(missing.stdout).error, /core action and name are required/);
     }
-    for (const args of [['prepare'], ['finish']]) {
-        const missing = run('root/usr/lib/hijpass/trace-config.uc', args);
+    for (const args of [['prepare'], ['report']]) {
+        const missing = run('root/usr/lib/hijpass/diagnostics/capturecli.uc', args);
         assert.equal(missing.status, 1);
         assert.match(missing.stderr, /invalid capture (PID|directory)/);
         assert.equal(missing.stdout, '');

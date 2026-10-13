@@ -1,0 +1,188 @@
+import * as fs from 'fs';
+import { first, of } from 'hijpass.config.sections';
+import { list } from 'hijpass.config.values';
+import { run, sections, text, lines } from 'hijpass.common';
+import { contains } from '../network/network.uc';
+
+// RuleSource：key 为 UCI 下载地址字段，path 为目标文件，kind 为 domain/ip4/ip6/geo。
+// 同类多个 URL 分别下载后合并去重；至少一个完整、有效来源成功后才替换旧文件。
+/**
+ * @param {object[]} sections
+ */
+function sources(sections) {
+	let g = first(sections, 'hijpass');
+	return {
+		gfw_list: { path: g.gfw_list, kind: 'domain' }, chn_domain_list: { path: g.chn_list, kind: 'domain' },
+		chn_v4_route: { path: g.chn_route, kind: 'ip4' }, chn_v6_route: { path: g.chn_route6, kind: 'ip6' },
+		geoip: { path: '/usr/share/v2ray/geoip.dat', kind: 'geo' }, geosite: { path: '/usr/share/v2ray/geosite.dat', kind: 'geo' },
+	};
+}
+/**
+ * @param {string} line
+ * @returns {string|null}
+ */
+export function domain(line) {
+	line = lc(trim(line));
+	if (!line || substr(line, 0, 1) == '#' || substr(line, 0, 1) == '!') return null;
+	let m = match(line, /^server=\/([^/]+)\//);
+	if (m) line = m[1];
+	else if (substr(line, 0, 2) == '+.') line = substr(line, 2);
+	else if (substr(line, 0, 4) == '@@||') line = split(substr(line, 4), '^')[0];
+	else line = replace(line, /^(domain|full):/, '');
+	return match(line, /^[a-z0-9.-]+[.][a-z]{2,}$/) ? line : null;
+};
+/**
+ * @param {string|null} text
+ * @param {string} kind
+ * @returns {string[]}
+ */
+export function normalize(text, kind) {
+	let result = [];
+	for (let line in lines(text)) {
+		if (kind == 'domain') { let value = domain(line); if (value) push(result, value); }
+		else {
+			let parts = split(line, '/'), bytes = iptoarr(parts[0] || ''), prefix = parts[1] || '';
+			if (bytes && length(bytes) == (kind == 'ip4' ? 4 : 16) && (parts[1] == null || match(prefix, /^[0-9]+$/) && int(parts[1]) <= length(bytes) * 8)) push(result, line);
+		}
+	}
+	return sort(uniq(result));
+};
+
+// UpdatePlan：timeout/retries 是已校验整数；jobs 含 key/kind/path/urls。
+// GeoPlan：database/tag/input/output 只描述业务资源，不携带待执行的命令。
+/**
+ * @param {object[]} config
+ * @param {string} action
+ */
+export function updatePlan(config, action) {
+    let settings = first(config, 'rule'), catalog = sources(config);
+    let groups = { chnlist: ['chn_domain_list'], gfw: ['gfw_list'], chnroute: ['chn_v4_route', 'chn_v6_route'], geo: ['geoip', 'geosite'] };
+    let selected = groups[action] || (action == 'all' || action == 'update' ? keys(catalog) : null);
+    if (type(selected) != 'array') die('unknown rule action');
+    let timeout = int(settings.download_timeout || '30'), retries = int(settings.retry_count || '3');
+    if (!match(settings.download_timeout || '30', /^[0-9]+$/) || !match(settings.retry_count || '3', /^[0-9]+$/)
+        || type(timeout) != 'int' || type(retries) != 'int' || timeout < 1 || timeout > 600 || retries < 1 || retries > 10)
+        die('invalid download timeout or retry count');
+    return { timeout, retries, enabled: first(config, 'hijpass').enabled == '1',
+        jobs: map(selected, key => ({ key, ...catalog[key], urls: list(settings[key]) })) };
+};
+/**
+ * @param {object[]} config
+ */
+export function geoPlan(config) {
+    let jobs = [];
+    for (let database in ['geoip', 'geosite']) {
+        let tags = [], key = database == 'geoip' ? 'ip_list' : 'domain_list';
+        for (let rule in of(config, 'shunt_route_rule')) {
+            if (rule.enabled != '1') continue;
+            for (let line in lines(rule[key]))
+                if (substr(line, 0, length(database) + 1) == database + ':') push(tags, substr(line, length(database) + 1));
+        }
+        for (let tag in uniq(tags)) {
+            if (!match(tag, /^[A-Za-z0-9_.:@!-]+$/)) die('invalid Geo tag');
+            push(jobs, { database, tag, input: `/usr/share/v2ray/${database}.dat`, output: `/etc/hijpass/ruleset/${database}-${tag}.srs` });
+        }
+    }
+    return { jobs };
+};
+/**
+ * @param {object[]} config
+ */
+export function dnsPlan(config) {
+    if (first(config, 'dns').dns_service != 'chinadns-ng') return { jobs: [] };
+    let global = first(config, 'hijpass'), jobs = [];
+    for (let kind in ['proxy', 'direct']) {
+        let tags = [];
+        for (let line in lines(fs.readfile(global[`domain_${kind}`])))
+            if (substr(line, 0, 8) == 'geosite:') push(tags, substr(line, 8));
+        let value = join(',', uniq(tags));
+        if (value && !match(value, /^[A-Za-z0-9_.:@,\/!-]+$/)) die('invalid Geo argument');
+        push(jobs, { value, output: `/tmp/hijpass/domain-${kind}-geo.txt` });
+    }
+    return { jobs };
+};
+/**
+ * @param {string} action
+ * @param {string} kind
+ * @param {string[]} args
+ */
+export function geoRequest(action, kind, args) {
+    if (index(['geoip', 'geosite'], kind) < 0 || !length(args)) die('invalid geo type or argument');
+    for (let arg in args) if (!match(arg, /^[A-Za-z0-9_.:@,\/!-]+$/)) die('invalid Geo argument');
+    let extract = action == '-e' || action == '--extract';
+    if (!extract && action != '-l' && action != '--lookup') die('unknown Geo action');
+    return { kind, extract, input: `/usr/share/v2ray/${kind}.dat`, values: args };
+};
+/**
+ * @param {string} host
+ * @param {string} rule
+ */
+function suffix(host, rule) { return host == rule || substr(host, -length(rule) - 1) == '.' + rule; }
+/**
+ * @param {string} target
+ * @returns {string}
+ */
+export function queryFiles(target) {
+	if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
+	let ip = iptoarr(target), matched = [];
+	for (let path in fs.glob('/etc/hijpass/rules/*') || []) {
+		if (fs.stat(path)?.type != 'file') continue;
+		let name = fs.basename(path);
+		if (ip ? !match(name, /^(chn-route|ip)/) : !match(name, /(list[.]txt$|^domain)/)) continue;
+		if (length(filter(lines(fs.readfile(path)), line => ip ? contains(target, line) : suffix(lc(target), lc(line))))) push(matched, name);
+	}
+	return join('\n', sort(uniq(matched))) + '\n';
+};
+/**
+ * @param {object[]} sections
+ * @param {string} target
+ * @returns {string}
+ */
+export function routeMatch(sections, target, geoTags) {
+	if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
+	let ip = !!iptoarr(target), tags = [], loaded = false;
+	for (let rule in of(sections, 'shunt_route_rule')) {
+		if (rule.enabled != '1') continue;
+		for (let line in lines(rule[ip ? 'ip_list' : 'domain_list'])) {
+			if (substr(line, 0, 9) == 'rule-set:') continue;
+			let matched = false, kind = ip ? 'geoip' : 'geosite';
+			if (substr(line, 0, length(kind) + 1) == kind + ':') {
+				if (!loaded) { tags = split(trim(geoTags || '') || '', /[ \t\n]+/); loaded = true; }
+				matched = index(tags, substr(line, length(kind) + 1)) >= 0;
+			}
+			else if (ip) matched = contains(target, line);
+			else if (substr(line, 0, 5) == 'full:') matched = lc(target) == lc(substr(line, 5));
+			else if (substr(line, 0, 7) == 'domain:') matched = suffix(lc(target), lc(substr(line, 7)));
+			else if (substr(line, 0, 7) == 'regexp:') matched = !!match(target, regexp(substr(line, 7), 'i'));
+			else matched = index(lc(target), lc(line)) >= 0;
+			if (matched) return `规则名称 (Name) : ${rule.name || 'Unnamed'}\n匹配类型 (Type) : ${ip ? 'IP' : '域名'}\n匹配内容 (Item) : ${line}\n代理策略 (Node) : ${rule.proxy_node || 'default'}\n`;
+		}
+	}
+	return `未匹配到任何自定义规则，除去协议、端口等规则外，将使用全局默认策略\n\n规则名称 (Name) : 全局默认\n匹配类型 (Type) : ${ip ? 'IP' : '域名'}\n匹配内容 (Item) : * (全部)\n代理策略 (Node) : ${first(sections, 'shunt').default_proxy_node || ''}\n`;
+};
+
+export function main() { run(() => {
+    let action = shift(ARGV);
+    if (action == 'plan') { let config = sections(); return updatePlan(config, ARGV[0] || ''); }
+    if (action == 'geo-plan') return geoPlan(sections());
+    if (action == 'dns-plan') return dnsPlan(sections());
+    if (action == 'geo-request') { let mode = shift(ARGV), kind = shift(ARGV); return geoRequest(mode || '', kind || '', ARGV); }
+    if (action == 'normalize') return join('\n', normalize(text(ARGV[1]), ARGV[0] || '')) + '\n';
+    if (action == 'merge') return join('\n', sort(uniq(lines(text(ARGV[0]))))) + '\n';
+    if (action == 'query') return queryFiles(ARGV[0] || '');
+    if (action == 'match-plan') {
+        let config = sections(), target = ARGV[0] || '';
+        if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
+        let ip = !!iptoarr(target), kind = ip ? 'geoip' : 'geosite';
+        let lookup = length(filter(of(config, 'shunt_route_rule'), rule => rule.enabled == '1' && length(filter(lines(rule[ip ? 'ip_list' : 'domain_list']), line => substr(line, 0, length(kind) + 1) == kind + ':')))) > 0;
+        return { kind, lookup };
+    }
+    if (action == 'match') { let config = sections(); return routeMatch(config, ARGV[0] || '', ARGV[1] ? text(ARGV[1]) : ''); }
+    if (action == 'lower') return lc(text(ARGV[0]));
+    if (action == 'result') {
+        let failed = ARGV;
+        return { success: !length(failed), ...(length(failed) ? { failed } : {}) };
+    }
+    die('unknown rules data action');
+});
+};

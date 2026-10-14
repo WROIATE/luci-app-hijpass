@@ -92,7 +92,9 @@ fi`);
     f.script('ubus', `printf '%s\\n' '{"interface":[{"device":"wan0","route":[{"mask":0}]}]}'`);
     f.script('fw4', `if [ "$1" = zone ]; then echo wan0; else echo reload >>"$TEST_CALLS"; fi`);
     f.script('nft', '[ "$NFT_FAIL" != 1 ]');
-    const sections = [{ '.type': 'hijpass', nft: path.join(root, 'root/etc/hijpass/fw4-template.ut') },
+    const ruleDirectory = path.join(f.directory, 'chain-rules');
+    fs.cpSync(path.join(root, 'root/etc/hijpass/firewall'), ruleDirectory, { recursive: true });
+    const sections = [{ '.type': 'hijpass', firewall_rules: ruleDirectory },
         { '.type': 'firewall', shunt_port: '18081', tproxy_proto: 'tcp,udp', acl_default_allow: '1' },
         { '.type': 'dns', dns_service: 'custom' }];
     withConfig(sections, config => {
@@ -104,21 +106,21 @@ fi`);
             assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
             assert.equal(fs.existsSync(calls), false);
         }
-        // 用户模板语法错误也不能替换旧规则或触发防火墙重载。
-        const invalidTemplate = path.join(f.directory, 'invalid.ut');
-        fs.writeFileSync(invalidTemplate, '{% if (: %}');
-        const configPath = path.join(config, 'hijpass'), original = fs.readFileSync(configPath, 'utf8');
-        fs.writeFileSync(configPath, original.replace(sections[0].nft, invalidTemplate));
-        const broken = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
-        assert.equal(broken.status, 1);
-        assert.match(broken.stderr, /template/);
-        assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
-        assert.equal(fs.existsSync(calls), false);
-        fs.writeFileSync(configPath, original);
+        // 规则文件缺失、模板语法错误均不能替换旧规则或触发重载。
+        const file = path.join(ruleDirectory, 'pre-filter.ut'), original = fs.readFileSync(file, 'utf8');
+        for (const invalid of [null, '{% if (: %}']) {
+            if (invalid === null) fs.unlinkSync(file); else fs.writeFileSync(file, invalid);
+            const broken = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
+            assert.equal(broken.status, 1);
+            assert.match(broken.stderr, /template/);
+            assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
+            assert.equal(fs.existsSync(calls), false);
+            fs.writeFileSync(file, original);
+        }
         const applied = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
         assert.equal(applied.status, 0, applied.stderr);
         assert.match(fs.readFileSync(rules, 'utf8'), /192\.168\.1\.1\/24/);
-        assert.match(fs.readFileSync(rules, 'utf8'), /define WAN_DEV = \{ "wan0" \}/);
+        assert.match(fs.readFileSync(rules, 'utf8'), /iifname \{ "wan0" \} counter return/);
         assert.equal(fs.readFileSync(calls, 'utf8'), 'reload\n');
         assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('rules.nft.new.')), false);
     });

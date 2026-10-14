@@ -1,0 +1,20 @@
+{%
+/**
+ * @typedef {object} Chain
+ * @property {string} name 固定链名。
+ * @property {string} hook 基础链声明，普通链为空。
+ * @property {string} rules 用户规则模板的渲染结果。
+ */
+/** @global {Chain[]} chains 由 generate.uc 选择的已启用链。 */
+/** @global {string} sets 内部 sets.ut 生成的集合声明。 */
+%}
+{# 表、链和 hook 固定在内部；用户模板只提供链内规则。 -#}
+table inet hijpass {
+{% for (let chain in chains): %}
+    chain {{ chain.name }} {
+        {{ chain.hook }}
+        {{ replace(chain.rules, /\n/g, "\n        ") }}
+    }
+{% endfor %}
+{{ sets }}
+}

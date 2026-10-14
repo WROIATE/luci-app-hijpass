@@ -63,7 +63,13 @@ endmenu
 endef
 
 define Package/$(PKG_NAME)/conffiles
-/etc/hijpass/fw4-template.ut
+/etc/hijpass/firewall/pre-filter.ut
+/etc/hijpass/firewall/out-route.ut
+/etc/hijpass/firewall/tproxy-shunt.ut
+/etc/hijpass/firewall/tproxy-mark.ut
+/etc/hijpass/firewall/proxy-port-filter.ut
+/etc/hijpass/firewall/dns-forward.ut
+/etc/hijpass/firewall/dns-forward-output.ut
 /etc/hijpass/hook/dns-hook.sh
 /etc/hijpass/hook/nft-hook.sh
 /etc/hijpass/rules/chn-list.txt

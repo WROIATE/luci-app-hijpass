@@ -117,14 +117,12 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
     const firewall = { '.name': 'fw', '.type': 'firewall', shunt_port: '18081', tproxy_proto: 'tcp,udp', proxy_local: '0', acl_default_allow: '1' };
     const dns = { '.name': 'dns', '.type': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653' };
     for (const forward of ['none', 'pre-routing', 'routing']) for (const local of ['0', '1']) {
-        const result = value({ action: 'firewall', template: path.join(root, 'root/etc/hijpass/fw4-template.ut'), state,
+        const result = value({ action: 'firewall', ruleDirectory: path.join(root, 'root/etc/hijpass/firewall'), state,
             sections: [{ ...global, ip_direct: ip }, { ...firewall, dns_forward: forward, proxy_local: local }, dns,
                 { '.type': 'shunt', enabled: '1', dns_listen_port: '10153' }] });
-        assert.match(result, /define TPROXY_PROTO = \{ tcp, udp \}/);
-        assert.doesNotMatch(result, /^define \w+ =\s*$/m);
-        // Empty static sets must have no nested empty elements macro; nft can abort on that expansion.
-        for (const m of result.matchAll(/^define (\w+) = \{\s*\}$/gm))
-            assert.doesNotMatch(result, new RegExp('elements = \\{\\s*\\$' + m[1] + '\\s*\\}'));
+        assert.match(result, /meta l4proto != \{ tcp, udp \}/);
+        assert.doesNotMatch(result, /\bdefine\b|\$[A-Z_]+/);
+        assert.doesNotMatch(result, /elements = \{\s*\}/);
         assert.equal(result.includes('chain dns-forward {'), forward !== 'none');
         assert.equal(result.includes('chain dns-forward-output {'), forward !== 'none' && local === '1');
         assert.equal(result.includes('chain out-route {'), local === '1');
@@ -132,15 +130,12 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
         assert.doesNotMatch(result, /invalid|192\.0\.2\.0\/99/);
         const sets = new Set([...result.matchAll(/^    set (\S+)/gm)].map(m => m[1]));
         for (const m of result.matchAll(/@(\w+)/g)) assert.ok(sets.has(m[1]), 'missing set ' + m[1]);
-        const used = new Set([...result.matchAll(/\$(\w+)/g)].map(m => m[1]));
-        const definitions = new Set([...result.matchAll(/^define (\w+)/gm)].map(m => m[1]));
-        for (const name of used) assert.ok(definitions.has(name), 'missing define ' + name);
         fs.writeFileSync(path.join(directory, 'test.nft'), result);
         // nft parses without applying rules; hosts lacking netlink privileges still report grammar errors.
         const check = spawnSync('nft', ['-c', '-f', path.join(directory, 'test.nft')], { encoding: 'utf8' });
         if (!check.error) assert.doesNotMatch(check.stderr, /syntax error/);
     }
-    const rejected = invoke({ action: 'firewall', template: path.join(root, 'root/etc/hijpass/fw4-template.ut'), state,
+    const rejected = invoke({ action: 'firewall', ruleDirectory: path.join(root, 'root/etc/hijpass/firewall'), state,
         sections: [global, { ...firewall, proxy_iface_list: ['br-lan;flush ruleset'] }, dns] });
     assert.notEqual(rejected.status, 0);
 });
@@ -196,7 +191,8 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     const directory = fixture(t);
     fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass 'global'\n option enabled '1'\n option nft '/etc/hijpass/fw4-template.nft'\nconfig proxy_node 'a'\n option name 'member'\n option core 'singbox'\n option listen_port '7890'\n option socks_port '7891'\nconfig shunt 's'\n option type 'singbox'\n list lb_node_list 'member'\n option default_proxy_node 'hijpass-slb'\n option lb_strategy 'urltest'\nconfig dns 'dns'\n option direct_dns 'system'\nconfig firewall 'fw'\n`);
     const result = value({ action: 'migrate', directory });
-    assert.equal(result.find(s => s['.name'] === 'global').nft, '/etc/hijpass/fw4-template.ut');
+    assert.equal(result.find(s => s['.name'] === 'global').firewall_rules, '/etc/hijpass/firewall');
+    assert.equal(result.find(s => s['.name'] === 'global').nft, undefined);
     const balance = result.find(s => s.type === 'load_balance');
     assert.equal(balance.listen_port, '7892'); assert.equal(balance.socks_port, '7893');
     assert.deepEqual(balance.member_node, ['member']);
@@ -207,8 +203,8 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     const text = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
     value({ action: 'migrate', directory });
     assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), text);
-    fs.writeFileSync(path.join(directory, 'hijpass'), text.replace('/etc/hijpass/fw4-template.ut', '/custom/firewall.ut'));
-    assert.equal(value({ action: 'migrate', directory }).find(s => s['.name'] === 'global').nft, '/custom/firewall.ut');
+    fs.writeFileSync(path.join(directory, 'hijpass'), text.replace('/etc/hijpass/firewall', '/custom/rules'));
+    assert.equal(value({ action: 'migrate', directory }).find(s => s['.name'] === 'global').firewall_rules, '/custom/rules');
 });
 
 test('domain/IP normalization and CIDR lookup use native address validation', () => {
@@ -303,11 +299,11 @@ test('文本工具正常退出，参数错误保持 JSON 工具的错误契约',
 
 test('启用防火墙时，缺失模板不会生成缺少规则的配置', t => {
     const directory = fixture(t);
-    const result = invoke({ action: 'firewall', template: path.join(directory, 'missing.nft'),
+    const result = invoke({ action: 'firewall', ruleDirectory: path.join(directory, 'missing'),
         state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] },
         sections: [global, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp' }] });
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /template is empty or unreadable/);
+    assert.match(result.stderr, /rule template is unreadable/);
     assert.equal(result.stdout, '');
 });
 
@@ -429,4 +425,49 @@ config proxy_node 'sample'
     assert.equal(rendered.status, 1);
     assert.match(rendered.stderr, /invalid port/);
     assert.equal(rendered.stdout, '');
+});
+
+// 白名单为接口或 MAC 命中，不可因任一列表为空而放行所有客户端。
+test('空静态列表省略集合与规则，ACL 空白名单明确返回，动态 DNS 集合继续保留', () => {
+    const state = { wan: [], local4: [], local6: [], dns4: [], dns6: [] };
+    for (const [interfaces, macs] of [[[], []], [['lo'], []], [[], ['02:00:00:00:00:01']], [['lo'], ['02:00:00:00:00:01']]]) {
+        const result = value({ action: 'firewall', ruleDirectory: path.join(root, 'root/etc/hijpass/firewall'), state,
+            sections: [global, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp', dns_forward: 'pre-routing',
+                proxy_iface_list: interfaces, proxy_mac_list: macs, use_chnroute: '1' },
+                { '.type': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653', use_chn: '1', use_gfw: '1' }] });
+        assert.doesNotMatch(result, /@(bypass|proxy)[46]list|set (bypass|proxy)[46]list|proxy_interface_list|proxy_mac_list/);
+        for (const set of ['chnroute', 'chn', 'gfw', 'dnsproxy', 'dnsbypass'])
+            for (const version of [4, 6]) assert.ok(result.includes('set ' + set + version + 'list {'));
+        for (const name of ['pre-filter', 'dns-forward']) {
+            const body = result.split('chain ' + name + ' {')[1].split('\n    }')[0];
+            const rule = interfaces.length && macs.length ? /iif != \{ "lo" \} ether saddr != \{ 02:00:00:00:00:01 \} counter return/
+                : interfaces.length ? /iif != \{ "lo" \} counter return/
+                : macs.length ? /ether saddr != \{ 02:00:00:00:00:01 \} counter return/ : /^        counter return$/m;
+            assert.match(body, rule);
+        }
+    }
+});
+
+test('规则模板只替换启用链的内部规则，空文件合法，未启用链无需文件', t => {
+    const directory = fixture(t);
+    for (const name of ['pre-filter', 'tproxy-shunt', 'tproxy-mark', 'proxy-port-filter'])
+        fs.writeFileSync(path.join(directory, name + '.ut'), name === 'pre-filter' ? 'counter comment "edited-rule"\n' : '');
+    const result = value({ action: 'firewall', ruleDirectory: directory,
+        state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] },
+        sections: [global, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp', proxy_local: '0' }] });
+    assert.match(result, /chain pre-filter \{\n        type filter hook prerouting priority filter - 50; policy accept;\n/);
+    assert.match(result, /counter comment "edited-rule"/);
+    assert.doesNotMatch(result, /fib daddr|chain out-route|chain dns-forward/);
+    assert.match(result, /chain tproxy-shunt \{\s*\}/);
+});
+
+test('旧自定义整表模板必须迁移，不能静默替换为默认链规则', t => {
+    const directory = fixture(t);
+    fs.writeFileSync(path.join(directory, 'hijpass'), "config hijpass 'global'\n option nft '/custom/firewall.ut'\n");
+    const sections = value({ action: 'migrate', directory });
+    assert.equal(sections[0].nft, '/custom/firewall.ut');
+    const result = invoke({ action: 'firewall', sections: [...sections, { '.type': 'firewall', proxy_port: '10001' }],
+        ruleDirectory: path.join(root, 'root/etc/hijpass/firewall'), state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] } });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /legacy nft template/);
 });

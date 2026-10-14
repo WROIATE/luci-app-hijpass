@@ -116,10 +116,21 @@ function createTextOptions(s: LuCI.form.AbstractSection) {
     FormUtils.createTextOption(s, 'ip_proxy', 'ip_proxy_hash', null,
         _('Edit IP Proxy List'), FilePathUtils.getFilePath('ip_proxy'));
 
-    // 防火墙规则
-    FormUtils.createTextOption(s, 'nftables', 'nft_hash', null,
-        _('Edit the nftables rule template. Intended for users familiar with nftables and HiJpass rule generation. Arbitrary changes may break compatibility with LuCI configuration features and affect network connectivity.'),
-        FilePathUtils.getFilePath('nft'));
+    // 用户只编辑链内规则；表、集合、hook 和优先级在内部模板中管理。
+    const selector = s.taboption('nftables', form.ListValue, '_rule_chain', _('Chain'));
+    selector.default = 'pre-filter';
+    selector.load = function () { return 'pre-filter'; };
+    selector.write = function () { };
+    selector.remove = function () { };
+    for (const chain of ['pre-filter', 'out-route', 'tproxy-shunt', 'tproxy-mark',
+        'proxy-port-filter', 'dns-forward', 'dns-forward-output']) {
+        selector.value(chain, chain);
+        const editor = FormUtils.createTextOption(s, 'nftables', chain.replace(/-/g, '_') + '_hash', chain, null,
+            FilePathUtils.getFilePath('firewall_rules') + '/' + chain + '.ut');
+        // 切换链只隐藏编辑器；保存时保留其它链的规则文件。
+        editor.retain = true;
+        editor.depends('_rule_chain', chain);
+    }
 
     FirewallFormUtils.createNftViewOption(s);
 

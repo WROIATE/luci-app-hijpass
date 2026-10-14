@@ -58,8 +58,16 @@ function withConfig(sections, callback) {
 
 function run(script, args = [], input, extra = {}) {
     if (script.endsWith('.sh')) return runShell(script, args, extra);
+    if (script === 'ucode-src/tests/runtime.uc') {
+        const directory = shellRuntime();
+        const driver = fs.readFileSync(path.join(root, script), 'utf8')
+            .replaceAll('../../root/usr/lib/hijpass', directory)
+            .replaceAll('../../root/', path.join(root, 'root') + '/');
+        script = path.join(directory, 'runtime-test.uc');
+        fs.writeFileSync(script, driver);
+    }
     // Older ucode builds use getopt(), which can consume script flags such as --stdin on glibc hosts.
-    return spawnSync(interpreter, ['-S', '-L', path.join(root, 'root/usr/share/ucode'), '--', path.join(root, script), ...args], {
+    return spawnSync(interpreter, ['-S', '-L', path.join(root, 'root/usr/share/ucode'), '--', path.resolve(root, script), ...args], {
         encoding: 'utf8', input: input === undefined ? undefined : JSON.stringify(input), ...extra,
     });
 }

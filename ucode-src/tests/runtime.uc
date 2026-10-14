@@ -18,7 +18,7 @@ import { packetSummary, report } from '../../root/usr/lib/hijpass/diagnostics/re
 let request = json(fs.stdin.read('all')), result;
 switch (request.action) {
 case 'read': result = read('hijpass', request.directory); break;
-case 'firewall': result = firewall.generate(request.sections, request.state, request.template); break;
+case 'firewall': result = firewall.generate(request.sections, request.state, request.ruleDirectory); break;
 case 'chinadns': result = render(request.template, { options: dnsOptions(request.sections) }); break;
 case 'plan': result = service.plan(request.sections); break;
 case 'server-plan': result = service.serverPlan(request.sections); break;

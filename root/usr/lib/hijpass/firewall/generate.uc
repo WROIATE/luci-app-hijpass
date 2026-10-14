@@ -60,7 +60,8 @@ function ipList(path, version) {
 // FirewallOptions：端口为已校验整数，0 表示未启用；protocols 为 tcp/udp 数组。
 // wan/interfaces/excludedInterfaces 是设备名数组，macs/excludedMacs 是 MAC 数组。
 // proxyLocal/allowAll/useChnRoute/useChn/useGfw/domainSets 控制对应规则和集合。
-// ip4/ip6 各含 direct/proxy/china 地址数组，空数组只生成集合声明。
+// ip4/ip6 各含 direct/proxy/china 地址数组；空静态列表不生成集合或匹配规则。
+// proxyMark/shuntMark/user 是内部固定参数；*Names 是已引用、转义的 nft 接口列表。
 /**
  * @param {object[]} config
  * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
@@ -83,17 +84,25 @@ function options(config, state) {
         for (let value in values) if (!match(value, /^[A-Za-z0-9_.:@-]+$/)) die('invalid proxy interface');
         return values;
     }
+    /** @param {string[]} names @returns {string} */
+    function quoteNames(names) {
+        return join(', ', map(names, name => sprintf('%J', name)));
+    }
     let result = {
         proxyPort: f.proxy_port ? port(f.proxy_port) : 0,
         shuntPort: f.shunt_port ? port(f.shunt_port) : 0,
         forwardPort: forward ? port(forward) : 0,
         protocols, wan: state.wan,
+        proxyMark: 0x1, shuntMark: 0x3, user: 'hijpass',
         proxyLocal: f.proxy_local == '1', allowAll: f.acl_default_allow == '1',
         useChnRoute: f.use_chnroute == '1', useChn: dns.use_chn == '1', useGfw: dns.use_gfw == '1',
         domainSets: dns.dns_service != 'custom',
         macs: macs(list(f.proxy_mac_list)), excludedMacs: macs(list(f.proxy_mac_exclude_list)),
         interfaces: interfaces(list(f.proxy_iface_list)), excludedInterfaces: interfaces(list(f.proxy_iface_exclude_list)),
     };
+    result.wanNames = quoteNames(result.wan);
+    result.interfaceNames = quoteNames(result.interfaces);
+    result.excludedInterfaceNames = quoteNames(result.excludedInterfaces);
     for (let version in [4, 6]) result[`ip${version}`] = {
         direct: uniq([...state[`dns${version}`], ...state[`local${version}`], ...ipList(global.ip_direct, version)]),
         proxy: uniq(ipList(global.ip_proxy, version)),
@@ -104,14 +113,37 @@ function options(config, state) {
 /**
  * @param {object[]} config
  * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
- * @param {string|null} templatePath ucode 模板路径。
+ * @param {string} ruleDirectory 只包含各链内部规则模板的目录。
  */
-export function generate(config, state, templatePath) {
+export function generate(config, state, ruleDirectory) {
     let f = first(config, 'firewall');
     if (!f.proxy_port && !f.shunt_port) return '';
-    // 启用代理时模板必须存在；生成失败不能被当成禁用防火墙。
-    if (type(templatePath) != 'string' || !length(fs.readfile(templatePath) || '')) die('firewall template is empty or unreadable');
-    return renderTemplate(templatePath, { options: options(config, state) });
+    // 旧整表模板不能当成链内规则使用；未迁移的自定义路径必须明确报告。
+    let legacy = first(config, 'hijpass').nft;
+    if (legacy && index(['/etc/hijpass/fw4-template.nft', '/etc/hijpass/fw4-template.ut'], legacy) < 0)
+        die('legacy nft template: move chain rules to firewall_rules before enabling the firewall');
+    if (type(ruleDirectory) != 'string' || !length(ruleDirectory)) die('firewall_rules directory is required');
+    let values = options(config, state);
+    // Chain：name/hook 固定在内部，enabled 由已校验开关决定，rules 是用户模板结果。
+    // 只读取启用的链：关闭本机代理或 DNS 转发后，不依赖其规则文件。
+    let chains = [
+        { name: 'pre-filter', hook: 'type filter hook prerouting priority filter - 50; policy accept;', enabled: true },
+        { name: 'out-route', hook: 'type route hook output priority filter - 50; policy accept;', enabled: values.proxyLocal },
+        { name: 'tproxy-shunt', hook: '', enabled: true },
+        { name: 'tproxy-mark', hook: '', enabled: true },
+        { name: 'proxy-port-filter', hook: '', enabled: true },
+        { name: 'dns-forward', hook: 'type nat hook prerouting priority dstnat - 1; policy accept;', enabled: !!values.forwardPort },
+        { name: 'dns-forward-output', hook: 'type nat hook output priority -101; policy accept;', enabled: !!values.forwardPort && values.proxyLocal },
+    ];
+    chains = filter(chains, chain => chain.enabled);
+    for (let chain in chains) {
+        let path = `${ruleDirectory}/${chain.name}.ut`;
+        // 空文件允许清空链内规则；缺失文件则必须失败，避免意外生成残缺规则。
+        if (fs.readfile(path) == null) die(`firewall rule template is unreadable: ${path}`);
+        chain.rules = renderTemplate(path, { options: values });
+    }
+    let sets = renderTemplate('/usr/lib/hijpass/firewall/sets.ut', { options: values });
+    return renderTemplate('/usr/lib/hijpass/firewall/ruleset.ut', { chains, sets });
 };
 
 // NetworkSnapshot：Shell 采集的 wan 文本以及 address/interface 命令的输出与退出码。
@@ -120,6 +152,6 @@ export function main() { run(() => {
     let raw = { wan: text(directory + '/wan'),
         addresses: { stdout: text(directory + '/addresses'), code: int(text(directory + '/addresses.code')) },
         interfaces: { stdout: text(directory + '/interfaces'), code: int(text(directory + '/interfaces.code')) } };
-    return generate(config, networkState(raw), first(config, 'hijpass').nft || '/etc/hijpass/fw4-template.ut');
+    return generate(config, networkState(raw), first(config, 'hijpass').firewall_rules || '/etc/hijpass/firewall');
 });
 };

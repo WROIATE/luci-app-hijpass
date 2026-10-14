@@ -9,7 +9,7 @@ const DEFAULT_PATHS: Record<string, Record<string, string>> = {
         ip_proxy: '/etc/hijpass/rules/ip-proxy.txt',
         domain_direct: '/etc/hijpass/rules/domain-direct.txt',
         domain_proxy: '/etc/hijpass/rules/domain-proxy.txt',
-        nft: '/etc/hijpass/fw4-template.nft',
+        nft: '/etc/hijpass/fw4-template.ut',
         nft_hook: '/etc/hijpass/hook/nft-hook.sh',
         dns_hook: '/etc/hijpass/hook/dns-hook.sh',
     },

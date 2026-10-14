@@ -63,7 +63,7 @@ endmenu
 endef
 
 define Package/$(PKG_NAME)/conffiles
-/etc/hijpass/fw4-template.nft
+/etc/hijpass/fw4-template.ut
 /etc/hijpass/hook/dns-hook.sh
 /etc/hijpass/hook/nft-hook.sh
 /etc/hijpass/rules/chn-list.txt

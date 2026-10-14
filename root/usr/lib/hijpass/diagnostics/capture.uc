@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import { read } from 'hijpass.uci.read';
 import { resolve } from '../network/network.uc';
-import { atomic, lines, run, text } from 'hijpass.common';
+import { atomic, lines, run, text, renderTemplate } from 'hijpass.common';
 import { report } from './report.uc';
 
 // Capture 字段：mode 为 client/router；client 为客户端 IP，protocol 为 all/tcp/udp，
@@ -107,23 +107,7 @@ export function prepare(pid, args) {
  * @returns {string}
  */
 export function ruleText(c) {
-    let result = [];
-    function insert(chain, fields) {
-        push(result, `insert rule inet hijpass ${chain} ${fields} meta nftrace set 1 comment "${c.comment}"`);
-    }
-    if (c.mode == 'client') {
-        push(result, `add chain inet hijpass ${c.chain} { type filter hook prerouting priority -301; policy accept; }`);
-        let fields = `${length(iptoarr(c.client || '')) == 4 ? 'ip' : 'ip6'} saddr ${c.client}`;
-        if (c.protocol != 'all') fields += ` meta l4proto ${c.protocol}`;
-        else if (c.port != 'all') fields += ' meta l4proto { tcp, udp }';
-        if (c.port != 'all') fields += ` th dport ${c.port}`;
-        insert(c.chain, fields);
-    }
-    else {
-        for (let address in c.addresses) insert('out-route', `${length(iptoarr(address)) == 4 ? 'ip' : 'ip6'} daddr ${address} tcp dport ${c.targetPort}`);
-        insert('out-route', `tcp dport ${c.targetPort}`);
-    }
-    return join('\n', result) + '\n';
+    return renderTemplate('/usr/lib/hijpass/diagnostics/trace.ut', { capture: c });
 };
 /**
  * @param {string|null} directory

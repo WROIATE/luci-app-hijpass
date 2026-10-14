@@ -9,4 +9,4 @@ hijpass_data() {
     # -- 分隔解释器选项和业务参数，兼容旧版本以及 glibc 宿主机的 getopt。
     ucode -S -- "$@"
 }
-hijpass_error() { hijpass_data "$HIJPASS_LIB/resultcli.uc" error "$1"; }
+hijpass_error() { hijpass_data "$HIJPASS_LIB/result.uc" error "$1"; }

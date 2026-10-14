@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import { first, of } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
-import { render } from 'hijpass.coreconfig.render';
+import { render as renderCore } from 'hijpass.coreconfig.render';
 import { CORE, core } from 'hijpass.config.protocol.proxy';
 import { resolve } from '../network/network.uc';
-import { atomic, command, temporary, run, sections } from 'hijpass.common';
+import { atomic, command, temporary, run, sections, renderTemplate } from 'hijpass.common';
 import { prepare as prepareDNS } from './dns.uc';
 import { logger } from '../maintenance/logs.uc';
 
@@ -144,8 +144,7 @@ function writeServerRules(sections) {
 	let output = serverPlan(sections);
 	// 只开放明确选中的端口；没有端口时删除旧 include，避免旧服务端仍对 WAN 开放。
 	if (length(output.ports)) {
-		let ports = join(', ', output.ports);
-		atomic(SERVER_TABLE, `chain hijserver {\n    tcp dport { ${ports} } counter accept\n    udp dport { ${ports} } counter accept\n    return\n}\n`, 0o644);
+		atomic(SERVER_TABLE, renderTemplate('/usr/lib/hijpass/service/server.ut', { ports: output.ports }), 0o644);
 		atomic(SERVER_CHAIN, 'jump hijserver comment "hijserver rule"\n', 0o644);
 	}
 	else { fs.unlink(SERVER_TABLE); fs.unlink(SERVER_CHAIN); }
@@ -176,7 +175,7 @@ export function main() { run(() => {
             // 先生成进程描述，确认自定义命令、环境变量和文件名有效，再替换配置。
             plan(config);
             logger(config)('INFO', 'Preparing proxy configurations');
-            writeConfigs(config, render(config));
+            writeConfigs(config, renderCore(config));
         }
         return;
     }

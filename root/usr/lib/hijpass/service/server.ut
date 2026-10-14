@@ -1,0 +1,9 @@
+{%
+/** @global {integer[]} ports 由 serverPlan 生成的允许端口。 */
+%}
+{# ports 是 serverPlan 已校验并去重的监听端口，只开放明确勾选的服务端节点。 -#}
+chain hijserver {
+    tcp dport { {{ join(', ', ports) }} } counter accept
+    udp dport { {{ join(', ', ports) }} } counter accept
+    return
+}

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
-const { root, shellRuntime, withConfig } = require('./helpers.cjs');
+const { root, interpreter, shellRuntime, withConfig } = require('./helpers.cjs');
 
 // 只在安装副本中替换系统路径，生产代码不增加测试开关或模拟逻辑。
 function fixture(t) {
@@ -13,7 +13,7 @@ function fixture(t) {
     const sourceRuntime = shellRuntime();
     fs.cpSync(sourceRuntime, runtime, { recursive: true });
     // 各场景使用独立的安装副本，避免路径仍指向共享测试目录。
-    for (const file of fs.readdirSync(runtime, { recursive: true })) if (file.endsWith('.sh')) {
+    for (const file of fs.readdirSync(runtime, { recursive: true })) if (file.endsWith('.sh') || file.endsWith('.uc')) {
         const target = path.join(runtime, file);
         fs.writeFileSync(target, fs.readFileSync(target, 'utf8').replaceAll(sourceRuntime, runtime));
     }
@@ -31,7 +31,11 @@ function fixture(t) {
                 PATH: `${directory}:${runtime}/testbin:${process.env.PATH}` },
         });
     }
-    return { directory, runtime, patch, script, run };
+    function data(file, args) {
+        return spawnSync(interpreter, ['-S', '-L', path.join(root, 'root/usr/share/ucode'), '--', path.join(runtime, file), ...args],
+            { encoding: 'utf8', env: process.env });
+    }
+    return { directory, runtime, patch, script, run, data };
 }
 
 test('Geo 更新验证下载内容，失败保留旧库，有效备用来源才替换', t => {
@@ -88,7 +92,7 @@ fi`);
     f.script('ubus', `printf '%s\\n' '{"interface":[{"device":"wan0","route":[{"mask":0}]}]}'`);
     f.script('fw4', `if [ "$1" = zone ]; then echo wan0; else echo reload >>"$TEST_CALLS"; fi`);
     f.script('nft', '[ "$NFT_FAIL" != 1 ]');
-    const sections = [{ '.type': 'hijpass', nft: path.join(root, 'root/etc/hijpass/fw4-template.nft') },
+    const sections = [{ '.type': 'hijpass', nft: path.join(root, 'root/etc/hijpass/fw4-template.ut') },
         { '.type': 'firewall', shunt_port: '18081', tproxy_proto: 'tcp,udp', acl_default_allow: '1' },
         { '.type': 'dns', dns_service: 'custom' }];
     withConfig(sections, config => {
@@ -100,12 +104,79 @@ fi`);
             assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
             assert.equal(fs.existsSync(calls), false);
         }
+        // 用户模板语法错误也不能替换旧规则或触发防火墙重载。
+        const invalidTemplate = path.join(f.directory, 'invalid.ut');
+        fs.writeFileSync(invalidTemplate, '{% if (: %}');
+        const configPath = path.join(config, 'hijpass'), original = fs.readFileSync(configPath, 'utf8');
+        fs.writeFileSync(configPath, original.replace(sections[0].nft, invalidTemplate));
+        const broken = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
+        assert.equal(broken.status, 1);
+        assert.match(broken.stderr, /template/);
+        assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
+        assert.equal(fs.existsSync(calls), false);
+        fs.writeFileSync(configPath, original);
         const applied = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
         assert.equal(applied.status, 0, applied.stderr);
         assert.match(fs.readFileSync(rules, 'utf8'), /192\.168\.1\.1\/24/);
         assert.match(fs.readFileSync(rules, 'utf8'), /define WAN_DEV = \{ "wan0" \}/);
         assert.equal(fs.readFileSync(calls, 'utf8'), 'reload\n');
         assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('rules.nft.new.')), false);
+    });
+});
+
+test('Chinadns 模板保留列表开关、默认 tag、上游和自定义域名的组合行为', t => {
+    const f = fixture(t), configFile = path.join(f.directory, 'chinadns.conf');
+    f.patch('service/dns.uc', '/etc/hijpass/chinadns-ng.conf', configFile);
+    f.patch('service/dns.uc', '/tmp/hijpass/', f.directory + '/');
+    f.patch('rules/rules.uc', '/tmp/hijpass/', f.directory + '/');
+    const domain = path.join(f.directory, 'domains');
+    fs.writeFileSync(domain, 'Example.ORG\nfull:example.net\ninvalid\n');
+    const base = [{ '.type': 'hijpass', '.name': 'global', enabled: '1',
+        domain_direct: domain, domain_proxy: domain, chn_list: '/rules/china', gfw_list: '/rules/proxy' },
+        { '.type': 'dns', '.name': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653',
+            direct_dns: 'custom', direct_dns_custom: '223.5.5.5#53', proxy_dns: '1.1.1.1#53' }];
+    for (const [china, proxy, tag] of [['0', '0', null], ['1', '0', 'gfw'], ['0', '1', 'chn'], ['1', '1', null]]) {
+        const sections = [base[0], { ...base[1], use_chn: china, use_gfw: proxy }];
+        withConfig(sections, config => {
+            const prepared = f.run('service/service.sh', ['prepare', '--configdir', config]);
+            assert.equal(prepared.status, 0, prepared.stderr);
+            assert.equal(JSON.parse(prepared.stdout).instances[0].name, 'chinadns-ng');
+            const text = fs.readFileSync(configFile, 'utf8');
+            assert.match(text, /^bind-port 53653$/m);
+            assert.match(text, /^china-dns 223\.5\.5\.5#53$/m);
+            assert.match(text, /^trust-dns 1\.1\.1\.1#53$/m);
+            assert.equal(text.includes('chnlist-file /rules/china'), china === '1');
+            assert.equal(text.includes('gfwlist-file /rules/proxy'), proxy === '1');
+            assert.deepEqual(text.match(/^default-tag .*$/gm), tag ? ['default-tag ' + tag] : null);
+            assert.match(text, /^group-upstream 223\.5\.5\.5#53$/m);
+            assert.match(text, /^group-upstream 1\.1\.1\.1#53$/m);
+            assert.match(text, /^verdict-cache 4096\n$/m);
+            assert.equal(fs.readFileSync(path.join(f.directory, 'domain-direct.txt'), 'utf8'), 'example.org\nexample.net\n');
+            assert.equal(fs.readFileSync(path.join(f.directory, 'domain-proxy.txt'), 'utf8'), 'example.org\nexample.net\n');
+        });
+    }
+});
+
+test('服务端模板仅开放选中的端口，错误保留旧规则，没有允许端口时删除旧 include', t => {
+    const f = fixture(t), table = path.join(f.directory, 'server.nft'), chain = path.join(f.directory, 'chain.nft');
+    f.patch('service/prepare.uc', '/usr/share/nftables.d/table-post/hijserver.nft', table);
+    f.patch('service/prepare.uc', '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', chain);
+    withConfig([], config => {
+        const configFile = path.join(config, 'hijserver');
+        const source = "config hijserver\n option enabled '1'\nconfig server_node 'a'\n option enabled '1'\n option name 'a'\n option command 'xray run'\n option allow_firewall '1'\n option listen_port '443'\n";
+        fs.writeFileSync(configFile, source);
+        const result = f.data('service/preparecli.uc', ['server', 'server-files', '--configdir', config]);
+        assert.equal(result.status, 0, result.stderr);
+        const original = fs.readFileSync(table, 'utf8');
+        assert.equal(original, 'chain hijserver {\n    tcp dport { 443 } counter accept\n    udp dport { 443 } counter accept\n    return\n}\n');
+        assert.equal(fs.readFileSync(chain, 'utf8'), 'jump hijserver comment "hijserver rule"\n');
+        fs.writeFileSync(configFile, source.replace("'443'", "'0'"));
+        assert.equal(f.data('service/preparecli.uc', ['server', 'server-files', '--configdir', config]).status, 1);
+        assert.equal(fs.readFileSync(table, 'utf8'), original);
+        fs.writeFileSync(configFile, source.replace("allow_firewall '1'", "allow_firewall '0'"));
+        assert.equal(f.data('service/preparecli.uc', ['server', 'server-files', '--configdir', config]).status, 0);
+        assert.equal(fs.existsSync(table), false);
+        assert.equal(fs.existsSync(chain), false);
     });
 });
 

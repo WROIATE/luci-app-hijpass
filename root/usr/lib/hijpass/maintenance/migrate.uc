@@ -13,6 +13,9 @@ export function migrate(ctx) {
 	if (!ctx.load('hijpass')) die(`cannot load hijpass: ${ctx.error()}`);
 	let shunt, dns, firewall, names = {}, ports = {};
 	ctx.foreach('hijpass', null, s => {
+		// 包自带的防火墙配置改用 ucode 模板；保留用户指定的其它路径。
+		if (s['.type'] == 'hijpass' && s.nft == '/etc/hijpass/fw4-template.nft')
+			ctx.set('hijpass', s['.name'], 'nft', '/etc/hijpass/fw4-template.ut');
 		if (s.name) names[s.name] = true;
 		for (let key in ['listen_port', 'socks_port', 'shunt_listen_port', 'dns_listen_port', 'cdg_port']) if (s[key]) ports[s[key]] = true;
 		if (s['.type'] == 'shunt' && !shunt) shunt = s;

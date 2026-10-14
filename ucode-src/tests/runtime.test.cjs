@@ -117,7 +117,7 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
     const firewall = { '.name': 'fw', '.type': 'firewall', shunt_port: '18081', tproxy_proto: 'tcp,udp', proxy_local: '0', acl_default_allow: '1' };
     const dns = { '.name': 'dns', '.type': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653' };
     for (const forward of ['none', 'pre-routing', 'routing']) for (const local of ['0', '1']) {
-        const result = value({ action: 'firewall', template: path.join(root, 'root/etc/hijpass/fw4-template.nft'), state,
+        const result = value({ action: 'firewall', template: path.join(root, 'root/etc/hijpass/fw4-template.ut'), state,
             sections: [{ ...global, ip_direct: ip }, { ...firewall, dns_forward: forward, proxy_local: local }, dns,
                 { '.type': 'shunt', enabled: '1', dns_listen_port: '10153' }] });
         assert.match(result, /define TPROXY_PROTO = \{ tcp, udp \}/);
@@ -140,7 +140,7 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
         const check = spawnSync('nft', ['-c', '-f', path.join(directory, 'test.nft')], { encoding: 'utf8' });
         if (!check.error) assert.doesNotMatch(check.stderr, /syntax error/);
     }
-    const rejected = invoke({ action: 'firewall', template: path.join(root, 'root/etc/hijpass/fw4-template.nft'), state,
+    const rejected = invoke({ action: 'firewall', template: path.join(root, 'root/etc/hijpass/fw4-template.ut'), state,
         sections: [global, { ...firewall, proxy_iface_list: ['br-lan;flush ruleset'] }, dns] });
     assert.notEqual(rejected.status, 0);
 });
@@ -194,8 +194,9 @@ test('native configuration writes are private and staging failure preserves ever
 
 test('native UCI migration is idempotent and moves legacy balance references without resetting fields', t => {
     const directory = fixture(t);
-    fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass 'global'\n option enabled '1'\nconfig proxy_node 'a'\n option name 'member'\n option core 'singbox'\n option listen_port '7890'\n option socks_port '7891'\nconfig shunt 's'\n option type 'singbox'\n list lb_node_list 'member'\n option default_proxy_node 'hijpass-slb'\n option lb_strategy 'urltest'\nconfig dns 'dns'\n option direct_dns 'system'\nconfig firewall 'fw'\n`);
+    fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass 'global'\n option enabled '1'\n option nft '/etc/hijpass/fw4-template.nft'\nconfig proxy_node 'a'\n option name 'member'\n option core 'singbox'\n option listen_port '7890'\n option socks_port '7891'\nconfig shunt 's'\n option type 'singbox'\n list lb_node_list 'member'\n option default_proxy_node 'hijpass-slb'\n option lb_strategy 'urltest'\nconfig dns 'dns'\n option direct_dns 'system'\nconfig firewall 'fw'\n`);
     const result = value({ action: 'migrate', directory });
+    assert.equal(result.find(s => s['.name'] === 'global').nft, '/etc/hijpass/fw4-template.ut');
     const balance = result.find(s => s.type === 'load_balance');
     assert.equal(balance.listen_port, '7892'); assert.equal(balance.socks_port, '7893');
     assert.deepEqual(balance.member_node, ['member']);
@@ -206,6 +207,8 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     const text = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
     value({ action: 'migrate', directory });
     assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), text);
+    fs.writeFileSync(path.join(directory, 'hijpass'), text.replace('/etc/hijpass/fw4-template.ut', '/custom/firewall.ut'));
+    assert.equal(value({ action: 'migrate', directory }).find(s => s['.name'] === 'global').nft, '/custom/firewall.ut');
 });
 
 test('domain/IP normalization and CIDR lookup use native address validation', () => {

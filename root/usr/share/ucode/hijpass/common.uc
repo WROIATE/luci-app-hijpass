@@ -1,6 +1,20 @@
 import * as fs from 'fs';
 import { read } from './uci/read.uc';
 
+/**
+ * @param {string} path 模板文件的绝对路径。
+ * @param {object} scope 只传入模板需要的已校验字段。
+ * @returns {string}
+ */
+export function renderTemplate(path, scope) {
+	try {
+		let output = render(path, scope);
+		if (type(output) != 'string') die('template did not return text');
+		return output;
+	}
+	catch (e) { die(`template "${path}": ${e.message}`); }
+};
+
 export function quote(value) { return "'" + replace(`${value}`, "'", "'\\''") + "'"; };
 /**
  * @param {array} args 作为独立 argv 引用的参数数组。

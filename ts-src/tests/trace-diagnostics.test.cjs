@@ -100,7 +100,7 @@ function fixture(t) {
     cpSync(path.join(root, 'root/usr/lib/hijpass'), runtime, { recursive: true });
     for (const folder of readdirSync(runtime, { withFileTypes: true })) {
         const files = folder.isDirectory() ? readdirSync(path.join(runtime, folder.name)).map(name => path.join(runtime, folder.name, name)) : [path.join(runtime, folder.name)];
-        for (const file of files) if (file.endsWith('.sh'))
+        for (const file of files) if (file.endsWith('.sh') || file.endsWith('.uc'))
             writeFileSync(file, readFileSync(file, 'utf8')
                 .replace('#!/bin/sh', '#!/usr/bin/busybox ash')
                 .replaceAll('/usr/lib/hijpass', runtime));

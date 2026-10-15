@@ -1,0 +1,37 @@
+[
+  {
+    "name": "pre-filter",
+    "hook": "type filter hook prerouting priority filter - 50; policy accept;",
+    "requires": []
+  },
+  {
+    "name": "out-route",
+    "hook": "type route hook output priority filter - 50; policy accept;",
+    "requires": ["proxyLocal"]
+  },
+  {
+    "name": "tproxy-shunt",
+    "hook": "",
+    "requires": []
+  },
+  {
+    "name": "tproxy-mark",
+    "hook": "",
+    "requires": []
+  },
+  {
+    "name": "proxy-port-filter",
+    "hook": "",
+    "requires": []
+  },
+  {
+    "name": "dns-forward",
+    "hook": "type nat hook prerouting priority dstnat - 1; policy accept;",
+    "requires": ["forwardPort"]
+  },
+  {
+    "name": "dns-forward-output",
+    "hook": "type nat hook output priority -101; policy accept;",
+    "requires": ["forwardPort", "proxyLocal"]
+  }
+]

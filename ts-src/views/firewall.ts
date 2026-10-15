@@ -1,4 +1,5 @@
 import view from "view";
+import fs from "fs";
 import uci from "uci";
 import { FIREWALL_DNS_FORWARD, LuciFlied } from "../enum/hijpass";
 import form from "form";
@@ -9,17 +10,29 @@ import { FirewallFormUtils } from "../utils/feature/firewall/form";
 import { FirewallDnsForwardUtils } from "../utils/feature/firewall/dns-forward";
 
 
+// 与后端 chains.json 对应：requires 中的条件由生成器计算，hook 只读展示。
+type FirewallChain = {
+    name: string;
+    hook: string;
+    requires: string[];
+};
+
 const v = view.extend({
     load: function () {
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME),
             uci.load('firewall'),
+            fs.read('/usr/lib/hijpass/firewall/chains.json').then((source: string) => {
+                const chains: FirewallChain[] = JSON.parse(source);
+                if (!Array.isArray(chains) || !chains.length) throw new Error(_('Invalid firewall chain definitions'));
+                return chains;
+            }),
         ]);
     },
 
     handleSaveApply: SaveApplyUtils.genHandleSaveApply(),
 
-    render: async function () {
+    render: async function (data: [unknown, unknown, FirewallChain[]]) {
         let m = new form.Map(LuciFlied.CONF_NAME, _('Firewall Configuration'),
             _('Configure Firewall'));
 
@@ -34,7 +47,7 @@ const v = view.extend({
         // 创建 ACL 配置选项
         await createAclOptions(s);
         // 创建文本编辑选项
-        createTextOptions(s);
+        createTextOptions(s, data[2]);
 
         return m.render();
     }
@@ -106,7 +119,7 @@ function createListOptions(s: LuCI.form.AbstractSection) {
 }
 
 // 创建所有文本编辑选项
-function createTextOptions(s: LuCI.form.AbstractSection) {
+function createTextOptions(s: LuCI.form.AbstractSection, chains: FirewallChain[]) {
     // IP 直连列表（IPv4 + IPv6）
     FormUtils.createTextOption(s, 'ip_direct', 'ip_direct_hash', null,
         _('Edit IP Direct List'),
@@ -117,19 +130,37 @@ function createTextOptions(s: LuCI.form.AbstractSection) {
         _('Edit IP Proxy List'), FilePathUtils.getFilePath('ip_proxy'));
 
     // 用户只编辑链内规则；表、集合、hook 和优先级在内部模板中管理。
-    const selector = s.taboption('nftables', form.ListValue, '_rule_chain', _('Chain'));
-    selector.default = 'pre-filter';
-    selector.load = function () { return 'pre-filter'; };
+    const selector = s.taboption('nftables', form.ListValue, '_rule_chain', null);
+    selector.default = chains[0].name;
+    selector.load = function () { return chains[0].name; };
     selector.write = function () { };
     selector.remove = function () { };
-    for (const chain of ['pre-filter', 'out-route', 'tproxy-shunt', 'tproxy-mark',
-        'proxy-port-filter', 'dns-forward', 'dns-forward-output']) {
-        selector.value(chain, chain);
-        const editor = FormUtils.createTextOption(s, 'nftables', chain.replace(/-/g, '_') + '_hash', chain, null,
-            FilePathUtils.getFilePath('firewall_rules') + '/' + chain + '.ut');
+    const renderSelector = selector.renderWidget;
+    selector.renderWidget = function (...args: any[]) {
+        const widget = renderSelector.apply(this, args) as HTMLElement;
+        // 不显示标题，但键盘和屏幕阅读器仍能识别选择器。
+        widget.querySelector('select')?.setAttribute('aria-label', _('Chain'));
+        return widget;
+    };
+    for (const chain of chains) {
+        selector.value(chain.name, chain.name);
+        const hook = s.taboption('nftables', form.DummyValue, '_hook_' + chain.name.replace(/-/g, '_'), null);
+        hook.renderWidget = function () {
+            return E('code', { style: 'white-space:normal;overflow-wrap:anywhere' },
+                chain.hook || _('Regular chain (no hook)'));
+        };
+        hook.depends('_rule_chain', chain.name);
+        const editor = FormUtils.createTextOption(s, 'nftables', chain.name.replace(/-/g, '_') + '_hash', null, null,
+            FilePathUtils.getFilePath('firewall_rules') + '/' + chain.name + '.ut');
+        const renderEditor = editor.renderWidget;
+        editor.renderWidget = function (...args: any[]) {
+            const widget = renderEditor.apply(this, args) as HTMLElement;
+            widget.querySelector('textarea')?.setAttribute('aria-label', chain.name);
+            return widget;
+        };
         // 切换链只隐藏编辑器；保存时保留其它链的规则文件。
         editor.retain = true;
-        editor.depends('_rule_chain', chain);
+        editor.depends('_rule_chain', chain.name);
     }
 
     FirewallFormUtils.createNftViewOption(s);

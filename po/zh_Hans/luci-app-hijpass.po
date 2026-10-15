@@ -2351,3 +2351,9 @@ msgstr "采集已开始，请立即在所选客户端发起请求。"
 
 msgid "Timed out waiting for trace results"
 msgstr "等待诊断结果超时"
+
+msgid "Regular chain (no hook)"
+msgstr "普通链（无 hook）"
+
+msgid "Invalid firewall chain definitions"
+msgstr "防火墙链定义无效"

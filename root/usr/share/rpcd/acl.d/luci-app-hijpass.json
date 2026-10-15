@@ -11,6 +11,9 @@
         "dhcp"
       ],
       "file": {
+        "/usr/lib/hijpass/firewall/chains.json": [
+          "read"
+        ],
         "/etc/hijpass/*": [
           "read"
         ],

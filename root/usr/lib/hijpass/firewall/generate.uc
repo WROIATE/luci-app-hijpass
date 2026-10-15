@@ -124,23 +124,34 @@ export function generate(config, state, ruleDirectory) {
         die('legacy nft template: move chain rules to firewall_rules before enabling the firewall');
     if (type(ruleDirectory) != 'string' || !length(ruleDirectory)) die('firewall_rules directory is required');
     let values = options(config, state);
-    // Chain：name/hook 固定在内部，enabled 由已校验开关决定，rules 是用户模板结果。
-    // 只读取启用的链：关闭本机代理或 DNS 转发后，不依赖其规则文件。
-    let chains = [
-        { name: 'pre-filter', hook: 'type filter hook prerouting priority filter - 50; policy accept;', enabled: true },
-        { name: 'out-route', hook: 'type route hook output priority filter - 50; policy accept;', enabled: values.proxyLocal },
-        { name: 'tproxy-shunt', hook: '', enabled: true },
-        { name: 'tproxy-mark', hook: '', enabled: true },
-        { name: 'proxy-port-filter', hook: '', enabled: true },
-        { name: 'dns-forward', hook: 'type nat hook prerouting priority dstnat - 1; policy accept;', enabled: !!values.forwardPort },
-        { name: 'dns-forward-output', hook: 'type nat hook output priority -101; policy accept;', enabled: !!values.forwardPort && values.proxyLocal },
-    ];
-    chains = filter(chains, chain => chain.enabled);
-    for (let chain in chains) {
+    // ChainDefinition：name 对应同名 .ut；hook 是完整基础链声明，普通链为空。
+    // requires 列出 FirewallOptions 字段，全部为真才启用；空数组表示始终启用。
+    // LuCI 从同一个只读文件获取链列表和 hook，避免页面与生成结果各自维护。
+    let definitions;
+    try {
+        let source = fs.readfile('/usr/lib/hijpass/firewall/chains.json');
+        if (type(source) != 'string') die('file is unreadable');
+        definitions = json(source);
+    }
+    catch (e) { die(`firewall chain definitions: ${e.message}`); }
+    if (type(definitions) != 'array' || !length(definitions)) die('firewall chain definitions must be a non-empty array');
+    let chains = [], names = {};
+    for (let chain in definitions) {
+        if (type(chain) != 'object' || type(chain.name) != 'string' || !match(chain.name, /^[A-Za-z][A-Za-z0-9_-]*$/) ||
+            type(chain.hook) != 'string' || type(chain.requires) != 'array') die('invalid firewall chain definition');
+        if (names[chain.name]) die(`duplicate firewall chain "${chain.name}"`);
+        names[chain.name] = true;
+        let enabled = true;
+        for (let field in chain.requires) {
+            if (type(field) != 'string' || !exists(values, field)) die(`unknown firewall condition "${field}"`);
+            if (!values[field]) enabled = false;
+        }
+        // 未启用链不读取规则文件；即使条件不满足，也检查该链的全部条件名。
+        if (!enabled) continue;
         let path = `${ruleDirectory}/${chain.name}.ut`;
         // 空文件允许清空链内规则；缺失文件则必须失败，避免意外生成残缺规则。
         if (fs.readfile(path) == null) die(`firewall rule template is unreadable: ${path}`);
-        chain.rules = renderTemplate(path, { options: values });
+        push(chains, { name: chain.name, hook: chain.hook, rules: renderTemplate(path, { options: values }) });
     }
     let sets = renderTemplate('/usr/lib/hijpass/firewall/sets.ut', { options: values });
     return renderTemplate('/usr/lib/hijpass/firewall/ruleset.ut', { chains, sets });

@@ -312,6 +312,7 @@ declare namespace LuCI {
     declare namespace rpc {
         interface RPC {
             declare(spec: {
+                reject?: boolean;
                 object: string;
                 method: string;
                 params: string[];

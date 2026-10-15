@@ -17,7 +17,11 @@ const defaults = {
 function loadPanel(fs, clock = { now: 0 }) {
     const source = readFileSync(path.join(root, 'ts-src/utils/feature/log/panel.ts'), 'utf8');
     const context = vm.createContext({
-        exports: {}, require: name => name === 'fs' ? fs : {}, _: value => value, console,
+        exports: {}, require: name => name.endsWith('/backend') ? { Backend: {
+            startTrace: args => fs.exec('trace', ['start', ...args]),
+            traceStatus: id => fs.exec_direct('trace', ['status', id]),
+            releaseTrace: id => fs.exec('trace', ['release', id]),
+        } } : {}, _: value => value, console,
         Date: class extends Date { static now() { return clock.now; } },
         window: { setTimeout(fn, ms) { clock.now += ms; fn(); } },
     });
@@ -55,7 +59,7 @@ for (const seconds of [30, 120]) {
                 return { code: 0, stdout: '', stderr: '' };
             },
             async exec_direct(command, args) {
-                assert.equal(command, '/usr/lib/hijpass/diagnostics/task.sh');
+                assert.equal(command, 'trace');
                 assert.deepEqual(Array.from(args), ['status', 'ABcd1234']);
                 const running = clock.now < seconds * 1000;
                 return { running, code: running ? null : 0, stdout: running ? 'Trace is active' : 'capture complete', stderr: '' };

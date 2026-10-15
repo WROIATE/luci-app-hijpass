@@ -1,32 +1,20 @@
 import view from "view";
-import fs from "fs";
+import { Backend, FirewallChain } from "../utils/backend";
 import uci from "uci";
 import { FIREWALL_DNS_FORWARD, LuciFlied } from "../enum/hijpass";
 import form from "form";
 import { SaveApplyUtils } from "../utils/actions/save-apply/index";
 import { FormUtils } from "../utils/base/luci/form";
-import { FilePathUtils } from "../utils/base/files/paths";
 import { FirewallFormUtils } from "../utils/feature/firewall/form";
 import { FirewallDnsForwardUtils } from "../utils/feature/firewall/dns-forward";
 
-
-// 与后端 chains.json 对应：requires 中的条件由生成器计算，hook 只读展示。
-type FirewallChain = {
-    name: string;
-    hook: string;
-    requires: string[];
-};
 
 const v = view.extend({
     load: function () {
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME),
             uci.load('firewall'),
-            fs.read('/usr/lib/hijpass/firewall/chains.json').then((source: string) => {
-                const chains: FirewallChain[] = JSON.parse(source);
-                if (!Array.isArray(chains) || !chains.length) throw new Error(_('Invalid firewall chain definitions'));
-                return chains;
-            }),
+            Backend.firewallChains(),
         ]);
     },
 
@@ -123,11 +111,11 @@ function createTextOptions(s: LuCI.form.AbstractSection, chains: FirewallChain[]
     // IP 直连列表（IPv4 + IPv6）
     FormUtils.createTextOption(s, 'ip_direct', 'ip_direct_hash', null,
         _('Edit IP Direct List'),
-        FilePathUtils.getFilePath('ip_direct'));
+        { resource: 'ip_direct' });
 
     // IP 代理列表（IPv4 + IPv6）
     FormUtils.createTextOption(s, 'ip_proxy', 'ip_proxy_hash', null,
-        _('Edit IP Proxy List'), FilePathUtils.getFilePath('ip_proxy'));
+        _('Edit IP Proxy List'), { resource: 'ip_proxy' });
 
     // 用户只编辑链内规则；表、集合、hook 和优先级在内部模板中管理。
     const selector = s.taboption('nftables', form.ListValue, '_rule_chain', null);
@@ -146,7 +134,7 @@ function createTextOptions(s: LuCI.form.AbstractSection, chains: FirewallChain[]
         selector.value(chain.name, chain.name);
         const hook = s.taboption('nftables', form.DummyValue, '_hook_' + chain.name.replace(/-/g, '_'), null);
         hook.renderWidget = function () {
-            // 只整理声明的展示方式；生成器仍直接使用共享配置中的原始声明。
+            // 只整理声明的展示方式；生成器仍直接使用后端定义的原始声明。
             const fields = chain.hook.match(/^type\s+(\S+)\s+hook\s+(\S+)\s+priority\s+([^;]+);\s*policy\s+(\S+);$/);
             const description = fields
                 ? `hook: ${fields[2]} · type: ${fields[1]} · priority: ${fields[3]} · policy: ${fields[4]}`
@@ -158,7 +146,7 @@ function createTextOptions(s: LuCI.form.AbstractSection, chains: FirewallChain[]
         };
         hook.depends('_rule_chain', chain.name);
         const editor = FormUtils.createTextOption(s, 'nftables', chain.name.replace(/-/g, '_') + '_hash', null, null,
-            FilePathUtils.getFilePath('firewall_rules') + '/' + chain.name + '.ut');
+            { resource: 'firewall_rule', section: chain.name });
         const renderEditor = editor.renderWidget;
         editor.renderWidget = function (...args: any[]) {
             const widget = renderEditor.apply(this, args) as HTMLElement;
@@ -175,7 +163,7 @@ function createTextOptions(s: LuCI.form.AbstractSection, chains: FirewallChain[]
     // 用户自定义启动脚本
     FormUtils.createTextOption(s, 'hook', 'nft_hook_hash', null,
         _('Executed after HiJpass attempts to load its generated nftables rules during firewall start or reload. Runs only when the generated rules file and this script exist; it may also run if loading the rules fails.'),
-        FilePathUtils.getFilePath('nft_hook'));
+        { resource: 'nft_hook' });
 }
 
 // 创建所有标签页

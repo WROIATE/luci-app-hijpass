@@ -76,79 +76,27 @@ test('CLI renders supplied input without runtime commands and rejects generate',
     assert.match(rejected.stderr, /unknown command/);
 });
 
-function fileUtils(sections, resolve) {
-    const writes = [];
-    const hashes = [];
-    const utils = loadTS('utils/feature/config/files.ts', {
-        fs: { exec_direct: resolve, write: async (path, data) => writes.push([path, JSON.parse(data)]) },
-        uci: { sections: () => sections, set_first: (...args) => hashes.push(args) },
-        '../../../enum/hijpass': { LuciFlied: { CONF_NAME: 'hijpass', PROXY_NODE_TYPE: 'proxy_node', SHUNT_SECTION_TYPE: 'shunt' } },
-        '../../base/files/paths': { FilePathUtils: { getProxyConfigFilePath: s => `/client/${s['.name']}.json`, getFilePath: () => '/shunt.json' } },
-        '../../base/luci/form': { FormUtils: { simpleHash: () => 123 } },
-    }).ConfigFileUtils;
-    return { utils, writes, hashes };
-}
-
-test('LuCI writes ucode output, preserves custom files and TLS when resolving chains', async () => {
-    for (const core of ['sing-box', 'xray']) {
-        const sections = [
-            { '.name': 'downstream', server: 'proxy.example.org', upstream_proxy_node: 'upstream' },
-            { '.name': 'custom', type: 'custom' },
-        ];
-        const calls = [];
-        const { utils, writes, hashes } = fileUtils(sections, async (...args) => {
-            calls.push(args);
-            return { address: '192.0.2.10' };
-        });
-        const outbound = core === 'sing-box'
-            ? { server: 'proxy.example.org', tls: { server_name: 'tls.example.org', insecure: false } }
-            : { settings: { address: 'proxy.example.org' }, streamSettings: { tlsSettings: { serverName: 'tls.example.org' } } };
-        const config = { outbounds: [outbound] };
-        await utils.writeGeneratedConfigs({ nodes: { downstream: config }, shunt: { route: { final: 'direct' } } });
-        assert.equal(calls[0][0], '/usr/lib/hijpass/network/network.sh');
-        assert.deepEqual(Array.from(calls[0][1]), ['resolve', 'proxy.example.org']);
-        assert.deepEqual(writes.map(w => w[0]), ['/client/downstream.json', '/shunt.json']);
-        const written = writes[0][1].outbounds[0];
-        if (core === 'sing-box') {
-            assert.equal(written.server, '192.0.2.10');
-            assert.equal(written.tls.server_name, 'tls.example.org');
-            assert.equal(written.tls.insecure, false);
-        } else {
-            assert.equal(written.settings.address, '192.0.2.10');
-            assert.equal(written.streamSettings.tlsSettings.serverName, 'tls.example.org');
-        }
-        assert.equal(hashes[0][2], 'shunt_hash');
-    }
-});
-
-test('failed address resolution writes no generated files', async () => {
-    const sections = [{ '.name': 'first' }, { '.name': 'second', server: 'bad.example.org', upstream_proxy_node: 'first' }];
-    const { utils, writes } = fileUtils(sections, async () => { throw new Error('DNS failed'); });
-    await assert.rejects(utils.writeGeneratedConfigs({ nodes: { first: {}, second: {} } }), /DNS failed/);
-    assert.deepEqual(writes, []);
-});
-
 test('Save & Apply consumes backend output before applying UCI and stops on generation failure', async () => {
     for (const fail of [false, true]) {
         const events = [];
         const generated = { nodes: {} };
         const handler = loadTS('utils/actions/save-apply/index.ts', {
             '../../../enum/hijpass': { LuciFlied: { CONF_NAME: 'hijpass', GLOBAL_SECTION_TYPE: 'hijpass' } },
-            uci: { get_first: () => '1', save: async () => events.push('save'), changes: async () => ({}) },
+            uci: { sections: () => [], get_first: () => '1', save: async () => events.push('save'), changes: async () => ({}) },
             ui: { changes: { apply: async () => events.push('apply') } },
             './node-file-cleanup': { NodeFileCleanupUtils: { cleanupChangedNodeFiles: async () => events.push('cleanup') } },
             '../../base/luci/notification': { NotificationUtils: { error: () => events.push('error') } },
-            '../../feature/config/backend': { GeneratedConfigUtils: { render: async () => {
-                events.push('render');
+            '../../base/luci/form': { FormUtils: { simpleHash: () => 0 } },
+            '../../backend': { Backend: { writeConfigs: async () => {
+                events.push('write');
                 if (fail) throw new Error('invalid configuration');
-                return generated;
+                return {};
             } } },
-            '../../feature/config/files': { ConfigFileUtils: { writeGeneratedConfigs: async value => { assert.equal(value, generated); events.push('write'); } } },
             '../../feature/shunt/georules': { GeoRuleUtils: { updateGeoRules: () => events.push('geo') } },
             './precheck': { PrecheckUtils: { runSaveApplyPrechecks: async () => true } },
         }).SaveApplyUtils.genHandleSaveApply();
         await handler.call({ handleSave: async () => events.push('form') }, {}, 1);
-        assert.deepEqual(events, fail ? ['form', 'render', 'error'] : ['form', 'render', 'write', 'geo', 'save', 'cleanup', 'apply']);
+        assert.deepEqual(events, fail ? ['form', 'write', 'error'] : ['form', 'write', 'geo', 'save', 'cleanup', 'apply']);
     }
 });
 

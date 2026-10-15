@@ -1,0 +1,100 @@
+#!/bin/sh
+
+# RPC 桥只分发已命名的业务方法；数据交给 ucode，系统操作交给各功能 Shell。
+. /usr/lib/hijpass/common.sh
+case "$1" in
+    list) hijpass_data "$HIJPASS_LIB/rpc/data.uc" list; exit $? ;;
+    call) method=$2 ;;
+    *) exit 1 ;;
+esac
+
+case "$method" in
+    firewall_chains|editor_read|editor_write|config_write|log_list|log_read|log_clear|log_settings|defaults)
+        hijpass_data "$HIJPASS_LIB/rpc/data.uc" call "$method"
+        exit $? ;;
+esac
+
+# jshn 解析参数，不对客户端输入使用 eval 或拼接 Shell 命令。
+json_load "$(cat)" || { hijpass_error 'invalid RPC request'; exit 0; }
+argument() {
+    json_get_type arg_type "$1"
+    case "$arg_type" in string|'') ;; *) hijpass_error "invalid RPC argument: $1"; exit 0 ;; esac
+    json_get_var "$1" "$1"
+}
+
+directory=$(mktemp -d /tmp/hijpass-rpc.XXXXXX) || exit 1
+trap 'rm -rf -- "$directory"' EXIT
+capture() {
+    "$@" >"$directory/stdout" 2>"$directory/stderr"
+    status=$?
+    json_init
+    json_add_int code "$status"
+    json_add_string stdout "$(cat "$directory/stdout")"
+    json_add_string stderr "$(cat "$directory/stderr")"
+    json_dump
+}
+# 已输出业务 JSON 的脚本保留原响应；没有 JSON 时才返回 RPC 错误。
+structured() {
+    "$@" >"$directory/stdout" 2>"$directory/stderr"
+    if [ -s "$directory/stdout" ]; then cat "$directory/stdout"
+    else hijpass_error "$(cat "$directory/stderr")"; fi
+}
+case "$method" in
+    service_restart) structured "$HIJPASS_LIB/rpc/jobs.sh" start restart ;;
+    firewall_reset) capture "$HIJPASS_LIB/firewall/firewall.sh" reset ;;
+    firewall_show) capture "$HIJPASS_LIB/firewall/firewall.sh" show ;;
+    cleanup_node)
+        argument kind; argument section; argument name
+        capture "$HIJPASS_LIB/maintenance/cleanup.sh" "$kind" "$section" "$name" ;;
+    network_connect)
+        argument url; argument timeout
+        structured "$HIJPASS_LIB/network/network.sh" connect "$url" "$timeout" ;;
+    network_ping)
+        argument port
+        structured "$HIJPASS_LIB/network/network.sh" ping "$port" ;;
+    rule_update) structured "$HIJPASS_LIB/rpc/jobs.sh" start rules ;;
+    rule_query)
+        argument keyword
+        capture "$HIJPASS_LIB/rules/update.sh" query "$keyword" ;;
+    rule_match)
+        argument keyword
+        capture "$HIJPASS_LIB/rules/route-match.sh" "$keyword" ;;
+    geo_lookup)
+        argument type; argument mode; argument keyword
+        case "$type:$mode" in geosite:list|geoip:list) flag=-l ;; geosite:expand|geoip:expand) flag=-e ;;
+            *) hijpass_error 'invalid Geo query'; exit 0 ;; esac
+        capture "$HIJPASS_LIB/rules/geoview.sh" "$flag" "$type" "$keyword" ;;
+    geo_query)
+        argument keyword
+        if "$HIJPASS_LIB/network/network.sh" iptype "$keyword" >/dev/null 2>&1; then type=geoip; else type=geosite; fi
+        capture "$HIJPASS_LIB/rules/geoview.sh" -l "$type" "$keyword" ;;
+    core_version|core_latest|core_update)
+        argument core
+        action=${method#core_}
+        case "$core" in xray|sing-box) ;;
+            *) hijpass_error 'invalid core action'; exit 0 ;; esac
+        if [ "$action" = update ]; then structured "$HIJPASS_LIB/rpc/jobs.sh" start "$core"
+        else structured "$HIJPASS_LIB/core/update.sh" "$action" "$core"; fi ;;
+    job_status|job_release)
+        argument id
+        structured "$HIJPASS_LIB/rpc/jobs.sh" "${method#job_}" "$id" ;;
+    trace_start)
+        json_get_type arg_type args
+        [ "$arg_type" = array ] || { hijpass_error 'invalid trace arguments'; exit 0; }
+        json_select args
+        json_get_keys keys
+        set --
+        for key in $keys; do
+            json_get_type arg_type "$key"
+            [ "$arg_type" = string ] && [ "$#" -lt 24 ] || { hijpass_error 'invalid trace argument'; exit 0; }
+            json_get_var value "$key"
+            set -- "$@" "$value"
+        done
+        capture "$HIJPASS_LIB/diagnostics/task.sh" start "$@" ;;
+    trace_status|trace_release)
+        argument id
+        if [ "$method" = trace_status ]; then structured "$HIJPASS_LIB/diagnostics/task.sh" status "$id"
+        else capture "$HIJPASS_LIB/diagnostics/task.sh" release "$id"; fi ;;
+    *) hijpass_error 'unknown RPC method' ;;
+esac
+exit 0

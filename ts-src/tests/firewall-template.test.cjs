@@ -4,8 +4,10 @@ const { test } = require('node:test');
 const vm = require('node:vm');
 const ts = require('typescript');
 const path = require('node:path');
-const definitionPath = '/usr/lib/hijpass/firewall/chains.json';
-const definitions = JSON.parse(readFileSync(path.join(__dirname, '../../root', definitionPath), 'utf8'));
+const definitions = [
+    { name: 'pre-filter', hook: 'type filter hook prerouting priority filter - 50; policy accept;', requires: [] },
+    { name: 'ordinary', hook: '', requires: [] },
+];
 
 function formFixture(chains = definitions) {
     const options = [], paths = [], reads = [];
@@ -24,7 +26,7 @@ function formFixture(chains = definitions) {
         E: (tag, attributes, children) => ({ tag, attributes, children }),
         require(name) {
             if (name === 'view') return { extend: value => value };
-            if (name === 'fs') return { read: async file => { reads.push(file); return JSON.stringify(chains); } };
+            if (name.endsWith('/backend')) return { Backend: { firewallChains: async () => { reads.push('firewallChains'); return chains; } } };
             if (name === 'uci') return { load: async () => {} };
             if (name === 'form') return { ListValue: 'selector', DummyValue: 'hook', TextValue: 'editor' };
             if (name.endsWith('/hijpass')) return { LuciFlied: { CONF_NAME: 'hijpass' } };
@@ -36,8 +38,6 @@ function formFixture(chains = definitions) {
                     return editor;
                 }
             } };
-            if (name.endsWith('/paths')) return { FilePathUtils: { getFilePath: option =>
-                option === 'firewall_rules' ? '/custom/chain-rules' : '/etc/hijpass/' + option } };
             if (name.endsWith('/firewall/form')) return { FirewallFormUtils: { createNftViewOption() {} } };
             if (name.endsWith('/save-apply/index')) return { SaveApplyUtils: { genHandleSaveApply() {} } };
             return {};
@@ -51,7 +51,7 @@ function formFixture(chains = definitions) {
 test('前端读取共享定义，选择器和编辑器无标题，hook 与规则按链关联展示', async () => {
     const f = formFixture();
     const loaded = await f.context.exports.default.load();
-    assert.deepEqual(f.reads, [definitionPath]);
+    assert.deepEqual(f.reads, ['firewallChains']);
     f.context.createTextOptions(f.section, loaded[2]);
     const selector = f.options.find(option => option.field === '_rule_chain');
     assert.equal(selector.title, null);
@@ -69,14 +69,14 @@ test('前端读取共享定义，选择器和编辑器无标题，hook 与规则
         editor.renderWidget();
         assert.equal(editor.input.attributes['aria-label'], chain.name);
         assert.ok(selector.values.includes(chain.name));
-        assert.ok(f.paths.includes('/custom/chain-rules/' + chain.name + '.ut'));
+        assert.ok(f.paths.some(editor => editor.resource === 'firewall_rule' && editor.section === chain.name));
         const hook = f.options.find(option => option.type === 'hook' && option.dependencies[0][1] === chain.name);
         assert.equal(hook.title, null);
         assert.equal(hook.renderWidget().tag, 'div');
         assert.equal(hook.renderWidget().attributes.class, 'cbi-value-description');
         assert.ok(hook.renderWidget().children.includes(chain.hook ? 'hook: ' : 'no hook'));
     }
-    assert.equal(f.paths.some(file => /\/usr\/lib\/|ruleset\.ut|sets\.ut|fw4-template/.test(file)), false);
+    assert.equal(f.paths.some(editor => 'path' in editor), false);
 });
 
 test('共享定义增加链和修改 hook 后，前端直接展示配置而非硬编码列表', async () => {
@@ -90,8 +90,11 @@ test('共享定义增加链和修改 hook 后，前端直接展示配置而非�
         'hook: forward · type: filter · priority: 10 · policy: accept');
 });
 
-test('共享定义在 LuCI ACL 中只有读取权限', () => {
+test('ACL 仅提供业务接口，不授予前端通用文件或命令权限', () => {
     const acl = JSON.parse(readFileSync(path.join(__dirname, '../../root/usr/share/rpcd/acl.d/luci-app-hijpass.json'), 'utf8'))['luci-app-hijpass'];
-    assert.deepEqual(acl.read.file[definitionPath], ['read']);
-    assert.equal(acl.write.file[definitionPath], undefined);
+    assert.ok(acl.read.ubus.hijpass.includes('firewall_chains'));
+    assert.equal(acl.read.file, undefined);
+    assert.equal(acl.write.file, undefined);
+    assert.equal(acl.read.ubus.hijpass.includes('editor_write'), false);
+    assert.ok(acl.write.ubus.hijpass.includes('editor_write'));
 });

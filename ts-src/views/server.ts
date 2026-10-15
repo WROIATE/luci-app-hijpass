@@ -1,3 +1,4 @@
+import { Backend } from "../utils/backend";
 import view from "view";
 import uci from "uci";
 import {LuciFlied} from "../enum/hijpass";
@@ -6,7 +7,6 @@ import {SaveApplyUtils} from "../utils/actions/save-apply/index";
 import {ServiceUtils} from "../utils/base/luci/service";
 import {FormUtils} from "../utils/base/luci/form";
 import {ValidationUtils} from "../utils/base/luci/validation";
-import {FilePathUtils} from "../utils/base/files/paths";
 import {UciUtils} from "../utils/base/luci/uci";
 
 const v = view.extend({
@@ -115,7 +115,7 @@ function createNodeNameOption(s: LuCI.form.AbstractSection) {
 function createCommandOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.Value, 'command', _('Run Command'),
         _('Server Run Command. Executed with root privileges.'));
-    o.default = '/usr/bin/xray -c {conf_path}';
+    o.load = async function (id: string) { return uci.get(LuciFlied.SERVER_CONF_NAME, id, 'command') || (await Backend.defaults()).command; };
     o.rmempty = false;
     o.modalonly = true;
     return o;
@@ -126,8 +126,7 @@ function createConfContentOption(s: LuCI.form.AbstractSection) {
     let o = s.option(form.TextValue, 'custom_conf', _('Configuration File Content'),
         _('Edit Configuration File'));
     o.modalonly = true;
-    const serverDir = FilePathUtils.getFilePath('server_dir', LuciFlied.SERVER_CONF_NAME);
-    FormUtils.setConfContentOptionMembers(o, LuciFlied.SERVER_CONF_NAME, serverDir);
+    FormUtils.setConfContentOptionMembers(o, LuciFlied.SERVER_CONF_NAME);
     return o;
 }
 

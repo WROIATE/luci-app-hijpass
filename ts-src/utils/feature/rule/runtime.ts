@@ -1,10 +1,10 @@
-import fs from "fs";
+import { Backend } from "../../backend";
 
 import { CORE_TYPE } from "../../../enum/hijpass";
 import { NotificationUtils } from "../../base/luci/notification";
 
 function loadCoreVersion(versionElement: HTMLElement, core: string) {
-    fs.exec_direct('/usr/lib/hijpass/core/update.sh', ['version', core], 'json')
+    Backend.coreAction('version', core)
         .then((result: any) => {
             versionElement.textContent = result?.version || _('Unknown');
         })
@@ -14,7 +14,7 @@ function loadCoreVersion(versionElement: HTMLElement, core: string) {
 }
 
 function loadLatestCoreVersion(versionElement: HTMLElement, core: string) {
-    fs.exec_direct('/usr/lib/hijpass/core/update.sh', ['latest', core], 'json')
+    Backend.coreAction('latest', core)
         .then((result: any) => {
             versionElement.textContent = result?.version || _('Unavailable');
         })
@@ -32,7 +32,7 @@ function updateCore(
     button.disabled = true;
     button.textContent = _('Updating...');
 
-    fs.exec_direct('/usr/lib/hijpass/core/update.sh', ['update', core], 'json')
+    Backend.coreAction('update', core)
         .then((result: any) => {
             if (result?.success) {
                 versionElement.textContent = result.version || _('Updated');

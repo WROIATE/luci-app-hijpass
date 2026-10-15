@@ -1,4 +1,4 @@
-import fs from "fs";
+import { Backend } from "../../backend";
 import form from "form";
 import uci from "uci";
 import ui from "ui";
@@ -14,11 +14,11 @@ import { findProxyDependencyCycleFrom } from "./validation";
 
 const PROTOCOL_CORES: CoreType[] = [CORE_TYPE.XRAY, CORE_TYPE.SING_BOX];
 
-function loadProxyLog(logPath: string, contentEl: HTMLElement) {
+function loadProxyLog(logId: string, contentEl: HTMLElement) {
     contentEl.textContent = _('Loading...');
-    fs.exec('/usr/bin/tail', ['-n', '200', logPath])
+    Backend.readLog(logId)
         .then((result: any) => {
-            let text = (result && result.stdout) ? result.stdout.trim() : '';
+            let text = result ? result.trim() : '';
             text = text.replace(/\x1b\[[0-9;]*m/g, '');
             contentEl.textContent = text || _('No Logs');
             contentEl.scrollTop = contentEl.scrollHeight;
@@ -407,12 +407,12 @@ const ProxyFormUtils = {
                     let contentEl = E('pre', {
                         style: 'max-height:500px;overflow:auto;padding:10px;border-radius:4px;white-space:pre;font-size:0.8em'
                     }, '') as HTMLElement;
-                    loadProxyLog(logPath, contentEl);
+                    loadProxyLog(LuciFlied.CONF_NAME + ':' + section_id, contentEl);
                     ui.showModal(name + ' - ' + _('Log'), [
                         E('div', { class: 'cbi-section' }, [contentEl]),
                         E('div', { class: 'right', style: 'display:flex;justify-content:flex-end;gap:10px' }, [
                             E('button', { class: 'btn cbi-button', click: ui.hideModal }, _('Close')),
-                            E('button', { class: 'btn cbi-button-action', click: function () { loadProxyLog(logPath, contentEl); } }, _('Refresh'))
+                            E('button', { class: 'btn cbi-button-action', click: function () { loadProxyLog(LuciFlied.CONF_NAME + ':' + section_id, contentEl); } }, _('Refresh'))
                         ])
                     ]);
                 }
@@ -432,7 +432,7 @@ const ProxyFormUtils = {
                     el.textContent = '...';
                     el.style.backgroundColor = '#1a6a8a';
                     el.style.borderColor = '#1a6a8a';
-                    fs.exec_direct('/usr/lib/hijpass/network/network.sh', ['ping', port], 'json')
+                    Backend.ping(port)
                         .then((res: any) => {
                             if (res && res.ms != null) {
                                 updateLatencyButton(el, res.ms);

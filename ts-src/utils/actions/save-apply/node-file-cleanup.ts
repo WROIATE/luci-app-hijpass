@@ -1,12 +1,11 @@
 import { LuciFlied } from "../../../enum/hijpass";
-import fs from "fs";
+import { Backend } from "../../backend";
 import uci from "uci";
-import { FilePathUtils } from "../../base/files/paths";
 
 async function cleanupChangedNodeFiles(changes: any) {
-    async function cleanup(type: string, sectionId: string, keepPath?: string) {
-        const args = keepPath ? [type, sectionId, keepPath] : [type, sectionId];
-        await fs.exec('/usr/lib/hijpass/maintenance/cleanup.sh', args);
+    async function cleanup(kind: string, section: string, name: string = '') {
+        const result = await Backend.cleanupNode(kind, section, name);
+        if (result.code !== 0) throw new Error(result.stderr || _('Configuration cleanup failed'));
     }
 
     if (changes?.hijpass) {
@@ -16,8 +15,8 @@ async function cleanupChangedNodeFiles(changes: any) {
             }
             if (change.length === 4 && change[0] === 'set' && change[2] === 'name') {
                 const section = uci.get(LuciFlied.CONF_NAME, change[1]);
-                const keepPath = section ? FilePathUtils.getProxyConfigFilePath(section) : undefined;
-                await cleanup('proxy', change[1], keepPath);
+                const name = section?.name || section?.['.name'] || '';
+                await cleanup('proxy', change[1], name);
             }
         }
     }
@@ -29,8 +28,8 @@ async function cleanupChangedNodeFiles(changes: any) {
             }
             if (change.length === 4 && change[0] === 'set' && change[2] === 'name') {
                 const section = uci.get(LuciFlied.SERVER_CONF_NAME, change[1]);
-                const keepPath = section ? FilePathUtils.getServerConfigFilePath(section) : undefined;
-                await cleanup('server', change[1], keepPath);
+                const name = section?.name || section?.['.name'] || '';
+                await cleanup('server', change[1], name);
             }
         }
     }

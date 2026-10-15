@@ -126,46 +126,6 @@ fi`);
     });
 });
 
-test('防火墙从共享定义读取新增链、hook 和条件，损坏定义不能覆盖旧规则', t => {
-    const f = fixture(t), target = path.join(f.runtime, 'firewall/chains.json');
-    const definitions = JSON.parse(fs.readFileSync(target, 'utf8'));
-    const ruleDirectory = path.join(f.directory, 'rules');
-    fs.cpSync(path.join(root, 'root/etc/hijpass/firewall'), ruleDirectory, { recursive: true });
-    // 配置新增链不要求修改生成器；requires 全部满足才渲染。
-    definitions.push({ name: 'additional-chain', hook: 'type filter hook forward priority 10; policy accept;', requires: ['proxyPort'] });
-    fs.writeFileSync(path.join(ruleDirectory, 'additional-chain.ut'), 'counter return\n');
-    const sections = [{ '.type': 'hijpass', firewall_rules: ruleDirectory },
-        { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp', acl_default_allow: '1' }];
-    // 调用真实 Shell 入口，网络采集失败也按退出码忽略，不解析无效快照。
-    f.patch('firewall/firewall.sh', '\nip -j ', `\n'${f.directory}/ip' -j `);
-    f.script('ip', 'exit 1'); f.script('ubus', 'exit 1'); f.script('fw4', 'exit 1');
-    withConfig(sections, config => {
-        fs.writeFileSync(path.join(config, 'dhcp'), 'config dnsmasq\n');
-        fs.writeFileSync(target, JSON.stringify(definitions));
-        const rendered = f.run('firewall/firewall.sh', ['generate', '--configdir', config]);
-        assert.equal(rendered.status, 0, rendered.stderr);
-        assert.match(rendered.stdout, /chain additional-chain \{\n        type filter hook forward priority 10; policy accept;/);
-        definitions.at(-1).requires = ['proxyLocal'];
-        fs.writeFileSync(target, JSON.stringify(definitions));
-        const disabled = f.run('firewall/firewall.sh', ['generate', '--configdir', config]);
-        assert.equal(disabled.status, 0, disabled.stderr);
-        assert.doesNotMatch(disabled.stdout, /chain additional-chain/);
-        // 拼错的条件即使排在未满足条件之后也不能被静默忽略。
-        definitions.at(-1).requires = ['proxyLocal', 'proxyLocla'];
-        const rules = path.join(f.directory, 'preserved.nft');
-        f.patch('firewall/firewall.sh', '/etc/hijpass/fw4-rules.nft', rules);
-        fs.writeFileSync(rules, 'old rules');
-        for (const invalid of [null, '{', '[]', JSON.stringify(definitions), JSON.stringify([definitions[0], definitions[0]])]) {
-            if (invalid === null) fs.unlinkSync(target); else fs.writeFileSync(target, invalid);
-            const failed = f.run('firewall/firewall.sh', ['reset', '--configdir', config]);
-            assert.equal(failed.status, 1);
-            assert.match(failed.stderr, /chain|condition/);
-            assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
-            fs.writeFileSync(target, JSON.stringify(definitions));
-        }
-    });
-});
-
 test('Chinadns 模板保留列表开关、默认 tag、上游和自定义域名的组合行为', t => {
     const f = fixture(t), configFile = path.join(f.directory, 'chinadns.conf');
     f.patch('service/dns.uc', '/etc/hijpass/chinadns-ng.conf', configFile);

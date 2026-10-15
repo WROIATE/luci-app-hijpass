@@ -1,0 +1,78 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const { test } = require('node:test');
+const ts = require('typescript');
+
+function backend(handler, clock = { now: 0 }) {
+    const source = fs.readFileSync(path.join(__dirname, '../utils/backend.ts'), 'utf8');
+    const calls = [];
+    const context = vm.createContext({ exports: {}, console,
+        Date: class extends Date { static now() { return clock.now; } },
+        window: { setTimeout(fn, ms) { clock.now += ms; fn(); } },
+        require(name) {
+            assert.equal(name, 'rpc');
+            return { declare: options => async (...args) => {
+                assert.equal(options.object, 'hijpass');
+                assert.equal(options.reject, true);
+                calls.push([options.method, args]);
+                return handler(options.method, args);
+            } };
+        },
+    });
+    vm.runInContext(ts.transpileModule(source, { compilerOptions: {
+        module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true,
+    } }).outputText, context);
+    return { api: context.exports.Backend, calls };
+}
+
+test('editors send resource identities and propagate backend failures', async () => {
+    const f = backend((method, args) => method === 'editor_read' ? { content: 'template' } : { error: 'write failed' });
+    assert.equal(await f.api.readEditor({ resource: 'firewall_rule', section: 'pre-filter' }), 'template');
+    assert.deepEqual(Array.from(f.calls[0][1]), ['firewall_rule', 'pre-filter', '']);
+    await assert.rejects(f.api.writeEditor({ resource: 'proxy_config', section: 'node', name: 'renamed' }, '{}'), /write failed/);
+    assert.deepEqual(Array.from(f.calls[1][1]), ['proxy_config', 'node', 'renamed', '{}']);
+});
+
+for (const code of [0, 7]) test(`long updates poll beyond the RPC limit, report exit ${code} and release results`, async () => {
+    const clock = { now: 0 };
+    const f = backend(method => {
+        if (method === 'rule_update') return { id: 'Abcd1234' };
+        if (method === 'job_release') return { ok: true };
+        assert.equal(method, 'job_status');
+        if (clock.now < 120000) return { running: true };
+        return { running: false, code, stdout: code ? '' : '{"success":true}', stderr: code ? 'download failed' : '' };
+    }, clock);
+    if (code) await assert.rejects(f.api.updateRules(), /download failed/);
+    else assert.equal((await f.api.updateRules()).success, true);
+    assert.equal(clock.now, 120000);
+    assert.equal(f.calls.at(-1)[0], 'job_release');
+});
+
+test('runtime TypeScript has no device filesystem paths or direct fs access', () => {
+    const base = path.join(__dirname, '..');
+    for (const folder of ['views', 'utils']) for (const name of fs.readdirSync(path.join(base, folder), { recursive: true })) {
+        if (!name.endsWith('.ts')) continue;
+        const source = fs.readFileSync(path.join(base, folder, name), 'utf8');
+        assert.doesNotMatch(source, /from\s+['"]fs['"]|\/(?:etc|usr|tmp)\//, folder + '/' + name);
+    }
+});
+
+test('rule-set references remain visible to form prechecks without parsing filenames', () => {
+    function load(file, require) {
+        const context = vm.createContext({ exports: {}, require });
+        const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        vm.runInContext(ts.transpileModule(source, { compilerOptions: {
+            module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true,
+        } }).outputText, context);
+        return context.exports;
+    }
+    const model = load('module/luci.ts', () => ({}));
+    const { ShuntUtils } = load('utils/feature/shunt/section.ts', name => name.endsWith('/module/luci') ? model : {});
+    const reference = 'rule-set:remote:https://example.org/list.srs';
+    const parsed = ShuntUtils.parseRuleList({ domainList: reference, ipList: '' });
+    assert.equal(parsed.containRuleSet(), true);
+    assert.equal(parsed.isEmpty('set'), false);
+    assert.deepEqual(Array.from(parsed.ruleSet), [reference]);
+});

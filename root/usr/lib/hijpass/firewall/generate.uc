@@ -57,6 +57,46 @@ function ipList(path, version) {
 	});
 }
 
+// ChainDefinition：name 对应链规则模板；hook 为基础链声明，普通链为空。
+// requires 列出 FirewallOptions 条件，全部满足才启用。生成与 RPC 共用此对象。
+export const definitions = [
+  {
+    "name": "pre-filter",
+    "hook": "type filter hook prerouting priority filter - 50; policy accept;",
+    "requires": []
+  },
+  {
+    "name": "out-route",
+    "hook": "type route hook output priority filter - 50; policy accept;",
+    "requires": ["proxyLocal"]
+  },
+  {
+    "name": "tproxy-shunt",
+    "hook": "",
+    "requires": []
+  },
+  {
+    "name": "tproxy-mark",
+    "hook": "",
+    "requires": []
+  },
+  {
+    "name": "proxy-port-filter",
+    "hook": "",
+    "requires": []
+  },
+  {
+    "name": "dns-forward",
+    "hook": "type nat hook prerouting priority dstnat - 1; policy accept;",
+    "requires": ["forwardPort"]
+  },
+  {
+    "name": "dns-forward-output",
+    "hook": "type nat hook output priority -101; policy accept;",
+    "requires": ["forwardPort", "proxyLocal"]
+  }
+];
+
 // FirewallOptions：端口为已校验整数，0 表示未启用；protocols 为 tcp/udp 数组。
 // wan/interfaces/excludedInterfaces 是设备名数组，macs/excludedMacs 是 MAC 数组。
 // proxyLocal/allowAll/useChnRoute/useChn/useGfw/domainSets 控制对应规则和集合。
@@ -124,17 +164,6 @@ export function generate(config, state, ruleDirectory) {
         die('legacy nft template: move chain rules to firewall_rules before enabling the firewall');
     if (type(ruleDirectory) != 'string' || !length(ruleDirectory)) die('firewall_rules directory is required');
     let values = options(config, state);
-    // ChainDefinition：name 对应同名 .ut；hook 是完整基础链声明，普通链为空。
-    // requires 列出 FirewallOptions 字段，全部为真才启用；空数组表示始终启用。
-    // LuCI 从同一个只读文件获取链列表和 hook，避免页面与生成结果各自维护。
-    let definitions;
-    try {
-        let source = fs.readfile('/usr/lib/hijpass/firewall/chains.json');
-        if (type(source) != 'string') die('file is unreadable');
-        definitions = json(source);
-    }
-    catch (e) { die(`firewall chain definitions: ${e.message}`); }
-    if (type(definitions) != 'array' || !length(definitions)) die('firewall chain definitions must be a non-empty array');
     let chains = [], names = {};
     for (let chain in definitions) {
         if (type(chain) != 'object' || type(chain.name) != 'string' || !match(chain.name, /^[A-Za-z][A-Za-z0-9_-]*$/) ||

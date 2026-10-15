@@ -14,14 +14,6 @@ import { UciUtils } from "../../base/luci/uci";
 type RuleListSource = Pick<ShuntRouteRule, 'domainList' | 'ipList'>
     & Partial<Pick<ShuntRouteRule, 'network' | 'protocol' | 'port' | 'portRange'>>;
 
-function parseRuleSetPath(line: string, type: string) {
-    let pathOrUrl = line.substring(type === 'remote' ? 16 : 15);
-    let filename = pathOrUrl.split('/').pop();
-    let tag = filename.substring(0, filename.lastIndexOf('.')) || filename;
-    let format = (type === 'remote' ? pathOrUrl : filename).endsWith('srs') ? 'binary' : 'source';
-    return { tag: tag, type: type, format: format, pathOrUrl: pathOrUrl }
-}
-
 const ShuntUtils = {
     getShuntSection: function () {
         let shuntSection = new ShuntSection();
@@ -122,9 +114,8 @@ const ShuntUtils = {
 
                 // 处理rule-set（域名和IP通用）
                 if (line.startsWith('rule-set:')) {
-                    let type = line.startsWith('rule-set:remote:') ? 'remote' : 'local';
-                    let ruleSet = parseRuleSetPath(line, type);
-                    result.ruleSet.push(ruleSet);
+                    // 预检只记录是否存在规则集引用，路径、格式和 tag 交给后端解析。
+                    result.ruleSet.push(line);
                     continue;
                 }
 
@@ -156,9 +147,8 @@ const ShuntUtils = {
 
                 // 处理rule-set（域名和IP通用）
                 if (line.startsWith('rule-set:')) {
-                    let type = line.startsWith('rule-set:remote:') ? 'remote' : 'local';
-                    let ruleSet = parseRuleSetPath(line, type);
-                    result.ruleSet.push(ruleSet);
+                    // 预检只记录是否存在规则集引用，路径、格式和 tag 交给后端解析。
+                    result.ruleSet.push(line);
                     continue;
                 }
 

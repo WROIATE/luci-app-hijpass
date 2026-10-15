@@ -1,8 +1,7 @@
 import { LuciFlied, ShuntTag } from "../../../enum/hijpass";
-import fs from "fs";
+import { Backend, Editor } from "../../backend";
 import form from "form";
 import uci from "uci";
-import { FilePathUtils } from "../files/paths";
 
 const FormUtils = {
     setAnonymousGridSectionMembers: function (section: any) {
@@ -38,10 +37,10 @@ const FormUtils = {
         return hash;
     },
 
-    setEditorOptionMembers: function (o: LuCI.form.TextValue, filePath: string, fieldName: string) {
+    setEditorOptionMembers: function (o: LuCI.form.TextValue, editor: Editor, fieldName: string) {
         o.rows = 30;
         o.load = function (_) {
-            return fs.trimmed(filePath);
+            return Backend.readEditor(editor).then(content => content.trim());
         };
 
         async function writeFile(sectionId: string, formvalue?: string) {
@@ -50,8 +49,8 @@ const FormUtils = {
             if (currentHash === oldHash) {
                 return
             }
-            uci.set(LuciFlied.CONF_NAME, sectionId, fieldName, currentHash)
-            await fs.write(filePath, (formvalue || '').trim().replace(/\r\n/g, '\n') + '\n');
+            await Backend.writeEditor(editor, formvalue || '');
+            uci.set(LuciFlied.CONF_NAME, sectionId, fieldName, currentHash);
         }
 
         o.write = writeFile
@@ -64,47 +63,43 @@ const FormUtils = {
     setConfContentOptionMembers: function (
         o: LuCI.form.TextValue,
         confName: string,
-        dirPath: string,
     ) {
         o.monospace = true;
         o.rows = 20;
 
         o.load = async function (section_id: string) {
-            return L.resolveDefault(fs.read(FilePathUtils.getNodeConfigFilePath(confName, dirPath, section_id)), '');
+            return Backend.readEditor({ resource: confName === LuciFlied.SERVER_CONF_NAME ? 'server_config' : 'proxy_config', section: section_id });
         };
         o.write = async function (section_id: string, value: string) {
-            const content = FilePathUtils.normalizeFileContent(value);
-            await fs.write(FilePathUtils.getNodeConfigFilePath(confName, dirPath, section_id, this), content);
+            const text = (value || '').trim().replace(/\r\n/g, '\n');
+            const content = text ? text + '\n' : '';
+            await Backend.writeEditor({ resource: confName === LuciFlied.SERVER_CONF_NAME ? 'server_config' : 'proxy_config',
+                section: section_id, name: this.section.formvalue(section_id, 'name') || uci.get(confName, section_id, 'name') || section_id }, content);
             uci.set(confName, section_id, 'custom_conf_hash', String(FormUtils.simpleHash(content)));
         };
         o.remove = async function (section_id: string) {
-            await fs.write(FilePathUtils.getNodeConfigFilePath(confName, dirPath, section_id, this), '');
+            await Backend.writeEditor({ resource: confName === LuciFlied.SERVER_CONF_NAME ? 'server_config' : 'proxy_config',
+                section: section_id, name: this.section.formvalue(section_id, 'name') || uci.get(confName, section_id, 'name') || section_id }, '');
             uci.set(confName, section_id, 'custom_conf_hash', '');
         };
     },
 
     createTextOption: function (s: LuCI.form.AbstractSection, tabName: string,
-        fieldName: string, title: string, description: string, filePath: string) {
+        fieldName: string, title: string, description: string, editor: Editor) {
         let o = s.taboption(tabName, form.TextValue, fieldName, title, description);
-        FormUtils.setEditorOptionMembers(o, filePath, fieldName);
+        FormUtils.setEditorOptionMembers(o, editor, fieldName);
         return o;
     },
 
     createLogFlagOption: function (s: LuCI.form.AbstractSection, conf_type: string, tab: string) {
-        let log_dir = uci.get_first(conf_type, conf_type, 'log_dir');
-
         let o = tab ? s.taboption(tab, form.Flag, 'log_enabled', _('Record Logs'))
             : s.option(form.Flag, 'log_enabled', _('Record Logs'));
         o.modalonly = true;
-        o.write = function (section_id: string, value: string) {
-            let log_file = 'shunt.log'
-            let name = uci.get(conf_type, section_id, 'name');
-            if (name) {
-                log_file = name + '-' + section_id + '.log'
-            }
-
-            uci.set(conf_type, section_id, 'log_path', log_dir + '/' + log_file);
-        }
+        o.write = async function (section_id: string) {
+            const name = this.section.formvalue(section_id, 'name') || uci.get(conf_type, section_id, 'name') || '';
+            const settings = await Backend.logSettings(conf_type, section_id, name);
+            uci.set(conf_type, section_id, 'log_path', settings.path);
+        };
         o.remove = function (section_id: string) {
             uci.unset(conf_type, section_id, 'log_path');
         }

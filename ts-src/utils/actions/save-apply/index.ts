@@ -3,8 +3,8 @@ import uci from "uci";
 import ui from "ui";
 import { NodeFileCleanupUtils } from "./node-file-cleanup";
 import { NotificationUtils } from "../../base/luci/notification";
-import { GeneratedConfigUtils } from "../../feature/config/backend";
-import { ConfigFileUtils } from "../../feature/config/files";
+import { Backend } from "../../backend";
+import { FormUtils } from "../../base/luci/form";
 import { GeoRuleUtils } from "../../feature/shunt/georules";
 import { PrecheckUtils } from "./precheck";
 
@@ -28,8 +28,9 @@ const SaveApplyUtils = {
                     return;
                 }
 
-                const generated = await GeneratedConfigUtils.render();
-                await ConfigFileUtils.writeGeneratedConfigs(generated);
+                const written = await Backend.writeConfigs(JSON.stringify(uci.sections(LuciFlied.CONF_NAME, undefined)));
+                if (written.shunt !== undefined) uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE,
+                    'shunt_hash', String(FormUtils.simpleHash(written.shunt)));
                 GeoRuleUtils.updateGeoRules();
 
                 await uci.save();

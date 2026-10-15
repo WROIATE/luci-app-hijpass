@@ -8,7 +8,7 @@ import {ShuntUtils} from "../utils/feature/shunt/section";
 import {CORE_TYPE, FIREWALL_DNS_FORWARD, HijpassValues, LuciFlied} from "../enum/hijpass";
 import {FirewallDnsForwardUtils} from "../utils/feature/firewall/dns-forward";
 import form from "form";
-import fs from "fs";
+import { Backend } from "../utils/backend";
 import view from 'view';
 import uci from 'uci';
 
@@ -255,8 +255,7 @@ function createGeoRuleQuery(
                 return;
             }
 
-            const result = await fs.exec('/usr/lib/hijpass/rules/geoview.sh',
-                [isTagQuery ? '-e' : '-l', queryType, queryValue]);
+            const result = await Backend.lookupGeo(queryType, queryValue, isTagQuery ? 'expand' : 'list');
             if (result.code !== 0) {
                 throw new Error(result.stderr || _('Query Failed'));
             }

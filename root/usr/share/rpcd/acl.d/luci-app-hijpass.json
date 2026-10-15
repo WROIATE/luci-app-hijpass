@@ -2,31 +2,33 @@
   "luci-app-hijpass": {
     "description": "Grant access to hijpass configurations",
     "read": {
-      "cgi-io": [
-        "exec"
-      ],
       "uci": [
         "hijpass",
         "hijserver",
         "dhcp"
       ],
-      "file": {
-        "/usr/lib/hijpass/firewall/chains.json": [
-          "read"
-        ],
-        "/etc/hijpass/*": [
-          "read"
-        ],
-        "/tmp/hijpass/log/*.log": [
-          "read"
-        ],
-        "/tmp/hijserver/log/*.log": [
-          "read"
-        ]
-      },
       "ubus": {
         "service": [
           "list"
+        ],
+        "hijpass": [
+          "firewall_chains",
+          "editor_read",
+          "log_list",
+          "log_read",
+          "log_settings",
+          "defaults",
+          "firewall_show",
+          "network_connect",
+          "network_ping",
+          "rule_query",
+          "rule_match",
+          "geo_lookup",
+          "geo_query",
+          "trace_status",
+          "core_version",
+          "core_latest",
+          "job_status"
         ]
       }
     },
@@ -35,141 +37,23 @@
         "hijpass",
         "hijserver"
       ],
-      "file": {
-        "/etc/hijpass/*": [
-          "write"
-        ],
-        "/tmp/hijpass/log/*.log": [
-          "write"
-        ],
-        "/tmp/hijserver/log/*.log": [
-          "write"
-        ],
-        "/etc/init.d/hijpass restart": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/firewall/firewall.sh reset": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/firewall/firewall.sh show": [
-          "exec"
-        ],
-        "/usr/bin/tail -n [0-9]* /tmp/hijpass/log/*.log": [
-          "exec"
-        ],
-        "/usr/bin/tail -n [0-9]* /tmp/hijserver/log/*.log": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/rules/update.sh update": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/rules/update.sh query [A-Za-z0-9._:/-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/network/network.sh iptype [A-Za-z0-9._:/-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/network/network.sh connect https://www.baidu.com [0-9]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/network/network.sh connect https://www.google.com/ncr [0-9]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/network/network.sh connect https://github.com [0-9]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/network/network.sh connect https://www.bilibili.com [0-9]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/network/network.sh port [0-9]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/network/network.sh ping [0-9]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/rules/geoview.sh -e geosite [A-Za-z0-9_.:,/!-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/rules/geoview.sh -e geoip [A-Za-z0-9_.:,/!-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/rules/geoview.sh -l geosite [A-Za-z0-9._:/-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/rules/geoview.sh -l geoip [A-Za-z0-9._:/-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/rules/route-match.sh [A-Za-z0-9._:/-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/maintenance/cleanup.sh proxy [A-Za-z0-9_-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/maintenance/cleanup.sh proxy [A-Za-z0-9_-]* /etc/hijpass/client/*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/maintenance/cleanup.sh server [A-Za-z0-9_-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/maintenance/cleanup.sh server [A-Za-z0-9_-]* /etc/hijpass/server/*": [
-          "exec"
-        ],
-        "/bin/cat /proc/net/arp": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/core/update.sh version sing-box": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/core/update.sh version xray": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/core/update.sh latest sing-box": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/core/update.sh latest xray": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/core/update.sh update sing-box": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/core/update.sh update xray": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -X [A-Z]* [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -X [A-Z]* -v [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -X [A-Z]* -p -i [A-Za-z0-9_.:@-]* [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -X [A-Z]* -p -i [A-Za-z0-9_.:@-]* -v [A-Za-z0-9._:/?&=%#~+\\[\\]-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]* -v": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]* -p -i [A-Za-z0-9_.:@-]*": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh start -t [0-9]* -c [A-Fa-f0-9:.]* -n [a-z]* -P [a-z0-9]* -p -i [A-Za-z0-9_.:@-]* -v": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh status [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]": [
-          "exec"
-        ],
-        "/usr/lib/hijpass/diagnostics/task.sh release [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]": [
-          "exec"
-        ]
-      },
       "ubus": {
         "hijpass-config": [
           "render",
           "validate"
+        ],
+        "hijpass": [
+          "editor_write",
+          "config_write",
+          "log_clear",
+          "cleanup_node",
+          "service_restart",
+          "firewall_reset",
+          "rule_update",
+          "core_update",
+          "trace_start",
+          "trace_release",
+          "job_release"
         ]
       }
     }

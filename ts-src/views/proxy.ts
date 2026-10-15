@@ -1,3 +1,4 @@
+import { Backend } from "../utils/backend";
 import view from "view";
 import uci from "uci";
 import { CORE_TYPE, LuciFlied, HijpassValues, PROXY_TYPE, ProxyType } from "../enum/hijpass";
@@ -6,7 +7,6 @@ import { SaveApplyUtils } from "../utils/actions/save-apply/index";
 import { ServiceUtils } from "../utils/base/luci/service";
 import { FormUtils } from "../utils/base/luci/form";
 import { ValidationUtils } from "../utils/base/luci/validation";
-import { FilePathUtils } from "../utils/base/files/paths";
 import { UciUtils } from "../utils/base/luci/uci";
 import { ProxyFormUtils } from "../utils/feature/proxy/form";
 import { ProxyChainUtils } from "../utils/feature/proxy/chain";
@@ -155,17 +155,17 @@ function createCustomProxyOptions(s: LuCI.form.AbstractSection) {
     // 运行命令，{conf_path} 为配置文件路径占位符
     let cmdOpt = s.option(form.Value, 'command', _('Run Command'),
         _('Proxy Run Command'));
-    cmdOpt.default = '/usr/bin/xray -c {conf_path}';
+    cmdOpt.load = async function (id: string) { return uci.get(LuciFlied.CONF_NAME, id, 'command') || (await Backend.defaults()).command; };
     cmdOpt.rmempty = false;
     cmdOpt.modalonly = true;
     cmdOpt.depends('core', CORE_TYPE.CUSTOM);
 
-    // 配置文件内容编辑器，路径自动生成为 $client_dir/$name-$section_id.json
+    // 配置位置和命名由后端根据节点标识解析。
     let confOpt = s.option(form.TextValue, 'custom_conf', _('Configuration File Content'),
         _('Edit Configuration File'));
     confOpt.modalonly = true;
     confOpt.depends('core', CORE_TYPE.CUSTOM);
-    FormUtils.setConfContentOptionMembers(confOpt, LuciFlied.CONF_NAME, FilePathUtils.getFilePath('client_dir'));
+    FormUtils.setConfContentOptionMembers(confOpt, LuciFlied.CONF_NAME);
 }
 
 /**

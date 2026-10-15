@@ -1,4 +1,4 @@
-import fs from "fs";
+import { Backend } from "../../backend";
 
 type RuleUpdateStatus = 'success' | 'error' | 'neutral';
 type RuleUpdateResult = { success?: boolean };
@@ -6,7 +6,7 @@ type RuleUpdateResult = { success?: boolean };
 function updateRuleFile(statusElement: HTMLElement, updateButton: HTMLButtonElement) {
     updateButton.disabled = true;
     updateUpdateStatus(statusElement, _('Updating Rule Files'), 'neutral');
-    fs.exec_direct('/usr/lib/hijpass/rules/update.sh', ['update'], 'json')
+    Backend.updateRules()
         .then(function (result: RuleUpdateResult) {
             if (result?.success) {
                 updateUpdateStatus(statusElement, _('Rule Files Updated'), 'success');
@@ -64,28 +64,24 @@ function performQuery(
 
 function queryDomain(keyword: string, outputElement: HTMLTextAreaElement, statusElement: HTMLElement) {
     clearQuery(outputElement)
-    fs.exec('/usr/lib/hijpass/network/network.sh', ['iptype', keyword])
-        .then(function (result) {
-            const geoType = result.code === 0 ? 'geoip' : 'geosite';
-            return fs.exec('/usr/lib/hijpass/rules/geoview.sh', ['-l', geoType, keyword])
-                .then(setOutput(outputElement, statusElement, '# ' + geoType + '\n'));
-        })
-        .catch(setError(statusElement))
-    fs.exec('/usr/lib/hijpass/rules/update.sh', ['query', keyword])
+    Backend.queryGeo(keyword)
+        .then(setOutput(outputElement, statusElement, _('# Geo Rules\n')))
+        .catch(setError(statusElement));
+    Backend.queryRules(keyword)
         .then(setOutput(outputElement, statusElement, _('# Local Rule Files\n')))
         .catch(setError(statusElement));
 }
 
 function queryShunt(keyword: string, outputElement: HTMLTextAreaElement, statusElement: HTMLElement) {
     clearQuery(outputElement)
-    fs.exec('/usr/lib/hijpass/rules/route-match.sh', [keyword])
+    Backend.matchRule(keyword)
         .then(setOutput(outputElement, statusElement, _('# Shunt Rules\n')))
         .catch(setError(statusElement))
 }
 
 function queryGeoTag(keyword: string, geoType: string, outputElement: HTMLTextAreaElement, statusElement: HTMLElement) {
     clearQuery(outputElement)
-    fs.exec('/usr/lib/hijpass/rules/geoview.sh', ['-e', geoType, keyword])
+    Backend.lookupGeo(geoType, keyword, 'expand')
         .then(function (result) {
             if (result.code !== 0) {
                 throw new Error(result.stderr || _('Query Failed'));

@@ -82,7 +82,7 @@ export class RuleDTO {
     portRange: string[];
     ipVersion?: 4 | 6;
 
-    ruleSet: RuleSetDTO[]; // 规则集合
+    ruleSet: string[]; // 原始规则集引用，仅用于前端预检；路径和格式由后端解析
     geoIp: string[];
     geoSite: string[];
 
@@ -139,12 +139,7 @@ export interface ShuntRouteRuleVariant {
     ipVersion?: 4 | 6;
 }
 
-export interface RuleSetDTO {
-    tag: string;
-    type: string;
-    format: string;
-    pathOrUrl: string;
-}
+
 
 export interface CoreAdapter {
     genShuntConf: () => {}

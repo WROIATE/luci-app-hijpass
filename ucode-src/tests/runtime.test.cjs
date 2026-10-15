@@ -20,7 +20,7 @@ function invoke(request, env) {
         script(directory, 'uci', 'printf "%s\\n" "$CLEANUP_TEST_DIRECTORY"');
         try {
             return runShell('root/usr/lib/hijpass/maintenance/cleanup.sh',
-                [request.kind, request.id, request.keep || ''],
+                [request.kind, request.id, request.name || ''],
                 { env: { ...process.env, PATH: directory + ':' + process.env.PATH, CLEANUP_TEST_DIRECTORY: target } });
         } finally { fs.rmSync(directory, { recursive: true, force: true }); }
     }
@@ -245,7 +245,7 @@ test('subprocess arguments and connection JSON survive quotes and reject malform
 test('file cleanup matches exact section suffix and log truncation keeps the last 30000 lines', t => {
     const directory = fixture(t), keep = path.join(directory, 'new-a.json');
     for (const name of ['old-a.json', 'new-a.json', 'other-aa.json']) fs.writeFileSync(path.join(directory, name), name);
-    value({ action: 'cleanup', sections: [{ ...global, client_dir: directory }], kind: 'proxy', id: 'a', keep });
+    value({ action: 'cleanup', sections: [{ ...global, client_dir: directory }], kind: 'proxy', id: 'a', name: 'new' });
     assert.deepEqual(fs.readdirSync(directory).sort(), ['new-a.json', 'other-aa.json']);
     const log = path.join(directory, 'service.log'); fs.writeFileSync(log, Array.from({ length: 30005 }, (_, i) => i + '\n').join(''));
     value({ action: 'clean-log', sections: [{ log_path: log }], operation: 'hijpass' });

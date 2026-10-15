@@ -5,7 +5,6 @@ import {SaveApplyUtils} from "../utils/actions/save-apply/index";
 import {ServiceUtils} from "../utils/base/luci/service";
 import {FormUtils} from "../utils/base/luci/form";
 import {ValidationUtils} from "../utils/base/luci/validation";
-import {FilePathUtils} from "../utils/base/files/paths";
 import {FIREWALL_DNS_FORWARD, LuciFlied} from "../enum/hijpass";
 import {FirewallDnsForwardUtils} from "../utils/feature/firewall/dns-forward";
 
@@ -128,7 +127,7 @@ const v = view.extend({
         // Hook 脚本编辑（启动传 start，停止传 stop，路径从 UCI hijpass.dns_hook 读取）
         FormUtils.createTextOption(s, 'dns_hook', 'dns_hook_hash', null,
             _('Edit DNS Hook Script'),
-            FilePathUtils.getFilePath('dns_hook'));
+            { resource: 'dns_hook' });
 
         // 域名直连列表（仅 chinadns-ng 时通过 subsection 显示）
         let oDomainDirect = s.taboption('domain_direct', form.SectionValue, '_domain_direct',
@@ -140,7 +139,7 @@ const v = view.extend({
         FormUtils.setEditorOptionMembers(
             ssDirect.option(form.TextValue, 'domain_direct_hash', null,
                 _('Edit Domain Direct List')),
-            FilePathUtils.getFilePath('domain_direct'), 'domain_direct_hash');
+            { resource: 'domain_direct' }, 'domain_direct_hash');
 
         // 域名代理列表（仅 chinadns-ng 时通过 subsection 显示）
         let oDomainProxy = s.taboption('domain_proxy', form.SectionValue, '_domain_proxy',
@@ -152,7 +151,7 @@ const v = view.extend({
         FormUtils.setEditorOptionMembers(
             ssProxy.option(form.TextValue, 'domain_proxy_hash', null,
                 _('Edit Domain Proxy List')),
-            FilePathUtils.getFilePath('domain_proxy'), 'domain_proxy_hash');
+            { resource: 'domain_proxy' }, 'domain_proxy_hash');
 
         return m.render();
     }

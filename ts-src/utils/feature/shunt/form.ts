@@ -1,9 +1,8 @@
-import fs from "fs";
+import { Backend } from "../../backend";
 import form from "form";
 import uci from "uci";
 import ui from "ui";
 import { CORE_TYPE, LuciFlied, ShuntTag } from "../../../enum/hijpass";
-import { FilePathUtils } from "../../base/files/paths";
 import { FormUtils } from "../../base/luci/form";
 import { NotificationUtils } from "../../base/luci/notification";
 import { GeneratedConfigUtils } from "../config/backend";
@@ -35,16 +34,16 @@ const ShuntFormUtils = {
         o.rows = 30;
         o.monospace = true;
         o.load = async function (_: string) {
-            return L.resolveDefault(fs.read(FilePathUtils.getFilePath('shunt_conf')), '');
+            return Backend.readEditor({ resource: 'shunt_conf' });
         };
         o.write = async function (sectionId: string, value: string) {
             const content = (value || '').trim().replace(/\r\n/g, '\n');
-            await fs.write(FilePathUtils.getFilePath('shunt_conf'), content ? content + '\n' : '');
+            await Backend.writeEditor({ resource: 'shunt_conf' }, content);
             uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_hash', String(FormUtils.simpleHash(content)));
         };
         o.remove = async function (sectionId: string) {
             if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') !== 'tmpl') {
-                await fs.write(FilePathUtils.getFilePath('shunt_conf'), '');
+                await Backend.writeEditor({ resource: 'shunt_conf' }, '');
                 uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_hash', '-1');
             }
         };

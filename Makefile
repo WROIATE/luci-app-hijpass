@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-hijpass
 PKG_VERSION:=26.9.6
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
 

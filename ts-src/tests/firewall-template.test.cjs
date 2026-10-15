@@ -72,8 +72,9 @@ test('前端读取共享定义，选择器和编辑器无标题，hook 与规则
         assert.ok(f.paths.includes('/custom/chain-rules/' + chain.name + '.ut'));
         const hook = f.options.find(option => option.type === 'hook' && option.dependencies[0][1] === chain.name);
         assert.equal(hook.title, null);
-        assert.equal(hook.renderWidget().tag, 'code');
-        assert.equal(hook.renderWidget().children, chain.hook || 'Regular chain (no hook)');
+        assert.equal(hook.renderWidget().tag, 'div');
+        assert.equal(hook.renderWidget().attributes.class, 'cbi-value-description');
+        assert.ok(hook.renderWidget().children.includes(chain.hook ? 'hook: ' : 'no hook'));
     }
     assert.equal(f.paths.some(file => /\/usr\/lib\/|ruleset\.ut|sets\.ut|fw4-template/.test(file)), false);
 });
@@ -85,7 +86,8 @@ test('共享定义增加链和修改 hook 后，前端直接展示配置而非�
     f.context.createTextOptions(f.section, loaded[2]);
     assert.equal(f.options.find(option => option.field === '_rule_chain').load(), 'additional-chain');
     assert.equal(f.controls.filter(option => option.tab === 'nftables').length, 1);
-    assert.equal(f.options.find(option => option.type === 'hook').renderWidget().children, chains[0].hook);
+    assert.equal(f.options.find(option => option.type === 'hook').renderWidget().children,
+        'hook: forward · type: filter · priority: 10 · policy: accept');
 });
 
 test('共享定义在 LuCI ACL 中只有读取权限', () => {

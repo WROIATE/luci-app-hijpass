@@ -146,8 +146,15 @@ function createTextOptions(s: LuCI.form.AbstractSection, chains: FirewallChain[]
         selector.value(chain.name, chain.name);
         const hook = s.taboption('nftables', form.DummyValue, '_hook_' + chain.name.replace(/-/g, '_'), null);
         hook.renderWidget = function () {
-            return E('code', { style: 'white-space:normal;overflow-wrap:anywhere' },
-                chain.hook || _('Regular chain (no hook)'));
+            // 只整理声明的展示方式；生成器仍直接使用共享配置中的原始声明。
+            const fields = chain.hook.match(/^type\s+(\S+)\s+hook\s+(\S+)\s+priority\s+([^;]+);\s*policy\s+(\S+);$/);
+            const description = fields
+                ? `hook: ${fields[2]} · type: ${fields[1]} · priority: ${fields[3]} · policy: ${fields[4]}`
+                : chain.hook || _('Regular chain (no hook)');
+            return E('div', {
+                class: 'cbi-value-description',
+                style: 'margin:0;opacity:.75;line-height:1.6;overflow-wrap:anywhere',
+            }, description);
         };
         hook.depends('_rule_chain', chain.name);
         const editor = FormUtils.createTextOption(s, 'nftables', chain.name.replace(/-/g, '_') + '_hash', null, null,

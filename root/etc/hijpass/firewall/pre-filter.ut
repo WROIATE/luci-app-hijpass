@@ -19,13 +19,13 @@
 /** @global {RuleOptions} options 由 generate.uc 注入的已校验字段。 */
 %}
 {# 本文件只包含 pre-filter 链内规则；链声明、hook 和优先级由内部模板负责。 -#}
-# 过滤来源非本地内网的请求
-# fib saddr type != local iif != br-lan counter return
+{# 过滤来源非本地内网的请求 -#}
+{# fib saddr type != local iif != br-lan counter return -#}
 
-# 过滤访问本地的请求
+{# 过滤访问本地的请求 -#}
 fib daddr type local counter return
 
-# WAN 入站流量不参与透明代理
+{# WAN 入站流量不参与透明代理 -#}
 {% if (length(options.wan)): %}
 iifname { {{ options.wanNames }} } counter return
 {% endif %}
@@ -49,27 +49,27 @@ iif { {{ options.excludedInterfaceNames }} } counter return
 ether saddr { {{ join(', ', options.excludedMacs) }} } counter return
 {% endif %}
 
-# 过滤回包
+{# 过滤回包 -#}
 ct direction reply counter return
 
-# 不满足代理协议，返回原链
+{# 不满足代理协议，返回原链 -#}
 meta l4proto != { {{ join(', ', options.protocols) }} } counter return
 
-# 新连接设置代理、分流标记
+{# 新连接设置代理、分流标记 -#}
 ct state new,related counter jump tproxy-shunt
 
-# 未标记连接，返回原链
+{# 未标记连接，返回原链 -#}
 ct mark != { {{ options.proxyMark }}, {{ options.shuntMark }} } counter return
 
-# 仅代理常用端口
+{# 仅代理常用端口 -#}
 counter jump proxy-port-filter
 
-# 代理标记，通过代理节点进行透明代理
+{# 代理标记，通过代理节点进行透明代理 -#}
 {% if (options.proxyPort): %}
 meta l4proto { {{ join(', ', options.protocols) }} } ct mark {{ options.proxyMark }} tproxy to :{{ options.proxyPort }} meta mark set {{ options.proxyMark }} counter accept
 {% endif %}
 
-# 分流、代理标记，通过分流节点进行透明代理
+{# 分流、代理标记，通过分流节点进行透明代理 -#}
 {% if (options.shuntPort): %}
 meta l4proto { {{ join(', ', options.protocols) }} } ct mark { {{ options.proxyMark }}, {{ options.shuntMark }} } tproxy to :{{ options.shuntPort }} meta mark set {{ options.proxyMark }} counter
 {% endif %}

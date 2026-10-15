@@ -122,6 +122,7 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
                 { '.type': 'shunt', enabled: '1', dns_listen_port: '10153' }] });
         assert.match(result, /meta l4proto != \{ tcp, udp \}/);
         assert.doesNotMatch(result, /\bdefine\b|\$[A-Z_]+/);
+        assert.doesNotMatch(result, /^\s*#/m);
         assert.doesNotMatch(result, /elements = \{\s*\}/);
         assert.equal(result.includes('chain dns-forward {'), forward !== 'none');
         assert.equal(result.includes('chain dns-forward-output {'), forward !== 'none' && local === '1');

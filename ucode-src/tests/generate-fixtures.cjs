@@ -1,6 +1,6 @@
 // Run with: node ucode-src/tests/generate-fixtures.cjs
-// The last TS generator before the Go migration is the source of expected behavior.
-// This script executes that TS code directly; it never invokes the Go implementation.
+// The last browser-side TS generator is the source of expected behavior.
+// Execute that historical TS code directly, independently of the ucode implementation.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');

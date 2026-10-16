@@ -19,7 +19,7 @@ function mount(widget: HTMLElement, label: string) {
         '&.cm-focused': { outline: '2px solid currentColor', outlineOffset: '-1px' },
         '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace', fontSize: '.9rem' },
         '.cm-content': { padding: '.5rem 0', caretColor: 'currentColor' },
-        '.cm-gutters': { backgroundColor: 'transparent', color: 'inherit', borderRight: '1px solid #7774' },
+        '.cm-gutters': { color: 'inherit', borderRight: '1px solid #7774' },
         '.cm-lineNumbers .cm-gutterElement': { opacity: '.65' },
         '.cm-activeLine': { backgroundColor: dark ? '#ffffff08' : '#00000005' },
     }, { dark });

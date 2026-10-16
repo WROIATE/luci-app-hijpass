@@ -2,9 +2,11 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-hijpass
 PKG_VERSION:=26.9.6
-PKG_RELEASE:=8
+PKG_RELEASE:=9
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
+# esbuild 已压缩 JS；再次经过 jsmin 会改写 CodeMirror 中的正则表达式。
+LUCI_MINIFY_JS:=0
 
 PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_$(PKG_NAME)_INCLUDE_Hysteria \

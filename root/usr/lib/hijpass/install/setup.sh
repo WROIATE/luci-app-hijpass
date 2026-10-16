@@ -17,6 +17,8 @@ for file in group passwd shadow; do
     fi
 done
 hijpass_data "$HIJPASS_LIB/install/migrate.uc" || exit 1
+# 让 crond 立即丢弃已移除的旧任务；任务内容的转换只在安装迁移脚本中进行。
+[ ! -x /etc/init.d/cron ] || /etc/init.d/cron restart || exit 1
 # 防火墙 include 是安装配置，不属于旧字段迁移。
 uci -q set firewall.hijpass=include &&
     uci -q set firewall.hijpass.type=script &&

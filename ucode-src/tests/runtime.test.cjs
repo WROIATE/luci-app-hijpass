@@ -234,7 +234,7 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     assert.equal(result.find(s => s['.name'] === 's').default_proxy_node, balance.name);
     assert.equal(result.find(s => s['.name'] === 'a').core, 'sing-box');
     assert.equal(result.find(s => s['.name'] === 'a').config_type, 'generated');
-    assert.equal(result.find(s => s['.name'] === 'global').schema_version, '1');
+    assert.equal(result.find(s => s['.name'] === 'global').schema_version, '2');
     assert.equal(result.find(s => s['.name'] === 'dns').direct_dns, 'dnsmasq');
     assert.equal(result.find(s => s['.name'] === 'fw').proxy_local, '0');
     const text = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
@@ -270,7 +270,84 @@ test('迁移失败不写入完成标记，修复配置后可以重试', t => {
     assert.notEqual(failed.status, 0);
     assert.equal(fs.readFileSync(file, 'utf8'), invalid);
     fs.writeFileSync(file, "config hijpass 'global'\n");
-    assert.equal(value({ action: 'migrate', directory })[0].schema_version, '1');
+    assert.equal(value({ action: 'migrate', directory })[0].schema_version, '2');
+});
+
+test('schema 1 升级只迁移 Xray HTTP 和旧 cron，保留 sing-box、自定义配置及其他任务', t => {
+    const directory = fixture(t), configDir = path.join(directory, 'etc/config'), cronDir = path.join(directory, 'etc/crontabs');
+    fs.mkdirSync(configDir, { recursive: true }); fs.mkdirSync(cronDir);
+    const file = path.join(configDir, 'hijpass'), cron = path.join(cronDir, 'root');
+    fs.writeFileSync(file, `config hijpass 'global'
+ option schema_version '1'
+config proxy_node 'xr'
+ option enabled '1'
+ option config_type 'generated'
+ option core 'xray'
+ option type 'vless'
+ option server '192.0.2.1'
+ option server_port '443'
+ option listen_port '10001'
+ option socks_port '10002'
+ option uuid '11111111-1111-4111-8111-111111111111'
+ option transport_type 'http'
+ option transport_http_host 'host.example.org'
+ option transport_http_path '/kept'
+ option transport_http_method 'PUT'
+ option transport_http_idle_timeout '15s'
+ option transport_xhttp_host 'unused.example.org'
+config proxy_node 'sb'
+ option core 'sing-box'
+ option transport_type 'http'
+ option transport_http_host 'kept.example.org'
+config proxy_node 'manual'
+ option config_type 'custom'
+ option core 'xray'
+ option type 'vless'
+ option transport_type 'http'
+ option command 'user-program'
+`);
+    const kept = '# /usr/lib/hijpass/rules.sh is mentioned here\n0 * * * * echo /usr/lib/hijpass/rules.uc\n0 * * * * /other/rules.sh\n0 * * * * /usr/lib/hijpass/rules/update.sh update\n';
+    fs.writeFileSync(cron, kept + '0 * * * * /usr/lib/hijpass/rules.sh update\n0 * * * * /usr/lib/hijpass/rules.uc update\n@reboot /usr/lib/hijpass/clean-service-log.sh hijpass\n*/10 * * * * /usr/lib/hijpass/clean-service-log.uc hijserver\n', { mode: 0o600 });
+    const sections = value({ action: 'migrate', directory: configDir });
+    const node = sections.find(s => s['.name'] === 'xr');
+    assert.equal(node.transport_type, 'xhttp');
+    assert.equal(node.transport_xhttp_host, 'host.example.org');
+    assert.equal(node.transport_xhttp_path, '/kept');
+    assert.equal(node.transport_xhttp_method, 'PUT');
+    assert.equal(node.transport_xhttp_mode, 'stream-one');
+    assert.equal(Object.keys(node).some(key => key.startsWith('transport_http_')), false);
+    assert.equal(sections.find(s => s['.name'] === 'sb').transport_type, 'http');
+    assert.equal(sections.find(s => s['.name'] === 'manual').transport_type, 'http');
+    assert.equal(sections.find(s => s['.name'] === 'global').schema_version, '2');
+    const generated = run('root/usr/bin/hijpass-config', ['render', '--stdin'], sections);
+    assert.equal(generated.status, 0, generated.stderr);
+    assert.deepEqual(JSON.parse(generated.stdout).nodes.xr.outbounds[0].streamSettings.xhttpSettings,
+        { host: 'host.example.org', path: '/kept', mode: 'stream-one', uplinkHTTPMethod: 'PUT' });
+    assert.equal(fs.readFileSync(cron, 'utf8'), kept);
+    assert.equal(fs.statSync(cron).mode & 0o777, 0o600);
+    const migrated = fs.readFileSync(file, 'utf8');
+    value({ action: 'migrate', directory: configDir });
+    assert.equal(fs.readFileSync(file, 'utf8'), migrated);
+    assert.equal(fs.readFileSync(cron, 'utf8'), kept);
+});
+
+test('cron 迁移失败时不提交新版本，修复后可以重试；未知版本不降级', t => {
+    const directory = fixture(t), configDir = path.join(directory, 'config'), cronDir = path.join(directory, 'crontabs');
+    fs.mkdirSync(configDir); fs.mkdirSync(cronDir);
+    const file = path.join(configDir, 'hijpass'), cron = path.join(cronDir, 'root');
+    const original = "config hijpass 'global'\n option schema_version '1'\n";
+    fs.writeFileSync(file, original); fs.mkdirSync(cron);
+    const failed = invoke({ action: 'migrate', directory: configDir });
+    assert.notEqual(failed.status, 0);
+    assert.match(failed.stderr, /cron path is not a file/);
+    assert.equal(fs.readFileSync(file, 'utf8'), original);
+    fs.rmdirSync(cron); fs.writeFileSync(cron, '0 * * * * /usr/lib/hijpass/rules.sh update\n');
+    assert.equal(value({ action: 'migrate', directory: configDir })[0].schema_version, '2');
+    assert.equal(fs.readFileSync(cron, 'utf8'), '');
+    const future = "config hijpass 'global'\n option schema_version '3'\n";
+    fs.writeFileSync(file, future);
+    assert.notEqual(invoke({ action: 'migrate', directory: configDir }).status, 0);
+    assert.equal(fs.readFileSync(file, 'utf8'), future);
 });
 
 test('domain/IP normalization and CIDR lookup use native address validation', () => {

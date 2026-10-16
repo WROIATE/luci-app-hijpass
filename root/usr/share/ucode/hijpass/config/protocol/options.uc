@@ -61,4 +61,5 @@ export const TransportOptions = {
 	transport_xhttp_host: ["text", ""], // Xray XHTTP Host 头
 	transport_xhttp_path: ["text", ""], // Xray XHTTP 请求路径
 	transport_xhttp_mode: ["text", ""], // Xray XHTTP 模式（auto/packet-up/stream-up/stream-one）
+	transport_xhttp_method: ["text", ""], // Xray XHTTP 上行请求方法；空值使用核心默认值
 };

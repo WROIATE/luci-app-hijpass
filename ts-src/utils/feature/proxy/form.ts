@@ -466,8 +466,11 @@ const ProxyFormUtils = {
         }
     },
 
-    forCoreProtocols: function (o: LuCI.form.AbstractValue, core: CoreType, types: ProxyType[]): void {
-        types.forEach(t => o.depends({ config_type: PROXY_CONFIG_TYPE.GENERATED, type: t, core }));
+    forCoreProtocols: function (
+        o: LuCI.form.AbstractValue, core: CoreType, types: ProxyType[],
+        conditions: Record<string, string | RegExp> = {}
+    ): void {
+        types.forEach(t => o.depends({ config_type: PROXY_CONFIG_TYPE.GENERATED, type: t, core, ...conditions }));
     },
 
     createCoreAndTypeOptions: function (s: LuCI.form.AbstractSection): void {

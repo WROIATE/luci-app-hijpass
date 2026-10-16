@@ -439,6 +439,7 @@ export class VlessConfig implements ProxyNode {
     transport_xhttp_host: string;
     transport_xhttp_path: string;
     transport_xhttp_mode: string;
+    transport_xhttp_method: string;
 
     procd_env: string[];
     log_path: string;

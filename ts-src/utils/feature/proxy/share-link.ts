@@ -368,6 +368,9 @@ function parseVless(uri: ParsedUri, core: CoreType): ImportedProxyConfig {
     if (transport === 'xhttp' && core !== CORE_TYPE.XRAY) {
         throw new Error(_('XHTTP transport is only supported by Xray core'));
     }
+    if (transport === 'http' && core !== CORE_TYPE.SING_BOX) {
+        throw new Error(_('HTTP transport is only supported by sing-box core'));
+    }
 
     const values: Record<string, ProxyFieldValue> = {
         ...baseValues(PROXY_TYPE.VLESS, core),
@@ -413,6 +416,7 @@ function parseVless(uri: ParsedUri, core: CoreType): ImportedProxyConfig {
         values.transport_xhttp_host = queryValue(uri.query, 'host');
         values.transport_xhttp_path = queryValue(uri.query, 'path') || '/';
         values.transport_xhttp_mode = queryValue(uri.query, 'mode') || 'auto';
+        values.transport_xhttp_method = queryValue(uri.query, 'method');
     }
 
     return {
@@ -458,6 +462,7 @@ function generateVless(section: any): string {
         params.host = section.transport_xhttp_host;
         params.path = section.transport_xhttp_path;
         params.mode = section.transport_xhttp_mode;
+        params.method = section.transport_xhttp_method;
     }
 
     return 'vless://' + encodeText(String(section.uuid)) + '@' +

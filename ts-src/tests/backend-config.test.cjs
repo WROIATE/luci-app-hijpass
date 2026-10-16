@@ -174,4 +174,9 @@ test('share-link imports declare generated configuration and do not normalize le
     assert.throws(() => ProxyShareLinkUtils.parse(uri, 'singbox'), /Invalid core selection/);
     assert.equal(ProxyShareLinkUtils.canExport({ ...imported.values, config_type: 'custom' }), false);
     assert.equal(ProxyShareLinkUtils.canExport(imported.values), true);
+    assert.throws(() => ProxyShareLinkUtils.parse(uri + '&type=http', 'xray'), /HTTP transport is only supported by sing-box/);
+    assert.equal(ProxyShareLinkUtils.parse(uri + '&type=http', 'sing-box').values.transport_type, 'http');
+    const xhttp = ProxyShareLinkUtils.parse(uri + '&type=xhttp&method=PUT', 'xray');
+    assert.equal(xhttp.values.transport_xhttp_method, 'PUT');
+    assert.equal(new URLSearchParams(ProxyShareLinkUtils.generate(xhttp.values).split('?')[1]).get('method'), 'PUT');
 });

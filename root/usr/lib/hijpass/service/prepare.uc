@@ -97,9 +97,22 @@ export function writeConfigs(sections, generated) {
 	}
 	return files;
 };
+// 启停只替换当前服务注册的任务，保留其他命令及参数中的同名文本。
+function cronEntries(path, packageName) {
+    let entries = [];
+    for (let line in split(fs.readfile(path) || '', '\n')) {
+        if (!line) continue;
+        let fields = split(trim(line) || '', /[ \t]+/);
+        let position = substr(fields[0] || '', 0, 1) == '@' ? 1 : 5;
+        if (fields[position] == '/usr/lib/hijpass/maintenance/logs.sh' && fields[position + 1] == packageName) continue;
+        if (packageName == 'hijpass' && fields[position] == '/usr/lib/hijpass/rules/update.sh') continue;
+        push(entries, line);
+    }
+    return entries;
+}
 function cron(sections, enabled) {
-	let path = '/etc/crontabs/root';
-	let entries = filter(split(fs.readfile(path) || '', '\n'), line => line && !match(line, /\/hijpass\/(rules[.](sh|uc)|rules\/update[.]sh)/) && !match(line, /\/hijpass\/(clean-service-log[.](sh|uc)|maintenance\/logs[.]sh) hijpass/));
+    let path = '/etc/crontabs/root';
+    let entries = cronEntries(path, 'hijpass');
 	if (enabled) {
 		let schedule = first(sections, 'rule').update_schedule;
 		if (schedule) {
@@ -138,7 +151,7 @@ const SERVER_TABLE = '/usr/share/nftables.d/table-post/hijserver.nft';
 const SERVER_CHAIN = '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft';
 function serverCron(instances) {
 	let path = '/etc/crontabs/root';
-	let entries = filter(split(fs.readfile(path) || '', '\n'), line => line && !match(line, /\/hijpass\/(clean-service-log[.](sh|uc)|maintenance\/logs[.]sh) hijserver/));
+    let entries = cronEntries(path, 'hijserver');
 	if (length(filter(instances, instance => instance.log))) push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijserver');
 	atomic(path, join('\n', entries) + '\n');
 }

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { config, root, interpreter } = require('./helpers.cjs');
+const { config, root, interpreter, run, withConfig } = require('./helpers.cjs');
 const fixtures = require('./testdata/compatibility.json');
 
 function rpc(method, sections, target) {
@@ -14,16 +14,27 @@ function rpc(method, sections, target) {
 }
 for (const fixture of fixtures) {
     test(`配置兼容：${fixture.name}`, () => {
-        const result = config(['render', '--stdin'], fixture.sections);
+        let sections = fixture.sections;
+        if (sections.some(s => s.core === 'xray' && s.transport_type === 'http')) {
+            // 历史 TS 样本保持原始输入；先调用真实安装迁移，再比较生成结果。
+            sections = withConfig(sections, directory => {
+                const migrated = run('root/usr/lib/hijpass/install/migrate.uc', ['--configdir', directory]);
+                assert.equal(migrated.status, 0, migrated.stderr);
+                const read = run('ucode-src/tests/runtime.uc', [], { action: 'read', directory });
+                assert.equal(read.status, 0, read.stderr);
+                return JSON.parse(read.stdout);
+            });
+        }
+        const result = config(['render', '--stdin'], sections);
         assert.equal(result.status, 0, result.stderr);
         const generated = JSON.parse(result.stdout);
         // 样本直接来自迁移前的 TS；严格比较默认值、数组、时长和规则顺序。
         assert.deepEqual(generated, fixture.expected);
-        assert.deepEqual(rpc('render', fixture.sections), generated);
-        assert.deepEqual(rpc('validate', fixture.sections), { ok: true });
+        assert.deepEqual(rpc('render', sections), generated);
+        assert.deepEqual(rpc('validate', sections), { ok: true });
         for (const [id, expected] of [...Object.entries(generated.nodes), ...(generated.shunt ? [['shunt', generated.shunt]] : [])]) {
-            assert.deepEqual(rpc('render', fixture.sections, id), { config: expected });
-            const preview = config(['render', '--stdin', '--target', id], fixture.sections);
+            assert.deepEqual(rpc('render', sections, id), { config: expected });
+            const preview = config(['render', '--stdin', '--target', id], sections);
             assert.equal(preview.status, 0, preview.stderr);
             assert.deepEqual(JSON.parse(preview.stdout), expected);
         }
@@ -60,6 +71,8 @@ test('业务转换不再识别旧核心名称或根据旧 custom 字段推断配
     for (const core of ['singbox', 'custom'])
         assert.match(rpc('render', [node('a', { core, command: 'program' })]).error, /unsupported core/);
     assert.match(rpc('render', [node('a', { config_type: 'invalid' })]).error, /unsupported config_type/);
+    assert.match(rpc('render', [node('a', { core: 'xray', type: 'vless', transport_type: 'http' })]).error,
+        /unsupported Xray transport "http"/);
 });
 
 test('自定义命令节点仍可通过其本地 SOCKS 端口接入上游和负载均衡', () => {

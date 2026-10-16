@@ -113,8 +113,8 @@ export const HijpassValues = {
         {label: 'packetaddr', value: 'packetaddr'},
         {label: 'xudp', value: 'xudp'}
     ] as const,
-    // xray 支持的传输层（含 xhttp；sing-box 不支持 xhttp，由 validate 阻断）
-    V2RAY_TRANSPORT_TYPES_XRAY: [
+    // HTTP 用于 sing-box，XHTTP 用于 Xray；表单按所选核心校验。
+    V2RAY_TRANSPORT_TYPES: [
         {label: 'None', value: ''},
         {label: 'HTTP', value: 'http'},
         {label: 'WebSocket', value: 'ws'},

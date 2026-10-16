@@ -2476,3 +2476,6 @@ msgstr "IPv6 地址列表：direct（本地、DNS 上游及直连地址）、pro
 
 msgid "Generated"
 msgstr "自动生成"
+
+msgid "HTTP transport is only supported by sing-box core"
+msgstr "HTTP 传输仅支持 sing-box 核心"

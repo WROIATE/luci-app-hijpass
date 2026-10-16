@@ -457,7 +457,7 @@ function createVlessNetworkOptions(s: LuCI.form.AbstractSection) {
 /**
  * 创建通用传输层类型选择（用于支持Transport的协议：VLESS等）
  * - 所有传输类型统一注册（含 xhttp）
- * - sing-box 不支持 xhttp：通过 validate 校验阻止 sing-box+xhttp 的非法组合
+ * - HTTP 仅用于 sing-box，XHTTP 仅用于 Xray，保存时校验所选核心
  * - xhttp 相关子字段仅在 core:xray 时显示
  */
 function createTransportTypeOption(s: LuCI.form.AbstractSection) {
@@ -466,7 +466,7 @@ function createTransportTypeOption(s: LuCI.form.AbstractSection) {
     transportOpt.modalonly = true;
     ProxyFormUtils.forProtocols(transportOpt, [PROXY_TYPE.VLESS]);
 
-    HijpassValues.V2RAY_TRANSPORT_TYPES_XRAY.forEach((item) => {
+    HijpassValues.V2RAY_TRANSPORT_TYPES.forEach((item) => {
         transportOpt.value(item.value, _(item.label));
     });
 
@@ -478,6 +478,9 @@ function createTransportTypeOption(s: LuCI.form.AbstractSection) {
         const realityEnabled = this.section.formvalue(sectionId, 'tls_reality_enabled');
         if (value === 'xhttp' && core !== CORE_TYPE.XRAY) {
             return _('XHTTP transport is only supported by Xray core');
+        }
+        if (value === 'http' && core !== CORE_TYPE.SING_BOX) {
+            return _('HTTP transport is only supported by sing-box core');
         }
         if (core === CORE_TYPE.XRAY && realityEnabled === '1' && (value === 'ws' || value === 'httpupgrade')) {
             return _('Xray REALITY only supports RAW, XHTTP and gRPC transports');
@@ -493,29 +496,29 @@ function createTransportHttpOptions(s: LuCI.form.AbstractSection) {
     let hostOpt = s.option(form.Value, 'transport_http_host', _('HTTP Host'),
         _('HTTP Host List'));
     hostOpt.modalonly = true;
-    ProxyFormUtils.forProtocols(hostOpt, [PROXY_TYPE.VLESS], { transport_type: 'http' });
+    ProxyFormUtils.forCoreProtocols(hostOpt, CORE_TYPE.SING_BOX, [PROXY_TYPE.VLESS], { transport_type: 'http' });
 
     let pathOpt = s.option(form.Value, 'transport_http_path', _('HTTP Path'),
         _('HTTP Request Path'));
     pathOpt.modalonly = true;
-    ProxyFormUtils.forProtocols(pathOpt, [PROXY_TYPE.VLESS], { transport_type: 'http' });
+    ProxyFormUtils.forCoreProtocols(pathOpt, CORE_TYPE.SING_BOX, [PROXY_TYPE.VLESS], { transport_type: 'http' });
 
     let methodOpt = s.option(form.Value, 'transport_http_method', _('HTTP Method'),
         _('HTTP Request Method'));
     methodOpt.modalonly = true;
-    ProxyFormUtils.forProtocols(methodOpt, [PROXY_TYPE.VLESS], { transport_type: 'http' });
+    ProxyFormUtils.forCoreProtocols(methodOpt, CORE_TYPE.SING_BOX, [PROXY_TYPE.VLESS], { transport_type: 'http' });
 
     let idleOpt = s.option(form.Value, 'transport_http_idle_timeout', _('Idle Timeout'),
         _('Idle Timeout'));
     idleOpt.modalonly = true;
     idleOpt.default = '15s';
-    ProxyFormUtils.forProtocols(idleOpt, [PROXY_TYPE.VLESS], { transport_type: 'http' });
+    ProxyFormUtils.forCoreProtocols(idleOpt, CORE_TYPE.SING_BOX, [PROXY_TYPE.VLESS], { transport_type: 'http' });
 
     let pingOpt = s.option(form.Value, 'transport_http_ping_timeout', _('PING Timeout'),
         _('PING Response Timeout'));
     pingOpt.modalonly = true;
     pingOpt.default = '15s';
-    ProxyFormUtils.forProtocols(pingOpt, [PROXY_TYPE.VLESS], { transport_type: 'http' });
+    ProxyFormUtils.forCoreProtocols(pingOpt, CORE_TYPE.SING_BOX, [PROXY_TYPE.VLESS], { transport_type: 'http' });
 }
 
 /**
@@ -861,6 +864,10 @@ function createTransportXhttpOptions(s: LuCI.form.AbstractSection) {
     modeOpt.value('stream-one', 'stream-one');
     modeOpt.value('stream-up', 'stream-up');
     modeOpt.depends({ config_type: PROXY_CONFIG_TYPE.GENERATED,  type: PROXY_TYPE.VLESS, core: CORE_TYPE.XRAY, transport_type: 'xhttp' });
+
+    const methodOpt = s.option(form.Value, 'transport_xhttp_method', _('HTTP Method'), _('HTTP Request Method'));
+    methodOpt.modalonly = true;
+    methodOpt.depends({ config_type: PROXY_CONFIG_TYPE.GENERATED, type: PROXY_TYPE.VLESS, core: CORE_TYPE.XRAY, transport_type: 'xhttp' });
 }
 
 

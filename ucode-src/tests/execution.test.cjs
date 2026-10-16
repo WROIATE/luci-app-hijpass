@@ -297,24 +297,58 @@ test('uci-defaults 首次安装自动迁移并注册防火墙，重复安装不�
     f.patch('install/setup.sh', '/tmp/hijpass/log', f.directory + '/logs');
     f.patch('install/setup.sh', '/tmp/hijserver/log', f.directory + '/server-logs');
     f.patch('install/setup.sh', '/tmp/luci-*cache', f.directory + '/cache');
+    f.script('cron-restart', 'printf "%s\\n" "$1" >>"$CRON_TEST_CALLS"');
+    f.patch('install/setup.sh', '/etc/init.d/cron', path.join(f.directory, 'cron-restart'));
     f.patch('install/setup.sh', '"$HIJPASS_LIB/install/migrate.uc"', '"$HIJPASS_LIB/install/migrate.uc" --configdir "$TEST_CONFIG_DIRECTORY"');
     const uci = spawnSync('/bin/sh', ['-c', 'command -v uci'], { encoding: 'utf8' }).stdout.trim();
     assert.ok(uci, 'native UCI CLI is required for the installation test');
     f.script('uci', "exec '" + uci.replaceAll("'", "'\\''") + "' -c \"$TEST_CONFIG_DIRECTORY\" \"$@\"");
     fs.writeFileSync(path.join(f.runtime, 'install/firstboot.sh'),
         fs.readFileSync(path.join(root, 'root/etc/uci-defaults/luci-app-hijpass'), 'utf8').replaceAll('/usr/lib/hijpass', f.runtime));
-    const first = f.run('install/firstboot.sh', [], { TEST_CONFIG_DIRECTORY: directory });
+    const env = { TEST_CONFIG_DIRECTORY: directory, CRON_TEST_CALLS: path.join(f.directory, 'cron-calls') };
+    const first = f.run('install/firstboot.sh', [], env);
     assert.equal(first.status, 0, first.stderr);
     const migrated = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
-    assert.match(migrated, /schema_version '1'/);
+    assert.match(migrated, /schema_version '2'/);
     assert.match(migrated, /config_type 'custom'/);
     assert.doesNotMatch(migrated, /option (core|type) /);
     assert.match(fs.readFileSync(path.join(directory, 'firewall'), 'utf8'), /option type 'script'/);
     const modified = migrated + "\nconfig proxy_node 'later'\n option core 'singbox'\n";
     fs.writeFileSync(path.join(directory, 'hijpass'), modified);
-    const again = f.run('install/firstboot.sh', [], { TEST_CONFIG_DIRECTORY: directory });
+    const again = f.run('install/firstboot.sh', [], env);
     assert.equal(again.status, 0, again.stderr);
     assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), modified);
+    assert.equal(fs.readFileSync(env.CRON_TEST_CALLS, 'utf8'), 'restart\nrestart\n');
     for (const file of ['group', 'passwd', 'shadow'])
         assert.equal(fs.readFileSync(path.join(accounts, file), 'utf8').split('\n').filter(line => line.startsWith('hijpass:')).length, 1);
+});
+
+test('服务 cron 只管理当前脚本，客户端与服务端互不删除，不在启动时清理旧任务', t => {
+    const f = fixture(t), cron = path.join(f.directory, 'crontab');
+    f.patch('service/prepare.uc', '/etc/crontabs/root', cron);
+    const legacy = `0 * * * * ${f.runtime}/rules.sh update\n`;
+    const mentioned = `0 * * * * echo ${f.runtime}/rules/update.sh\n`;
+    fs.writeFileSync(cron, legacy + mentioned + `0 * * * * ${f.runtime}/rules/update.sh update\n*/10 * * * * ${f.runtime}/maintenance/logs.sh hijpass\n`);
+    withConfig([{ '.type': 'hijpass', '.name': 'global', enabled: '1', log_path: '/logs/main.log' },
+        { '.type': 'rule', '.name': 'rules', update_schedule: '0 5 * * 1' }], directory => {
+        fs.writeFileSync(path.join(directory, 'hijserver'), `config hijserver 'global'\n option enabled '1'\nconfig server_node 'a'\n option enabled '1'\n option command 'program'\n option log_path '/logs/server.log'\n`);
+        for (const args of [['cron', 'enable'], ['cron', 'enable'], ['server', 'cron', 'enable'], ['server', 'cron', 'enable']]) {
+            const result = f.data('service/preparecli.uc', [...args, '--configdir', directory]);
+            assert.equal(result.status, 0, result.stderr);
+        }
+        let contents = fs.readFileSync(cron, 'utf8');
+        assert.ok(contents.includes(legacy));
+        assert.ok(contents.includes(mentioned));
+        assert.equal(contents.split('\n').filter(line => line.includes(`0 5 * * 1 ${f.runtime}/rules/update.sh`)).length, 1);
+        for (const kind of ['hijpass', 'hijserver'])
+            assert.equal(contents.split('\n').filter(line => line.endsWith('/maintenance/logs.sh ' + kind)).length, 1);
+        const stopped = f.data('service/preparecli.uc', ['cron', 'disable', '--configdir', directory]);
+        assert.equal(stopped.status, 0, stopped.stderr);
+        contents = fs.readFileSync(cron, 'utf8');
+        assert.ok(contents.includes(legacy));
+        assert.ok(contents.includes(mentioned));
+        assert.ok(contents.includes('/maintenance/logs.sh hijserver'));
+        assert.equal(contents.includes('/maintenance/logs.sh hijpass'), false);
+        assert.equal(contents.includes(`0 5 * * 1 ${f.runtime}/rules/update.sh`), false);
+    });
 });

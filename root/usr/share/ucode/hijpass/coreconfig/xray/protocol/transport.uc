@@ -1,6 +1,6 @@
 import { duration } from '../../../config/values.uc';
 
-// streamSettings.network 为 Xray 原生传输名；HTTP 已迁移到 XHTTP stream-one。
+// streamSettings.network 为 Xray 原生传输名；只接收当前核心支持的传输。
 // WS 的 early data 通过 URL 的 ed 参数传递，必须保留已有 query 和 fragment。
 /**
  * @typedef {object} TransportOptions
@@ -8,9 +8,7 @@ import { duration } from '../../../config/values.uc';
  * @property {string} transport_xhttp_host XHTTP Host 头。
  * @property {string} transport_xhttp_path XHTTP 路径。
  * @property {string} transport_xhttp_mode XHTTP 模式。
- * @property {string} transport_http_host 旧 HTTP 传输 Host 头。
- * @property {string} transport_http_path 旧 HTTP 路径，转换为 XHTTP stream-one。
- * @property {string} transport_http_method HTTP 上行请求方法。
+ * @property {string} transport_xhttp_method XHTTP 上行请求方法；空值由核心决定。
  * @property {string} transport_httpupgrade_host HTTPUpgrade Host 头。
  * @property {string} transport_httpupgrade_path HTTPUpgrade 路径。
  * @property {string} transport_ws_host WebSocket Host 头。
@@ -24,7 +22,7 @@ import { duration } from '../../../config/values.uc';
 /**
  * @typedef {object} StreamSettings
  * @property {string|null} network 传输名称，选中传输后填充。
- * @property {object|null} xhttpSettings XHTTP/旧 HTTP 的传输选项。
+ * @property {object|null} xhttpSettings XHTTP 的传输选项。
  * @property {object|null} httpupgradeSettings HTTPUpgrade 的传输选项。
  * @property {object|null} wsSettings WebSocket 的传输选项。
  * @property {object|null} grpcSettings gRPC 的传输选项。
@@ -38,11 +36,10 @@ export function apply(stream, n) {
 	case '': break;
 	case 'xhttp':
 		stream.network = 'xhttp';
-		stream.xhttpSettings = { host: n.transport_xhttp_host, path: n.transport_xhttp_path || '/', mode: n.transport_xhttp_mode || 'auto' };
-		break;
-	case 'http':
-		stream.network = 'xhttp';
-		stream.xhttpSettings = { host: n.transport_http_host, path: n.transport_http_path || '/', mode: 'stream-one', uplinkHTTPMethod: n.transport_http_method };
+		stream.xhttpSettings = {
+			host: n.transport_xhttp_host, path: n.transport_xhttp_path || '/',
+			mode: n.transport_xhttp_mode || 'auto', uplinkHTTPMethod: n.transport_xhttp_method,
+		};
 		break;
 	case 'httpupgrade':
 		stream.network = 'httpupgrade';

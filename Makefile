@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-hijpass
 PKG_VERSION:=26.9.6
-PKG_RELEASE:=7
+PKG_RELEASE:=8
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
 
@@ -63,13 +63,7 @@ endmenu
 endef
 
 define Package/$(PKG_NAME)/conffiles
-/etc/hijpass/firewall/pre-filter.ut
-/etc/hijpass/firewall/out-route.ut
-/etc/hijpass/firewall/tproxy-shunt.ut
-/etc/hijpass/firewall/tproxy-mark.ut
-/etc/hijpass/firewall/proxy-port-filter.ut
-/etc/hijpass/firewall/dns-forward.ut
-/etc/hijpass/firewall/dns-forward-output.ut
+/etc/hijpass/firewall.ut
 /etc/hijpass/hook/dns-hook.sh
 /etc/hijpass/hook/nft-hook.sh
 /etc/hijpass/rules/chn-list.txt
@@ -100,6 +94,12 @@ uci -q batch <<-EOF >/dev/null
 EOF
 exit 0
 endef
+
+# 默认副本不列入 conffiles；恢复默认始终读取当前软件包版本的模板。
+define Build/FirewallDefault
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/root/etc/hijpass/firewall.ut $(PKG_BUILD_DIR)/root/usr/lib/hijpass/firewall/default.ut
+endef
+Hooks/Compile/Post += Build/FirewallDefault
 
 # ucode 源文件由 LuCI 的 root 安装流程直接复制，整个包保持架构无关。
 include $(TOPDIR)/feeds/luci/luci.mk

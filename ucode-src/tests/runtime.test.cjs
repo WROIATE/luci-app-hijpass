@@ -117,7 +117,7 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
     const firewall = { '.name': 'fw', '.type': 'firewall', shunt_port: '18081', tproxy_proto: 'tcp,udp', proxy_local: '0', acl_default_allow: '1' };
     const dns = { '.name': 'dns', '.type': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653' };
     for (const forward of ['none', 'pre-routing', 'routing']) for (const local of ['0', '1']) {
-        const result = value({ action: 'firewall', ruleDirectory: path.join(root, 'root/etc/hijpass/firewall'), state,
+        const result = value({ action: 'firewall', templatePath: path.join(root, 'root/etc/hijpass/firewall.ut'), state,
             sections: [{ ...global, ip_direct: ip }, { ...firewall, dns_forward: forward, proxy_local: local }, dns,
                 { '.type': 'shunt', enabled: '1', dns_listen_port: '10153' }] });
         assert.match(result, /meta l4proto != \{ tcp, udp \}/);
@@ -136,7 +136,7 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
         const check = spawnSync('nft', ['-c', '-f', path.join(directory, 'test.nft')], { encoding: 'utf8' });
         if (!check.error) assert.doesNotMatch(check.stderr, /syntax error/);
     }
-    const rejected = invoke({ action: 'firewall', ruleDirectory: path.join(root, 'root/etc/hijpass/firewall'), state,
+    const rejected = invoke({ action: 'firewall', templatePath: path.join(root, 'root/etc/hijpass/firewall.ut'), state,
         sections: [global, { ...firewall, proxy_iface_list: ['br-lan;flush ruleset'] }, dns] });
     assert.notEqual(rejected.status, 0);
 });
@@ -192,7 +192,7 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     const directory = fixture(t);
     fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass 'global'\n option enabled '1'\n option nft '/etc/hijpass/fw4-template.nft'\nconfig proxy_node 'a'\n option name 'member'\n option core 'singbox'\n option listen_port '7890'\n option socks_port '7891'\nconfig shunt 's'\n option type 'singbox'\n list lb_node_list 'member'\n option default_proxy_node 'hijpass-slb'\n option lb_strategy 'urltest'\nconfig dns 'dns'\n option direct_dns 'system'\nconfig firewall 'fw'\n`);
     const result = value({ action: 'migrate', directory });
-    assert.equal(result.find(s => s['.name'] === 'global').firewall_rules, '/etc/hijpass/firewall');
+    assert.equal(result.find(s => s['.name'] === 'global').firewall_template, '/etc/hijpass/firewall.ut');
     assert.equal(result.find(s => s['.name'] === 'global').nft, undefined);
     const balance = result.find(s => s.type === 'load_balance');
     assert.equal(balance.listen_port, '7892'); assert.equal(balance.socks_port, '7893');
@@ -204,8 +204,8 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     const text = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
     value({ action: 'migrate', directory });
     assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), text);
-    fs.writeFileSync(path.join(directory, 'hijpass'), text.replace('/etc/hijpass/firewall', '/custom/rules'));
-    assert.equal(value({ action: 'migrate', directory }).find(s => s['.name'] === 'global').firewall_rules, '/custom/rules');
+    fs.writeFileSync(path.join(directory, 'hijpass'), text.replace('/etc/hijpass/firewall.ut', '/custom/firewall.ut'));
+    assert.equal(value({ action: 'migrate', directory }).find(s => s['.name'] === 'global').firewall_template, '/custom/firewall.ut');
 });
 
 test('domain/IP normalization and CIDR lookup use native address validation', () => {
@@ -300,11 +300,11 @@ test('文本工具正常退出，参数错误保持 JSON 工具的错误契约',
 
 test('启用防火墙时，缺失模板不会生成缺少规则的配置', t => {
     const directory = fixture(t);
-    const result = invoke({ action: 'firewall', ruleDirectory: path.join(directory, 'missing'),
+    const result = invoke({ action: 'firewall', templatePath: path.join(directory, 'missing'),
         state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] },
         sections: [global, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp' }] });
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /rule template is unreadable/);
+    assert.match(result.stderr, /template/);
     assert.equal(result.stdout, '');
 });
 
@@ -432,7 +432,7 @@ config proxy_node 'sample'
 test('空静态列表省略集合与规则，ACL 空白名单明确返回，动态 DNS 集合继续保留', () => {
     const state = { wan: [], local4: [], local6: [], dns4: [], dns6: [] };
     for (const [interfaces, macs] of [[[], []], [['lo'], []], [[], ['02:00:00:00:00:01']], [['lo'], ['02:00:00:00:00:01']]]) {
-        const result = value({ action: 'firewall', ruleDirectory: path.join(root, 'root/etc/hijpass/firewall'), state,
+        const result = value({ action: 'firewall', templatePath: path.join(root, 'root/etc/hijpass/firewall.ut'), state,
             sections: [global, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp', dns_forward: 'pre-routing',
                 proxy_iface_list: interfaces, proxy_mac_list: macs, use_chnroute: '1' },
                 { '.type': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653', use_chn: '1', use_gfw: '1' }] });
@@ -449,26 +449,31 @@ test('空静态列表省略集合与规则，ACL 空白名单明确返回，动�
     }
 });
 
-test('规则模板只替换启用链的内部规则，空文件合法，未启用链无需文件', t => {
-    const directory = fixture(t);
-    for (const name of ['pre-filter', 'tproxy-shunt', 'tproxy-mark', 'proxy-port-filter'])
-        fs.writeFileSync(path.join(directory, name + '.ut'), name === 'pre-filter' ? 'counter comment "edited-rule"\n' : '');
-    const result = value({ action: 'firewall', ruleDirectory: directory,
+test('单文件模板完整控制表和链，空输出不能关闭已启用的防火墙', t => {
+    const directory = fixture(t), template = path.join(directory, 'firewall.ut');
+    const request = { action: 'firewall', templatePath: template,
         state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] },
-        sections: [global, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp', proxy_local: '0' }] });
-    assert.match(result, /chain pre-filter \{\n        type filter hook prerouting priority filter - 50; policy accept;\n/);
-    assert.match(result, /counter comment "edited-rule"/);
-    assert.doesNotMatch(result, /fib daddr|chain out-route|chain dns-forward/);
-    assert.match(result, /chain tproxy-shunt \{\s*\}/);
+        sections: [global, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp', proxy_local: '0' }] };
+    fs.writeFileSync(template, 'table inet hijpass { chain edited { tcp dport {{ options.proxyPort }} accept } }\n');
+    const result = value(request);
+    assert.match(result, /chain edited.*tcp dport 10001 accept/);
+    assert.doesNotMatch(result, /chain pre-filter|chain out-route/);
+    for (const empty of ['', '{# comment only #}']) {
+        fs.writeFileSync(template, empty);
+        const failed = invoke(request);
+        assert.notEqual(failed.status, 0);
+        assert.match(failed.stderr, /rendered no rules/);
+    }
 });
 
-test('旧自定义整表模板必须迁移，不能静默替换为默认链规则', t => {
-    const directory = fixture(t);
-    fs.writeFileSync(path.join(directory, 'hijpass'), "config hijpass 'global'\n option nft '/custom/firewall.ut'\n");
+test('迁移保留旧自定义整表路径，并清理旧路径字段', t => {
+    const directory = fixture(t), template = path.join(directory, 'custom.ut');
+    fs.writeFileSync(template, 'table inet hijpass { chain custom {} }\n');
+    fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass 'global'\n option nft '${template}'\n option firewall_rules '/custom/chains'\n`);
     const sections = value({ action: 'migrate', directory });
-    assert.equal(sections[0].nft, '/custom/firewall.ut');
-    const result = invoke({ action: 'firewall', sections: [...sections, { '.type': 'firewall', proxy_port: '10001' }],
-        ruleDirectory: path.join(root, 'root/etc/hijpass/firewall'), state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] } });
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /legacy nft template/);
+    assert.equal(sections[0].firewall_template, template);
+    assert.equal(sections[0].nft, undefined);
+    assert.equal(sections[0].firewall_rules, undefined);
+    assert.match(value({ action: 'firewall', sections: [...sections, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp' }],
+        state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] } }), /chain custom/);
 });

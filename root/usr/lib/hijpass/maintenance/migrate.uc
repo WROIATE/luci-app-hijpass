@@ -13,12 +13,21 @@ export function migrate(ctx) {
 	if (!ctx.load('hijpass')) die(`cannot load hijpass: ${ctx.error()}`);
 	let shunt, dns, firewall, names = {}, ports = {};
 	ctx.foreach('hijpass', null, s => {
-		// 已知旧路径改为链内规则目录；不删除旧文件，便于用户迁移自定义内容。
-		// 未知整表模板路径保留，生成阶段会提示迁移，不能静默忽略自定义配置。
-		if (s['.type'] == 'hijpass' && index(['/etc/hijpass/fw4-template.nft', '/etc/hijpass/fw4-template.ut'], s.nft) >= 0) {
-			if (!s.firewall_rules) ctx.set('hijpass', s['.name'], 'firewall_rules', '/etc/hijpass/firewall');
-			ctx.delete('hijpass', s['.name'], 'nft');
-		}
+        if (s['.type'] == 'hijpass') {
+            // 兼容旧整表路径；迁移不删除旧链规则文件。
+            if (!s.firewall_template) {
+                let path = s.nft;
+                if (!path || index(['/etc/hijpass/fw4-template.nft', '/etc/hijpass/fw4-template.ut'], path) >= 0)
+                    path = '/etc/hijpass/firewall.ut';
+                ctx.set('hijpass', s['.name'], 'firewall_template', path);
+            }
+            ctx.delete('hijpass', s['.name'], 'nft');
+            ctx.delete('hijpass', s['.name'], 'firewall_rules');
+        }
+        if (s['.type'] == 'firewall') for (let key in [
+            'pre_filter_hash', 'out_route_hash', 'tproxy_shunt_hash', 'tproxy_mark_hash',
+            'proxy_port_filter_hash', 'dns_forward_hash', 'dns_forward_output_hash',
+        ]) ctx.delete('hijpass', s['.name'], key);
 		if (s.name) names[s.name] = true;
 		for (let key in ['listen_port', 'socks_port', 'shunt_listen_port', 'dns_listen_port', 'cdg_port']) if (s[key]) ports[s[key]] = true;
 		if (s['.type'] == 'shunt' && !shunt) shunt = s;

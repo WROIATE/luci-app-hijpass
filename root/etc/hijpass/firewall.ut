@@ -1,0 +1,215 @@
+{%
+/** @typedef {{direct: string[], proxy: string[], china: string[]}} AddressLists */
+/**
+ * @global {{proxyPort: integer, shuntPort: integer, forwardPort: integer,
+ * proxyLocal: boolean, allowAll: boolean, protocols: string[], user: string,
+ * proxyMark: integer, shuntMark: integer, wan: string[], wanNames: string,
+ * interfaces: string[], interfaceNames: string, macs: string[],
+ * excludedInterfaces: string[], excludedInterfaceNames: string, excludedMacs: string[],
+ * domainSets: boolean, useChn: boolean, useChnRoute: boolean, useGfw: boolean,
+ * ip4: AddressLists, ip6: AddressLists}} options
+ * 端口为 0 表示关闭；proxyLocal 控制本机代理，allowAll 控制 ACL 默认放行。
+ * protocols 为 tcp/udp；user 为代理用户，proxyMark/shuntMark 为连接标记。
+ * wan/interfaces/macs 为设备与 MAC 列表，excluded* 为排除项，*Names 为已转义接口文本。
+ * domainSets/useChn/useChnRoute/useGfw 控制集合；ip4/ip6 含 direct/proxy/china 地址数组。
+ */
+%}
+table inet hijpass {
+    {# pre-filter：筛选客户端流量并转入透明代理。 -#}
+    chain pre-filter {
+        type filter hook prerouting priority filter - 50; policy accept;
+        fib daddr type local counter return
+
+{% if (length(options.wan)): %}
+        iifname { {{ options.wanNames }} } counter return
+{% endif %}
+
+{% if (!options.allowAll): %}
+{% if (length(options.interfaces) && length(options.macs)): %}
+        iif != { {{ options.interfaceNames }} } ether saddr != { {{ join(', ', options.macs) }} } counter return
+{% elif (length(options.interfaces)): %}
+        iif != { {{ options.interfaceNames }} } counter return
+{% elif (length(options.macs)): %}
+        ether saddr != { {{ join(', ', options.macs) }} } counter return
+{% else %}
+        counter return
+{% endif %}
+{% endif %}
+{% if (options.allowAll && length(options.excludedInterfaces)): %}
+        iif { {{ options.excludedInterfaceNames }} } counter return
+{% endif %}
+{% if (options.allowAll && length(options.excludedMacs)): %}
+        ether saddr { {{ join(', ', options.excludedMacs) }} } counter return
+{% endif %}
+
+        ct direction reply counter return
+
+        meta l4proto != { {{ join(', ', options.protocols) }} } counter return
+
+        ct state new,related counter jump tproxy-shunt
+
+        ct mark != { {{ options.proxyMark }}, {{ options.shuntMark }} } counter return
+
+        counter jump proxy-port-filter
+
+{% if (options.proxyPort): %}
+        meta l4proto { {{ join(', ', options.protocols) }} } ct mark {{ options.proxyMark }} tproxy to :{{ options.proxyPort }} meta mark set {{ options.proxyMark }} counter accept
+{% endif %}
+
+{% if (options.shuntPort): %}
+        meta l4proto { {{ join(', ', options.protocols) }} } ct mark { {{ options.proxyMark }}, {{ options.shuntMark }} } tproxy to :{{ options.shuntPort }} meta mark set {{ options.proxyMark }} counter
+{% endif %}
+    }
+
+    {# out-route：为路由器本机流量设置代理标记。 -#}
+{% if (options.proxyLocal): %}
+    chain out-route {
+        type route hook output priority filter - 50; policy accept;
+        fib daddr type local counter return
+        ct direction reply counter return
+        meta l4proto != { {{ join(', ', options.protocols) }} } counter return
+        meta skgid {{ sprintf("%J", options.user) }} counter return
+
+        ct state new,related counter jump tproxy-shunt
+
+        counter jump proxy-port-filter
+        counter jump tproxy-mark
+    }
+{% endif %}
+
+    {# tproxy-shunt：按地址与域名集合选择直连、代理或分流。 -#}
+    chain tproxy-shunt {
+        ct mark { {{ options.proxyMark }}, {{ options.shuntMark }} } return
+
+{% if (length(options.ip4.proxy)): %}
+        ip daddr @proxy4list ct mark set {{ options.proxyMark }} counter return
+{% endif %}
+{% if (length(options.ip6.proxy)): %}
+        ip6 daddr @proxy6list ct mark set {{ options.proxyMark }} counter return
+{% endif %}
+{% if (options.domainSets): %}
+        ip daddr @dnsproxy4list ct mark set {{ options.proxyMark }} counter return
+        ip6 daddr @dnsproxy6list ct mark set {{ options.proxyMark }} counter return
+{% endif %}
+
+{% if (length(options.ip4.direct)): %}
+        ip daddr @bypass4list counter return
+{% endif %}
+{% if (length(options.ip6.direct)): %}
+        ip6 daddr @bypass6list counter return
+{% endif %}
+{% if (options.domainSets): %}
+        ip daddr @dnsbypass4list counter return
+        ip6 daddr @dnsbypass6list counter return
+{% endif %}
+
+{% if (options.useGfw): %}
+        ip daddr @gfw4list counter ct mark set {{ options.proxyMark }} counter return
+        ip6 daddr @gfw6list counter ct mark set {{ options.proxyMark }} counter return
+{% endif %}
+
+{% if (options.useChn && options.shuntPort): %}
+        ip daddr @chn4list counter return
+        ip6 daddr @chn6list counter return
+{% endif %}
+
+{% if (options.useChnRoute && options.shuntPort): %}
+        ip daddr @chnroute4list counter return
+        ip6 daddr @chnroute6list counter return
+{% endif %}
+
+{% if (options.shuntPort): %}
+        ct mark set {{ options.shuntMark }} counter comment "shunt mark"
+{% endif %}
+    }
+
+    {# tproxy-mark：将连接标记同步到策略路由标记。 -#}
+    chain tproxy-mark {
+        ct mark { {{ options.proxyMark }}, {{ options.shuntMark }} } meta mark set {{ options.proxyMark }}
+    }
+
+    {# proxy-port-filter：过滤不代理的 UDP 和非常用 TCP 端口。 -#}
+    chain proxy-port-filter {
+        meta l4proto udp udp dport 443 counter reject
+
+        meta l4proto udp udp dport != 53 ct mark set 0 counter return
+
+        meta l4proto tcp ct mark != {{ options.proxyMark }} tcp dport != { 22, 25, 53, 143, 465, 587, 853, 993, 995, 80, 443} ct mark set 0 counter return
+    }
+
+    {# dns-forward：转发 ACL 选中客户端的 DNS 查询。 -#}
+{% if (options.forwardPort): %}
+    chain dns-forward {
+        type nat hook prerouting priority dstnat - 1; policy accept;
+{% if (length(options.wan)): %}
+        iifname { {{ options.wanNames }} } counter return
+{% endif %}
+
+{% if (!options.allowAll): %}
+{% if (length(options.interfaces) && length(options.macs)): %}
+        iif != { {{ options.interfaceNames }} } ether saddr != { {{ join(', ', options.macs) }} } counter return
+{% elif (length(options.interfaces)): %}
+        iif != { {{ options.interfaceNames }} } counter return
+{% elif (length(options.macs)): %}
+        ether saddr != { {{ join(', ', options.macs) }} } counter return
+{% else %}
+        counter return
+{% endif %}
+{% endif %}
+{% if (options.allowAll && length(options.excludedInterfaces)): %}
+        iif { {{ options.excludedInterfaceNames }} } counter return
+{% endif %}
+{% if (options.allowAll && length(options.excludedMacs)): %}
+        ether saddr { {{ join(', ', options.excludedMacs) }} } counter return
+{% endif %}
+        meta l4proto { tcp, udp } th dport 53 counter redirect to :{{ options.forwardPort }}
+    }
+{% endif %}
+
+    {# dns-forward-output：转发路由器系统 DNS 并排除代理进程。 -#}
+{% if (options.forwardPort && options.proxyLocal): %}
+    chain dns-forward-output {
+        type nat hook output priority -101; policy accept;
+        meta skgid {{ sprintf("%J", options.user) }} counter return
+
+        fib daddr type local meta l4proto { tcp, udp } th dport 53 counter redirect to :{{ options.forwardPort }}
+    }
+{% endif %}
+
+{% for (let version in [4, 6]): %}
+{% let addresses = version == 4 ? options.ip4 : options.ip6; %}
+{% for (let set in [
+    { name: 'chnroute', enabled: options.useChnRoute, elements: addresses.china },
+    { name: 'gfw', enabled: options.useGfw, elements: [] },
+    { name: 'chn', enabled: options.useChn, elements: [] },
+    { name: 'dnsproxy', enabled: options.domainSets, elements: [] },
+    { name: 'dnsbypass', enabled: options.domainSets, elements: [] },
+]): %}
+{% if (set.enabled): %}
+    set {{ set.name }}{{ version }}list {
+        type ipv{{ version }}_addr
+        flags interval,timeout
+        auto-merge
+        timeout 3d
+        gc-interval 3d
+{% if (length(set.elements)): %}
+        elements = { {{ join(', ', set.elements) }} }
+{% endif %}
+    }
+{% endif %}
+{% endfor %}
+{% for (let set in [
+    { name: 'bypass', elements: addresses.direct },
+    { name: 'proxy', elements: addresses.proxy },
+]): %}
+{% if (length(set.elements)): %}
+    set {{ set.name }}{{ version }}list {
+        type ipv{{ version }}_addr
+        flags interval
+        auto-merge
+        elements = { {{ join(', ', set.elements) }} }
+    }
+{% endif %}
+{% endfor %}
+{% endfor %}
+}

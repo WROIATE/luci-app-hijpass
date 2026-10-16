@@ -2357,3 +2357,15 @@ msgstr "普通链（无 hook）"
 
 msgid "Invalid firewall chain definitions"
 msgstr "防火墙链定义无效"
+
+#: ts-src/views/firewall.ts
+msgid "Restore Default Template"
+msgstr "恢复默认模板"
+
+#: ts-src/views/firewall.ts
+msgid "Restore Failed"
+msgstr "恢复失败"
+
+#: ts-src/views/firewall.ts
+msgid "Firewall Template"
+msgstr "防火墙模板"

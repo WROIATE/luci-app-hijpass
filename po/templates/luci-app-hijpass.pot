@@ -3129,3 +3129,15 @@ msgstr ""
 
 msgid "Timed out waiting for trace results"
 msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Restore Default Template"
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Restore Failed"
+msgstr ""
+
+#: ts-src/views/firewall.ts
+msgid "Firewall Template"
+msgstr ""

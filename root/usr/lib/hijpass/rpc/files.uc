@@ -2,14 +2,14 @@ import * as fs from 'fs';
 import { read } from 'hijpass.uci.read';
 import { first } from 'hijpass.config.sections';
 import { atomic } from 'hijpass.common';
-import { definitions } from '../firewall/generate.uc';
+import { TEMPLATE_PATH } from '../firewall/generate.uc';
 
 // 编辑器只传资源名、section ID 和可选的新名称；目录和文件命名始终由后端决定。
 const resources = {
     ip_direct: '/etc/hijpass/rules/ip-direct.txt', ip_proxy: '/etc/hijpass/rules/ip-proxy.txt',
     domain_direct: '/etc/hijpass/rules/domain-direct.txt', domain_proxy: '/etc/hijpass/rules/domain-proxy.txt',
     nft_hook: '/etc/hijpass/hook/nft-hook.sh', dns_hook: '/etc/hijpass/hook/dns-hook.sh',
-    shunt_conf: '/etc/hijpass/shunt.json',
+    shunt_conf: '/etc/hijpass/shunt.json', firewall_template: TEMPLATE_PATH,
 };
 /** @param {string|null} value @returns {string} */
 function identifier(value) {
@@ -28,10 +28,6 @@ function editorPath(request) {
     let packageName = kind == 'server_config' ? 'hijserver' : 'hijpass';
     let config = read(packageName), global = first(config, packageName);
     if (exists(resources, kind)) return global[kind] || resources[kind];
-    if (kind == 'firewall_rule') {
-        if (!length(filter(definitions, chain => chain.name == request.section))) die('unknown firewall chain');
-        return `${global.firewall_rules || '/etc/hijpass/firewall'}/${request.section}.ut`;
-    }
     if (kind != 'proxy_config' && kind != 'server_config') die('unknown editor resource');
     let id = identifier(request.section), section = filter(config, item => item['.name'] == id)[0];
     let name = filename(request.name || section?.name || id);

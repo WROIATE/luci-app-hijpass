@@ -9,6 +9,7 @@ function shellRuntime() {
     if (shellDirectory) return shellDirectory;
     shellDirectory = fs.mkdtempSync('/tmp/hijpass-shell-runtime-');
     fs.cpSync(path.join(root, 'root/usr/lib/hijpass'), shellDirectory, { recursive: true });
+    fs.copyFileSync(path.join(root, 'root/etc/hijpass/firewall.ut'), path.join(shellDirectory, 'firewall/default.ut'));
     for (const folder of fs.readdirSync(shellDirectory, { withFileTypes: true })) {
         const files = folder.isDirectory() ? fs.readdirSync(path.join(shellDirectory, folder.name)).map(name => path.join(shellDirectory, folder.name, name)) : [path.join(shellDirectory, folder.name)];
         // 在测试安装副本中映射固定路径，生产脚本无需支持可变安装目录。

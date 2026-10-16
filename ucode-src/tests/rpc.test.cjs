@@ -25,14 +25,14 @@ function read(packageName) { return readConfig(packageName, '${config}'); }`));
     }
     const jobs = path.join(runtime, 'rpc/jobs.sh');
     fs.writeFileSync(jobs, fs.readFileSync(jobs, 'utf8').replaceAll('/tmp/hijpass-jobs', path.join(directory, 'jobs')));
-    const rules = path.join(directory, 'rules');
-    fs.cpSync(path.join(root, 'root/etc/hijpass/firewall'), rules, { recursive: true });
+    const rules = path.join(directory, 'firewall.ut');
+    fs.copyFileSync(path.join(root, 'root/etc/hijpass/firewall.ut'), rules);
     const editor = path.join(directory, 'direct.txt'), log = path.join(directory, 'node.log');
     fs.writeFileSync(editor, 'original\n');
     fs.writeFileSync(log, 'first\nsecond\nthird\n');
     fs.writeFileSync(path.join(config, 'hijpass'), `config hijpass 'global'
  option client_dir '${directory}'
- option firewall_rules '${rules}'
+ option firewall_template '${rules}'
  option ip_direct '${editor}'
  option shunt_conf '${directory}/shunt.json'
 config proxy_node 'node'
@@ -54,17 +54,19 @@ config proxy_node 'node'
     return { invoke, directory, runtime, rules, editor, log };
 }
 
-test('RPC serves the same in-code chains used for generation and exposes no path arguments', t => {
+test('RPC reads the full editable template and serves an immutable default without paths', t => {
     const f = fixture(t), schema = f.invoke('list');
-    assert.ok(schema.firewall_chains);
+    assert.ok(schema.firewall_template_default);
+    assert.equal(schema.firewall_chains, undefined);
     assert.deepEqual(Object.keys(schema.editor_read), ['resource', 'section', 'name']);
-    const definitions = f.invoke('firewall_chains').chains;
-    assert.equal(definitions.length, 7);
-    for (const chain of definitions) {
-        const response = f.invoke('editor_read', { resource: 'firewall_rule', section: chain.name });
-        assert.equal(response.content, fs.readFileSync(path.join(f.rules, chain.name + '.ut'), 'utf8'));
-    }
-    assert.match(f.invoke('editor_read', { resource: 'firewall_rule', section: '../sets' }).error, /unknown firewall chain/);
+    const original = fs.readFileSync(f.rules, 'utf8');
+    assert.equal(f.invoke('editor_read', { resource: 'firewall_template' }).content, original);
+    assert.equal(f.invoke('firewall_template_default').content, original);
+    assert.equal(f.invoke('editor_write', { resource: 'firewall_template', content: 'changed template' }).ok, true);
+    assert.equal(f.invoke('editor_read', { resource: 'firewall_template' }).content, 'changed template\n');
+    assert.equal(f.invoke('firewall_template_default').content, original);
+    fs.unlinkSync(path.join(f.runtime, 'firewall/default.ut'));
+    assert.match(f.invoke('firewall_template_default').error, /cannot read/);
     assert.match(f.invoke('editor_read', { resource: '/etc/shadow' }).error, /unknown editor resource/);
     assert.equal(f.invoke('not_a_method').error, 'unknown RPC method');
 });

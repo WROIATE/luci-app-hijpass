@@ -29,8 +29,8 @@ function backend(handler, clock = { now: 0 }) {
 
 test('editors send resource identities and propagate backend failures', async () => {
     const f = backend((method, args) => method === 'editor_read' ? { content: 'template' } : { error: 'write failed' });
-    assert.equal(await f.api.readEditor({ resource: 'firewall_rule', section: 'pre-filter' }), 'template');
-    assert.deepEqual(Array.from(f.calls[0][1]), ['firewall_rule', 'pre-filter', '']);
+    assert.equal(await f.api.readEditor({ resource: 'firewall_template' }), 'template');
+    assert.deepEqual(Array.from(f.calls[0][1]), ['firewall_template', '', '']);
     await assert.rejects(f.api.writeEditor({ resource: 'proxy_config', section: 'node', name: 'renamed' }, '{}'), /write failed/);
     assert.deepEqual(Array.from(f.calls[1][1]), ['proxy_config', 'node', 'renamed', '{}']);
 });

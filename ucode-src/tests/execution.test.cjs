@@ -92,9 +92,9 @@ fi`);
     f.script('ubus', `printf '%s\\n' '{"interface":[{"device":"wan0","route":[{"mask":0}]}]}'`);
     f.script('fw4', `if [ "$1" = zone ]; then echo wan0; else echo reload >>"$TEST_CALLS"; fi`);
     f.script('nft', '[ "$NFT_FAIL" != 1 ]');
-    const ruleDirectory = path.join(f.directory, 'chain-rules');
-    fs.cpSync(path.join(root, 'root/etc/hijpass/firewall'), ruleDirectory, { recursive: true });
-    const sections = [{ '.type': 'hijpass', firewall_rules: ruleDirectory },
+    const template = path.join(f.directory, 'firewall.ut');
+    fs.copyFileSync(path.join(root, 'root/etc/hijpass/firewall.ut'), template);
+    const sections = [{ '.type': 'hijpass', firewall_template: template },
         { '.type': 'firewall', shunt_port: '18081', tproxy_proto: 'tcp,udp', acl_default_allow: '1' },
         { '.type': 'dns', dns_service: 'custom' }];
     withConfig(sections, config => {
@@ -107,8 +107,8 @@ fi`);
             assert.equal(fs.existsSync(calls), false);
         }
         // 规则文件缺失、模板语法错误均不能替换旧规则或触发重载。
-        const file = path.join(ruleDirectory, 'pre-filter.ut'), original = fs.readFileSync(file, 'utf8');
-        for (const invalid of [null, '{% if (: %}']) {
+        const file = template, original = fs.readFileSync(file, 'utf8');
+        for (const invalid of [null, '', '{# empty rules #}', '{% if (: %}']) {
             if (invalid === null) fs.unlinkSync(file); else fs.writeFileSync(file, invalid);
             const broken = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
             assert.equal(broken.status, 1);

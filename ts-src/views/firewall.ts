@@ -1,11 +1,13 @@
 import view from "view";
-import { Backend, FirewallChain } from "../utils/backend";
+import { Backend } from "../utils/backend";
 import uci from "uci";
 import { FIREWALL_DNS_FORWARD, LuciFlied } from "../enum/hijpass";
 import form from "form";
 import { SaveApplyUtils } from "../utils/actions/save-apply/index";
 import { FormUtils } from "../utils/base/luci/form";
+import { FirewallEditorUtils } from "../utils/feature/firewall/editor";
 import { FirewallFormUtils } from "../utils/feature/firewall/form";
+import { NotificationUtils } from "../utils/base/luci/notification";
 import { FirewallDnsForwardUtils } from "../utils/feature/firewall/dns-forward";
 
 
@@ -14,13 +16,12 @@ const v = view.extend({
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME),
             uci.load('firewall'),
-            Backend.firewallChains(),
         ]);
     },
 
     handleSaveApply: SaveApplyUtils.genHandleSaveApply(),
 
-    render: async function (data: [unknown, unknown, FirewallChain[]]) {
+    render: async function () {
         let m = new form.Map(LuciFlied.CONF_NAME, _('Firewall Configuration'),
             _('Configure Firewall'));
 
@@ -35,7 +36,7 @@ const v = view.extend({
         // 创建 ACL 配置选项
         await createAclOptions(s);
         // 创建文本编辑选项
-        createTextOptions(s, data[2]);
+        createTextOptions(s);
 
         return m.render();
     }
@@ -107,7 +108,7 @@ function createListOptions(s: LuCI.form.AbstractSection) {
 }
 
 // 创建所有文本编辑选项
-function createTextOptions(s: LuCI.form.AbstractSection, chains: FirewallChain[]) {
+function createTextOptions(s: LuCI.form.AbstractSection) {
     // IP 直连列表（IPv4 + IPv6）
     FormUtils.createTextOption(s, 'ip_direct', 'ip_direct_hash', null,
         _('Edit IP Direct List'),
@@ -117,46 +118,36 @@ function createTextOptions(s: LuCI.form.AbstractSection, chains: FirewallChain[]
     FormUtils.createTextOption(s, 'ip_proxy', 'ip_proxy_hash', null,
         _('Edit IP Proxy List'), { resource: 'ip_proxy' });
 
-    // 用户只编辑链内规则；表、集合、hook 和优先级在内部模板中管理。
-    const selector = s.taboption('nftables', form.ListValue, '_rule_chain', null);
-    selector.default = chains[0].name;
-    selector.load = function () { return chains[0].name; };
-    selector.write = function () { };
-    selector.remove = function () { };
-    const renderSelector = selector.renderWidget;
-    selector.renderWidget = function (...args: any[]) {
-        const widget = renderSelector.apply(this, args) as HTMLElement;
-        // 不显示标题，但键盘和屏幕阅读器仍能识别选择器。
-        widget.querySelector('select')?.setAttribute('aria-label', _('Chain'));
+    const restore = s.taboption<LuCI.form.ButtonValue>('nftables', form.Button, '_restore_template', null);
+    restore.inputtitle = _('Restore Default Template');
+    restore.inputstyle = 'neutral';
+    restore.onclick = async function (ev: Event, sectionId: string) {
+        const button = ev.currentTarget as HTMLButtonElement;
+        button.disabled = true;
+        try {
+            // 只替换编辑器内容，沿用页面的保存流程。
+            const content = await Backend.defaultFirewallTemplate();
+            editor.getUIElement(sectionId).setValue(content.trim());
+        } catch (error) {
+            NotificationUtils.error(_('Restore Failed'), error.message, 5000);
+        } finally { button.disabled = false; }
+    };
+
+    const editor = FormUtils.createTextOption(s, 'nftables', 'nft_hash', null, null,
+        { resource: 'firewall_template' });
+    editor.rows = 38;
+    const renderEditor = editor.renderWidget;
+    editor.renderWidget = function (...args: any[]) {
+        const widget = renderEditor.apply(this, args) as HTMLElement;
+        FirewallEditorUtils.mount(widget, _('Firewall Template'));
         return widget;
     };
-    for (const chain of chains) {
-        selector.value(chain.name, chain.name);
-        const hook = s.taboption('nftables', form.DummyValue, '_hook_' + chain.name.replace(/-/g, '_'), null);
-        hook.renderWidget = function () {
-            // 只整理声明的展示方式；生成器仍直接使用后端定义的原始声明。
-            const fields = chain.hook.match(/^type\s+(\S+)\s+hook\s+(\S+)\s+priority\s+([^;]+);\s*policy\s+(\S+);$/);
-            const description = fields
-                ? `hook: ${fields[2]} · type: ${fields[1]} · priority: ${fields[3]} · policy: ${fields[4]}`
-                : chain.hook || _('Regular chain (no hook)');
-            return E('div', {
-                class: 'cbi-value-description',
-                style: 'margin:0;opacity:.75;line-height:1.6;overflow-wrap:anywhere',
-            }, description);
-        };
-        hook.depends('_rule_chain', chain.name);
-        const editor = FormUtils.createTextOption(s, 'nftables', chain.name.replace(/-/g, '_') + '_hash', null, null,
-            { resource: 'firewall_rule', section: chain.name });
-        const renderEditor = editor.renderWidget;
-        editor.renderWidget = function (...args: any[]) {
-            const widget = renderEditor.apply(this, args) as HTMLElement;
-            widget.querySelector('textarea')?.setAttribute('aria-label', chain.name);
-            return widget;
-        };
-        // 切换链只隐藏编辑器；保存时保留其它链的规则文件。
-        editor.retain = true;
-        editor.depends('_rule_chain', chain.name);
-    }
+    editor.write = async function (sectionId: string, content: string) {
+        // 文件也可能从命令行编辑，恢复后的保存不能只凭旧 hash 跳过写入。
+        await Backend.writeEditor({ resource: 'firewall_template' }, content || '');
+        uci.set(LuciFlied.CONF_NAME, sectionId, 'nft_hash', String(FormUtils.simpleHash(content)));
+    };
+    editor.remove = async function (sectionId: string) { await editor.write(sectionId, ''); };
 
     FirewallFormUtils.createNftViewOption(s);
 

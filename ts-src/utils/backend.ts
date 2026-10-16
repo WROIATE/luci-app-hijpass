@@ -1,8 +1,7 @@
 import rpc from 'rpc';
 
-export type FirewallChain = { name: string; hook: string; requires: string[] };
 export type EditorResource = 'ip_direct' | 'ip_proxy' | 'domain_direct' | 'domain_proxy'
-    | 'nft_hook' | 'dns_hook' | 'shunt_conf' | 'firewall_rule' | 'proxy_config' | 'server_config';
+    | 'nft_hook' | 'dns_hook' | 'shunt_conf' | 'firewall_template' | 'proxy_config' | 'server_config';
 export type Editor = { resource: EditorResource; section?: string; name?: string };
 export type Log = { id: string; kind: 'main' | 'shunt' | 'proxy' | 'server'; name: string };
 
@@ -21,7 +20,7 @@ const editorRead = method('editor_read', ['resource', 'section', 'name']);
 const editorWrite = method('editor_write', ['resource', 'section', 'name', 'content']);
 const logRead = method('log_read', ['id', 'action', 'lines']);
 const firewallShow = method('firewall_show');
-const chains = method('firewall_chains');
+const firewallDefault = method('firewall_template_default');
 const logs = method('log_list');
 const jobStatus = method('job_status', ['id']);
 const jobRelease = method('job_release', ['id']);
@@ -55,7 +54,7 @@ const coreCalls = {
 };
 
 export const Backend = {
-    firewallChains: async (): Promise<FirewallChain[]> => (await chains()).chains,
+    defaultFirewallTemplate: async (): Promise<string> => (await firewallDefault()).content,
     readEditor: async (editor: Editor): Promise<string> =>
         (await editorRead(editor.resource, editor.section || '', editor.name || '')).content,
     writeEditor: (editor: Editor, content: string) =>

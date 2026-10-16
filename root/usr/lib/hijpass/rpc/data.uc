@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { definitions } from '../firewall/generate.uc';
+import { defaultTemplate } from '../firewall/generate.uc';
 import { editor, logs, log, logSettings } from './files.uc';
 import { render } from 'hijpass.coreconfig.render';
 import { read } from 'hijpass.uci.read';
@@ -8,7 +8,7 @@ import { writeConfigs } from '../service/prepare.uc';
 
 // RPC 参数是业务数据。没有文件路径或通用 command/argv 入口。
 const methods = {
-    firewall_chains: {}, editor_read: { resource: '', section: '', name: '' },
+    firewall_template_default: {}, editor_read: { resource: '', section: '', name: '' },
     editor_write: { resource: '', section: '', name: '', content: '' },
     config_write: { sections: '' }, log_list: {}, log_read: { id: '', action: '', lines: '' },
     log_clear: { id: '' }, log_settings: { package: '', section: '', name: '' },
@@ -34,7 +34,7 @@ try {
         if (type(request[key]) != type(fallback)) die(`invalid RPC argument: ${key}`);
     }
     let result;
-    if (method == 'firewall_chains') result = { chains: definitions };
+    if (method == 'firewall_template_default') result = { content: defaultTemplate() };
     else if (method == 'editor_read' || method == 'editor_write') result = editor(request, method == 'editor_write');
     else if (method == 'log_list') result = logs();
     else if (method == 'log_read') {

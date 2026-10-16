@@ -12,7 +12,7 @@
           "list"
         ],
         "hijpass": [
-          "firewall_chains",
+          "firewall_template_default",
           "editor_read",
           "log_list",
           "log_read",

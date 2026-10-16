@@ -9,7 +9,7 @@ case "$1" in
 esac
 
 case "$method" in
-    firewall_chains|editor_read|editor_write|config_write|log_list|log_read|log_clear|log_settings|defaults)
+    firewall_template_default|editor_read|editor_write|config_write|log_list|log_read|log_clear|log_settings|defaults)
         hijpass_data "$HIJPASS_LIB/rpc/data.uc" call "$method"
         exit $? ;;
 esac

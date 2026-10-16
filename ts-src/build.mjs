@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 const VIEWS_DIR = path.join(__dirname, 'views');
 // 输出目录
 const DIST_DIR = path.join(__dirname, '../htdocs/luci-static/resources/view/hijpass');
+const runtimePackages = new Set();
 
 // 限定哪些 from 模块名当作 luci 模块（name = require name）
 const luciModuleNames = new Set(
@@ -75,7 +76,7 @@ async function buildOne(entryPath) {
     const baseName = rel.replace(/\.ts$/, '');       // demo
     const outFile = path.join(DIST_DIR, `${baseName}.js`);
 
-    await build({
+    const result = await build({
         entryPoints: [entryPath],
         bundle: true,
         platform: 'browser',
@@ -83,11 +84,17 @@ async function buildOne(entryPath) {
         target: ['es2022'],
         outfile: outFile,
         sourcemap: false,
+        metafile: true,
         minify: true,
         globalName: 'LuciView',
         plugins: [luciPlugin]
     });
 
+    // 仅收集实际打入浏览器的依赖，安装包同时携带它们的许可证。
+    for (const input of Object.keys(result.metafile.inputs)) {
+        const name = input.match(/node_modules\/((?:@[^/]+\/)?[^/]+)/)?.[1];
+        if (name) runtimePackages.add(name);
+    }
     const bundled = fs.readFileSync(outFile, 'utf-8');
     const requireLines = Array.from(usedModules)
         .sort()
@@ -123,6 +130,13 @@ async function bundleAll() {
         // 但串行 log 更清晰，出错也好排查
         await buildOne(entry);
     }
+    const licenses = [...runtimePackages].sort().map(name => {
+        const directory = path.join(__dirname, 'node_modules', name);
+        const license = ['LICENSE', 'LICENSE.txt', 'LICENSE.md'].find(file => fs.existsSync(path.join(directory, file)));
+        if (!license) throw new Error('Missing runtime dependency license: ' + name);
+        return name + '\n' + fs.readFileSync(path.join(directory, license), 'utf8');
+    });
+    fs.writeFileSync(path.join(DIST_DIR, 'editor.LICENSES.txt'), licenses.join('\n\n'));
 }
 
 bundleAll().catch(err => {

@@ -57,45 +57,10 @@ function ipList(path, version) {
 	});
 }
 
-// ChainDefinition：name 对应链规则模板；hook 为基础链声明，普通链为空。
-// requires 列出 FirewallOptions 条件，全部满足才启用。生成与 RPC 共用此对象。
-export const definitions = [
-  {
-    "name": "pre-filter",
-    "hook": "type filter hook prerouting priority filter - 50; policy accept;",
-    "requires": []
-  },
-  {
-    "name": "out-route",
-    "hook": "type route hook output priority filter - 50; policy accept;",
-    "requires": ["proxyLocal"]
-  },
-  {
-    "name": "tproxy-shunt",
-    "hook": "",
-    "requires": []
-  },
-  {
-    "name": "tproxy-mark",
-    "hook": "",
-    "requires": []
-  },
-  {
-    "name": "proxy-port-filter",
-    "hook": "",
-    "requires": []
-  },
-  {
-    "name": "dns-forward",
-    "hook": "type nat hook prerouting priority dstnat - 1; policy accept;",
-    "requires": ["forwardPort"]
-  },
-  {
-    "name": "dns-forward-output",
-    "hook": "type nat hook output priority -101; policy accept;",
-    "requires": ["forwardPort", "proxyLocal"]
-  }
-];
+export const TEMPLATE_PATH = '/etc/hijpass/firewall.ut';
+
+// 默认副本由打包流程从可编辑模板生成，升级时更新且不受用户编辑影响。
+export function defaultTemplate() { return text('/usr/lib/hijpass/firewall/default.ut'); };
 
 // FirewallOptions：端口为已校验整数，0 表示未启用；protocols 为 tcp/udp 数组。
 // wan/interfaces/excludedInterfaces 是设备名数组，macs/excludedMacs 是 MAC 数组。
@@ -153,37 +118,17 @@ function options(config, state) {
 /**
  * @param {object[]} config
  * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
- * @param {string} ruleDirectory 只包含各链内部规则模板的目录。
+ * @param {string} [templatePath] 完整 nftables 模板文件。
  */
-export function generate(config, state, ruleDirectory) {
+export function generate(config, state, templatePath) {
     let f = first(config, 'firewall');
     if (!f.proxy_port && !f.shunt_port) return '';
-    // 旧整表模板不能当成链内规则使用；未迁移的自定义路径必须明确报告。
-    let legacy = first(config, 'hijpass').nft;
-    if (legacy && index(['/etc/hijpass/fw4-template.nft', '/etc/hijpass/fw4-template.ut'], legacy) < 0)
-        die('legacy nft template: move chain rules to firewall_rules before enabling the firewall');
-    if (type(ruleDirectory) != 'string' || !length(ruleDirectory)) die('firewall_rules directory is required');
-    let values = options(config, state);
-    let chains = [], names = {};
-    for (let chain in definitions) {
-        if (type(chain) != 'object' || type(chain.name) != 'string' || !match(chain.name, /^[A-Za-z][A-Za-z0-9_-]*$/) ||
-            type(chain.hook) != 'string' || type(chain.requires) != 'array') die('invalid firewall chain definition');
-        if (names[chain.name]) die(`duplicate firewall chain "${chain.name}"`);
-        names[chain.name] = true;
-        let enabled = true;
-        for (let field in chain.requires) {
-            if (type(field) != 'string' || !exists(values, field)) die(`unknown firewall condition "${field}"`);
-            if (!values[field]) enabled = false;
-        }
-        // 未启用链不读取规则文件；即使条件不满足，也检查该链的全部条件名。
-        if (!enabled) continue;
-        let path = `${ruleDirectory}/${chain.name}.ut`;
-        // 空文件允许清空链内规则；缺失文件则必须失败，避免意外生成残缺规则。
-        if (fs.readfile(path) == null) die(`firewall rule template is unreadable: ${path}`);
-        push(chains, { name: chain.name, hook: chain.hook, rules: renderTemplate(path, { options: values }) });
-    }
-    let sets = renderTemplate('/usr/lib/hijpass/firewall/sets.ut', { options: values });
-    return renderTemplate('/usr/lib/hijpass/firewall/ruleset.ut', { chains, sets });
+    let path = templatePath || first(config, 'hijpass').firewall_template || TEMPLATE_PATH;
+    if (type(path) != 'string') die('invalid firewall template path');
+    let output = renderTemplate(path, { options: options(config, state) });
+    // 空模板不能让已启用的防火墙被当作关闭处理。
+    if (!length(trim(output))) die('firewall template rendered no rules');
+    return output;
 };
 
 // NetworkSnapshot：Shell 采集的 wan 文本以及 address/interface 命令的输出与退出码。
@@ -192,6 +137,6 @@ export function main() { run(() => {
     let raw = { wan: text(directory + '/wan'),
         addresses: { stdout: text(directory + '/addresses'), code: int(text(directory + '/addresses.code')) },
         interfaces: { stdout: text(directory + '/interfaces'), code: int(text(directory + '/interfaces.code')) } };
-    return generate(config, networkState(raw), first(config, 'hijpass').firewall_rules || '/etc/hijpass/firewall');
+    return generate(config, networkState(raw));
 });
 };

@@ -31,7 +31,7 @@ export function options(sections) {
 	function upstream(key) {
 		let value = dns[key];
 		if (value == 'custom') value = dns[`${key}_custom`];
-		if (value == 'system' || value == 'dnsmasq') {
+		if (value == 'dnsmasq') {
 			value = `127.0.0.1#${first(read('dhcp'), 'dnsmasq').port || '53'}`;
 		}
 		if (!value || match(value, /[\r\n]/)) die(`invalid ${key}`);

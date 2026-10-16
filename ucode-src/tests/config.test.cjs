@@ -35,7 +35,7 @@ function node(id, options = {}) {
         server: 'example.org', server_port: '443', listen_port: '10001', socks_port: '10002', ...options };
 }
 test('核心选择与协议独立，缺省 VLESS 使用 sing-box，显式 Xray 保持不变', () => {
-    for (const core of [undefined, '', 'singbox', 'sing-box', 'xray']) {
+    for (const core of [undefined, '', 'sing-box', 'xray']) {
         const section = node('a', { core, type: 'vless', uuid: '11111111-1111-4111-8111-111111111111' });
         const generated = rpc('render', [section]).nodes.a.outbounds[0];
         if (core === 'xray') assert.equal(generated.protocol, 'vless');
@@ -45,19 +45,25 @@ test('核心选择与协议独立，缺省 VLESS 使用 sing-box，显式 Xray �
         assert.match(rpc('render', [node('a', { core, type: 'custom', command: 'program' })]).error, /unsupported proxy type/);
 });
 
-test('自定义核心只读取命令和公共字段，不解释残留协议及其依赖', () => {
+test('自定义配置只读取命令和公共字段，不解释残留核心、协议及其依赖', () => {
     for (const type of [undefined, 'custom', 'vless', 'load_balance']) {
-        const section = node('a', { core: 'custom', type, command: 'program --config {conf_path}',
+        const section = node('a', { config_type: 'custom', core: 'unused', type, command: 'program --config {conf_path}',
             server_port: 'invalid', transport_grpc_idle_timeout: 'invalid', member_node: ['missing'], upstream_proxy_node: 'missing' });
         assert.deepEqual(rpc('render', [section]), { nodes: {} });
         assert.deepEqual(rpc('validate', [section]), { ok: true });
     }
     for (const command of [undefined, '', ' \t\n '])
-        assert.match(rpc('render', [node('a', { core: 'custom', command })]).error, /has no command/);
+        assert.match(rpc('render', [node('a', { config_type: 'custom', command })]).error, /has no command/);
+});
+
+test('业务转换不再识别旧核心名称或根据旧 custom 字段推断配置类型', () => {
+    for (const core of ['singbox', 'custom'])
+        assert.match(rpc('render', [node('a', { core, command: 'program' })]).error, /unsupported core/);
+    assert.match(rpc('render', [node('a', { config_type: 'invalid' })]).error, /unsupported config_type/);
 });
 
 test('自定义命令节点仍可通过其本地 SOCKS 端口接入上游和负载均衡', () => {
-    const custom = node('custom', { core: 'custom', type: 'load_balance', command: 'program',
+    const custom = node('custom', { config_type: 'custom', type: 'load_balance', command: 'program',
         member_node: ['missing'], upstream_proxy_node: 'missing' });
     for (const type of ['shadowsocks', 'load_balance']) {
         const generated = rpc('render', [custom, node('a', { type, listen_port: '10003', socks_port: '10004',
@@ -120,7 +126,7 @@ test('RPC 保持契约，非法显式快照不会退回本机 UCI', () => {
     assert.ok(JSON.parse(config(['call', 'render'], { sections: '' }).stdout).error);
     assert.match(rpc('render', {}).error, /unmarshal/);
     assert.match(rpc('render', [node('a')], 'missing').error, /not found/);
-    assert.match(rpc('render', [node('a', { core: 'custom', command: 'program' })], 'a').error, /custom/);
+    assert.match(rpc('render', [node('a', { config_type: 'custom', command: 'program' })], 'a').error, /custom/);
 });
 
 test('输入读取与 JSON 解析失败保留 RPC/CLI 错误格式，并限制输入大小', () => {

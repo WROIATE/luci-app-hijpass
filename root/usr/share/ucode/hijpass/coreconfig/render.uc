@@ -1,5 +1,5 @@
 import { first, validateSections } from '../config/sections.uc';
-import { CORE } from '../config/protocol/proxy.uc';
+import { CORE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 import { resolve as resolveDependencies, validate as validateDependencies } from './dependencies.uc';
 import { clean } from './json.uc';
 import { build as singbox } from './singbox/config.uc';
@@ -43,7 +43,7 @@ export function render(sections, target) {
 	validatePorts(dependencies.nodes, routing);
 	let result = { nodes: {} };
 	for (let n in dependencies.nodes) {
-		if (n.core == CORE.custom) continue;
+		if (n.config_type == CONFIG_TYPE.custom) continue;
 		try { result.nodes[n.id] = clean(n.core == CORE.xray ? xray(n) : singbox(n)); }
 		catch (e) { die(`node "${n.name}": ${e.message}`); }
 	}

@@ -3,7 +3,7 @@
 # 功能入口负责命令执行；相邻 ucode 脚本只校验、转换及生成数据。
 . /usr/lib/hijpass/common.sh
 
-# 账户、目录及缓存是安装动作；UCI 的字段迁移仍由原生 ucode 数据模块完成。
+# 安装时准备系统账户、目录与防火墙入口；旧配置转换独立执行。
 for file in group passwd shadow; do
     case "$file" in
         group) entry='hijpass:x:4396:hijpass' ;;
@@ -16,6 +16,11 @@ for file in group passwd shadow; do
         printf '%s\n' "$entry" >>"/etc/$file" || exit 1
     fi
 done
-hijpass_data "$HIJPASS_LIB/maintenance/migratecli.uc" || exit 1
+hijpass_data "$HIJPASS_LIB/install/migrate.uc" || exit 1
+# 防火墙 include 是安装配置，不属于旧字段迁移。
+uci -q set firewall.hijpass=include &&
+    uci -q set firewall.hijpass.type=script &&
+    uci -q set firewall.hijpass.path=/usr/lib/hijpass/firewall/fw4.sh &&
+    uci -q commit firewall || exit 1
 mkdir -p /etc/hijpass/client /etc/hijpass/server /tmp/hijpass/log /tmp/hijserver/log || exit 1
 rm -rf /tmp/luci-*cache

@@ -247,7 +247,7 @@ test('服务准备通过原生 UCI 读取并生成配置，禁用时不调用 Ge
     });
     const original = fs.readFileSync(client + '/test-ss.json', 'utf8');
     sections[1].password = 'changed';
-    sections.push({ '.type': 'proxy_node', '.name': 'custom', enabled: '1', name: 'custom', core: 'custom', type: 'custom' });
+    sections.push({ '.type': 'proxy_node', '.name': 'custom', enabled: '1', name: 'custom', config_type: 'custom', type: 'custom' });
     withConfig(sections, config => {
         const failed = f.run('service/service.sh', ['prepare', '--configdir', config], { TEST_CALLS: calls });
         assert.equal(failed.status, 1);
@@ -273,7 +273,7 @@ test('原生 UCI 中缺省核心的 VLESS 生成并启动 sing-box，自定义�
         { '.type': 'proxy_node', '.name': 'vless', enabled: '1', name: 'vless', type: 'vless',
             server: '192.0.2.10', server_port: '443', listen_port: '10001', socks_port: '10002',
             uuid: '11111111-1111-4111-8111-111111111111' },
-        { '.type': 'proxy_node', '.name': 'custom', enabled: '1', name: 'manual', core: 'custom',
+        { '.type': 'proxy_node', '.name': 'custom', enabled: '1', name: 'manual', config_type: 'custom',
             command, listen_port: '10003', socks_port: '10004' }];
     withConfig(sections, directory => {
         const result = f.run('service/service.sh', ['prepare', '--configdir', directory]);
@@ -284,4 +284,37 @@ test('原生 UCI 中缺省核心的 VLESS 生成并启动 sing-box，自定义�
         assert.deepEqual(plan.instances[1].command, ['/bin/sh', '-c', command]);
         assert.equal(fs.readFileSync(customFile, 'utf8'), 'user maintained content');
     });
+});
+
+test('uci-defaults 首次安装自动迁移并注册防火墙，重复安装不重新转换配置', t => {
+    const f = fixture(t), directory = path.join(f.directory, 'config'), accounts = path.join(f.directory, 'accounts');
+    fs.mkdirSync(directory); fs.mkdirSync(accounts);
+    for (const file of ['group', 'passwd', 'shadow']) fs.writeFileSync(path.join(accounts, file), 'existing:x:1:');
+    fs.writeFileSync(path.join(directory, 'hijpass'), "config hijpass 'global'\nconfig proxy_node 'manual'\n option core 'custom'\n option type 'custom'\n option command 'program'\n");
+    fs.writeFileSync(path.join(directory, 'firewall'), '');
+    f.patch('install/setup.sh', '/etc/$file', accounts + '/$file');
+    f.patch('install/setup.sh', '/etc/hijpass', f.directory + '/data');
+    f.patch('install/setup.sh', '/tmp/hijpass/log', f.directory + '/logs');
+    f.patch('install/setup.sh', '/tmp/hijserver/log', f.directory + '/server-logs');
+    f.patch('install/setup.sh', '/tmp/luci-*cache', f.directory + '/cache');
+    f.patch('install/setup.sh', '"$HIJPASS_LIB/install/migrate.uc"', '"$HIJPASS_LIB/install/migrate.uc" --configdir "$TEST_CONFIG_DIRECTORY"');
+    const uci = spawnSync('/bin/sh', ['-c', 'command -v uci'], { encoding: 'utf8' }).stdout.trim();
+    assert.ok(uci, 'native UCI CLI is required for the installation test');
+    f.script('uci', "exec '" + uci.replaceAll("'", "'\\''") + "' -c \"$TEST_CONFIG_DIRECTORY\" \"$@\"");
+    fs.writeFileSync(path.join(f.runtime, 'install/firstboot.sh'),
+        fs.readFileSync(path.join(root, 'root/etc/uci-defaults/luci-app-hijpass'), 'utf8').replaceAll('/usr/lib/hijpass', f.runtime));
+    const first = f.run('install/firstboot.sh', [], { TEST_CONFIG_DIRECTORY: directory });
+    assert.equal(first.status, 0, first.stderr);
+    const migrated = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
+    assert.match(migrated, /schema_version '1'/);
+    assert.match(migrated, /config_type 'custom'/);
+    assert.doesNotMatch(migrated, /option (core|type) /);
+    assert.match(fs.readFileSync(path.join(directory, 'firewall'), 'utf8'), /option type 'script'/);
+    const modified = migrated + "\nconfig proxy_node 'later'\n option core 'singbox'\n";
+    fs.writeFileSync(path.join(directory, 'hijpass'), modified);
+    const again = f.run('install/firstboot.sh', [], { TEST_CONFIG_DIRECTORY: directory });
+    assert.equal(again.status, 0, again.stderr);
+    assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), modified);
+    for (const file of ['group', 'passwd', 'shadow'])
+        assert.equal(fs.readFileSync(path.join(accounts, file), 'utf8').split('\n').filter(line => line.startsWith('hijpass:')).length, 1);
 });

@@ -8,6 +8,11 @@ const { root, run, runShell, withConfig } = require('./helpers.cjs');
 
 function invoke(request, env) {
     const extra = env ? { env: { ...process.env, ...env } } : {};
+    if (request.action === 'migrate') {
+        const migrated = run('root/usr/lib/hijpass/install/migrate.uc', ['--configdir', request.directory]);
+        if (migrated.status !== 0) return migrated;
+        return run('ucode-src/tests/runtime.uc', [], { action: 'read', directory: request.directory });
+    }
     if (request.action === 'connect') return runShell('root/usr/lib/hijpass/network/network.sh',
         ['connect', request.url, request.timeout || '5'], extra);
     if (request.action === 'update') return withConfig(request.sections, directory =>
@@ -145,7 +150,7 @@ test('service plans preserve argv, custom config paths, environments and nesting
     const directory = fixture(t);
     const sections = [{ ...global, client_dir: directory }, node('sb', { name: 'space name', procd_env: ['A=a b', 'B=two'] }),
         node('xr', { core: 'xray', listen_port: '10003', socks_port: '10004', nest_proxy: '1' }),
-        node('custom', { core: 'custom', type: 'custom', command: 'program --conf {conf_path}' }),
+        node('custom', { config_type: 'custom', type: 'custom', command: 'program --conf {conf_path}' }),
         node('off', { enabled: '0' })];
     const result = value({ action: 'plan', sections });
     assert.equal(result.instances.length, 3);
@@ -161,23 +166,31 @@ test('service plans preserve argv, custom config paths, environments and nesting
 
 test('服务启动和生成采用同一核心缺省值，自定义命令保持 Shell 语义', t => {
     const directory = fixture(t);
-    for (const core of [undefined, '', 'singbox', 'sing-box', 'xray']) {
+    for (const core of [undefined, '', 'sing-box', 'xray']) {
         const result = value({ action: 'plan', sections: [{ ...global, client_dir: directory },
             node('a', { core, type: 'vless' })] });
         assert.equal(result.instances[0].command[0], core === 'xray' ? 'xray' : 'sing-box');
     }
     const output = path.join(directory, 'command-output');
     const command = `value='a b'; printf '%s\\n' "$value" > '${output}'`;
-    const result = value({ action: 'plan', sections: [global, node('custom', { core: 'custom', command })] });
+    const result = value({ action: 'plan', sections: [global, node('custom', { config_type: 'custom', command })] });
     assert.deepEqual(result.instances[0].command, ['/bin/sh', '-c', command]);
     const executed = spawnSync(result.instances[0].command[0], result.instances[0].command.slice(1), { encoding: 'utf8' });
     assert.equal(executed.status, 0, executed.stderr);
     assert.equal(fs.readFileSync(output, 'utf8'), 'a b\n');
     for (const command of [undefined, '', ' \t\n ']) {
-        const invalid = invoke({ action: 'plan', sections: [global, node('custom', { core: 'custom', command })] });
+        const invalid = invoke({ action: 'plan', sections: [global, node('custom', { config_type: 'custom', command })] });
         assert.notEqual(invalid.status, 0);
         assert.match(invalid.stderr, /has no command/);
     }
+    for (const core of ['singbox', 'custom']) {
+        const invalid = invoke({ action: 'plan', sections: [global, node('a', { core })] });
+        assert.notEqual(invalid.status, 0);
+        assert.match(invalid.stderr, /unsupported core/);
+    }
+    const invalidMode = invoke({ action: 'plan', sections: [global, node('a', { config_type: 'invalid' })] });
+    assert.notEqual(invalidMode.status, 0);
+    assert.match(invalidMode.stderr, /unsupported config_type/);
 });
 
 test('server plan validates allowed ports and leaves manually edited JSON untouched', t => {
@@ -196,7 +209,7 @@ test('native configuration writes are private and staging failure preserves ever
     const directory = fixture(t), client = path.join(directory, 'client'); fs.mkdirSync(client);
     const custom = path.join(client, 'manual-c.json'); fs.writeFileSync(custom, 'manual');
     const sections = [{ ...global, client_dir: client, shunt_conf: path.join(directory, 'shunt.json') }, node('a'),
-        node('c', { name: 'manual', core: 'custom', command: 'program', listen_port: '10003', socks_port: '10004' })];
+        node('c', { name: 'manual', config_type: 'custom', command: 'program', listen_port: '10003', socks_port: '10004' })];
     const result = value({ action: 'write', sections });
     assert.equal(result.length, 1);
     const file = path.join(client, 'a-a.json'), original = fs.readFileSync(file, 'utf8');
@@ -220,6 +233,8 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     assert.deepEqual(balance.member_node, ['member']);
     assert.equal(result.find(s => s['.name'] === 's').default_proxy_node, balance.name);
     assert.equal(result.find(s => s['.name'] === 'a').core, 'sing-box');
+    assert.equal(result.find(s => s['.name'] === 'a').config_type, 'generated');
+    assert.equal(result.find(s => s['.name'] === 'global').schema_version, '1');
     assert.equal(result.find(s => s['.name'] === 'dns').direct_dns, 'dnsmasq');
     assert.equal(result.find(s => s['.name'] === 'fw').proxy_local, '0');
     const text = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
@@ -227,6 +242,35 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), text);
     fs.writeFileSync(path.join(directory, 'hijpass'), text.replace('/etc/hijpass/firewall.ut', '/custom/firewall.ut'));
     assert.equal(value({ action: 'migrate', directory }).find(s => s['.name'] === 'global').firewall_template, '/custom/firewall.ut');
+});
+
+test('独立迁移脚本转换旧自定义配置，保留用户命令并仅执行一次', t => {
+    const directory = fixture(t), file = path.join(directory, 'hijpass');
+    fs.writeFileSync(file, `config hijpass 'global'\nconfig proxy_node 'a'\n option core 'custom'\n option type 'vless'\n option command 'program --config {conf_path}'\nconfig proxy_node 'b'\n option type 'custom'\n option command 'other-program'\nconfig proxy_node 'c'\n option core 'xray'\n option type 'vless'\n`);
+    const sections = value({ action: 'migrate', directory });
+    for (const id of ['a', 'b']) {
+        const section = sections.find(s => s['.name'] === id);
+        assert.equal(section.config_type, 'custom');
+        assert.equal(section.core, undefined);
+        assert.equal(section.type, undefined);
+    }
+    assert.equal(sections.find(s => s['.name'] === 'a').command, 'program --config {conf_path}');
+    assert.equal(sections.find(s => s['.name'] === 'c').core, 'xray');
+    const modified = fs.readFileSync(file, 'utf8') + "\nconfig proxy_node 'later'\n option core 'singbox'\n";
+    fs.writeFileSync(file, modified);
+    value({ action: 'migrate', directory });
+    assert.equal(fs.readFileSync(file, 'utf8'), modified);
+});
+
+test('迁移失败不写入完成标记，修复配置后可以重试', t => {
+    const directory = fixture(t), file = path.join(directory, 'hijpass');
+    const invalid = "config hijpass 'global'\n option broken 'unterminated\n";
+    fs.writeFileSync(file, invalid);
+    const failed = invoke({ action: 'migrate', directory });
+    assert.notEqual(failed.status, 0);
+    assert.equal(fs.readFileSync(file, 'utf8'), invalid);
+    fs.writeFileSync(file, "config hijpass 'global'\n");
+    assert.equal(value({ action: 'migrate', directory })[0].schema_version, '1');
 });
 
 test('domain/IP normalization and CIDR lookup use native address validation', () => {

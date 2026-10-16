@@ -5,7 +5,7 @@ import { ShuntUtils } from './section';
 // Preserve the UCI metadata consumed by the existing geoview.sh conversion flow.
 function updateGeoRules() {
     const type = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type');
-    if ((type !== 'sing-box' && type !== 'singbox')
+    if (type !== 'sing-box'
         || uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'enabled') === '0'
         || uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'ruleset_convert') !== '1') return;
     const sites = new Set<string>();

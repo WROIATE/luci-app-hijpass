@@ -1,5 +1,5 @@
 import uci from "uci";
-import { CORE_TYPE, FIREWALL_DNS_FORWARD, LuciFlied, PROXY_TYPE } from "../../../enum/hijpass";
+import { FIREWALL_DNS_FORWARD, LuciFlied, PROXY_TYPE } from "../../../enum/hijpass";
 import { FirewallDnsForwardUtils } from "../firewall/dns-forward";
 import { ProxyChainUtils } from "../proxy/chain";
 
@@ -86,7 +86,7 @@ function getProxyTarget(port: string, portLabel: string): FlowStep[] {
         return steps;
     }
 
-    if (ProxyChainUtils.getProxyCore(proxy) !== CORE_TYPE.CUSTOM && proxy.type === PROXY_TYPE.LOAD_BALANCE) {
+    if (!ProxyChainUtils.isCustomProxy(proxy) && proxy.type === PROXY_TYPE.LOAD_BALANCE) {
         const members = ProxyChainUtils.normalizeProxyNodeList(proxy.member_node);
         steps.push({
             title: _('Load balancing: %s').format(proxy.name),
@@ -164,7 +164,7 @@ function getDnsUpstreamSteps(value: string, customValue: string, shunt: any): Fl
     if (value === 'custom') {
         return [{ title: _('Custom DNS'), detail: formatEndpoint(customValue), tone: 'normal', page: 'dns' }];
     }
-    if (value === 'dnsmasq' || value === 'system') {
+    if (value === 'dnsmasq') {
         const dnsmasqPort = uci.get_first('dhcp', 'dnsmasq', 'port') || '53';
         return [{ title: 'dnsmasq', detail: _('Local port %s').format(dnsmasqPort), tone: 'direct', page: 'dhcp' }];
     }

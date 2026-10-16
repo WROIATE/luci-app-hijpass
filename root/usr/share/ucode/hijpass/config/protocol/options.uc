@@ -1,11 +1,16 @@
 // 共享字段只由支持该能力的协议组合；每个对象均是明确的字段声明。
-export const BaseOptions = {
+export const LocalOptions = {
 	".name": ["text", ""], // UCI section ID；用于文件名和依赖索引，不是显示名称
 	name: ["text", ""], // 节点名称；其它节点通过此名称引用它
-	type: ["text", ""], // 协议名，决定选用哪份字段声明和生成器
-	core: ["text", ""], // 核心名：sing-box/xray/custom；空值统一使用 sing-box
 	listen_port: ["port", 0], // 本机透明代理监听端口，1–65535
 	socks_port: ["port", 0], // 本机 SOCKS 监听端口，供代理链/分流访问，1–65535
+};
+
+export const BaseOptions = {
+	...LocalOptions,
+	config_type: ["text", "generated"], // generated 自动生成配置；custom 由用户维护配置与命令
+	type: ["text", ""], // 协议名，决定选用哪份字段声明和生成器
+	core: ["text", "sing-box"], // 自动生成使用的核心：sing-box/xray
 	log_level: ["text", "info"], // 核心日志级别；默认 info
 };
 
@@ -57,4 +62,3 @@ export const TransportOptions = {
 	transport_xhttp_path: ["text", ""], // Xray XHTTP 请求路径
 	transport_xhttp_mode: ["text", ""], // Xray XHTTP 模式（auto/packet-up/stream-up/stream-one）
 };
-

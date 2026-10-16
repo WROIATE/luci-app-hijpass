@@ -1,4 +1,4 @@
-import { CORE_TYPE, LuciFlied, PROXY_TYPE, normalizeCoreType, ShuntTag } from "../../../enum/hijpass";
+import { CORE_TYPE, LuciFlied, PROXY_TYPE, ShuntTag } from "../../../enum/hijpass";
 import uci from "uci";
 import ui from "ui";
 import { NotificationUtils } from "../../base/luci/notification";
@@ -141,7 +141,7 @@ function checkLoadBalanceRefs() {
     const warnings: string[] = [];
 
     sections.forEach((section: any) => {
-        if (section.enabled !== '1' || ProxyChainUtils.getProxyCore(section) === CORE_TYPE.CUSTOM
+        if (section.enabled !== '1' || ProxyChainUtils.isCustomProxy(section)
             || section.type !== PROXY_TYPE.LOAD_BALANCE) return;
 
         const nodeName = ProxyChainUtils.getProxyName(section);
@@ -174,7 +174,7 @@ function checkLoadBalanceRefs() {
                     .format(nodeName, memberName));
                 return;
             }
-            if (ProxyChainUtils.getProxyCore(member) !== CORE_TYPE.CUSTOM && member.type === PROXY_TYPE.LOAD_BALANCE) {
+            if (!ProxyChainUtils.isCustomProxy(member) && member.type === PROXY_TYPE.LOAD_BALANCE) {
                 warnings.push(_('Load balancing node "%s" cannot contain load balancing member "%s"')
                     .format(nodeName, memberName));
             }
@@ -203,7 +203,7 @@ function checkProxyChainRefs() {
 
     sections.forEach((section: any) => {
         if (section.enabled !== '1'
-            || ProxyChainUtils.getProxyCore(section) === CORE_TYPE.CUSTOM
+            || ProxyChainUtils.isCustomProxy(section)
             || section.type === PROXY_TYPE.LOAD_BALANCE
             || !section.upstream_proxy_node) {
             return;
@@ -375,7 +375,7 @@ function checkDnsRoutingTargets() {
         ['proxy_dns', _('Proxy Domain DNS')],
     ].forEach(([option, label]) => {
         const value = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.DNS_SECTION_TYPE, option);
-        if (!value || value === 'dnsmasq' || value === 'system' || value === 'custom') {
+        if (!value || value === 'dnsmasq' || value === 'custom') {
             return;
         }
         if (!routingTarget.available || value !== routingServer) {
@@ -440,7 +440,7 @@ function checkXrayDnsServerTypes() {
 function checkXrayTlsInsecure() {
     const warnings: string[] = [];
     uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE, function (section: any) {
-        if (section.enabled !== '1' || normalizeCoreType(section.core) !== CORE_TYPE.XRAY || section.tls_insecure !== '1') {
+        if (section.enabled !== '1' || ProxyChainUtils.getProxyCore(section) !== CORE_TYPE.XRAY || section.tls_insecure !== '1') {
             return;
         }
         if (XRAY_TLS_PROTOCOLS.indexOf(section.type) !== -1) {

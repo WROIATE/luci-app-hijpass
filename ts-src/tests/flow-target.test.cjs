@@ -15,13 +15,13 @@ function preview(shunt, firewall, nodes = []) {
         if (name.endsWith('/hijpass')) return {
             LuciFlied: { CONF_NAME: 'hijpass', GLOBAL_SECTION_TYPE: 'hijpass',
                 FIREWALL_SECTION_TYPE: 'firewall', DNS_SECTION_TYPE: 'dns', SHUNT_SECTION_TYPE: 'shunt' },
-            CORE_TYPE: { CUSTOM: 'custom' },
             FIREWALL_DNS_FORWARD: { NONE: 'none' }, PROXY_TYPE: { LOAD_BALANCE: 'load_balance' }
         };
         if (name.endsWith('/dns-forward')) return { FirewallDnsForwardUtils: { getSource: () => 'none' } };
         if (name.endsWith('/chain')) return { ProxyChainUtils: {
             getProxySectionMap: () => new Map(nodes.map(node => [node.name, node])),
-            getProxyCore: node => node.core,
+            getProxyCore: node => node.config_type === 'custom' ? '' : node.core,
+            isCustomProxy: node => node.config_type === 'custom',
             collectProxyChain: name => ({ chain: [name] })
         } };
         throw new Error(name);
@@ -68,10 +68,10 @@ test('both default and proxy ports show the actual node resource', () => {
 
 test('custom command nodes are not displayed as load balancing when old protocol fields remain', () => {
     const diagram = preview({}, { shunt_port: '7890', proxy_port: '7890' },
-        [{ enabled: '1', name: 'manual', listen_port: '7890', core: 'custom', type: 'load_balance', member_node: ['missing'] }]);
+        [{ enabled: '1', name: 'manual', listen_port: '7890', config_type: 'custom', type: 'load_balance', member_node: ['missing'] }]);
     for (const branch of diagram.branches) {
         assert.equal(branch.steps[1].title, 'Proxy node: manual');
-        assert.equal(branch.steps[1].detail, 'custom');
+        assert.equal(branch.steps[1].detail, '');
     }
 });
 

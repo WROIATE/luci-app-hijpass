@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import { first, of } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
 import { render as renderCore } from 'hijpass.coreconfig.render';
-import { CORE, core } from 'hijpass.config.protocol.proxy';
+import { CORE, core, CONFIG_TYPE, configType } from 'hijpass.config.protocol.proxy';
 import { resolve } from '../network/network.uc';
 import { atomic, command, temporary, run, sections, renderTemplate } from 'hijpass.common';
 import { prepare as prepareDNS } from './dns.uc';
@@ -34,16 +34,18 @@ export function plan(sections) {
 		let name = section.name || section['.name'];
 		if (match(name, /[\/\\\r\n]/)) die('invalid proxy filename');
 		let path = `${client}/${name}-${section['.name']}.json`;
-		let engine = core(section.core);
 		let args;
-		if (engine == CORE.xray) args = ['xray', '-c', path];
-		else if (engine == CORE.singbox) args = ['sing-box', '-c', path, 'run'];
-		else if (engine == CORE.custom) {
+		if (configType(section.config_type) == CONFIG_TYPE.custom) {
 			if (!trim(section.command || '')) die(`custom node "${name}" has no command`);
 			// 自定义节点的 command 本身是用户填写的 Shell 命令；配置路径仍进行引用。
 			args = ['/bin/sh', '-c', replace(section.command, '{conf_path}', command([path]))];
 		}
-		else die(`unsupported core "${engine}"`);
+		else {
+			let engine = core(section.core);
+			if (engine == CORE.xray) args = ['xray', '-c', path];
+			else if (engine == CORE.singbox) args = ['sing-box', '-c', path, 'run'];
+			else die(`unsupported core "${engine}"`);
+		}
 		push(instances, instance(section, name, args));
 	}
 	let shunt = first(sections, 'shunt');

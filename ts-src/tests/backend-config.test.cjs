@@ -56,7 +56,7 @@ test('LuCI sends staged sections and propagates backend errors', async () => {
 });
 
 function loadTS(relative, modules) {
-    const context = vm.createContext({ exports: {}, console: { log() {} }, _: s => s, require(name) {
+    const context = vm.createContext({ exports: {}, URLSearchParams, atob, btoa, console: { log() {} }, _: s => s, require(name) {
         if (name in modules) return modules[name];
         throw new Error(`unexpected import ${name}`);
     } });
@@ -136,7 +136,7 @@ test('Geo metadata remains in UCI for the native converter', () => {
 test('LuCI uses the same default core and ignores protocol dependencies on custom commands', async () => {
     const enums = loadTS('enum/hijpass.ts', {});
     const sections = new Map([
-        ['custom', { name: 'custom', enabled: '1', core: 'custom', type: 'load_balance',
+        ['custom', { name: 'custom', enabled: '1', config_type: 'custom', type: 'load_balance',
             upstream_proxy_node: 'custom', member_node: ['missing'], socks_port: '10002' }],
         ['balance', { name: 'balance', enabled: '1', type: 'load_balance', member_node: ['custom'] }],
     ]);
@@ -144,15 +144,16 @@ test('LuCI uses the same default core and ignores protocol dependencies on custo
     const { ProxyChainUtils } = loadTS('utils/feature/proxy/chain.ts', {
         uci, '../../../enum/hijpass': enums,
     });
-    for (const core of [undefined, '', 'singbox', 'sing-box', 'xray', 'custom']) {
+    for (const core of [undefined, '', 'sing-box', 'xray']) {
         assert.equal(ProxyChainUtils.getProxyCore({ type: 'vless', core }),
-            core === 'xray' || core === 'custom' ? core : 'sing-box');
+            core === 'xray' ? core : 'sing-box');
     }
     assert.deepEqual(Array.from(ProxyChainUtils.getProxyDependencies(sections.get('custom'))), []);
     assert.deepEqual(Array.from(ProxyChainUtils.collectProxyChain('custom', sections).chain), ['custom']);
     assert.equal(ProxyChainUtils.findProxyDependencyCycle(sections), undefined);
     assert.equal(ProxyChainUtils.resolveUpstreamProxy(sections.get('custom'), sections), undefined);
-    assert.equal(ProxyChainUtils.resolveLoadBalanceMembers(sections.get('balance'), sections)[0].core, 'custom');
+    assert.equal(ProxyChainUtils.resolveLoadBalanceMembers(sections.get('balance'), sections)[0].core, '');
+    assert.equal(ProxyChainUtils.isCustomProxy({ core: 'custom', type: 'custom' }), false);
     const { PrecheckUtils } = loadTS('utils/actions/save-apply/precheck.ts', {
         uci, ui: {}, '../../../enum/hijpass': enums,
         '../../base/luci/notification': { NotificationUtils: { warning(...args) { assert.fail(JSON.stringify(args)); } } },
@@ -161,4 +162,16 @@ test('LuCI uses the same default core and ignores protocol dependencies on custo
         '../../feature/firewall/dns-forward': { FirewallDnsForwardUtils: { getSource: () => '', validateSource: () => true } },
     });
     assert.equal(await PrecheckUtils.runSaveApplyPrechecks(), true);
+});
+
+test('share-link imports declare generated configuration and do not normalize legacy core values', () => {
+    const enums = loadTS('enum/hijpass.ts', {});
+    const { ProxyShareLinkUtils } = loadTS('utils/feature/proxy/share-link.ts', { '../../../enum/hijpass': enums });
+    const uri = 'vless://11111111-1111-4111-8111-111111111111@example.org:443?security=tls';
+    const imported = ProxyShareLinkUtils.parse(uri, 'sing-box');
+    assert.equal(imported.values.config_type, 'generated');
+    assert.equal(imported.values.core, 'sing-box');
+    assert.throws(() => ProxyShareLinkUtils.parse(uri, 'singbox'), /Invalid core selection/);
+    assert.equal(ProxyShareLinkUtils.canExport({ ...imported.values, config_type: 'custom' }), false);
+    assert.equal(ProxyShareLinkUtils.canExport(imported.values), true);
 });

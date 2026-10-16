@@ -1,4 +1,4 @@
-import { CORE_TYPE } from "../enum/hijpass";
+import { CORE_TYPE, PROXY_CONFIG_TYPE, ProxyConfigType } from "../enum/hijpass";
 
 export class DnsNode {
     tag: string;
@@ -156,7 +156,8 @@ export interface LuciConvertUtils {
 export interface ProxyNode {
     name: string;
     cfgid?: string;
-    type: string;
+    config_type?: ProxyConfigType;
+    type?: string;
     core?: string;
     enabled: string;
     listen_port: string;
@@ -217,8 +218,7 @@ export class LoadBalanceProxyNode implements ProxyNode {
  */
 export class CustomProxyNode implements ProxyNode {
     name: string;
-    type: string = '';
-    core: string = CORE_TYPE.CUSTOM;
+    config_type = PROXY_CONFIG_TYPE.CUSTOM;
     enabled: string = '1';
     command: string;
     listen_port: string;

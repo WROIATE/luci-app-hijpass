@@ -1,4 +1,4 @@
-import { CORE_PROTOCOLS, CORE_TYPE, CoreType, PROXY_TYPE, ProxyType, normalizeCoreType } from "../../../enum/hijpass";
+import { CORE_PROTOCOLS, CORE_TYPE, CoreType, PROXY_TYPE, ProxyType, PROXY_CONFIG_TYPE } from "../../../enum/hijpass";
 
 type ProxyFieldValue = string | string[];
 
@@ -222,6 +222,7 @@ function splitFirst(value: string, separator: string): [string, string] {
 function baseValues(type: ProxyType, core: CoreType): Record<string, ProxyFieldValue> {
     return {
         enabled: '1',
+        config_type: PROXY_CONFIG_TYPE.GENERATED,
         type,
         core,
         log_level: 'info',
@@ -229,7 +230,7 @@ function baseValues(type: ProxyType, core: CoreType): Record<string, ProxyFieldV
 }
 
 function normalizeSelectedCore(core: string): CoreType {
-    const normalized = normalizeCoreType(core);
+    const normalized = (core || '').trim();
     if (normalized !== CORE_TYPE.XRAY && normalized !== CORE_TYPE.SING_BOX) {
         throw new Error(_('Invalid core selection'));
     }
@@ -548,7 +549,8 @@ function generateShadowTls(section: any): string {
 
 const ProxyShareLinkUtils = {
     canExport: function (section: any): boolean {
-        const core = normalizeCoreType(section?.core) as CoreType;
+        if (section?.config_type === PROXY_CONFIG_TYPE.CUSTOM) return false;
+        const core = (section?.core || CORE_TYPE.SING_BOX) as CoreType;
         return CORE_PROTOCOLS[core]?.includes(section?.type) ?? false;
     },
 

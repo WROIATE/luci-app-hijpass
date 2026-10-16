@@ -2473,3 +2473,6 @@ msgstr "IPv4 地址列表：direct（本地、DNS 上游及直连地址）、pro
 #: ts-src/utils/feature/firewall/editor.ts
 msgid "IPv6 lists: direct (local, DNS and bypass addresses), proxy (force proxy), china (CHN routes)."
 msgstr "IPv6 地址列表：direct（本地、DNS 上游及直连地址）、proxy（强制代理）、china（CHN 路由）。"
+
+msgid "Generated"
+msgstr "自动生成"

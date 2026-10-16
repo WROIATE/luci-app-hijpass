@@ -27,17 +27,14 @@ trap 'rm -rf -- "$directory"' EXIT
 capture() {
     "$@" >"$directory/stdout" 2>"$directory/stderr"
     status=$?
-    json_init
-    json_add_int code "$status"
-    json_add_string stdout "$(cat "$directory/stdout")"
-    json_add_string stderr "$(cat "$directory/stderr")"
-    json_dump
+    # 输出可能包含完整 nft 集合，不能放入 jshn 导出的环境变量。
+    hijpass_data "$HIJPASS_LIB/result.uc" output "$directory" "$status"
 }
 # 已输出业务 JSON 的脚本保留原响应；没有 JSON 时才返回 RPC 错误。
 structured() {
     "$@" >"$directory/stdout" 2>"$directory/stderr"
     if [ -s "$directory/stdout" ]; then cat "$directory/stdout"
-    else hijpass_error "$(cat "$directory/stderr")"; fi
+    else hijpass_data "$HIJPASS_LIB/result.uc" error-file "$directory/stderr"; fi
 }
 case "$method" in
     service_restart) structured "$HIJPASS_LIB/rpc/jobs.sh" start restart ;;

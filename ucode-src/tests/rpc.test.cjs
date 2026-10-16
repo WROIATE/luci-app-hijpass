@@ -114,6 +114,78 @@ test('Shell RPC keeps arguments separate and returns real command failures', t =
     assert.ok(f.invoke('trace_start', { args: ['-t', {}] }).error);
 });
 
+test('RPC encodes large command output from files and removes its capture directory', t => {
+    const f = fixture(t), entry = path.join(f.runtime, 'rpc/entry.sh');
+    fs.writeFileSync(entry, fs.readFileSync(entry, 'utf8')
+        .replace('/tmp/hijpass-rpc.XXXXXX', path.join(f.directory, 'capture.XXXXXX')));
+    const stdout = 'rule "quoted" \\ 规则\tvalue\n'.repeat(8000) + 'tail \n\n';
+    const stderr = 'failure "quoted" \\ 失败\n'.repeat(8000) + '\n';
+    fs.writeFileSync(path.join(f.runtime, 'firewall/firewall.sh'), `#!/bin/sh
+cat '${f.directory}/stdout'
+cat '${f.directory}/stderr' >&2
+exit "$(cat '${f.directory}/code')"
+`);
+    for (const [out, err, code] of [[stdout, '', 0], ['', stderr, 7], [stdout, stderr, 9]]) {
+        fs.writeFileSync(path.join(f.directory, 'stdout'), out);
+        fs.writeFileSync(path.join(f.directory, 'stderr'), err);
+        fs.writeFileSync(path.join(f.directory, 'code'), String(code));
+        const response = f.invoke('firewall_show');
+        assert.equal(response.code, code);
+        assert.equal(response.stdout, out.replace(/\n+$/, ''));
+        assert.equal(response.stderr, err.replace(/\n+$/, ''));
+        assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('capture.')), false);
+    }
+});
+
+test('RPC returns large stderr when a structured command produces no response', t => {
+    const f = fixture(t), stderr = 'upstream failure "quoted" \\ 失败\n'.repeat(8000);
+    fs.writeFileSync(path.join(f.directory, 'failure'), stderr);
+    fs.writeFileSync(path.join(f.runtime, 'network/network.sh'), `#!/bin/sh
+cat '${f.directory}/failure' >&2
+exit 1
+`);
+    const response = f.invoke('network_connect', { url: 'https://example.org', timeout: '5' });
+    assert.equal(response.success, false);
+    assert.equal(response.error, stderr.replace(/\n+$/, ''));
+});
+
+test('completed jobs return large stdout and stderr without environment-variable limits', t => {
+    const f = fixture(t), id = 'Large123', job = path.join(f.directory, 'jobs', id);
+    fs.mkdirSync(job, { recursive: true });
+    assert.deepEqual(f.invoke('job_status', { id }), { running: true });
+    const stdout = 'updated "rule" \\ 规则\n'.repeat(8000);
+    const stderr = 'warning "quoted" \\ 警告\n'.repeat(8000);
+    fs.writeFileSync(path.join(job, 'stdout'), stdout);
+    fs.writeFileSync(path.join(job, 'stderr'), stderr);
+    fs.writeFileSync(path.join(job, 'exit'), '7\n');
+    const response = f.invoke('job_status', { id });
+    assert.equal(response.running, false);
+    assert.equal(response.code, 7);
+    assert.equal(response.stdout, stdout.replace(/\n+$/, ''));
+    assert.equal(response.stderr, stderr.replace(/\n+$/, ''));
+    assert.equal(f.invoke('job_release', { id }).ok, true);
+    assert.equal(fs.existsSync(job), false);
+});
+
+test('jobs whose worker exits before producing output still return the recorded failure', t => {
+    const f = fixture(t), daemon = path.join(f.runtime, 'testbin/start-stop-daemon');
+    fs.writeFileSync(daemon, `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+    if [ "$1" = -p ]; then printf '2147483647\\n' >"$2"; exit 0; fi
+    shift
+done
+exit 1
+`, { mode: 0o755 });
+    // BusyBox ash 优先使用内置 applet，在安装副本中显式指定测试命令。
+    const jobs = path.join(f.runtime, 'rpc/jobs.sh');
+    fs.writeFileSync(jobs, fs.readFileSync(jobs, 'utf8').replace('exec start-stop-daemon ', `exec '${daemon}' `));
+    const start = f.invoke('core_update', { core: 'xray' });
+    assert.deepEqual(f.invoke('job_status', { id: start.id }), {
+        running: false, code: 1, stdout: '', stderr: 'job exited without a result',
+    });
+    assert.equal(f.invoke('job_release', { id: start.id }).ok, true);
+});
+
 test('backend writes preserve TLS while resolving chains and reject snapshot storage paths', t => {
     const fixtures = require('./testdata/compatibility.json');
     for (const core of ['xray', 'sing-box']) {

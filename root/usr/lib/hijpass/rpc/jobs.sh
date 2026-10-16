@@ -15,6 +15,9 @@ case "$action" in
             find "$expired" -maxdepth 0 -mmin +60 -exec rm -rf -- '{}' ';'
         done
         directory=$(mktemp -d "$root/XXXXXXXX") || exit 1
+        # worker 启动前即保留空输出，提前退出时仍能返回完整失败结果。
+        : >"$directory/stdout"
+        : >"$directory/stderr"
         if ! (
             for descriptor in /proc/self/fd/*; do
                 descriptor=${descriptor##*/}
@@ -54,13 +57,7 @@ case "$action" in
                 printf '1\n' >"$directory/exit"
             fi
         fi
-        json_init
-        if [ -f "$directory/exit" ]; then
-            json_add_boolean running 0
-            json_add_int code "$(cat "$directory/exit")"
-            json_add_string stdout "$(cat "$directory/stdout")"
-            json_add_string stderr "$(cat "$directory/stderr")"
-        else json_add_boolean running 1; fi
-        json_dump ;;
+        # 已完成任务的输出也可能很大，与同步 RPC 使用相同的文件读取方式。
+        hijpass_data "$HIJPASS_LIB/result.uc" job "$directory" ;;
     *) hijpass_error 'unknown job action'; exit 1 ;;
 esac

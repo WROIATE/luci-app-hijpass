@@ -180,7 +180,9 @@ const FirewallFormUtils = {
                         textarea.removeAttribute('title');
                         loaded = true;
                     })
-                    .catch(() => { textarea.value = _('Read Failed'); })
+                    .catch((error: Error) => {
+                        textarea.value = _('Read Failed') + (error?.message ? '\n' + error.message : '');
+                    })
                     .finally(() => {
                         loading = false;
                         textarea.removeAttribute('aria-busy');

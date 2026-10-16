@@ -276,7 +276,7 @@ const ProxyFormUtils = {
 
     renderProxyType: function (section_id: string) {
         let type = uci.get(LuciFlied.CONF_NAME, section_id, 'type');
-        let coreValue = normalizeCoreType(uci.get(LuciFlied.CONF_NAME, section_id, 'core') || CORE_TYPE.CUSTOM)
+        let coreValue = ProxyChainUtils.getProxyCore(findProxySection(section_id));
         if (coreValue === CORE_TYPE.CUSTOM) {
             return E('span', {}, _('Custom'));
         }
@@ -287,8 +287,8 @@ const ProxyFormUtils = {
     },
 
     renderProxyServerInfo: function (section_id: string) {
-        const core = normalizeCoreType(uci.get(LuciFlied.CONF_NAME, section_id, 'core') || CORE_TYPE.CUSTOM);
-        let type = uci.get(LuciFlied.CONF_NAME, section_id, 'type') || PROXY_TYPE.CUSTOM;
+        const core = ProxyChainUtils.getProxyCore(findProxySection(section_id));
+        let type = uci.get(LuciFlied.CONF_NAME, section_id, 'type') || '';
         let server_name = uci.get(LuciFlied.CONF_NAME, section_id, 'tls_server_name');
         if (!server_name) {
             server_name = uci.get(LuciFlied.CONF_NAME, section_id, 'server');

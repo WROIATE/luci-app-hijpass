@@ -43,7 +43,7 @@ export function render(sections, target) {
 	validatePorts(dependencies.nodes, routing);
 	let result = { nodes: {} };
 	for (let n in dependencies.nodes) {
-		if (n.core == CORE.custom || n.type == 'custom') continue;
+		if (n.core == CORE.custom) continue;
 		try { result.nodes[n.id] = clean(n.core == CORE.xray ? xray(n) : singbox(n)); }
 		catch (e) { die(`node "${n.name}": ${e.message}`); }
 	}

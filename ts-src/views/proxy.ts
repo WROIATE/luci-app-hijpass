@@ -155,7 +155,7 @@ function createCustomProxyOptions(s: LuCI.form.AbstractSection) {
     // 运行命令，{conf_path} 为配置文件路径占位符
     let cmdOpt = s.option(form.Value, 'command', _('Run Command'),
         _('Proxy Run Command'));
-    cmdOpt.load = async function (id: string) { return uci.get(LuciFlied.CONF_NAME, id, 'command') || (await Backend.defaults()).command; };
+    cmdOpt.validate = function (_id: string, value: string) { return value.trim() ? true : _('Proxy Run Command'); };
     cmdOpt.rmempty = false;
     cmdOpt.modalonly = true;
     cmdOpt.depends('core', CORE_TYPE.CUSTOM);

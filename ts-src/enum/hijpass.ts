@@ -19,7 +19,6 @@ export enum LuciFlied {
 }
 
 export const PROXY_TYPE = {
-    CUSTOM: 'custom',
     LOAD_BALANCE: 'load_balance',
     HYSTERIA2: 'hysteria2',
     SHADOWSOCKS: 'shadowsocks',

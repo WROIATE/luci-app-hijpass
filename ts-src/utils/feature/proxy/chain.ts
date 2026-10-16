@@ -79,7 +79,7 @@ function resolveLoadBalanceMembers(
         if (!section) {
             throw new Error('Load balancing member node not found: ' + memberName);
         }
-        if (section.type === PROXY_TYPE.LOAD_BALANCE) {
+        if (getProxyCore(section) !== CORE_TYPE.CUSTOM && section.type === PROXY_TYPE.LOAD_BALANCE) {
             throw new Error('Nested load balancing members are not supported: ' + memberName);
         }
         if (section.enabled !== '1') {
@@ -103,6 +103,7 @@ function resolveUpstreamProxy(
     proxyNode: ProxyNode,
     sections: Map<string, any> = getProxySectionMap()
 ): ResolvedUpstreamProxy | undefined {
+    if (getProxyCore(proxyNode) === CORE_TYPE.CUSTOM) return undefined;
     const upstreamName = proxyNode.upstream_proxy_node;
     if (!upstreamName) return undefined;
     if (upstreamName === proxyNode.name) {
@@ -144,7 +145,7 @@ function collectProxyChain(startName: string, sections: Map<string, any>) {
         chain.push(currentName);
 
         const section = sections.get(currentName);
-        if (!section || !section.upstream_proxy_node) break;
+        if (!section || getProxyCore(section) === CORE_TYPE.CUSTOM || !section.upstream_proxy_node) break;
         currentName = section.upstream_proxy_node;
     }
 
@@ -152,6 +153,8 @@ function collectProxyChain(startName: string, sections: Map<string, any>) {
 }
 
 function getProxyDependencies(section: any): string[] {
+    // 自定义命令的出站由用户管理，不读取隐藏的协议表单字段。
+    if (getProxyCore(section) === CORE_TYPE.CUSTOM) return [];
     const dependencies: string[] = [];
     if (section?.type === PROXY_TYPE.LOAD_BALANCE) {
         dependencies.push(...normalizeProxyNodeList(section.member_node));

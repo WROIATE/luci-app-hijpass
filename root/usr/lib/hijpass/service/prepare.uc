@@ -34,12 +34,12 @@ export function plan(sections) {
 		let name = section.name || section['.name'];
 		if (match(name, /[\/\\\r\n]/)) die('invalid proxy filename');
 		let path = `${client}/${name}-${section['.name']}.json`;
-		let engine = core(section.core || (section.type == 'vless' ? CORE.xray : section.type == 'custom' ? CORE.custom : CORE.singbox));
+		let engine = core(section.core);
 		let args;
 		if (engine == CORE.xray) args = ['xray', '-c', path];
 		else if (engine == CORE.singbox) args = ['sing-box', '-c', path, 'run'];
 		else if (engine == CORE.custom) {
-			if (!section.command) die(`custom node "${name}" has no command`);
+			if (!trim(section.command || '')) die(`custom node "${name}" has no command`);
 			// 自定义节点的 command 本身是用户填写的 Shell 命令；配置路径仍进行引用。
 			args = ['/bin/sh', '-c', replace(section.command, '{conf_path}', command([path]))];
 		}

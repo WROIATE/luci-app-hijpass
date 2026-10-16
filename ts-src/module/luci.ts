@@ -217,7 +217,8 @@ export class LoadBalanceProxyNode implements ProxyNode {
  */
 export class CustomProxyNode implements ProxyNode {
     name: string;
-    type: 'custom' = 'custom';
+    type: string = '';
+    core: string = CORE_TYPE.CUSTOM;
     enabled: string = '1';
     command: string;
     listen_port: string;
@@ -227,7 +228,6 @@ export class CustomProxyNode implements ProxyNode {
     log_path: string;
 
     constructor() {
-        this.type = 'custom';
         this.enabled = '1';
         this.procd_env = [];
     }

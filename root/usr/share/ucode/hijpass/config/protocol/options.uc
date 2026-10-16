@@ -3,7 +3,7 @@ export const BaseOptions = {
 	".name": ["text", ""], // UCI section ID；用于文件名和依赖索引，不是显示名称
 	name: ["text", ""], // 节点名称；其它节点通过此名称引用它
 	type: ["text", ""], // 协议名，决定选用哪份字段声明和生成器
-	core: ["text", ""], // 核心名：sing-box/xray/custom；空值使用该协议默认核心
+	core: ["text", ""], // 核心名：sing-box/xray/custom；空值统一使用 sing-box
 	listen_port: ["port", 0], // 本机透明代理监听端口，1–65535
 	socks_port: ["port", 0], // 本机 SOCKS 监听端口，供代理链/分流访问，1–65535
 	log_level: ["text", "info"], // 核心日志级别；默认 info

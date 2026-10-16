@@ -262,3 +262,26 @@ test('服务准备通过原生 UCI 读取并生成配置，禁用时不调用 Ge
         assert.equal(fs.existsSync(calls), false);
     });
 });
+
+test('原生 UCI 中缺省核心的 VLESS 生成并启动 sing-box，自定义命令不生成或覆盖配置', t => {
+    const f = fixture(t), client = path.join(f.directory, 'client');
+    fs.mkdirSync(client);
+    const customFile = path.join(client, 'manual-custom.json');
+    fs.writeFileSync(customFile, 'user maintained content');
+    const command = 'printf "%s\\n" "custom command"';
+    const sections = [{ '.type': 'hijpass', '.name': 'global', enabled: '1', client_dir: client },
+        { '.type': 'proxy_node', '.name': 'vless', enabled: '1', name: 'vless', type: 'vless',
+            server: '192.0.2.10', server_port: '443', listen_port: '10001', socks_port: '10002',
+            uuid: '11111111-1111-4111-8111-111111111111' },
+        { '.type': 'proxy_node', '.name': 'custom', enabled: '1', name: 'manual', core: 'custom',
+            command, listen_port: '10003', socks_port: '10004' }];
+    withConfig(sections, directory => {
+        const result = f.run('service/service.sh', ['prepare', '--configdir', directory]);
+        assert.equal(result.status, 0, result.stderr);
+        const plan = JSON.parse(result.stdout);
+        assert.deepEqual(plan.instances[0].command, ['sing-box', '-c', client + '/vless-vless.json', 'run']);
+        assert.equal(JSON.parse(fs.readFileSync(client + '/vless-vless.json', 'utf8')).outbounds[0].type, 'vless');
+        assert.deepEqual(plan.instances[1].command, ['/bin/sh', '-c', command]);
+        assert.equal(fs.readFileSync(customFile, 'utf8'), 'user maintained content');
+    });
+});

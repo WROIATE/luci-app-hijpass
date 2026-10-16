@@ -1,6 +1,6 @@
 import { of } from '../config/sections.uc';
 import { list } from '../config/values.uc';
-import { proxy, TYPE } from '../config/protocol/proxy.uc';
+import { proxy, TYPE, CORE } from '../config/protocol/proxy.uc';
 
 // ResolvedDependencies：nodes 为按发现顺序排列的节点，byID/byName 为查找索引。
 // 每个节点的 upstream/members 直接引用其依赖节点，供核心配置生成使用。
@@ -35,10 +35,12 @@ export function resolve(sections, target) {
 			byID[id] = n;
 			byName[name] = n;
 			push(nodes, n);
-			if (n.type == TYPE.balance && s.upstream_proxy_node) die(`load balancing node cannot have an upstream: ${name}`);
-			let refs = n.type == TYPE.balance ? list(s.member_node) : s.upstream_proxy_node ? [s.upstream_proxy_node] : [];
 			let dependencies = [];
 			references[id] = dependencies;
+			// 自定义命令自行管理出站；忽略切换核心后残留的协议依赖字段。
+			if (n.core == CORE.custom) continue;
+			if (n.type == TYPE.balance && s.upstream_proxy_node) die(`load balancing node cannot have an upstream: ${name}`);
+			let refs = n.type == TYPE.balance ? list(s.member_node) : s.upstream_proxy_node ? [s.upstream_proxy_node] : [];
 			for (let ref in refs) {
 				let matches = enabled[ref] || [];
 				if (!length(matches)) die(`proxy node "${ref}" missing or disabled`);

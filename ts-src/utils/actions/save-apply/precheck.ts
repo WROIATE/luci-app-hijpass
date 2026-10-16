@@ -141,10 +141,11 @@ function checkLoadBalanceRefs() {
     const warnings: string[] = [];
 
     sections.forEach((section: any) => {
-        if (section.enabled !== '1' || section.type !== PROXY_TYPE.LOAD_BALANCE) return;
+        if (section.enabled !== '1' || ProxyChainUtils.getProxyCore(section) === CORE_TYPE.CUSTOM
+            || section.type !== PROXY_TYPE.LOAD_BALANCE) return;
 
         const nodeName = ProxyChainUtils.getProxyName(section);
-        const core = normalizeCoreType(section.core);
+        const core = ProxyChainUtils.getProxyCore(section);
         if (core !== CORE_TYPE.SING_BOX && core !== CORE_TYPE.XRAY) {
             warnings.push(_('Load balancing node "%s" has an unsupported backend core').format(nodeName));
         }
@@ -173,7 +174,7 @@ function checkLoadBalanceRefs() {
                     .format(nodeName, memberName));
                 return;
             }
-            if (member.type === PROXY_TYPE.LOAD_BALANCE) {
+            if (ProxyChainUtils.getProxyCore(member) !== CORE_TYPE.CUSTOM && member.type === PROXY_TYPE.LOAD_BALANCE) {
                 warnings.push(_('Load balancing node "%s" cannot contain load balancing member "%s"')
                     .format(nodeName, memberName));
             }
@@ -202,6 +203,7 @@ function checkProxyChainRefs() {
 
     sections.forEach((section: any) => {
         if (section.enabled !== '1'
+            || ProxyChainUtils.getProxyCore(section) === CORE_TYPE.CUSTOM
             || section.type === PROXY_TYPE.LOAD_BALANCE
             || !section.upstream_proxy_node) {
             return;

@@ -159,6 +159,27 @@ test('service plans preserve argv, custom config paths, environments and nesting
     assert.notEqual(invoke({ action: 'plan', sections: [global, node('bad', { procd_env: ['bad entry'] })] }).status, 0);
 });
 
+test('服务启动和生成采用同一核心缺省值，自定义命令保持 Shell 语义', t => {
+    const directory = fixture(t);
+    for (const core of [undefined, '', 'singbox', 'sing-box', 'xray']) {
+        const result = value({ action: 'plan', sections: [{ ...global, client_dir: directory },
+            node('a', { core, type: 'vless' })] });
+        assert.equal(result.instances[0].command[0], core === 'xray' ? 'xray' : 'sing-box');
+    }
+    const output = path.join(directory, 'command-output');
+    const command = `value='a b'; printf '%s\\n' "$value" > '${output}'`;
+    const result = value({ action: 'plan', sections: [global, node('custom', { core: 'custom', command })] });
+    assert.deepEqual(result.instances[0].command, ['/bin/sh', '-c', command]);
+    const executed = spawnSync(result.instances[0].command[0], result.instances[0].command.slice(1), { encoding: 'utf8' });
+    assert.equal(executed.status, 0, executed.stderr);
+    assert.equal(fs.readFileSync(output, 'utf8'), 'a b\n');
+    for (const command of [undefined, '', ' \t\n ']) {
+        const invalid = invoke({ action: 'plan', sections: [global, node('custom', { core: 'custom', command })] });
+        assert.notEqual(invalid.status, 0);
+        assert.match(invalid.stderr, /has no command/);
+    }
+});
+
 test('server plan validates allowed ports and leaves manually edited JSON untouched', t => {
     const directory = fixture(t);
     const file = path.join(directory, 'server-a.json'); fs.writeFileSync(file, 'custom JSON');
@@ -175,7 +196,7 @@ test('native configuration writes are private and staging failure preserves ever
     const directory = fixture(t), client = path.join(directory, 'client'); fs.mkdirSync(client);
     const custom = path.join(client, 'manual-c.json'); fs.writeFileSync(custom, 'manual');
     const sections = [{ ...global, client_dir: client, shunt_conf: path.join(directory, 'shunt.json') }, node('a'),
-        node('c', { name: 'manual', core: 'custom', type: 'custom', listen_port: '10003', socks_port: '10004' })];
+        node('c', { name: 'manual', core: 'custom', command: 'program', listen_port: '10003', socks_port: '10004' })];
     const result = value({ action: 'write', sections });
     assert.equal(result.length, 1);
     const file = path.join(client, 'a-a.json'), original = fs.readFileSync(file, 'utf8');

@@ -1,5 +1,5 @@
 import uci from "uci";
-import { FIREWALL_DNS_FORWARD, LuciFlied, PROXY_TYPE } from "../../../enum/hijpass";
+import { CORE_TYPE, FIREWALL_DNS_FORWARD, LuciFlied, PROXY_TYPE } from "../../../enum/hijpass";
 import { FirewallDnsForwardUtils } from "../firewall/dns-forward";
 import { ProxyChainUtils } from "../proxy/chain";
 
@@ -86,7 +86,7 @@ function getProxyTarget(port: string, portLabel: string): FlowStep[] {
         return steps;
     }
 
-    if (proxy.type === PROXY_TYPE.LOAD_BALANCE) {
+    if (ProxyChainUtils.getProxyCore(proxy) !== CORE_TYPE.CUSTOM && proxy.type === PROXY_TYPE.LOAD_BALANCE) {
         const members = ProxyChainUtils.normalizeProxyNodeList(proxy.member_node);
         steps.push({
             title: _('Load balancing: %s').format(proxy.name),

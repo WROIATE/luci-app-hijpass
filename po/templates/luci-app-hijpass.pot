@@ -3141,3 +3141,107 @@ msgstr ""
 #: ts-src/views/firewall.ts
 msgid "Firewall Template"
 msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Template Parameters"
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Parameter"
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Description"
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Proxy node port; 0 disables this entry."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Shunt node port; 0 disables this entry."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Local DNS forwarding port; 0 disables DNS forwarding."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Protocols selected for transparent proxying: tcp, udp, or both."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Whether to proxy traffic originating from the router."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "true: proxy all clients except exclusions; false: proxy only selected clients."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Connection mark for forced proxying (0x1)."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Connection mark for shunt routing (0x3)."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Proxy process group excluded from interception."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "WAN device names excluded from interception."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Client device names selected for proxying."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Client MAC addresses selected for proxying."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Client device names excluded when allowAll is true."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Client MAC addresses excluded when allowAll is true."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Quoted, comma-separated WAN names for nft interface matches."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Quoted, comma-separated selected client device names."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Quoted, comma-separated excluded client device names."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Whether to create DNS-managed address sets."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Whether to create the CHN domain address sets."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Whether to load CHN IPv4/IPv6 route lists."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "Whether to create the GFW domain address sets."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "IPv4 lists: direct (local, DNS and bypass addresses), proxy (force proxy), china (CHN routes)."
+msgstr ""
+
+#: ts-src/utils/feature/firewall/editor.ts
+msgid "IPv6 lists: direct (local, DNS and bypass addresses), proxy (force proxy), china (CHN routes)."
+msgstr ""

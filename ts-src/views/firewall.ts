@@ -121,6 +121,13 @@ function createTextOptions(s: LuCI.form.AbstractSection) {
     const restore = s.taboption<LuCI.form.ButtonValue>('nftables', form.Button, '_restore_template', null);
     restore.inputtitle = _('Restore Default Template');
     restore.inputstyle = 'neutral';
+    const renderRestore = restore.renderWidget;
+    restore.renderWidget = function (...args: any[]) {
+        return E('div', { style: 'display:flex;flex-wrap:wrap;align-items:center;gap:.5rem' }, [
+            renderRestore.apply(this, args),
+            E('button', { type: 'button', class: 'btn cbi-button', click: FirewallEditorUtils.showParameters }, _('Template Parameters')),
+        ]);
+    };
     restore.onclick = async function (ev: Event, sectionId: string) {
         const button = ev.currentTarget as HTMLButtonElement;
         button.disabled = true;

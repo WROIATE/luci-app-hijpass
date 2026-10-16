@@ -231,7 +231,7 @@ declare namespace LuCI {
                 apply(checked?: boolean): void;
             };
 
-            showModal(modal: any, e: any): void;
+            showModal(title: string, children: any, ...classes: string[]): HTMLElement;
 
             hideModal(): void;
 

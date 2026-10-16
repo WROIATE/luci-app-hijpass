@@ -129,7 +129,7 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
         assert.equal(result.includes('chain out-route {'), local === '1');
         assert.match(result, /192\.0\.2\.0\/24/);
         assert.doesNotMatch(result, /invalid|192\.0\.2\.0\/99/);
-        const sets = new Set([...result.matchAll(/^    set (\S+)/gm)].map(m => m[1]));
+        const sets = new Set([...result.matchAll(/^[ \t]*set (\S+)/gm)].map(m => m[1]));
         for (const m of result.matchAll(/@(\w+)/g)) assert.ok(sets.has(m[1]), 'missing set ' + m[1]);
         fs.writeFileSync(path.join(directory, 'test.nft'), result);
         // nft parses without applying rules; hosts lacking netlink privileges still report grammar errors.
@@ -440,10 +440,10 @@ test('空静态列表省略集合与规则，ACL 空白名单明确返回，动�
         for (const set of ['chnroute', 'chn', 'gfw', 'dnsproxy', 'dnsbypass'])
             for (const version of [4, 6]) assert.ok(result.includes('set ' + set + version + 'list {'));
         for (const name of ['pre-filter', 'dns-forward']) {
-            const body = result.split('chain ' + name + ' {')[1].split('\n    }')[0];
+            const body = result.split('chain ' + name + ' {')[1].split(/\n[ \t]*\}/)[0];
             const rule = interfaces.length && macs.length ? /iif != \{ "lo" \} ether saddr != \{ 02:00:00:00:00:01 \} counter return/
                 : interfaces.length ? /iif != \{ "lo" \} counter return/
-                : macs.length ? /ether saddr != \{ 02:00:00:00:00:01 \} counter return/ : /^        counter return$/m;
+                : macs.length ? /ether saddr != \{ 02:00:00:00:00:01 \} counter return/ : /^[ \t]*counter return$/m;
             assert.match(body, rule);
         }
     }

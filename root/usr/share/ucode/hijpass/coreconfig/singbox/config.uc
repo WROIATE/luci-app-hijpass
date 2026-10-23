@@ -12,15 +12,18 @@ const builders = {
 	[TYPE.tuic]: tuic, [TYPE.shadowtls]: shadowtls,
 };
 
+/** @returns {object} 连接本机指定端口的 sing-box SOCKS5 出站，包含 type/tag/server/server_port/version。 */
 export function socks(tag, port) {
 	return { type: 'socks', tag, server: '127.0.0.1', server_port: port, version: '5' };
 };
+/** @returns {object} sing-box 入站 {type, tag, listen, listen_port}；未指定监听地址时使用 127.0.0.1。 */
 export function inbound(kind, tag, port, address) {
 	return { type: kind, tag, listen: address || '127.0.0.1', listen_port: port };
 };
 
 // Config 字段：log 日志；dns DNS 服务器和规则；inbounds 本地监听；
 // outbounds 远端出口；route 匹配规则及默认出口。返回普通 JSON 对象。
+/** @returns {object} 单个代理节点的完整 sing-box 配置，包含日志、DNS、入站、出站和路由设置，均衡节点含本地 SOCKS 成员。 */
 export function build(n) {
 	let config = {
 		log: { disabled: false, level: n.log_level || 'info', timestamp: true },

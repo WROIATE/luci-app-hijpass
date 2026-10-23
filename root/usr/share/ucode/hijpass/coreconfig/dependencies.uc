@@ -8,6 +8,7 @@ import { proxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 /**
  * @param {object[]} sections
  * @param {string} [target]
+ * @returns {object} 依赖结果 {nodes, byID, byName}；包含目标及依赖，索引与 upstream/members 直接引用同一节点对象。
  */
 export function resolve(sections, target) {
 	let all = of(sections, 'proxy_node'), enabled = {}, selected = [];
@@ -62,9 +63,11 @@ export function resolve(sections, target) {
 
 /**
  * @param {{nodes: object[]}} dependencies
+ * @returns {null} 校验通过不返回数据；循环、超过三节点或均衡成员/回退配置无效时抛错。
  */
 export function validate(dependencies) {
 	let active = {}, heights = {};
+	/** @returns {integer} 当前普通节点到末端上游的链长（含自身）；均衡节点返回 1，成员单独校验，链长会缓存。 */
 	function visit(n) {
 		if (active[n.id]) die(`proxy dependency cycle at "${n.name}"`);
 		if (heights[n.id]) return heights[n.id];

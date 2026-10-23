@@ -10,9 +10,11 @@ import { prepare as prepareRouting, build as buildRouting } from './routing.uc';
 /**
  * @param {object[]} nodes
  * @param {object|null} shunt
+ * @returns {null} 校验节点及分流监听端口是否重复；通过时不修改节点，重复时抛错。
  */
 function validatePorts(nodes, shunt) {
 	let owners = {};
+	/** @returns {null} 登记当前端口的占用者；端口已被登记时抛错。 */
 	function add(port, owner) {
 		if (owners[port]) die(`port ${port} is shared by ${owners[port]} and ${owner}`);
 		owners[port] = owner;
@@ -30,6 +32,7 @@ function validatePorts(nodes, shunt) {
 // Generated：nodes 为 section ID -> 核心 JSON 对象；shunt 只在模板分流开启时出现。
 // render 是纯转换：不写 UCI/文件，不启动进程，失败时不会返回半份配置。
 /**
+ * 返回：未指定 target 时为 {nodes, shunt?} 对象，nodes 按 section ID 索引；指定节点 ID 或 shunt 时为对应的核心 JSON 对象。
  * @param {object[]} sections
  * @param {string} [target]
  */
@@ -55,6 +58,7 @@ export function render(sections, target) {
 };
 /**
  * @param {object[]} sections
+ * @returns {object} 成功返回 {ok: true}；服务禁用时只校验快照结构，启用时也验证完整配置生成。
  */
 export function validate(sections) {
 	// 服务关闭时允许保存未完成表单，但输入的 UCI 结构仍必须有效。

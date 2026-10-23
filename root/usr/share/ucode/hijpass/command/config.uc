@@ -6,6 +6,7 @@ import { render, validate } from '../coreconfig/render.uc';
 // 未给 sections 时直接读取 /etc/config/hijpass，支持脱离 LuCI 的命令行运行。
 // RPC Response：render 返回 {nodes, shunt?} 或 {config}；validate 返回 {ok:true}；
 // 错误统一为 {error}，供 LuCI 展示；CLI 错误输出到 stderr 并返回非零状态。
+/** @returns {string} 完整的标准输入文本，最多 4 MiB；读取失败或超限时抛错，不在此处解析 JSON。 */
 function stdinText() {
 	// 多读一个字节即可判断超限，避免先把任意大小的输入全部载入内存。
 	let limit = 4 * 1024 * 1024, data = fs.stdin.read(limit + 1);
@@ -13,7 +14,10 @@ function stdinText() {
 	if (length(data) > limit) die('input exceeds 4 MiB');
 	return data;
 }
-/** @param {string[]} args 命令行参数；由解释器 ARGV 提供。 */
+/**
+ * @param {string[]} args 命令行参数；由解释器 ARGV 提供。
+ * @returns {null} 不返回业务数据；将方法描述、配置 JSON 或 {ok: true} 写入 stdout，RPC 错误返回 {error}，CLI 错误写 stderr 并退出。
+ */
 export function main(args) {
 	if (args[0] == 'list') {
 		printf('%J\n', { render: { sections: '', target: '' }, validate: { sections: '' } });

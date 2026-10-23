@@ -22,6 +22,7 @@ import { lines, run, sections, text, renderTemplate } from 'hijpass.common';
  */
 /**
  * @param {NetworkSnapshot} raw Shell 采集的网络快照。
+ * @returns {object} 网络状态：wan 为绕过设备，local4/local6 为本机网段，dns4/dns6 为有效上游 DNS 地址。
  */
 function networkState(raw) {
 	let state = { wan: lines(raw.wan), local4: [], local6: [], dns4: [], dns6: [] };
@@ -49,6 +50,7 @@ function networkState(raw) {
 /**
  * @param {string} path
  * @param {integer} version
+ * @returns {string[]} 指定地址族的有效 IP/CIDR 列表，保持文件顺序；缺失或空文件返回空数组。
  */
 function ipList(path, version) {
 	return filter(lines(fs.readfile(path)), value => {
@@ -59,6 +61,7 @@ function ipList(path, version) {
 }
 
 // 默认副本由打包流程从可编辑模板生成，升级时更新且不受用户编辑影响。
+/** @returns {string} 当前软件包内不可编辑的默认防火墙模板原文；读取失败抛错。 */
 export function defaultTemplate() { return text('/usr/lib/hijpass/firewall/default.ut'); };
 
 // FirewallOptions：端口为已校验整数，0 表示未启用；protocols 为 tcp/udp 数组。
@@ -69,6 +72,7 @@ export function defaultTemplate() { return text('/usr/lib/hijpass/firewall/defau
 /**
  * @param {object[]} config
  * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
+ * @returns {object} 模板 options 对象：含整数端口、协议、访问控制、接口、地址列表及已转义的接口名称，供 firewall.ut 使用。
  */
 function options(config, state) {
     let f = first(config, 'firewall');
@@ -80,15 +84,20 @@ function options(config, state) {
     let protocols = filter(split(join(',', list(f.tproxy_proto)), /[, \t]+/), value => value != '');
     if (!length(protocols)) die('tproxy_proto is required');
     for (let value in protocols) if (index(['tcp', 'udp'], value) < 0) die('invalid tproxy_proto');
+    /** @returns {string[]} 校验通过的原 MAC 数组，不复制或改写；任一地址格式错误则抛错。 */
     function macs(values) {
         for (let value in values) if (!match(value, /^[A-Fa-f0-9]{2}(:[A-Fa-f0-9]{2}){5}$/)) die('invalid proxy MAC');
         return values;
     }
+    /** @returns {string[]} 校验通过的原接口名称数组，不复制或改写；含非法字符时抛错。 */
     function interfaces(values) {
         for (let value in values) if (!match(value, /^[A-Za-z0-9_.:@-]+$/)) die('invalid proxy interface');
         return values;
     }
-    /** @param {string[]} names @returns {string} */
+    /**
+     * @param {string[]} names
+     * @returns {string} 逐项按 JSON 字符串转义并以逗号分隔的接口名称，可直接放入 nft 接口集合。
+     */
     function quoteNames(names) {
         return join(', ', map(names, name => sprintf('%J', name)));
     }
@@ -117,6 +126,7 @@ function options(config, state) {
 /**
  * @param {object[]} config
  * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
+ * @returns {string} 完整的 HiJpass nft 表文本；未配置代理/分流入口时返回空字符串，启用时模板为空或无效则抛错。
  */
 export function generate(config, state) {
     let f = first(config, 'firewall');
@@ -130,6 +140,7 @@ export function generate(config, state) {
 };
 
 // NetworkSnapshot：Shell 采集的 wan 文本以及 address/interface 命令的输出与退出码。
+/** @returns {null} 不返回业务数据；hook 动作输出固定 Hook 路径，其余动作读取网络快照并将生成的 nft 文本写入 stdout。 */
 export function main() { run(() => {
     if (ARGV[0] == 'hook') return FILES.nft_hook + '\n';
     let config = sections(), directory = ARGV[0];

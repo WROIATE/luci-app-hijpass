@@ -5,10 +5,13 @@ import { TYPE } from '../../config/protocol/proxy.uc';
 import { TAG } from '../constants.uc';
 
 const builders = { [TYPE.shadowsocks]: shadowsocks, [TYPE.vless]: vless, [TYPE.hysteria2]: hysteria2 };
+/** @returns {object} 连接本机指定端口的 Xray SOCKS 出站，含 protocol/tag 及 settings.address/port。 */
 export function socks(tag, port) {
 	return { protocol: 'socks', tag, settings: { address: '127.0.0.1', port } };
 };
+/** @returns {object} Xray 日志配置 {loglevel, dnsLog}；warn 转为 warning，缺省 info，并关闭 dnsLog。 */
 export function log(level) { return { loglevel: level == 'warn' ? 'warning' : level || 'info', dnsLog: false }; };
+/** @returns {object} Xray 入站对象；SOCKS 启用 UDP，tproxy 配置透明代理，并按 shunt 标志启用嗅探。 */
 export function inbound(kind, tag, port, shunt) {
 	let out = { protocol: kind == 'socks' ? 'socks' : 'dokodemo-door', port, tag };
 	if (kind == 'socks') out.settings = { udp: true };
@@ -26,6 +29,7 @@ export function inbound(kind, tag, port, shunt) {
 
 // Config 字段：log/inbounds/outbounds 为核心基础配置；routing 为路由表。
 // burstObservatory.pingConfig 为负载均衡探测参数，时长使用核心字符串格式。
+/** @returns {object} 单个代理节点的完整 Xray 配置，含日志、入站及出站；均衡节点另含路由策略和 burstObservatory。 */
 export function build(n) {
 	let config = {
 		log: log(n.log_level),

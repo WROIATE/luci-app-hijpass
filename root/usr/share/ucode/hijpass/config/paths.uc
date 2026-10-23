@@ -21,7 +21,11 @@ export const SERVER_DIR = '/etc/hijpass/server';
 const LOG_DIR = '/tmp/hijpass/log';
 const SERVER_LOG_DIR = '/tmp/hijserver/log';
 
-/** @param {object} section @param {string} [name] @returns {string} */
+/**
+ * @param {object} section
+ * @param {string} [name]
+ * @returns {string} 校验后的“节点名称-section ID”文件名主体，不含扩展名；名称缺失时用 section ID。
+ */
 export function nodeFilename(section, name) {
     let id = section['.name'];
     if (type(id) != 'string' || !match(id, /^[A-Za-z0-9_-]+$/)) die('invalid section ID');
@@ -30,13 +34,21 @@ export function nodeFilename(section, name) {
         die('invalid node name');
     return `${name}-${id}`;
 };
-/** @param {object} section @param {boolean} [server] @returns {string} */
+/**
+ * @param {object} section
+ * @param {boolean} [server]
+ * @returns {string} 代理或服务端节点的 JSON 绝对路径；目录固定，文件名为节点名称-section ID.json。
+ */
 export function nodeConfig(section, server) {
     return `${server ? SERVER_DIR : CLIENT_DIR}/${nodeFilename(section)}.json`;
 };
 
 // 日志位置与开关分离：主日志始终记录，节点及分流只读取 log_enabled。
-/** @param {object} section @param {boolean} [server] @returns {string} */
+/**
+ * @param {object} section
+ * @param {boolean} [server]
+ * @returns {string} 日志绝对路径；主日志始终可用，节点/分流日志未启用或 section 不支持日志时返回空字符串。
+ */
 export function logPath(section, server) {
     if (section['.type'] == 'hijpass') return `${LOG_DIR}/hijpass.log`;
     if (section.log_enabled != '1') return '';

@@ -4,7 +4,7 @@ import { read } from './uci/read.uc';
 /**
  * @param {string} path 模板文件的绝对路径。
  * @param {object} scope 只传入模板需要的已校验字段。
- * @returns {string}
+ * @returns {string} 使用 scope 渲染后的模板文本；模板失败时抛出带模板路径的错误。
  */
 export function renderTemplate(path, scope) {
 	try {
@@ -15,15 +15,16 @@ export function renderTemplate(path, scope) {
 	catch (e) { die(`template "${path}": ${e.message}`); }
 };
 
+/** @returns {string} 按 POSIX Shell 单引号规则转义后的单个参数，包含外围引号，不执行命令。 */
 export function quote(value) { return "'" + replace(`${value}`, "'", "'\\''") + "'"; };
 /**
  * @param {array} args 作为独立 argv 引用的参数数组。
- * @returns {string}
+ * @returns {string} 将各 argv 独立转义并以空格连接的 Shell 命令片段，不执行命令。
  */
 export function command(args) { return join(' ', map(args, quote)); };
 /**
  * @param {string|null} text
- * @returns {string[]} 去掉空行、注释并修剪空白的文本行。
+ * @returns {string[]} 去掉空行、# / ! 注释并修剪首尾空白后的文本行，保持原顺序。
  */
 export function lines(text) {
 	let result = [];
@@ -36,6 +37,7 @@ export function lines(text) {
 /**
  * @param {string|null} path 路径解析失败返回 null；拒绝无效目录。
  * @param {integer} [mode]
+ * @returns {null} 确保目录及父目录存在；已存在时不修改，路径无效或创建失败时抛错。
  */
 export function mkdir(path, mode) {
 	if (type(path) != 'string' || !length(path)) die('directory path is empty or invalid');
@@ -47,13 +49,14 @@ export function mkdir(path, mode) {
 let serial = 0;
 /**
  * @param {string} path
- * @returns {string}
+ * @returns {string} 目标文件旁包含当前 PID 和递增序号的临时路径；只生成名字，不创建文件。
  */
 export function temporary(path) { return `${path}.new-${fs.readlink('/proc/self')}-${++serial}`; };
 /**
  * @param {string} path
  * @param {string} data
  * @param {integer} [mode]
+ * @returns {null} 将完整数据写入临时文件后原子替换目标；失败清理临时文件并抛错，不返回文件路径。
  */
 export function atomic(path, data, mode) {
 	mkdir(fs.dirname(path));
@@ -74,6 +77,7 @@ let configDirectory;
 /**
  * @param {function} handler
  * @param {boolean} [jsonErrors]
+ * @returns {null} 不传递 handler 返回值；非 null 结果写入 stdout（字符串原样，其余编码为 JSON），异常报告错误并退出。
  */
 export function run(handler, jsonErrors) {
     try {
@@ -99,14 +103,14 @@ export function run(handler, jsonErrors) {
 };
 /**
  * @param {string} [packageName]
- * @returns {object[]}
+ * @returns {object[]} 指定 UCI 包的原始 section 数组，保留元数据和读取顺序，使用当前 CLI 的可选配置目录。
  */
 export function sections(packageName) {
     return read(packageName || 'hijpass', configDirectory);
 };
 /**
  * @param {string|null} path
- * @returns {string}
+ * @returns {string} 指定文件的完整原始文本，包含已有空白与换行；路径无效或读取失败时抛错。
  */
 export function text(path) {
     if (type(path) != 'string') die('missing input path');

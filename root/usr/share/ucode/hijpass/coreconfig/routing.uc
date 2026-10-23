@@ -14,8 +14,10 @@ import * as xr from './xray/config.uc';
 /**
  * @param {object[]} sections
  * @param {{nodes: object[], byName: object}} dependencies
+ * @returns {object} 已解析的分流设置，含核心、监听端口、默认出口/DNS、规则集下载策略及带匹配条件的 entries。
  */
 export function prepare(sections, dependencies) {
+	/** @returns {string} 有效节点名称或直连/阻断内部标签；非必需的空选择返回空字符串，必需项或引用无效时抛错。 */
 	function exit(name, required) {
 		if (!name && !required) return '';
 		if (name == 'hijpass-direct') return TAG.direct;
@@ -29,6 +31,7 @@ export function prepare(sections, dependencies) {
 		if (servers[s.tag]) die(`duplicate DNS tag "${s.tag}"`);
 		servers[s.tag] = { tag: s.tag, type: s.type, address: s.server, port: s.port ? port(s.port) : null };
 	}
+	/** 返回已启用的 DNS 节点对象 {tag, type, address, port}，未配置端口时 port 为 null；引用无效时抛错。 */
 	function server(name) {
 		if (!servers[name]) die(`DNS node "${name}" missing or disabled`);
 		return servers[name];
@@ -63,6 +66,7 @@ export function prepare(sections, dependencies) {
 /**
  * @param {string} value
  * @param {boolean} singbox
+ * @returns {string} 核心原生的 DNS 地址族策略名；没有对应映射时返回空字符串。
  */
 function strategy(value, singbox) {
 	return (singbox ? { '4': 'ipv4_only', '6': 'ipv6_only', '46': 'prefer_ipv4', '64': 'prefer_ipv6' }
@@ -73,6 +77,7 @@ function strategy(value, singbox) {
  * @param {string} tag
  * @param {string} detour
  * @param {boolean} singbox
+ * @returns {object} 原生 DNS 服务器配置：sing-box 使用 type/server/server_port，Xray 使用 address/port，均带指定 tag。
  */
 function dnsServer(s, tag, detour, singbox) {
 	if (singbox) {
@@ -99,6 +104,7 @@ function dnsServer(s, tag, detour, singbox) {
 /**
  * @param {object} settings
  * @param {{nodes: object[], byName: object}} dependencies
+ * @returns {object} 按 settings.core 生成的完整分流配置，包含日志、DNS、入站、出站和路由规则。
  */
 export function build(settings, dependencies) {
 	let s = settings, singbox = s.core == CORE.singbox, config = {};
@@ -143,6 +149,7 @@ export function build(settings, dependencies) {
 		};
 	}
 	let routes = [], dnsExits = {}, exitOrder = [], sets = {}, setOrder = [];
+	/** @returns {null} 原地登记当前规则的 DNS 服务器及分流规则；Xray 同时记录 DNS 请求的出口关联。 */
 	function addDNS(entry, r, exit) {
 		if (exit == TAG.block) die(`rule "${entry.name}" DNS exit cannot be Block`);
 		let tag = entry.name + '-dns', server = dnsServer(entry.dns, tag, exit, singbox);

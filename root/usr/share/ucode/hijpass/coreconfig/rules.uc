@@ -31,7 +31,7 @@ import { optional } from './json.uc';
  */
 /**
  * @param {RuleOptions} section UCI shunt_route_rule 的匹配字段。
- * @returns {Match}
+ * @returns {Match} 规范化匹配条件，各类条件均为数组；包含域名、IP、Geo 标签、规则集及网络/协议/端口限制。
  */
 export function parse(section) {
 	let r = {
@@ -73,6 +73,7 @@ export function parse(section) {
 /**
  * @param {Match} r
  * @param {boolean} [includeGeoSite] 核心支持 GeoSite 或先转换规则集时纳入 GeoSite。
+ * @returns {boolean} 存在域名匹配条件时为 true；includeGeoSite 为真时也将 GeoSite 引用计入。
  */
 export function hasDomain(r, includeGeoSite) {
 	return length(r.domain) + length(r.suffix) + length(r.keyword) + length(r.regex)
@@ -81,12 +82,16 @@ export function hasDomain(r, includeGeoSite) {
 /**
  * @param {Match} r
  * @param {boolean} geo 是否按 Xray Geo 标签判断匹配条件。
+ * @returns {boolean} 当前核心可用的匹配条件全部为空时为 true；geo 决定检查 Geo 标签还是 sing-box 规则集。
  */
 export function empty(r, geo) {
 	return !hasDomain(r) && !length(r.ip) && !length(r.network) && !length(r.protocol)
 		&& !length(r.ports) && !length(r.ranges) && !(geo ? length(r.geoip) + length(r.geosite) : length(r.sets));
 };
-/** @param {Match} r */
+/**
+ * @param {Match} r
+ * @returns {null} 把 GeoSite/GeoIP 引用追加为 r.sets 中的本地 SRS 规则集，不移除原 Geo 数组。
+ */
 export function convertGeo(r) {
 	for (let value in [...r.geosite, ...r.geoip]) {
 		let tag = replace(value, ':', '-');
@@ -96,6 +101,7 @@ export function convertGeo(r) {
 /**
  * @param {Match} r
  * @param {boolean} dnsOnly
+ * @returns {object} 仅含非空字段的 sing-box 匹配条件；dnsOnly 时省略 IP、网络、协议和端口条件。
  */
 export function singboxMatch(r, dnsOnly) {
 	let out = {};
@@ -108,7 +114,10 @@ export function singboxMatch(r, dnsOnly) {
 	}
 	return out;
 };
-/** @param {Match} r */
+/**
+ * @param {Match} r
+ * @returns {string[]} Xray 域名表达式列表，补齐 full:/domain:/regexp: 前缀，并保留关键字和 geosite: 引用。
+ */
 export function xrayDomains(r) {
 	return [...map(r.domain, d => 'full:' + d), ...map(r.suffix, d => 'domain:' + d), ...r.keyword, ...map(r.regex, d => 'regexp:' + d), ...r.geosite];
 };
@@ -117,6 +126,7 @@ export function xrayDomains(r) {
  * @param {string} name
  * @param {string} exit
  * @param {integer} version 0 表示不限制地址族，4/6 表示 IPv4/IPv6。
+ * @returns {object[]} Xray 路由规则数组；域名/IP 分别生成规则，带名称、出口及可选的 IPv4/IPv6 限制。
  */
 export function xrayRules(r, name, exit, version) {
 	let base = { inboundTag: [TAG.tproxy], outboundTag: exit };

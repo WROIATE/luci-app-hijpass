@@ -12,7 +12,7 @@ import { report } from './report.uc';
 /**
  * @param {string[]} args
  * @param {string} [pid]
- * @returns {object} 已校验的捕获参数。
+ * @returns {object} 已校验的捕获参数，包含请求目标、BPF filter 和任务专属 chain/comment；-h 打印帮助后退出。
  */
 export function parse(args, pid) {
 	let c = { mode: 'router', client: '', protocol: 'all', port: 'all', seconds: '8', method: 'HEAD',
@@ -60,6 +60,7 @@ export function parse(args, pid) {
 	return c;
 };
 
+/** @returns {object[]} 现有主日志和节点日志的位置快照，每项含 path、字节偏移 offset 与 inode；无可用日志时为空数组。 */
 function positions() {
 	let sections = [];
 	// 诊断本身不依赖服务已配置；缺少 UCI 时仍可提供 nft/系统日志报告。
@@ -74,6 +75,7 @@ function positions() {
 /**
  * @param {string|null} pid 命令参数，可缺失；入口拒绝空值。
  * @param {string[]} args
+ * @returns {object} 已解析目标地址的捕获参数，并补充任务目录 directory；域名解析失败时保留空 addresses 并报告警告。
  */
 export function prepare(pid, args) {
     if (!match(pid || '', /^[0-9]+$/)) die('invalid capture PID');
@@ -105,14 +107,14 @@ export function prepare(pid, args) {
 // 这里只生成 nft 文本；Shell 负责真正加载规则以及处理失败清理。
 /**
  * @param {Capture} c
- * @returns {string}
+ * @returns {string} 当前捕获任务的完整 nft 追踪规则文本；只生成文本，不加载规则。
  */
 export function ruleText(c) {
     return renderTemplate('/usr/lib/hijpass/diagnostics/trace.ut', { capture: c });
 };
 /**
  * @param {string|null} directory
- * @returns {object}
+ * @returns {object} 从已校验任务目录推导的 {chain, comment}，用于标识当前任务的 nft 规则。
  */
 function identity(directory) {
     if (type(directory) != 'string' || !match(directory, /^\/tmp\/hijpass-trace[.][0-9]+$/)) die('invalid capture directory');
@@ -121,7 +123,7 @@ function identity(directory) {
 }
 /**
  * @param {string|null} directory
- * @returns {object}
+ * @returns {object} 身份校验通过的元数据对象：capture 为捕获参数，positions 为开始捕获时的日志位置快照。
  */
 function metadata(directory) {
     let expected = identity(directory), data;
@@ -136,7 +138,7 @@ function metadata(directory) {
 /**
  * @param {string|null} directory
  * @param {string} raw
- * @returns {object}
+ * @returns {object} 清理计划：chain/comment 标识任务，rules 为需移除的 {chain, handle} 数组；不依赖元数据文件。
  */
 export function cleanupPlan(directory, raw) {
     let expected = identity(directory), rules = [];
@@ -148,6 +150,7 @@ export function cleanupPlan(directory, raw) {
     }
     return { ...expected, rules };
 };
+/** @returns {null} 不返回业务数据；向 stdout 输出准备参数、nft 文本、清理计划、诊断报告或任务状态，错误由 stderr/退出码报告。 */
 export function main() { run(() => {
     let action = shift(ARGV);
     if (action == 'prepare') { let pid = shift(ARGV); return prepare(pid, ARGV); }

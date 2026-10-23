@@ -9,9 +9,11 @@ import { decode, duration } from '../values.uc';
 
 // 核心由 core 字段决定；未设置时统一使用 sing-box，不根据协议推断。
 export const CORE = { singbox: 'sing-box', xray: 'xray' };
+/** @returns {string} 核心名称；空值使用 sing-box，此处只提供缺省值，不校验名称是否支持。 */
 export function core(value) { return value || CORE.singbox; };
 
 export const CONFIG_TYPE = { generated: 'generated', custom: 'custom' };
+/** @returns {string} generated 或 custom 配置类型，空值使用 generated；其他值抛错。 */
 export function configType(value) {
 	value ||= CONFIG_TYPE.generated;
 	if (index(values(CONFIG_TYPE), value) < 0) die(`unsupported config_type "${value}"`);
@@ -35,6 +37,7 @@ const commandFields = {
 // Proxy 为对应协议 fields 的解码结果，只包含该协议声明的字段，额外包含：
 // id/name/config_type（标识），type/core（仅自动生成），upstream（上游 Proxy 或 null），members（成员数组）。
 // upstream/members 在 dependencies.uc 中连接，生成器不再根据名字查询和重复解码。
+/** 返回已解码并校验的节点对象，含 id/name/config_type；upstream 为 null、members 为空数组，等待连接依赖。 */
 export function proxy(section) {
 	let mode = configType(section.config_type), custom = mode == CONFIG_TYPE.custom;
 	let engine = custom ? '' : core(section.core);

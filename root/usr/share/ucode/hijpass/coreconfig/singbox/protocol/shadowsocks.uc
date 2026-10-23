@@ -3,6 +3,7 @@ import { optional } from '../../json.uc';
 
 // method/password 为加密方法与凭据；plugin/plugin_opts 为可选插件；
 // udp_over_tcp 与 multiplex 为 sing-box 原生对象，仅启用时创建。
+/** @returns {object} sing-box Shadowsocks 出站，含加密认证、可选 SIP003 插件、UDP-over-TCP 及连接复用。 */
 export function build(n) {
 	let out = endpoint(n);
 	optional(out, 'method', n.method);

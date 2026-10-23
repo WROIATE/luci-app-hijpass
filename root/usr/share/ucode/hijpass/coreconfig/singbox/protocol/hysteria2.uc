@@ -15,6 +15,7 @@ import { optional } from '../../json.uc';
  */
 /**
  * @param {Hysteria2Options} n 已解码的专用字段；通用地址/TLS 交给 options.uc。
+ * @returns {object} sing-box Hysteria2 出站，含 TLS、认证及可选带宽、跳跃端口和混淆配置。
  */
 export function build(n) {
 	let out = endpoint(n);

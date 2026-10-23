@@ -5,7 +5,7 @@ import { cursor } from 'uci';
 /**
  * @param {string} [packageName] UCI 包名，默认 hijpass。
  * @param {string} [directory] 配置目录，默认 /etc/config。
- * @returns {object[]} 原生 foreach() 提供的 section，保持配置顺序。
+ * @returns {object[]} 原生 foreach() 读取的 section 数组，保留 .name/.type/.index 元数据、原始字段和配置顺序。
  */
 export function read(packageName, directory) {
 	packageName ||= 'hijpass';

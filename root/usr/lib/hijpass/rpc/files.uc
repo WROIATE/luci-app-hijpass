@@ -9,13 +9,19 @@ const resources = {
     domain_direct: RULE_FILES.domain_direct, domain_proxy: RULE_FILES.domain_proxy,
     ...FILES,
 };
-/** @param {string|null} value @returns {string} */
+/**
+ * @param {string|null} value
+ * @returns {string} 经校验的 section ID；空值、非字符串或包含非法字符时抛错。
+ */
 function identifier(value) {
     if (type(value) != 'string') die('invalid section ID');
     if (!match(value, /^[A-Za-z0-9_-]+$/)) die('invalid section ID');
     return value;
 }
-/** @param {object} request @returns {string} */
+/**
+ * @param {object} request
+ * @returns {string} 资源或节点配置的后端绝对路径；目录由后端决定，前端只能提供资源名和节点标识。
+ */
 function editorPath(request) {
     let kind = request.resource;
     let packageName = kind == 'server_config' ? 'hijserver' : 'hijpass';
@@ -25,7 +31,11 @@ function editorPath(request) {
     let id = identifier(request.section), section = filter(config, item => item['.name'] == id)[0];
     return nodeConfig({ '.name': id, name: request.name || section?.name }, kind == 'server_config');
 }
-/** @param {{resource: string, section: string, name: string, content: string}} request @param {boolean} write @returns {object} */
+/**
+ * @param {{resource: string, section: string, name: string, content: string}} request
+ * @param {boolean} write
+ * @returns {object} 读取时返回 {content}（文件文本），写入成功返回 {ok: true}；新节点/分流文件缺失时 content 为空字符串。
+ */
 export function editor(request, write) {
     let path = editorPath(request);
     if (!write) {
@@ -41,6 +51,7 @@ export function editor(request, write) {
 };
 
 // Log：id 为 package:section 的业务标识；客户端不能提交任意日志路径。
+/** @returns {object} 日志目录 {logs}；每项仅含业务 id、kind 和显示名称 name，不向前端返回文件路径。 */
 export function logs() {
     let result = [];
     for (let packageName in ['hijpass', 'hijserver']) for (let section in read(packageName)) {
@@ -51,7 +62,10 @@ export function logs() {
     }
     return { logs: result };
 };
-/** @param {{id: string, action: string, lines: string}} request @returns {object} */
+/**
+ * @param {{id: string, action: string, lines: string}} request
+ * @returns {object} read 返回 {content}，download 返回 {content, name}（下载文件名），clear 成功返回 {ok: true}。
+ */
 export function log(request) {
     let parts = split(request.id, ':'), packageName = parts[0];
     if (length(parts) != 2 || index(['hijpass', 'hijserver'], packageName) < 0) die('invalid log ID');

@@ -3,6 +3,7 @@ import { optional } from '../../json.uc';
 
 // uuid 标识用户；flow/packet_encoding 为 VLESS 扩展，transport 为传输层。
 // Reality 必须有公钥，并同时启用 uTLS，使用 chrome 指纹。
+/** @returns {object} sing-box VLESS 出站，含 UUID/flow、TLS/Reality 及可选传输和连接复用。 */
 export function build(n) {
 	let out = endpoint(n);
 	optional(out, 'uuid', n.uuid);

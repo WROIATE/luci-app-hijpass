@@ -6,7 +6,7 @@ import { run, text } from 'hijpass.common';
 // 地址解析返回 IP 字符串，不改动 TLS 的 server_name，代理链仍可验证原始域名证书。
 /**
  * @param {string|null} host
- * @returns {string}
+ * @returns {string} 首个可用 IPv4 地址，无 A 记录时回退 IPv6；传入 IP 原样返回，解析失败抛错。
  */
 export function resolve(host) {
 	if (type(host) != 'string') die('invalid argument');
@@ -22,6 +22,7 @@ export function resolve(host) {
 };
 /**
  * @param {string[]} values
+ * @returns {object} 按输入端口字符串索引的 TCP 监听状态；true 表示 IPv4/IPv6 任一 TCP 表中正在监听。
  */
 export function ports(values) {
 	let occupied = {};
@@ -41,6 +42,7 @@ export function ports(values) {
 /**
  * @param {{stdout: string, code: integer}} response Shell 提供的标准输出及真实退出状态。
  * @param {string} url 原始 URL，用于报告。
+ * @returns {object} 探测报告：含 url/success/exit_code；curl 输出完整时补充 HTTP 状态、远端地址/端口及各阶段耗时（毫秒）。
  */
 export function curlReport(response, url) {
 	let fields = split(response.stdout, '\n');
@@ -60,6 +62,7 @@ export function curlReport(response, url) {
  * @param {string|null} url
  * @param {string} [timeout]
  * @param {string} [socks]
+ * @returns {object} 已校验的探测参数 {url, timeout, socks}；timeout 为秒，未指定代理时 socks 为空字符串。
  */
 export function request(url, timeout, socks) {
     if (type(url) != 'string') die('only http:// and https:// URLs are supported');
@@ -74,6 +77,7 @@ export function request(url, timeout, socks) {
 /**
  * @param {object} response
  * @param {string} url
+ * @returns {object} 测速成功时返回 {ms, total_ms}（毫秒）；失败且非 curl 退出码 56 时返回 {error: "timeout"}。
  */
 export function pingReport(response, url) {
     let result = curlReport(response, url);
@@ -84,6 +88,7 @@ export function pingReport(response, url) {
 /**
  * @param {string} address
  * @param {string} cidr
+ * @returns {boolean} 地址位于 CIDR 内时为 true；地址无效、地址族不同或前缀无效时为 false。
  */
 export function contains(address, cidr) {
 	let parts = split(cidr, '/'), host = iptoarr(address), range = iptoarr(parts[0] || '');
@@ -98,6 +103,7 @@ export function contains(address, cidr) {
 	return true;
 };
 
+/** @returns {null} 不返回业务数据；向 stdout 输出解析地址、监听状态、探测参数/报告或地址族文本，失败输出 JSON 错误并退出。 */
 export function main() { run(() => {
     let action = shift(ARGV);
     if (action == 'resolve') return { address: resolve(ARGV[0]) };

@@ -2,7 +2,7 @@
 // 本模块处理业务类型与范围，不解释 UCI 文件语法，也不访问原生 cursor。
 /**
  * @param {string|string[]|null} value 原始 option/list；缺失时返回空数组。
- * @returns {string[]}
+ * @returns {string[]} option/list 的统一数组表示；原数组直接返回，非空字符串包装为单项数组，缺失或空值为空数组。
  */
 export function list(value) {
 	if (type(value) == 'array') return value;
@@ -11,6 +11,7 @@ export function list(value) {
 };
 
 // 端口必须是完整的十进制文本，转换后限定为 1–65535。
+/** @returns {integer} 1–65535 范围内的端口整数；非完整十进制文本或越界时抛错。 */
 export function port(value) {
 	if (type(value) != 'string' || !match(value, /^[0-9]+$/) || int(value) < 1 || int(value) > 65535)
 		die(`invalid port "${value}"`);
@@ -20,7 +21,7 @@ export function port(value) {
 // 校验时长并按需换算成秒；无需换算的核心字段仍保留原始时长字符串。
 /**
  * @param {string} value
- * @returns {number} 秒数，仅用于需要换算的核心字段。
+ * @returns {number} 以秒为单位的时长，可含小数；空字符串/0 返回 0，非法单位、格式或超限时抛错。
  */
 export function duration(value) {
 	if (value == '' || value == '0') return 0;
@@ -38,6 +39,7 @@ export function duration(value) {
 
 // 字段声明为 [类型, 默认值, 最大值（可选）]；只转换当前协议声明的字段。
 // 不属于该协议的旧字段不会误触发校验，也不会混入解码结果。
+/** @returns {object} 仅包含 declarations 声明字段的新对象；应用默认值并转换类型，保留未设置与显式 false/0 的差异。 */
 export function decode(section, declarations) {
 	let result = {};
 	for (let key, spec in declarations) {

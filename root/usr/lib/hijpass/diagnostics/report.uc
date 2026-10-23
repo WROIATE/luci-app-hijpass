@@ -7,7 +7,7 @@ import { lines } from 'hijpass.common';
 /**
  * @param {string} path
  * @param {integer} [offset]
- * @returns {string} 最多 4 MiB 的日志尾部。
+ * @returns {string} 从指定偏移读取且最多 4 MiB 的日志尾部；文件无法打开或定位时返回空字符串。
  */
 function tail(path, offset) {
 	let file = fs.open(path, 'r');
@@ -25,7 +25,7 @@ function tail(path, offset) {
 /**
  * @param {string} text
  * @param {string} chain
- * @returns {string[]}
+ * @returns {string[]} 与指定追踪链关联的全部 trace ID 日志行，包含这些 ID 在其他链中的后续记录。
  */
 export function filteredTrace(text, chain) {
 	let entries = lines(text), ids = {};
@@ -42,10 +42,12 @@ export function filteredTrace(text, chain) {
  * @param {string[]} values
  * @param {integer} limit
  * @param {string} [spaces]
+ * @returns {string} 去重、限制行数并添加缩进后的多行文本；未给 spaces 时每行缩进两个空格。
  */
 function indent(values, limit, spaces) { return join('\n', map(slice(uniq(values), 0, limit), line => (spaces || '  ') + line)); }
 /**
  * @param {string[]} packets
+ * @returns {object} 抓包统计：counts 含 TCP 标志、UDP 包数和 TCP 负载包数/字节数；interfaces、flows 分别按接口方向和流统计包数。
  */
 export function packetSummary(packets) {
 	let counts = { syn: 0, syn_ack: 0, fin: 0, rst: 0, udp: 0, payload_packets: 0, payload_bytes: 0 }, interfaces = {}, flows = {};
@@ -68,7 +70,7 @@ export function packetSummary(packets) {
 /**
  * @param {string} text
  * @param {array} targets 可含缺失地址；匹配前过滤空值。
- * @returns {string[]}
+ * @returns {string[]} 与目标地址或关联连接 ID 匹配的日志行，去重后最多 100 行。
  */
 function relatedLogs(text, targets) {
 	let all = lines(text), seeds = slice(uniq(filter(all, line => length(filter(targets, target => target && index(line, target) >= 0)))), 0, 80), ids = [];
@@ -103,6 +105,7 @@ function relatedLogs(text, targets) {
  * @param {Capture} c
  * @param {string} directory
  * @param {object[]} [positions]
+ * @returns {string} 包含追踪概况、防火墙、可选抓包及关联核心/系统日志的完整诊断文本，以换行结束。
  */
 export function report(c, directory, positions) {
 	let output = ['\n== Trace summary =='];

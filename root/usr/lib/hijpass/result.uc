@@ -5,7 +5,7 @@ import { run, text } from 'hijpass.common';
 /**
  * @param {string} directory Shell 采集的输出目录。
  * @param {integer} code 命令退出码。
- * @returns {{code: integer, stdout: string, stderr: string}} 保持同步 RPC 和任务查询的输出字段。
+ * @returns {{code: integer, stdout: string, stderr: string}} 命令结果：code 为真实退出码，stdout/stderr 为原始输出，仅移除末尾换行。
  */
 function commandOutput(directory, code) {
     // 保持原 Shell 命令替换的行为：只移除末尾换行，不修剪其它空白。

@@ -12,6 +12,7 @@ import { lines, atomic, renderTemplate } from 'hijpass.common';
 /**
  * @param {string} path
  * @param {string} output
+ * @returns {null} 合并普通域名和已提取的 Geo 域名后去重写入 output，不返回域名数组。
  */
 function domains(path, output) {
 	let result = [], tags = [];
@@ -25,10 +26,12 @@ function domains(path, output) {
 }
 /**
  * @param {object[]} sections
+ * @returns {object|null} chinadns 模板参数：监听端口、解析后的直连/代理上游及规则列表开关/路径；非 chinadns-ng 模式返回 null。
  */
 export function options(sections) {
 	let dns = first(sections, 'dns');
 	if (dns.dns_service != 'chinadns-ng') return null;
+	/** @returns {string} 最终上游地址；custom 使用自定义值，dnsmasq 转为其本机监听地址，缺失或含换行时抛错。 */
 	function upstream(key) {
 		let value = dns[key];
 		if (value == 'custom') value = dns[`${key}_custom`];
@@ -46,6 +49,7 @@ export function options(sections) {
 };
 /**
  * @param {object[]} sections
+ * @returns {object|null} 生成 DNS 文件后返回 chinadns-ng 的 procd 实例 {id, name, command, env, user}；其他 DNS 模式返回 null。
  */
 export function prepare(sections) {
 	let settings = options(sections);

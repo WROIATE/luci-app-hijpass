@@ -4,7 +4,7 @@
 /**
  * @param {object[]} sections
  * @param {string} kind
- * @returns {object[]}
+ * @returns {object[]} 指定类型的全部 section，保持输入顺序并引用原对象；无匹配时返回空数组。
  */
 export function of(sections, kind) {
 	return filter(sections, s => s['.type'] == kind);
@@ -12,13 +12,14 @@ export function of(sections, kind) {
 /**
  * @param {object[]} sections
  * @param {string} kind
- * @returns {object} 首个对应类型的 section，缺失时返回空对象。
+ * @returns {object} 首个匹配类型的原 section 对象；缺失时返回新的空对象。
  */
 export function first(sections, kind) {
 	return of(sections, kind)[0] || {};
 };
 
 // 校验快照结构，防止外部 JSON 的数字/对象进入只接受 UCI 字符串的业务转换。
+/** @returns {null} 校验 section 数组、必需标识及普通字段类型；通过时不修改数据，失败抛错。 */
 export function validateSections(sections) {
 	if (type(sections) != 'array' || !length(sections))
 		die('configuration is empty or cannot unmarshal sections array');

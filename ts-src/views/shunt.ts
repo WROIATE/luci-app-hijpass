@@ -559,7 +559,7 @@ function createBasicOptions(s: LuCI.form.AbstractSection) {
     }
 
     // 日志开关
-    FormUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, 'basic');
+    FormUtils.createLogFlagOption(s, 'basic');
 
     // 日志路径
     let logLevel = s.taboption('basic', form.ListValue, 'log_level', _('Log Level'), _('Logging Level'));

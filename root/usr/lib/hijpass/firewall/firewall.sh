@@ -15,7 +15,7 @@ case "$action" in
         if nft list table inet hijpass >/dev/null 2>&1; then nft delete table inet hijpass || exit 1; fi
         [ -f "$rules" ] || exit 0
         nft -f "$rules" || exit 1
-        hook=$(uci -q get hijpass.@hijpass[0].nft_hook)
+        hook=$(hijpass_data "$data" hook) || exit 1
         [ -z "$hook" ] || [ ! -x "$hook" ] || "$hook"
         exit $? ;;
     reset|generate) ;;

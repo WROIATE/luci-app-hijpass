@@ -91,24 +91,10 @@ const FormUtils = {
         return o;
     },
 
-    createLogFlagOption: function (s: LuCI.form.AbstractSection, conf_type: string, tab: string) {
+    createLogFlagOption: function (s: LuCI.form.AbstractSection, tab?: string) {
         let o = tab ? s.taboption(tab, form.Flag, 'log_enabled', _('Record Logs'))
             : s.option(form.Flag, 'log_enabled', _('Record Logs'));
         o.modalonly = true;
-        o.write = async function (section_id: string) {
-            const name = this.section.formvalue(section_id, 'name') || uci.get(conf_type, section_id, 'name') || '';
-            const settings = await Backend.logSettings(conf_type, section_id, name);
-            uci.set(conf_type, section_id, 'log_path', settings.path);
-        };
-        o.remove = function (section_id: string) {
-            uci.unset(conf_type, section_id, 'log_path');
-        }
-        o.load = function (section_id: string) {
-            if (uci.get(conf_type, section_id, 'log_path')) {
-                return '1'
-            }
-            return '0'
-        }
         o.rmempty = true;
         return o;
     },

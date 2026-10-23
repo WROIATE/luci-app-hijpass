@@ -165,7 +165,7 @@ export interface ProxyNode {
     upstream_proxy_node?: string;
     procd_env: string[];
     log_level?: string;
-    log_path: string;
+    log_enabled?: string;
 }
 
 /**
@@ -183,7 +183,7 @@ export class LoadBalanceProxyNode implements ProxyNode {
     member_node: string[];
     procd_env: string[];
     log_level: string;
-    log_path: string;
+    log_enabled?: string;
 
     // sing-box urltest
     url: string;
@@ -224,8 +224,7 @@ export class CustomProxyNode implements ProxyNode {
     listen_port: string;
     socks_port: string;
     procd_env: string[];
-    log_enabled: string;
-    log_path: string;
+    log_enabled?: string;
 
     constructor() {
         this.enabled = '1';
@@ -263,7 +262,7 @@ export class Hysteria2Config implements ProxyNode {
     socks_port: string;
 
     procd_env: string[];
-    log_path: string;
+    log_enabled?: string;
 
     constructor() {
         this.type = 'hysteria2';
@@ -306,7 +305,7 @@ export class ShadowsocksConfig implements ProxyNode {
     multiplex_brutal_down_mbps: string;
 
     procd_env: string[];
-    log_path: string;
+    log_enabled?: string;
 
     constructor() {
         this.type = 'shadowsocks';
@@ -344,7 +343,7 @@ export class TuicConfig implements ProxyNode {
     socks_port: string;
 
     procd_env: string[];
-    log_path: string;
+    log_enabled?: string;
 
     constructor() {
         this.type = 'tuic';
@@ -377,7 +376,7 @@ export class ShadowTLSConfig implements ProxyNode {
     listen_port: string;
     socks_port: string;
     procd_env: string[];
-    log_path: string;
+    log_enabled?: string;
 
     constructor() {
         this.type = 'shadowtls';
@@ -442,7 +441,7 @@ export class VlessConfig implements ProxyNode {
     transport_xhttp_method: string;
 
     procd_env: string[];
-    log_path: string;
+    log_enabled?: string;
 
     constructor() {
         this.type = 'vless';

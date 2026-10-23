@@ -13,7 +13,7 @@ function fixture(t) {
     const original = shellRuntime();
     fs.cpSync(original, runtime, { recursive: true });
     fs.mkdirSync(config);
-    for (const name of fs.readdirSync(runtime, { recursive: true })) if (/\.(sh|uc)$/.test(name)) {
+    for (const name of fs.readdirSync(runtime, { recursive: true })) if (/\.(sh|uc)$/.test(name) || name === 'testbin/ucode') {
         const file = path.join(runtime, name);
         fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll(original, runtime));
     }
@@ -27,17 +27,24 @@ function read(packageName) { return readConfig(packageName, '${config}'); }`));
     fs.writeFileSync(jobs, fs.readFileSync(jobs, 'utf8').replaceAll('/tmp/hijpass-jobs', path.join(directory, 'jobs')));
     const rules = path.join(directory, 'firewall.ut');
     fs.copyFileSync(path.join(root, 'root/etc/hijpass/firewall.ut'), rules);
-    const editor = path.join(directory, 'direct.txt'), log = path.join(directory, 'node.log');
+    const editor = path.join(directory, 'direct.txt'), log = path.join(directory, 'original-node.log');
+    const pathsFile = path.join(runtime, 'ucode/hijpass/config/paths.uc');
+    fs.writeFileSync(pathsFile, fs.readFileSync(pathsFile, 'utf8')
+        .replaceAll('/etc/hijpass/client', directory).replaceAll('/etc/hijpass/firewall.ut', rules)
+        .replaceAll('/etc/hijpass/rules/ip-direct.txt', editor)
+        .replaceAll('/etc/hijpass/shunt.json', directory + '/shunt.json')
+        .replaceAll('/tmp/hijpass/log', directory));
     fs.writeFileSync(editor, 'original\n');
     fs.writeFileSync(log, 'first\nsecond\nthird\n');
     fs.writeFileSync(path.join(config, 'hijpass'), `config hijpass 'global'
- option client_dir '${directory}'
- option firewall_template '${rules}'
- option ip_direct '${editor}'
- option shunt_conf '${directory}/shunt.json'
+ option client_dir '/untrusted/client'
+ option firewall_template '/untrusted/template'
+ option ip_direct '/untrusted/rules'
+ option shunt_conf '/untrusted/shunt'
 config proxy_node 'node'
  option name 'original'
- option log_path '${log}'
+ option log_enabled '1'
+ option log_path '/untrusted/log'
 `);
     fs.writeFileSync(path.join(config, 'hijserver'), "config hijserver 'global'\n");
     const entry = path.join(runtime, 'rpc/entry.sh');
@@ -71,7 +78,7 @@ test('RPC reads the full editable template and serves an immutable default witho
     assert.equal(f.invoke('not_a_method').error, 'unknown RPC method');
 });
 
-test('RPC resolves configured directories and renamed/new node names without client file paths', t => {
+test('RPC resolves backend directories and renamed/new node names without client file paths', t => {
     const f = fixture(t);
     assert.equal(f.invoke('editor_read', { resource: 'ip_direct' }).content, 'original\n');
     fs.chmodSync(f.editor, 0o640);
@@ -92,9 +99,9 @@ test('RPC resolves configured directories and renamed/new node names without cli
 
 test('RPC logs use section identities and preserve tail, download and clear behavior', t => {
     const f = fixture(t), id = 'hijpass:node';
-    assert.deepEqual(f.invoke('log_list').logs, [{ id, name: 'original', kind: 'proxy' }]);
+    assert.deepEqual(f.invoke('log_list').logs, [{ id: 'hijpass:global', name: 'global', kind: 'main' }, { id, name: 'original', kind: 'proxy' }]);
     assert.equal(f.invoke('log_read', { id, action: 'read', lines: '2' }).content, 'second\nthird\n');
-    assert.deepEqual(f.invoke('log_read', { id, action: 'download' }), { content: 'first\nsecond\nthird\n', name: 'node.log' });
+    assert.deepEqual(f.invoke('log_read', { id, action: 'download' }), { content: 'first\nsecond\nthird\n', name: 'original-node.log' });
     for (const request of [{ id: '/etc/shadow', action: 'read', lines: '2' }, { id, action: 'read', lines: '-1' }])
         assert.ok(f.invoke('log_read', request).error);
     assert.ok(f.invoke('log_read', { id, action: 'clear' }).error);

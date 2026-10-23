@@ -183,7 +183,7 @@ function createProxyEnvironmentOptions(s: LuCI.form.AbstractSection) {
     logLevelOpt.depends('config_type', PROXY_CONFIG_TYPE.GENERATED);
     HijpassValues.PROXY_LOG_LEVELS.forEach(level => logLevelOpt.value(level));
 
-    FormUtils.createLogFlagOption(s, LuciFlied.CONF_NAME, undefined)
+    FormUtils.createLogFlagOption(s)
 }
 
 function addLoadBalanceDepends(o: LuCI.form.AbstractValue, core?: string) {

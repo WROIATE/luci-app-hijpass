@@ -149,7 +149,7 @@ function createProcdEnvOption(s: LuCI.form.AbstractSection) {
 }
 
 function createLogRedirectOption(s: LuCI.form.AbstractSection) {
-    return FormUtils.createLogFlagOption(s, LuciFlied.SERVER_CONF_NAME, undefined);
+    return FormUtils.createLogFlagOption(s);
 }
 
 // 创建所有代理配置选项

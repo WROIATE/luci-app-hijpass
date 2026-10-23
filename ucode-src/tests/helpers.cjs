@@ -18,6 +18,7 @@ function shellRuntime() {
                 .replace('#!/bin/sh', '#!/usr/bin/busybox ash')
                 .replaceAll('/usr/lib/hijpass', shellDirectory));
     }
+    fs.cpSync(path.join(root, 'root/usr/share/ucode'), path.join(shellDirectory, 'ucode'), { recursive: true });
     const common = path.join(shellDirectory, 'common.sh');
     fs.writeFileSync(common, fs.readFileSync(common, 'utf8').replace('/usr/share/libubox/jshn.sh',
         process.env.JSHN_SH || '/usr/share/libubox/jshn.sh'));
@@ -25,18 +26,22 @@ function shellRuntime() {
     fs.mkdirSync(bin);
     const quote = text => "'" + text.replaceAll("'", "'\\''") + "'";
     fs.writeFileSync(path.join(bin, 'ucode'), '#!/bin/sh\nexec ' + quote(interpreter) +
-        ' -L ' + quote(path.join(root, 'root/usr/share/ucode')) + ' "$@"\n', { mode: 0o755 });
+        ' -L "${HIJPASS_TEST_LIBRARY:-' + shellDirectory + '/ucode}"' + ' "$@"\n', { mode: 0o755 });
     process.on('exit', () => fs.rmSync(shellDirectory, { recursive: true, force: true }));
     return shellDirectory;
 }
 
 function runShell(script, args = [], extra = {}) {
     const directory = shellRuntime();
-    const env = { ...process.env, ...(extra.env || {}) };
+    const { paths, ...options } = extra;
+    const library = paths ? mappedLibrary(paths) : null;
+    const env = { ...process.env, ...(options.env || {}) };
+    if (library) env.HIJPASS_TEST_LIBRARY = library;
     env.PATH = path.join(directory, 'testbin') + ':' + env.PATH;
     const target = path.join(directory, script.replace('root/usr/lib/hijpass/', ''));
     // OpenWrt 的 /bin/sh 是 BusyBox ash；jshn 使用 ash 的 export -n。
-    return spawnSync('/usr/bin/busybox', ['ash', target, ...args], { encoding: 'utf8', ...extra, env });
+    try { return spawnSync('/usr/bin/busybox', ['ash', target, ...args], { encoding: 'utf8', ...options, env }); }
+    finally { if (library) fs.rmSync(library, { recursive: true, force: true }); }
 }
 
 // 将快照写成真实 UCI 文件，系统操作测试通过公开 Shell 入口读取它。
@@ -57,6 +62,16 @@ function withConfig(sections, callback) {
     finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
 
+function mappedLibrary(paths) {
+    const directory = fs.mkdtempSync('/tmp/hijpass-test-library-');
+    fs.cpSync(path.join(shellRuntime(), 'ucode'), directory, { recursive: true });
+    const file = path.join(directory, 'hijpass/config/paths.uc');
+    let source = fs.readFileSync(file, 'utf8');
+    for (const [before, after] of Object.entries(paths)) source = source.replaceAll(before, after);
+    fs.writeFileSync(file, source);
+    return directory;
+}
+
 function run(script, args = [], input, extra = {}) {
     if (script.endsWith('.sh')) return runShell(script, args, extra);
     if (script === 'ucode-src/tests/runtime.uc') {
@@ -68,9 +83,11 @@ function run(script, args = [], input, extra = {}) {
         fs.writeFileSync(script, driver);
     }
     // Older ucode builds use getopt(), which can consume script flags such as --stdin on glibc hosts.
-    return spawnSync(interpreter, ['-S', '-L', path.join(root, 'root/usr/share/ucode'), '--', path.resolve(root, script), ...args], {
-        encoding: 'utf8', input: input === undefined ? undefined : JSON.stringify(input), ...extra,
-    });
+    const { paths, ...options } = extra;
+    const library = paths ? mappedLibrary(paths) : path.join(shellRuntime(), 'ucode');
+    try { return spawnSync(interpreter, ['-S', '-L', library, '--', path.resolve(root, script), ...args], {
+        encoding: 'utf8', input: input === undefined ? undefined : JSON.stringify(input), ...options,
+    }); } finally { if (paths) fs.rmSync(library, { recursive: true, force: true }); }
 }
 function config(args, input, extra) {
     return run('root/usr/bin/hijpass-config', args, input, extra);

@@ -124,7 +124,7 @@ const v = view.extend({
         useChn.rmempty = true;
         useChn.depends('dns_service', 'chinadns-ng');
 
-        // Hook 脚本编辑（启动传 start，停止传 stop，路径从 UCI hijpass.dns_hook 读取）
+        // Hook 脚本编辑（启动传 start，停止传 stop，脚本资源由后端定位）
         FormUtils.createTextOption(s, 'dns_hook', 'dns_hook_hash', null,
             _('Edit DNS Hook Script'),
             { resource: 'dns_hook' });

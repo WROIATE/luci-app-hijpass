@@ -176,7 +176,7 @@ function getDnsUpstreamSteps(value: string, customValue: string, shunt: any): Fl
     return [{ title: _('DNS upstream'), detail: formatEndpoint(value), tone: 'normal', page: 'dns' }];
 }
 
-function buildDnsDiagram(global: any, firewall: any, dns: any, shunt: any): FlowDiagram {
+function buildDnsDiagram(firewall: any, dns: any, shunt: any): FlowDiagram {
     const source = FirewallDnsForwardUtils.getSource();
     const aclDetail = source === FIREWALL_DNS_FORWARD.NONE
         ? getAclDetail(firewall)
@@ -209,8 +209,8 @@ function buildDnsDiagram(global: any, firewall: any, dns: any, shunt: any): Flow
     steps.push({ title: _('Independent DNS: %s').format(dns.cdg_port), detail: 'chinadns-ng', tone: 'proxy', page: 'dns' });
     const directConditions: string[] = [];
     const proxyConditions: string[] = [];
-    if (global.domain_direct) directConditions.push(_('Custom direct domain list'));
-    if (global.domain_proxy) proxyConditions.push(_('Custom proxy domain list'));
+    directConditions.push(_('Custom direct domain list'));
+    proxyConditions.push(_('Custom proxy domain list'));
     if (dns.use_chn === '1') directConditions.push(_('CHN domain list'));
     if (dns.use_gfw === '1') proxyConditions.push(_('GFW domain list'));
 
@@ -248,7 +248,7 @@ function getProxyTrafficTarget(firewall: any, shunt: any): FlowStep[] {
     return [{ title: _('No proxy target'), tone: 'warning', page: 'firewall' }];
 }
 
-function buildTrafficDiagram(global: any, firewall: any, dns: any, shunt: any): FlowDiagram {
+function buildTrafficDiagram(firewall: any, dns: any, shunt: any): FlowDiagram {
     const protocols = (firewall.tproxy_proto || '').split(',').filter(Boolean).map((item: string) => item.toUpperCase());
     const sourceStep: FlowStep = {
         title: _('Client traffic'),
@@ -275,12 +275,8 @@ function buildTrafficDiagram(global: any, firewall: any, dns: any, shunt: any): 
     }
 
     const branches: FlowBranch[] = [];
-    if (global.ip_proxy || (dns.dns_service === 'chinadns-ng' && global.domain_proxy)) {
-        branches.push({ condition: _('Forced proxy address'), page: 'firewall', steps: getProxyTrafficTarget(firewall, shunt) });
-    }
-    if (global.ip_direct || (dns.dns_service === 'chinadns-ng' && global.domain_direct)) {
-        branches.push({ condition: _('Forced direct address'), page: 'firewall', steps: [{ title: _('Direct'), tone: 'direct' }] });
-    }
+    branches.push({ condition: _('Forced proxy address'), page: 'firewall', steps: getProxyTrafficTarget(firewall, shunt) });
+    branches.push({ condition: _('Forced direct address'), page: 'firewall', steps: [{ title: _('Direct'), tone: 'direct' }] });
     if (dns.dns_service === 'chinadns-ng' && dns.use_gfw === '1') {
         branches.push({ condition: _('GFW domain set'), page: 'dns', steps: getProxyTrafficTarget(firewall, shunt) });
     }
@@ -303,12 +299,11 @@ function buildTrafficDiagram(global: any, firewall: any, dns: any, shunt: any): 
 }
 
 function buildConfigurationFlowPreview(): ConfigurationFlowPreview {
-    const global = getFirstSection(LuciFlied.GLOBAL_SECTION_TYPE);
     const firewall = getFirstSection(LuciFlied.FIREWALL_SECTION_TYPE);
     const dns = getFirstSection(LuciFlied.DNS_SECTION_TYPE);
     const shunt = getFirstSection(LuciFlied.SHUNT_SECTION_TYPE);
     return {
-        diagrams: [buildDnsDiagram(global, firewall, dns, shunt), buildTrafficDiagram(global, firewall, dns, shunt)],
+        diagrams: [buildDnsDiagram(firewall, dns, shunt), buildTrafficDiagram(firewall, dns, shunt)],
     };
 }
 

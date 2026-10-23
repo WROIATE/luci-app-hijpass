@@ -1,10 +1,11 @@
 #!/usr/bin/ucode -S
 import { cursor } from 'uci';
 import * as fs from 'fs';
+import { RULE_FILES, FILES, CLIENT_DIR, SERVER_DIR, nodeConfig, logPath } from 'hijpass.config.paths';
 
 // 安装专用：历史字段按 schema_version 分阶段转换；业务模块只读取当前格式。
 // 版本号在全部迁移成功后提交；同版本重复安装跳过，失败则保留入口供重试。
-const VERSION = '2';
+const VERSION = '3';
 
 /** @param {uci.cursor} ctx */
 function migrateInitial(ctx) {
@@ -68,7 +69,7 @@ function migrateInitial(ctx) {
         let options = {
             name, config_type: 'generated', type: 'load_balance', core: shunt.type == 'xray' ? 'xray' : 'sing-box', enabled: '1',
             listen_port: listen, socks_port: socks, log_level: 'info', member_node: list(shunt.lb_node_list),
-            log_path: `/tmp/hijpass/log/${name}-${id}.log`,
+            log_enabled: '1',
         };
         for (let key in balanceKeys) if (shunt[key] != null) options[key] = shunt[key];
         for (let key, value in options) ctx.set('hijpass', id, key, value);
@@ -93,6 +94,72 @@ function migrateHTTP(ctx) {
         for (let key in ['host', 'path', 'method', 'idle_timeout', 'ping_timeout'])
             ctx.delete('hijpass', id, `transport_http_${key}`);
     });
+}
+
+/** @param {string} path */
+function mkdir(path) {
+    if (fs.stat(path)?.type == 'directory') return;
+    let parent = fs.dirname(path);
+    if (parent != path) mkdir(parent);
+    if (!fs.mkdir(path, 0o755)) die(`cannot create migration directory ${path}`);
+}
+
+/** @param {string} path @param {string} content @param {integer} mode */
+function writeFile(path, content, mode) {
+    mkdir(fs.dirname(path));
+    let temp = `${path}.migrate-${fs.readlink('/proc/self')}`, file = fs.open(temp, 'wx');
+    if (!file) die(`cannot stage migration file ${path}`);
+    try {
+        if (!fs.chmod(temp, mode) || file.write(content) != length(content) || !file.flush())
+            die(`cannot write migration file ${path}`);
+        file.close();
+        if (!fs.rename(temp, path)) die(`cannot replace migration file ${path}`);
+    }
+    catch (e) { file.close(); fs.unlink(temp); die(e.message); }
+}
+
+// 旧位置的内容优先于软件包默认文件；保留来源，并备份目标原内容，失败可重试。
+/** @param {string|null} source @param {string} target */
+function copyManagedFile(source, target) {
+    if (!source || source == target) return;
+    let info = fs.stat(source);
+    if (!info) return;
+    let content = fs.readfile(source);
+    if (info.type != 'file' || type(content) != 'string') die(`cannot migrate ${source}`);
+    let existing = fs.stat(target), original = existing ? fs.readfile(target) : null;
+    if (existing && type(original) != 'string') die(`cannot back up ${target}`);
+    if (original == content) return;
+    let backup = target + '.before-path-migration';
+    if (existing && !fs.stat(backup)) writeFile(backup, original, existing.mode);
+    writeFile(target, content, info.mode);
+}
+
+/** @param {uci.cursor} ctx @param {string} packageName */
+function migratePaths(ctx, packageName) {
+    let server = packageName == 'hijserver', global;
+    ctx.foreach(packageName, packageName, s => { if (!global) global = s; });
+    if (!global) die(`missing ${packageName} global section`);
+    if (!server) for (let key, target in { ...RULE_FILES, ...FILES }) {
+        copyManagedFile(global[key], target);
+        ctx.delete(packageName, global['.name'], key);
+    }
+    let directoryKey = server ? 'server_dir' : 'client_dir';
+    let oldDirectory = global[directoryKey], directory = server ? SERVER_DIR : CLIENT_DIR;
+    ctx.foreach(packageName, null, s => {
+        let id = s['.name'];
+        if (s['.type'] == (server ? 'server_node' : 'proxy_node') && oldDirectory && oldDirectory != directory) {
+            let target = nodeConfig(s, server);
+            copyManagedFile(`${oldDirectory}/${fs.basename(target)}`, target);
+        }
+        if (s.log_path) {
+            if (s['.type'] != packageName) ctx.set(packageName, id, 'log_enabled', '1');
+            let target = logPath({ ...s, log_enabled: '1' }, server);
+            if (target) copyManagedFile(s.log_path, target);
+        }
+        ctx.delete(packageName, id, 'log_path');
+        ctx.delete(packageName, id, 'log_dir');
+    });
+    ctx.delete(packageName, global['.name'], directoryKey);
 }
 
 /** @param {string} path */
@@ -145,10 +212,18 @@ try {
     if (!global) die('hijpass global section is missing');
     let version = global.schema_version || '0';
     if (version == VERSION) exit(0);
-    if (version != '0' && version != '1') die(`unsupported schema_version "${version}"`);
+    if (index(['0', '1', '2'], version) < 0) die(`unsupported schema_version "${version}"`);
     if (version == '0') migrateInitial(ctx);
-    migrateHTTP(ctx);
-    cleanLegacyCron(directory ? fs.dirname(directory) + '/crontabs/root' : '/etc/crontabs/root');
+    if (version != '2') {
+        migrateHTTP(ctx);
+        cleanLegacyCron(directory ? fs.dirname(directory) + '/crontabs/root' : '/etc/crontabs/root');
+    }
+    migratePaths(ctx, 'hijpass');
+    if (fs.stat((directory || '/etc/config') + '/hijserver')) {
+        if (!ctx.load('hijserver')) die('cannot load hijserver for migration');
+        migratePaths(ctx, 'hijserver');
+        if (!ctx.commit('hijserver')) die(`cannot commit hijserver migration: ${ctx.error()}`);
+    }
     ctx.set('hijpass', global['.name'], 'schema_version', VERSION);
     if (!ctx.commit('hijpass')) die(`cannot commit hijpass migration: ${ctx.error()}`);
 }

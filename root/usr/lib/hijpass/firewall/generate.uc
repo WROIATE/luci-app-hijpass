@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { RULE_FILES, FILES } from 'hijpass.config.paths';
 import { sections as read } from 'hijpass.common';
 import { first } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
@@ -57,8 +58,6 @@ function ipList(path, version) {
 	});
 }
 
-export const TEMPLATE_PATH = '/etc/hijpass/firewall.ut';
-
 // 默认副本由打包流程从可编辑模板生成，升级时更新且不受用户编辑影响。
 export function defaultTemplate() { return text('/usr/lib/hijpass/firewall/default.ut'); };
 
@@ -72,7 +71,7 @@ export function defaultTemplate() { return text('/usr/lib/hijpass/firewall/defau
  * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
  */
 function options(config, state) {
-    let f = first(config, 'firewall'), global = first(config, 'hijpass');
+    let f = first(config, 'firewall');
     let dns = first(config, 'dns'), shunt = first(config, 'shunt');
     let forward = '';
     if (f.dns_forward == 'pre-routing' && dns.dns_service == 'chinadns-ng') forward = dns.cdg_port;
@@ -109,21 +108,20 @@ function options(config, state) {
     result.interfaceNames = quoteNames(result.interfaces);
     result.excludedInterfaceNames = quoteNames(result.excludedInterfaces);
     for (let version in [4, 6]) result[`ip${version}`] = {
-        direct: uniq([...state[`dns${version}`], ...state[`local${version}`], ...ipList(global.ip_direct, version)]),
-        proxy: uniq(ipList(global.ip_proxy, version)),
-        china: result.useChnRoute ? uniq(ipList(version == 4 ? global.chn_route : global.chn_route6, version)) : [],
+        direct: uniq([...state[`dns${version}`], ...state[`local${version}`], ...ipList(RULE_FILES.ip_direct, version)]),
+        proxy: uniq(ipList(RULE_FILES.ip_proxy, version)),
+        china: result.useChnRoute ? uniq(ipList(version == 4 ? RULE_FILES.chn_route : RULE_FILES.chn_route6, version)) : [],
     };
     return result;
 }
 /**
  * @param {object[]} config
  * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
- * @param {string} [templatePath] 完整 nftables 模板文件。
  */
-export function generate(config, state, templatePath) {
+export function generate(config, state) {
     let f = first(config, 'firewall');
     if (!f.proxy_port && !f.shunt_port) return '';
-    let path = templatePath || first(config, 'hijpass').firewall_template || TEMPLATE_PATH;
+    let path = FILES.firewall_template;
     if (type(path) != 'string') die('invalid firewall template path');
     let output = renderTemplate(path, { options: options(config, state) });
     // 空模板不能让已启用的防火墙被当作关闭处理。
@@ -133,6 +131,7 @@ export function generate(config, state, templatePath) {
 
 // NetworkSnapshot：Shell 采集的 wan 文本以及 address/interface 命令的输出与退出码。
 export function main() { run(() => {
+    if (ARGV[0] == 'hook') return FILES.nft_hook + '\n';
     let config = sections(), directory = ARGV[0];
     let raw = { wan: text(directory + '/wan'),
         addresses: { stdout: text(directory + '/addresses'), code: int(text(directory + '/addresses.code')) },

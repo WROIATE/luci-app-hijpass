@@ -16,7 +16,6 @@
           "editor_read",
           "log_list",
           "log_read",
-          "log_settings",
           "defaults",
           "firewall_show",
           "network_connect",

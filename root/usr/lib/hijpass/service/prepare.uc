@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { FILES, nodeConfig, logPath } from 'hijpass.config.paths';
 import { first, of } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
 import { render as renderCore } from 'hijpass.coreconfig.render';
@@ -25,15 +26,13 @@ export function plan(sections) {
 		if (shunt) push(env, 'XRAY_LOCATION_ASSET=/usr/share/v2ray');
 		return {
 			id: section['.name'], name, command: args, env, shunt: !!shunt,
-			user: section.nest_proxy == '1' ? 'root' : 'hijpass', log: section.log_path || '',
+			user: section.nest_proxy == '1' ? 'root' : 'hijpass', log: logPath(section),
 		};
 	}
-	let client = global.client_dir || '/etc/hijpass/client';
 	for (let section in of(sections, 'proxy_node')) {
 		if (section.enabled != '1') continue;
 		let name = section.name || section['.name'];
-		if (match(name, /[\/\\\r\n]/)) die('invalid proxy filename');
-		let path = `${client}/${name}-${section['.name']}.json`;
+		let path = nodeConfig(section);
 		let args;
 		if (configType(section.config_type) == CONFIG_TYPE.custom) {
 			if (!trim(section.command || '')) die(`custom node "${name}" has no command`);
@@ -50,7 +49,7 @@ export function plan(sections) {
 	}
 	let shunt = first(sections, 'shunt');
 	if (shunt.enabled != '0' && shunt.type) {
-		let engine = core(shunt.type), path = global.shunt_conf || '/etc/hijpass/shunt.json';
+		let engine = core(shunt.type), path = FILES.shunt_conf;
 		if (engine != CORE.xray && engine != CORE.singbox) die('unsupported shunt core');
 		push(instances, instance(shunt, 'shunt', engine == CORE.xray ? ['xray', '-c', path] : ['sing-box', 'run', '-c', path], true));
 	}
@@ -60,21 +59,19 @@ export function plan(sections) {
 // ConfigFile：path 为目标路径，data 为已完整生成和解析上游域名的 JSON 文本。
 // 单次生成先完成全部转换/DNS，再创建临时文件；已提交的文件在后续错误时恢复。
 export function writeConfigs(sections, generated) {
-	let global = first(sections, 'hijpass'), client = global.client_dir || '/etc/hijpass/client', files = [];
+	let files = [];
 	for (let section in of(sections, 'proxy_node')) {
 		let config = generated.nodes[section['.name']];
 		if (!config) continue;
-		let name = section.name || section['.name'];
-		if (match(name, /[\/\\\r\n]/)) die('invalid proxy filename');
 		if (section.upstream_proxy_node && section.server && !iptoarr(section.server)) {
 			let address = resolve(section.server), outbound = config.outbounds[0];
 			if (outbound.server) outbound.server = address;
 			else if (outbound.settings?.address) outbound.settings.address = address;
 			else die('unsupported proxy server field');
 		}
-		push(files, { path: `${client}/${name}-${section['.name']}.json`, data: sprintf('%.2J\n', config) });
+		push(files, { path: nodeConfig(section), data: sprintf('%.2J\n', config) });
 	}
-	if (generated.shunt) push(files, { path: global.shunt_conf || '/etc/hijpass/shunt.json', data: sprintf('%.2J\n', generated.shunt) });
+	if (generated.shunt) push(files, { path: FILES.shunt_conf, data: sprintf('%.2J\n', generated.shunt) });
 	let staged = [], committed = [];
 	try {
 		for (let file in files) {
@@ -119,7 +116,7 @@ function cron(sections, enabled) {
 			if (!match(schedule, /^[A-Za-z0-9*\/,? -]+$/) || length(split(trim(schedule) || '', /[ \t]+/)) != 5) die('invalid update schedule');
 			push(entries, `${schedule} /usr/lib/hijpass/rules/update.sh update`);
 		}
-		if (length(filter(sections, section => !!section.log_path))) push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijpass');
+		if (length(filter(sections, section => !!logPath(section)))) push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijpass');
 	}
 	atomic(path, join('\n', entries) + '\n');
 }
@@ -135,13 +132,12 @@ export function serverPlan(sections) {
 	for (let section in of(sections, 'server_node')) {
 		if (section.enabled != '1') continue;
 		let name = section.name || section['.name'];
-		if (match(name, /[\/\\\r\n]/)) die('invalid server filename');
 		if (!section.command) die(`server "${name}" has no command`);
-		let env = list(section.procd_env), path = `${global.server_dir || '/etc/hijpass/server'}/${name}-${section['.name']}.json`;
+		let env = list(section.procd_env), path = nodeConfig(section, true);
 		for (let entry in env) if (!match(entry, /^[A-Za-z_][A-Za-z0-9_]*=/)) die('invalid procd_env');
 		push(instances, {
 			id: section['.name'], name, command: ['/bin/sh', '-c', replace(section.command, '{conf_path}', command([path]))],
-			env, user: 'root', shunt: false, log: section.log_path || '',
+			env, user: 'root', shunt: false, log: logPath(section, true),
 		});
 		if (section.allow_firewall == '1') push(ports, port(section.listen_port));
 	}
@@ -166,7 +162,7 @@ function writeServerRules(sections) {
 };
 
 // ServiceSettings 是执行层需要的业务值；不包含可执行的通用动作列表。
-// enabled 控制启停，geo_convert 控制 Geo 准备，dns_hook 是用户配置的 hook，
+// enabled 控制启停，geo_convert 控制 Geo 准备，dns_hook 是后端固定的 Hook 位置，
 // update_interval 为自动更新间隔天数，log_paths 为需要准备目录的日志位置。
 /**
  * @param {object[]} config
@@ -174,10 +170,10 @@ function writeServerRules(sections) {
  */
 function settings(config, server) {
     let global = first(config, server ? 'hijserver' : 'hijpass'), shunt = first(config, 'shunt');
-    return { enabled: global.enabled == '1', dns_hook: global.dns_hook || '',
+    return { enabled: global.enabled == '1', dns_hook: server ? '' : FILES.dns_hook,
         geo_convert: !server && shunt.enabled != '0' && core(shunt.type) == CORE.singbox && shunt.ruleset_convert == '1',
         update_interval: int(first(config, 'rule').update_interval || '0'),
-        log_paths: filter(map(config, item => item.log_path), path => !!path) };
+        log_paths: filter(map(config, item => logPath(item, server)), path => !!path) };
 };
 export function main() { run(() => {
     let server = ARGV[0] == 'server';

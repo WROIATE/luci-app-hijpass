@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { RULE_FILES } from 'hijpass.config.paths';
 import { sections as read } from 'hijpass.common';
 import { first } from 'hijpass.config.sections';
 import { port } from 'hijpass.config.values';
@@ -26,7 +27,7 @@ function domains(path, output) {
  * @param {object[]} sections
  */
 export function options(sections) {
-	let dns = first(sections, 'dns'), global = first(sections, 'hijpass');
+	let dns = first(sections, 'dns');
 	if (dns.dns_service != 'chinadns-ng') return null;
 	function upstream(key) {
 		let value = dns[key];
@@ -40,7 +41,7 @@ export function options(sections) {
 	return {
 		listenPort: port(dns.cdg_port), direct: upstream('direct_dns'), proxy: upstream('proxy_dns'),
 		useChn: dns.use_chn == '1', useGfw: dns.use_gfw == '1',
-		chnList: global.chn_list, gfwList: global.gfw_list,
+		chnList: RULE_FILES.chn_list, gfwList: RULE_FILES.gfw_list,
 	};
 };
 /**
@@ -49,9 +50,9 @@ export function options(sections) {
 export function prepare(sections) {
 	let settings = options(sections);
 	if (!settings) return null;
-	let dns = first(sections, 'dns'), global = first(sections, 'hijpass');
-	domains(global.domain_proxy, '/tmp/hijpass/domain-proxy.txt');
-	domains(global.domain_direct, '/tmp/hijpass/domain-direct.txt');
+	let dns = first(sections, 'dns');
+	domains(RULE_FILES.domain_proxy, '/tmp/hijpass/domain-proxy.txt');
+	domains(RULE_FILES.domain_direct, '/tmp/hijpass/domain-direct.txt');
 	atomic('/etc/hijpass/chinadns-ng.conf', renderTemplate('/usr/lib/hijpass/service/chinadns.ut', { options: settings }), 0o644);
 	return { id: dns['.name'], name: 'chinadns-ng', command: ['chinadns-ng', '-C', '/etc/hijpass/chinadns-ng.conf'], env: [], user: 'hijpass' };
 };

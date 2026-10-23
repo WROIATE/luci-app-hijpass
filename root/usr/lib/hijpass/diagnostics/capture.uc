@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { logPath } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
 import { resolve } from '../network/network.uc';
 import { atomic, lines, run, text, renderTemplate } from 'hijpass.common';
@@ -63,7 +64,7 @@ function positions() {
 	let sections = [];
 	// 诊断本身不依赖服务已配置；缺少 UCI 时仍可提供 nft/系统日志报告。
 	try { sections = read(); } catch (e) { return []; }
-	return filter(map(uniq(map(sections, s => s.log_path)), path => {
+	return filter(map(uniq(map(sections, s => logPath(s))), path => {
 		let stat = path && fs.stat(path);
 		return stat?.type == 'file' ? { path, offset: stat.size, inode: stat.inode } : null;
 	}), entry => entry != null);

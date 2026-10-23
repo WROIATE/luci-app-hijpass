@@ -13,7 +13,7 @@ function fixture(t) {
     const sourceRuntime = shellRuntime();
     fs.cpSync(sourceRuntime, runtime, { recursive: true });
     // 各场景使用独立的安装副本，避免路径仍指向共享测试目录。
-    for (const file of fs.readdirSync(runtime, { recursive: true })) if (file.endsWith('.sh') || file.endsWith('.uc')) {
+    for (const file of fs.readdirSync(runtime, { recursive: true })) if (file.endsWith('.sh') || file.endsWith('.uc') || file === 'testbin/ucode') {
         const target = path.join(runtime, file);
         fs.writeFileSync(target, fs.readFileSync(target, 'utf8').replaceAll(sourceRuntime, runtime));
     }
@@ -32,9 +32,10 @@ function fixture(t) {
         });
     }
     function data(file, args) {
-        return spawnSync(interpreter, ['-S', '-L', path.join(root, 'root/usr/share/ucode'), '--', path.join(runtime, file), ...args],
+        return spawnSync(interpreter, ['-S', '-L', path.join(runtime, 'ucode'), '--', path.join(runtime, file), ...args],
             { encoding: 'utf8', env: process.env });
     }
+    patch('ucode/hijpass/config/paths.uc', '/tmp/hijpass/log', directory + '/logs');
     return { directory, runtime, patch, script, run, data };
 }
 
@@ -94,7 +95,8 @@ fi`);
     f.script('nft', '[ "$NFT_FAIL" != 1 ]');
     const template = path.join(f.directory, 'firewall.ut');
     fs.copyFileSync(path.join(root, 'root/etc/hijpass/firewall.ut'), template);
-    const sections = [{ '.type': 'hijpass', firewall_template: template },
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/firewall.ut', template);
+    const sections = [{ '.type': 'hijpass' },
         { '.type': 'firewall', shunt_port: '18081', tproxy_proto: 'tcp,udp', acl_default_allow: '1' },
         { '.type': 'dns', dns_service: 'custom' }];
     withConfig(sections, config => {
@@ -133,8 +135,10 @@ test('Chinadns 模板保留列表开关、默认 tag、上游和自定义域名�
     f.patch('rules/rules.uc', '/tmp/hijpass/', f.directory + '/');
     const domain = path.join(f.directory, 'domains');
     fs.writeFileSync(domain, 'Example.ORG\nfull:example.net\ninvalid\n');
-    const base = [{ '.type': 'hijpass', '.name': 'global', enabled: '1',
-        domain_direct: domain, domain_proxy: domain, chn_list: '/rules/china', gfw_list: '/rules/proxy' },
+    for (const key of ['direct', 'proxy']) f.patch('ucode/hijpass/config/paths.uc', `/etc/hijpass/rules/domain-${key}.txt`, domain);
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules/chn-list.txt', '/rules/china');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules/gfw-list.txt', '/rules/proxy');
+    const base = [{ '.type': 'hijpass', '.name': 'global', enabled: '1' },
         { '.type': 'dns', '.name': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653',
             direct_dns: 'custom', direct_dns_custom: '223.5.5.5#53', proxy_dns: '1.1.1.1#53' }];
     for (const [china, proxy, tag] of [['0', '0', null], ['1', '0', 'gfw'], ['0', '1', 'chn'], ['1', '1', null]]) {
@@ -235,8 +239,9 @@ esac`);
 
 test('服务准备通过原生 UCI 读取并生成配置，禁用时不调用 Geo 工具', t => {
     const f = fixture(t), client = path.join(f.directory, 'client'), calls = path.join(f.directory, 'calls');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/client', client);
     f.script('geoview', 'echo unexpected >>"$TEST_CALLS"; exit 1');
-    const sections = [{ '.type': 'hijpass', '.name': 'global', enabled: '1', client_dir: client, log_path: path.join(f.directory, 'app.log') },
+    const sections = [{ '.type': 'hijpass', '.name': 'global', enabled: '1' },
         { '.type': 'proxy_node', '.name': 'ss', enabled: '1', name: 'test', type: 'shadowsocks', core: 'sing-box',
             server: '192.0.2.10', server_port: '443', listen_port: '10001', socks_port: '10002', method: 'aes-128-gcm', password: 'test' }];
     withConfig(sections, config => {
@@ -265,11 +270,12 @@ test('服务准备通过原生 UCI 读取并生成配置，禁用时不调用 Ge
 
 test('原生 UCI 中缺省核心的 VLESS 生成并启动 sing-box，自定义命令不生成或覆盖配置', t => {
     const f = fixture(t), client = path.join(f.directory, 'client');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/client', client);
     fs.mkdirSync(client);
     const customFile = path.join(client, 'manual-custom.json');
     fs.writeFileSync(customFile, 'user maintained content');
     const command = 'printf "%s\\n" "custom command"';
-    const sections = [{ '.type': 'hijpass', '.name': 'global', enabled: '1', client_dir: client },
+    const sections = [{ '.type': 'hijpass', '.name': 'global', enabled: '1' },
         { '.type': 'proxy_node', '.name': 'vless', enabled: '1', name: 'vless', type: 'vless',
             server: '192.0.2.10', server_port: '443', listen_port: '10001', socks_port: '10002',
             uuid: '11111111-1111-4111-8111-111111111111' },
@@ -309,7 +315,7 @@ test('uci-defaults 首次安装自动迁移并注册防火墙，重复安装不�
     const first = f.run('install/firstboot.sh', [], env);
     assert.equal(first.status, 0, first.stderr);
     const migrated = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
-    assert.match(migrated, /schema_version '2'/);
+    assert.match(migrated, /schema_version '3'/);
     assert.match(migrated, /config_type 'custom'/);
     assert.doesNotMatch(migrated, /option (core|type) /);
     assert.match(fs.readFileSync(path.join(directory, 'firewall'), 'utf8'), /option type 'script'/);
@@ -329,9 +335,9 @@ test('服务 cron 只管理当前脚本，客户端与服务端互不删除，�
     const legacy = `0 * * * * ${f.runtime}/rules.sh update\n`;
     const mentioned = `0 * * * * echo ${f.runtime}/rules/update.sh\n`;
     fs.writeFileSync(cron, legacy + mentioned + `0 * * * * ${f.runtime}/rules/update.sh update\n*/10 * * * * ${f.runtime}/maintenance/logs.sh hijpass\n`);
-    withConfig([{ '.type': 'hijpass', '.name': 'global', enabled: '1', log_path: '/logs/main.log' },
+    withConfig([{ '.type': 'hijpass', '.name': 'global', enabled: '1' },
         { '.type': 'rule', '.name': 'rules', update_schedule: '0 5 * * 1' }], directory => {
-        fs.writeFileSync(path.join(directory, 'hijserver'), `config hijserver 'global'\n option enabled '1'\nconfig server_node 'a'\n option enabled '1'\n option command 'program'\n option log_path '/logs/server.log'\n`);
+        fs.writeFileSync(path.join(directory, 'hijserver'), `config hijserver 'global'\n option enabled '1'\nconfig server_node 'a'\n option enabled '1'\n option command 'program'\n option log_enabled '1'\n`);
         for (const args of [['cron', 'enable'], ['cron', 'enable'], ['server', 'cron', 'enable'], ['server', 'cron', 'enable']]) {
             const result = f.data('service/preparecli.uc', [...args, '--configdir', directory]);
             assert.equal(result.status, 0, result.stderr);

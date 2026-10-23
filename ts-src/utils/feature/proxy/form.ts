@@ -394,8 +394,8 @@ const ProxyFormUtils = {
             }, _('Preview')));
         }
 
-        let logPath = uci.get(LuciFlied.CONF_NAME, section_id, 'log_path');
-        if (logPath) {
+        let logEnabled = uci.get(LuciFlied.CONF_NAME, section_id, 'log_enabled');
+        if (logEnabled === '1') {
             let name = uci.get(LuciFlied.CONF_NAME, section_id, 'name') || section_id;
             btns.push(E('button', {
                 class: 'btn cbi-button',

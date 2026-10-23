@@ -64,7 +64,6 @@ export const Backend = {
     readLog: async (id: string, lines: string = '200'): Promise<string> => (await logRead(id, 'read', lines)).content,
     downloadLog: (id: string) => logRead(id, 'download', ''),
     clearLog: method('log_clear', ['id']),
-    logSettings: method('log_settings', ['package', 'section', 'name']),
     defaults: method('defaults'),
     cleanupNode: method('cleanup_node', ['kind', 'section', 'name']),
     restartService: () => runJob(method('service_restart'), false),

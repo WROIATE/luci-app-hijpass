@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { RULE_FILES } from 'hijpass.config.paths';
 import { first, of } from 'hijpass.config.sections';
 import { list } from 'hijpass.config.values';
 import { run, sections, text, lines } from 'hijpass.common';
@@ -6,14 +7,10 @@ import { contains } from '../network/network.uc';
 
 // RuleSource：key 为 UCI 下载地址字段，path 为目标文件，kind 为 domain/ip4/ip6/geo。
 // 同类多个 URL 分别下载后合并去重；至少一个完整、有效来源成功后才替换旧文件。
-/**
- * @param {object[]} sections
- */
-function sources(sections) {
-	let g = first(sections, 'hijpass');
+function sources() {
 	return {
-		gfw_list: { path: g.gfw_list, kind: 'domain' }, chn_domain_list: { path: g.chn_list, kind: 'domain' },
-		chn_v4_route: { path: g.chn_route, kind: 'ip4' }, chn_v6_route: { path: g.chn_route6, kind: 'ip6' },
+		gfw_list: { path: RULE_FILES.gfw_list, kind: 'domain' }, chn_domain_list: { path: RULE_FILES.chn_list, kind: 'domain' },
+		chn_v4_route: { path: RULE_FILES.chn_route, kind: 'ip4' }, chn_v6_route: { path: RULE_FILES.chn_route6, kind: 'ip6' },
 		geoip: { path: '/usr/share/v2ray/geoip.dat', kind: 'geo' }, geosite: { path: '/usr/share/v2ray/geosite.dat', kind: 'geo' },
 	};
 }
@@ -55,7 +52,7 @@ export function normalize(text, kind) {
  * @param {string} action
  */
 export function updatePlan(config, action) {
-    let settings = first(config, 'rule'), catalog = sources(config);
+    let settings = first(config, 'rule'), catalog = sources();
     let groups = { chnlist: ['chn_domain_list'], gfw: ['gfw_list'], chnroute: ['chn_v4_route', 'chn_v6_route'], geo: ['geoip', 'geosite'] };
     let selected = groups[action] || (action == 'all' || action == 'update' ? keys(catalog) : null);
     if (type(selected) != 'array') die('unknown rule action');
@@ -90,10 +87,10 @@ export function geoPlan(config) {
  */
 export function dnsPlan(config) {
     if (first(config, 'dns').dns_service != 'chinadns-ng') return { jobs: [] };
-    let global = first(config, 'hijpass'), jobs = [];
+    let jobs = [];
     for (let kind in ['proxy', 'direct']) {
         let tags = [];
-        for (let line in lines(fs.readfile(global[`domain_${kind}`])))
+        for (let line in lines(fs.readfile(RULE_FILES[`domain_${kind}`])))
             if (substr(line, 0, 8) == 'geosite:') push(tags, substr(line, 8));
         let value = join(',', uniq(tags));
         if (value && !match(value, /^[A-Za-z0-9_.:@,\/!-]+$/)) die('invalid Geo argument');

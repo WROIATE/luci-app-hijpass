@@ -7,9 +7,10 @@ const { spawnSync } = require('node:child_process');
 const { root, run, runShell, withConfig } = require('./helpers.cjs');
 
 function invoke(request, env) {
-    const extra = env ? { env: { ...process.env, ...env } } : {};
+    const extra = { paths: request.paths, ...(env ? { env: { ...process.env, ...env } } : {}) };
+    if (request.templatePath) extra.paths = { ...extra.paths, '/etc/hijpass/firewall.ut': request.templatePath };
     if (request.action === 'migrate') {
-        const migrated = run('root/usr/lib/hijpass/install/migrate.uc', ['--configdir', request.directory]);
+        const migrated = run('root/usr/lib/hijpass/install/migrate.uc', ['--configdir', request.directory], undefined, extra);
         if (migrated.status !== 0) return migrated;
         return run('ucode-src/tests/runtime.uc', [], { action: 'read', directory: request.directory });
     }
@@ -19,17 +20,9 @@ function invoke(request, env) {
         runShell('root/usr/lib/hijpass/rules/update.sh', [request.group, '--configdir', directory], extra));
     if (request.action === 'clean-log') return withConfig(request.sections, directory =>
         runShell('root/usr/lib/hijpass/maintenance/logs.sh', [request.operation, ...(request.path ? [request.path] : []), '--configdir', directory], extra));
-    if (request.action === 'cleanup') {
-        const directory = fs.mkdtempSync('/tmp/hijpass-cleanup-test-');
-        const target = request.sections[0].client_dir;
-        script(directory, 'uci', 'printf "%s\\n" "$CLEANUP_TEST_DIRECTORY"');
-        try {
-            return runShell('root/usr/lib/hijpass/maintenance/cleanup.sh',
-                [request.kind, request.id, request.name || ''],
-                { env: { ...process.env, PATH: directory + ':' + process.env.PATH, CLEANUP_TEST_DIRECTORY: target } });
-        } finally { fs.rmSync(directory, { recursive: true, force: true }); }
-    }
-    return run('ucode-src/tests/runtime.uc', [], request, env ? { env: { ...process.env, ...env } } : {});
+    if (request.action === 'cleanup') return runShell('root/usr/lib/hijpass/maintenance/cleanup.sh',
+        [request.kind, request.id, request.name || ''], extra);
+    return run('ucode-src/tests/runtime.uc', [], request, extra);
 }
 function value(request, env) {
     const result = invoke(request, env);
@@ -123,7 +116,7 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
     const dns = { '.name': 'dns', '.type': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653' };
     for (const forward of ['none', 'pre-routing', 'routing']) for (const local of ['0', '1']) {
         const result = value({ action: 'firewall', templatePath: path.join(root, 'root/etc/hijpass/firewall.ut'), state,
-            sections: [{ ...global, ip_direct: ip }, { ...firewall, dns_forward: forward, proxy_local: local }, dns,
+            paths: { '/etc/hijpass/rules/ip-direct.txt': ip }, sections: [global, { ...firewall, dns_forward: forward, proxy_local: local }, dns,
                 { '.type': 'shunt', enabled: '1', dns_listen_port: '10153' }] });
         assert.match(result, /meta l4proto != \{ tcp, udp \}/);
         assert.doesNotMatch(result, /\bdefine\b|\$[A-Z_]+/);
@@ -154,11 +147,11 @@ test('service plans preserve argv, custom config paths, environments and nesting
         node('off', { enabled: '0' })];
     const result = value({ action: 'plan', sections });
     assert.equal(result.instances.length, 3);
-    assert.deepEqual(result.instances[0].command, ['sing-box', '-c', directory + '/space name-sb.json', 'run']);
+    assert.deepEqual(result.instances[0].command, ['sing-box', '-c', '/etc/hijpass/client/space name-sb.json', 'run']);
     assert.deepEqual(result.instances[0].env, ['A=a b', 'B=two']);
     assert.equal(result.instances[0].user, 'hijpass');
     assert.equal(result.instances[1].user, 'root');
-    assert.equal(result.instances[2].command[2], `program --conf '${directory}/custom-custom.json'`);
+    assert.equal(result.instances[2].command[2], "program --conf '/etc/hijpass/client/custom-custom.json'");
     assert.deepEqual(value({ action: 'plan', sections: [{ ...global, enabled: '0' }] }), { instances: [] });
     assert.notEqual(invoke({ action: 'plan', sections: [global, node('bad', { name: '../file' })] }).status, 0);
     assert.notEqual(invoke({ action: 'plan', sections: [global, node('bad', { procd_env: ['bad entry'] })] }).status, 0);
@@ -210,13 +203,14 @@ test('native configuration writes are private and staging failure preserves ever
     const custom = path.join(client, 'manual-c.json'); fs.writeFileSync(custom, 'manual');
     const sections = [{ ...global, client_dir: client, shunt_conf: path.join(directory, 'shunt.json') }, node('a'),
         node('c', { name: 'manual', config_type: 'custom', command: 'program', listen_port: '10003', socks_port: '10004' })];
-    const result = value({ action: 'write', sections });
+    const paths = { '/etc/hijpass/client': client, '/etc/hijpass/shunt.json': path.join(directory, 'shunt.json') };
+    const result = value({ action: 'write', sections, paths });
     assert.equal(result.length, 1);
     const file = path.join(client, 'a-a.json'), original = fs.readFileSync(file, 'utf8');
     assert.equal(fs.statSync(file).mode & 0o777, 0o600);
     assert.equal(fs.readFileSync(custom, 'utf8'), 'manual');
     const generated = { nodes: { a: { changed: true } }, shunt: { outbounds: [] } };
-    const failed = invoke({ action: 'write', sections: [{ ...sections[0], shunt_conf: file + '/blocked.json' }, ...sections.slice(1)], generated });
+    const failed = invoke({ action: 'write', paths: { ...paths, '/etc/hijpass/shunt.json': file + '/blocked.json' }, sections: [{ ...sections[0], shunt_conf: file + '/blocked.json' }, ...sections.slice(1)], generated });
     assert.notEqual(failed.status, 0);
     assert.equal(fs.readFileSync(file, 'utf8'), original);
     assert.equal(fs.readdirSync(client).some(name => name.includes('.new-')), false);
@@ -226,7 +220,7 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     const directory = fixture(t);
     fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass 'global'\n option enabled '1'\n option nft '/etc/hijpass/fw4-template.nft'\nconfig proxy_node 'a'\n option name 'member'\n option core 'singbox'\n option listen_port '7890'\n option socks_port '7891'\nconfig shunt 's'\n option type 'singbox'\n list lb_node_list 'member'\n option default_proxy_node 'hijpass-slb'\n option lb_strategy 'urltest'\nconfig dns 'dns'\n option direct_dns 'system'\nconfig firewall 'fw'\n`);
     const result = value({ action: 'migrate', directory });
-    assert.equal(result.find(s => s['.name'] === 'global').firewall_template, '/etc/hijpass/firewall.ut');
+    assert.equal(result.find(s => s['.name'] === 'global').firewall_template, undefined);
     assert.equal(result.find(s => s['.name'] === 'global').nft, undefined);
     const balance = result.find(s => s.type === 'load_balance');
     assert.equal(balance.listen_port, '7892'); assert.equal(balance.socks_port, '7893');
@@ -234,14 +228,14 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     assert.equal(result.find(s => s['.name'] === 's').default_proxy_node, balance.name);
     assert.equal(result.find(s => s['.name'] === 'a').core, 'sing-box');
     assert.equal(result.find(s => s['.name'] === 'a').config_type, 'generated');
-    assert.equal(result.find(s => s['.name'] === 'global').schema_version, '2');
+    assert.equal(result.find(s => s['.name'] === 'global').schema_version, '3');
     assert.equal(result.find(s => s['.name'] === 'dns').direct_dns, 'dnsmasq');
     assert.equal(result.find(s => s['.name'] === 'fw').proxy_local, '0');
     const text = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
     value({ action: 'migrate', directory });
     assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), text);
-    fs.writeFileSync(path.join(directory, 'hijpass'), text.replace('/etc/hijpass/firewall.ut', '/custom/firewall.ut'));
-    assert.equal(value({ action: 'migrate', directory }).find(s => s['.name'] === 'global').firewall_template, '/custom/firewall.ut');
+    fs.writeFileSync(path.join(directory, 'hijpass'), text.replace("option enabled '1'", "option enabled '0'"));
+    assert.equal(value({ action: 'migrate', directory }).find(s => s['.name'] === 'global').enabled, '0');
 });
 
 test('独立迁移脚本转换旧自定义配置，保留用户命令并仅执行一次', t => {
@@ -270,7 +264,7 @@ test('迁移失败不写入完成标记，修复配置后可以重试', t => {
     assert.notEqual(failed.status, 0);
     assert.equal(fs.readFileSync(file, 'utf8'), invalid);
     fs.writeFileSync(file, "config hijpass 'global'\n");
-    assert.equal(value({ action: 'migrate', directory })[0].schema_version, '2');
+    assert.equal(value({ action: 'migrate', directory })[0].schema_version, '3');
 });
 
 test('schema 1 升级只迁移 Xray HTTP 和旧 cron，保留 sing-box、自定义配置及其他任务', t => {
@@ -318,7 +312,7 @@ config proxy_node 'manual'
     assert.equal(Object.keys(node).some(key => key.startsWith('transport_http_')), false);
     assert.equal(sections.find(s => s['.name'] === 'sb').transport_type, 'http');
     assert.equal(sections.find(s => s['.name'] === 'manual').transport_type, 'http');
-    assert.equal(sections.find(s => s['.name'] === 'global').schema_version, '2');
+    assert.equal(sections.find(s => s['.name'] === 'global').schema_version, '3');
     const generated = run('root/usr/bin/hijpass-config', ['render', '--stdin'], sections);
     assert.equal(generated.status, 0, generated.stderr);
     assert.deepEqual(JSON.parse(generated.stdout).nodes.xr.outbounds[0].streamSettings.xhttpSettings,
@@ -342,9 +336,9 @@ test('cron 迁移失败时不提交新版本，修复后可以重试；未知版
     assert.match(failed.stderr, /cron path is not a file/);
     assert.equal(fs.readFileSync(file, 'utf8'), original);
     fs.rmdirSync(cron); fs.writeFileSync(cron, '0 * * * * /usr/lib/hijpass/rules.sh update\n');
-    assert.equal(value({ action: 'migrate', directory: configDir })[0].schema_version, '2');
+    assert.equal(value({ action: 'migrate', directory: configDir })[0].schema_version, '3');
     assert.equal(fs.readFileSync(cron, 'utf8'), '');
-    const future = "config hijpass 'global'\n option schema_version '3'\n";
+    const future = "config hijpass 'global'\n option schema_version '4'\n";
     fs.writeFileSync(file, future);
     assert.notEqual(invoke({ action: 'migrate', directory: configDir }).status, 0);
     assert.equal(fs.readFileSync(file, 'utf8'), future);
@@ -361,14 +355,14 @@ test('rule updates preserve old files on HTTP/format failure and merge valid sou
     const directory = fixture(t), file = path.join(directory, 'domains'); fs.writeFileSync(file, 'old.example.org\n');
     const env = { PATH: directory + ':' + process.env.PATH };
     script(directory, 'curl', 'exit 22');
-    const sections = [{ ...global, chn_list: file, enabled: '0' }, { '.type': 'rule', retry_count: '1', chn_domain_list: ['https://example.org/1', 'https://example.org/2'] }];
-    assert.equal(value({ action: 'update', sections, group: 'chnlist' }, env).success, false);
+    const sections = [{ ...global, enabled: '0' }, { '.type': 'rule', retry_count: '1', chn_domain_list: ['https://example.org/1', 'https://example.org/2'] }];
+    assert.equal(value({ action: 'update', sections, paths: { '/etc/hijpass/rules/chn-list.txt': file }, group: 'chnlist' }, env).success, false);
     assert.equal(fs.readFileSync(file, 'utf8'), 'old.example.org\n');
     script(directory, 'curl', `while [ "$#" -gt 0 ]; do if [ "$1" = -o ]; then output=$2; shift; fi; shift; done\nprintf '%s\\n' 'not a domain' 'some HTML error text' >"$output"`);
-    assert.equal(value({ action: 'update', sections, group: 'chnlist' }, env).success, false);
+    assert.equal(value({ action: 'update', sections, paths: { '/etc/hijpass/rules/chn-list.txt': file }, group: 'chnlist' }, env).success, false);
     assert.equal(fs.readFileSync(file, 'utf8'), 'old.example.org\n');
     script(directory, 'curl', `while [ "$#" -gt 0 ]; do if [ "$1" = -o ]; then output=$2; shift; fi; shift; done\ni=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); done >"$output"`);
-    assert.equal(value({ action: 'update', sections, group: 'chnlist' }, env).success, true);
+    assert.equal(value({ action: 'update', sections, paths: { '/etc/hijpass/rules/chn-list.txt': file }, group: 'chnlist' }, env).success, true);
     assert.equal(fs.readFileSync(file, 'utf8'), 'example.org\n');
 });
 
@@ -387,10 +381,10 @@ test('subprocess arguments and connection JSON survive quotes and reject malform
 test('file cleanup matches exact section suffix and log truncation keeps the last 30000 lines', t => {
     const directory = fixture(t), keep = path.join(directory, 'new-a.json');
     for (const name of ['old-a.json', 'new-a.json', 'other-aa.json']) fs.writeFileSync(path.join(directory, name), name);
-    value({ action: 'cleanup', sections: [{ ...global, client_dir: directory }], kind: 'proxy', id: 'a', name: 'new' });
+    value({ action: 'cleanup', sections: [global], paths: { '/etc/hijpass/client': directory }, kind: 'proxy', id: 'a', name: 'new' });
     assert.deepEqual(fs.readdirSync(directory).sort(), ['new-a.json', 'other-aa.json']);
-    const log = path.join(directory, 'service.log'); fs.writeFileSync(log, Array.from({ length: 30005 }, (_, i) => i + '\n').join(''));
-    value({ action: 'clean-log', sections: [{ log_path: log }], operation: 'hijpass' });
+    const log = path.join(directory, 'hijpass.log'); fs.writeFileSync(log, Array.from({ length: 30005 }, (_, i) => i + '\n').join(''));
+    value({ action: 'clean-log', sections: [global], paths: { '/tmp/hijpass/log': directory }, operation: 'hijpass' });
     const contents = fs.readFileSync(log, 'utf8'); assert.ok(contents.startsWith('5\n')); assert.ok(contents.endsWith('30004\n'));
     assert.equal(contents.split('\n').length, 30001);
 });
@@ -504,7 +498,7 @@ test('规则下载拒绝非整数参数，校验失败时保留原文件且不�
         const sections = [{ ...global, enabled: '0', chn_list: file },
             { '.type': 'rule', download_timeout: '30', retry_count: '1',
                 chn_domain_list: ['https://example.org/domains'], ...options }];
-        const result = invoke({ action: 'update', sections, group: 'chnlist' }, env);
+        const result = invoke({ action: 'update', sections, paths: { '/etc/hijpass/rules/chn-list.txt': file }, group: 'chnlist' }, env);
         assert.notEqual(result.status, 0, JSON.stringify(options));
         assert.match(result.stderr, /invalid download timeout or retry count/);
         assert.equal(fs.readFileSync(file, 'utf8'), 'old.example.org\n');
@@ -608,14 +602,74 @@ test('单文件模板完整控制表和链，空输出不能关闭已启用的�
     }
 });
 
-test('迁移保留旧自定义整表路径，并清理旧路径字段', t => {
+test('迁移保留旧自定义整表内容，并清理全部路径字段', t => {
     const directory = fixture(t), template = path.join(directory, 'custom.ut');
     fs.writeFileSync(template, 'table inet hijpass { chain custom {} }\n');
     fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass 'global'\n option nft '${template}'\n option firewall_rules '/custom/chains'\n`);
-    const sections = value({ action: 'migrate', directory });
-    assert.equal(sections[0].firewall_template, template);
+    const paths = { '/etc/hijpass/firewall.ut': path.join(directory, 'firewall.ut') };
+    const sections = value({ action: 'migrate', directory, paths });
+    assert.equal(sections[0].firewall_template, undefined);
     assert.equal(sections[0].nft, undefined);
     assert.equal(sections[0].firewall_rules, undefined);
-    assert.match(value({ action: 'firewall', sections: [...sections, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp' }],
+    assert.match(value({ action: 'firewall', paths, sections: [...sections, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp' }],
         state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] } }), /chain custom/);
+});
+
+test('schema 2 路径迁移保留规则、模板、Hook、自定义配置和日志，前端只需日志开关', t => {
+    const directory = fixture(t), old = path.join(directory, 'old'), target = path.join(directory, 'managed');
+    fs.mkdirSync(old); fs.mkdirSync(target);
+    const paths = { '/etc/hijpass': target, '/tmp/hijpass/log': path.join(target, 'logs'),
+        '/tmp/hijserver/log': path.join(target, 'server-logs') };
+    const resources = { ip_direct: 'rules/ip-direct.txt', ip_proxy: 'rules/ip-proxy.txt',
+        domain_direct: 'rules/domain-direct.txt', domain_proxy: 'rules/domain-proxy.txt',
+        gfw_list: 'rules/gfw-list.txt', chn_route: 'rules/chn-route.txt', chn_route6: 'rules/chn-route6.txt',
+        chn_list: 'rules/chn-list.txt', firewall_template: 'firewall.ut',
+        nft_hook: 'hook/nft-hook.sh', dns_hook: 'hook/dns-hook.sh', shunt_conf: 'shunt.json' };
+    let source = `config hijpass 'global'\n option schema_version '2'\n option client_dir '${old}'\n option log_dir '${old}'\n option log_path '${old}/main.log'\n`;
+    for (const [key] of Object.entries(resources)) {
+        fs.writeFileSync(path.join(old, key), key + ' user content\n', { mode: key.endsWith('hook') ? 0o755 : 0o640 });
+        source += ` option ${key} '${old}/${key}'\n`;
+    }
+    fs.writeFileSync(path.join(target, 'firewall.ut'), 'package default');
+    for (const name of ['manual-a.json', 'server-b.json', 'main.log', 'node.log', 'shunt.log', 'server.log'])
+        fs.writeFileSync(path.join(old, name), name + ' content');
+    source += `config proxy_node 'a'\n option name 'manual'\n option config_type 'custom'\n option command 'program --config {conf_path}'\n option log_path '${old}/node.log'\nconfig proxy_node 'off'\n option log_enabled '0'\nconfig shunt 'shunt'\n option log_path '${old}/shunt.log'\nconfig rule 'rules'\n option gfw_list 'https://example.org/gfw.txt'\n`;
+    fs.writeFileSync(path.join(directory, 'hijpass'), source);
+    fs.writeFileSync(path.join(directory, 'hijserver'), `config hijserver 'global'\n option server_dir '${old}'\n option log_dir '${old}'\nconfig server_node 'b'\n option name 'server'\n option log_path '${old}/server.log'\n`);
+    const sections = value({ action: 'migrate', directory, paths });
+    assert.equal(sections[0].schema_version, '3');
+    for (const [key, file] of Object.entries(resources)) {
+        assert.equal(sections[0][key], undefined);
+        assert.equal(fs.readFileSync(path.join(target, file), 'utf8'), key + ' user content\n');
+    }
+    assert.equal(fs.readFileSync(path.join(target, 'firewall.ut.before-path-migration'), 'utf8'), 'package default');
+    assert.equal(fs.statSync(path.join(target, 'hook/nft-hook.sh')).mode & 0o777, 0o755);
+    for (const [file, content] of [['client/manual-a.json', 'manual-a.json'], ['server/server-b.json', 'server-b.json'],
+        ['logs/hijpass.log', 'main.log'], ['logs/manual-a.log', 'node.log'], ['logs/shunt.log', 'shunt.log'],
+        ['server-logs/server-b.log', 'server.log']])
+        assert.equal(fs.readFileSync(path.join(target, file), 'utf8'), content + ' content');
+    assert.equal(sections.find(s => s['.name'] === 'a').command, 'program --config {conf_path}');
+    assert.equal(sections.find(s => s['.name'] === 'a').log_enabled, '1');
+    assert.equal(sections.find(s => s['.name'] === 'off').log_enabled, '0');
+    assert.equal(sections.find(s => s['.name'] === 'rules').gfw_list, 'https://example.org/gfw.txt');
+    for (const packageName of ['hijpass', 'hijserver']) {
+        const text = fs.readFileSync(path.join(directory, packageName), 'utf8');
+        assert.doesNotMatch(text, /option (log_path|log_dir|client_dir|server_dir|firewall_template|nft_hook|dns_hook|shunt_conf) /);
+        value({ action: 'migrate', directory, paths });
+        assert.equal(fs.readFileSync(path.join(directory, packageName), 'utf8'), text);
+    }
+    assert.equal(fs.readFileSync(path.join(old, 'manual-a.json'), 'utf8'), 'manual-a.json content');
+});
+
+test('路径迁移写入失败时保留旧 UCI，修复后可重试且备份不被覆盖', t => {
+    const directory = fixture(t), source = path.join(directory, 'custom'), target = path.join(directory, 'blocked');
+    fs.writeFileSync(source, 'custom template'); fs.writeFileSync(target, 'blocks directory');
+    const original = `config hijpass 'global'\n option schema_version '2'\n option firewall_template '${source}'\n`;
+    fs.writeFileSync(path.join(directory, 'hijpass'), original);
+    const request = { action: 'migrate', directory, paths: { '/etc/hijpass/firewall.ut': target + '/template.ut' } };
+    assert.notEqual(invoke(request).status, 0);
+    assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), original);
+    fs.unlinkSync(target);
+    assert.equal(value(request)[0].schema_version, '3');
+    assert.equal(fs.readFileSync(target + '/template.ut', 'utf8'), 'custom template');
 });

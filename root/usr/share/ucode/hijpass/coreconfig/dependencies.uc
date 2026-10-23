@@ -13,28 +13,28 @@ import { proxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
  */
 export function resolve(sections, target) {
 	let proxySections = of(sections, 'proxy_node');
-	let enabledProxySectionsByName = {};
-	let rootProxySections = [];
+	let enabledProxies = {};
+	let rootSections = [];
 	for (let section in proxySections) {
 		if (section.enabled == '1') {
 			let name = section.name || section['.name'];
-			enabledProxySectionsByName[name] ||= [];
-			push(enabledProxySectionsByName[name], section);
+			enabledProxies[name] ||= [];
+			push(enabledProxies[name], section);
 		}
 		// 单节点生成从目标开始；全量生成和分流预览从全部启用节点开始。
 		if (target && target != 'shunt' ? section['.name'] == target : section.enabled == '1')
-			push(rootProxySections, section);
+			push(rootSections, section);
 	}
-	if (target && target != 'shunt' && !length(rootProxySections)) die('node not found');
-	let nodes = [], byID = {}, byName = {}, dependencyIDsByNodeID = {};
+	if (target && target != 'shunt' && !length(rootSections)) die('node not found');
+	let nodes = [], byID = {}, byName = {}, dependencies = {};
 	// 按批次展开依赖，保持发现顺序；每个 ID 只展开一次，循环有界。
-	let pendingProxySections = rootProxySections;
-	while (length(pendingProxySections)) {
-		let nextProxySections = [];
-		for (let section in pendingProxySections) {
+	let pendingSections = rootSections;
+	while (length(pendingSections)) {
+		let nextSections = [];
+		for (let section in pendingSections) {
 			let id = section['.name'], name = section.name || id;
 			if (byID[id]) continue;
-			if (length(filter(enabledProxySectionsByName[name] || [], other => other['.name'] != id)))
+			if (length(filter(enabledProxies[name] || [], other => other['.name'] != id)))
 				die(`duplicate proxy name "${name}"`);
 			let node;
 			try { node = proxy(section); }
@@ -43,7 +43,7 @@ export function resolve(sections, target) {
 			byName[name] = node;
 			push(nodes, node);
 			let dependencyIDs = [];
-			dependencyIDsByNodeID[id] = dependencyIDs;
+			dependencies[id] = dependencyIDs;
 			// 自定义命令自行管理出站；忽略切换核心后残留的协议依赖字段。
 			if (node.config_type == CONFIG_TYPE.custom) continue;
 			if (node.type == TYPE.balance && section.upstream_proxy_node)
@@ -52,18 +52,18 @@ export function resolve(sections, target) {
 				? list(section.member_node)
 				: section.upstream_proxy_node ? [section.upstream_proxy_node] : [];
 			for (let dependencyName in dependencyNames) {
-				let matchingSections = enabledProxySectionsByName[dependencyName] || [];
-				if (!length(matchingSections)) die(`proxy node "${dependencyName}" missing or disabled`);
-				if (length(matchingSections) > 1) die(`duplicate proxy name "${dependencyName}"`);
-				push(dependencyIDs, matchingSections[0]['.name']);
-				push(nextProxySections, matchingSections[0]);
+				let matches = enabledProxies[dependencyName] || [];
+				if (!length(matches)) die(`proxy node "${dependencyName}" missing or disabled`);
+				if (length(matches) > 1) die(`duplicate proxy name "${dependencyName}"`);
+				push(dependencyIDs, matches[0]['.name']);
+				push(nextSections, matches[0]);
 			}
 		}
-		pendingProxySections = nextProxySections;
+		pendingSections = nextSections;
 	}
 	for (let node in nodes) {
 		let dependencyNodes = [];
-		for (let id in dependencyIDsByNodeID[node.id]) push(dependencyNodes, byID[id]);
+		for (let id in dependencies[node.id]) push(dependencyNodes, byID[id]);
 		if (node.type == TYPE.balance) node.members = dependencyNodes;
 		else node.upstream = dependencyNodes[0];
 	}

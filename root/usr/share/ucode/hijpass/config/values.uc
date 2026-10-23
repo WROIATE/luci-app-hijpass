@@ -1,8 +1,9 @@
 // 配置字段转换：保留 option/list、未设置和显式 false/0 的差异。
 // 本模块处理业务类型与范围，不解释 UCI 文件语法，也不访问原生 cursor。
 /**
+ * 将 UCI 单值和列表统一为数组。
  * @param {string|string[]|null} value 原始 option/list；缺失时返回空数组。
- * @returns {string[]} option/list 的统一数组表示；原数组直接返回，非空字符串包装为单项数组，缺失或空值为空数组。
+ * @returns {string[]} 原数组或单项数组；缺失或空值返回空数组。
  */
 export function list(value) {
 	if (type(value) == 'array') return value;
@@ -10,8 +11,10 @@ export function list(value) {
 	return [];
 };
 
-// 端口必须是完整的十进制文本，转换后限定为 1–65535。
-/** @returns {integer} 1–65535 范围内的端口整数；非完整十进制文本或越界时抛错。 */
+/**
+ * 将十进制端口文本转换为整数，并检查范围。
+ * @returns {integer} 1–65535 的端口整数；格式或范围无效时抛错。
+ */
 export function port(value) {
 	if (type(value) != 'string' || !match(value, /^[0-9]+$/) || int(value) < 1 || int(value) > 65535)
 		die(`invalid port "${value}"`);
@@ -20,8 +23,9 @@ export function port(value) {
 
 // 校验时长并按需换算成秒；无需换算的核心字段仍保留原始时长字符串。
 /**
+ * 解析带单位的时长，并换算成秒。
  * @param {string} value
- * @returns {number} 以秒为单位的时长，可含小数；空字符串/0 返回 0，非法单位、格式或超限时抛错。
+ * @returns {number} 秒数，可含小数；空字符串或 "0" 返回 0。
  */
 export function duration(value) {
 	if (value == '' || value == '0') return 0;
@@ -39,7 +43,10 @@ export function duration(value) {
 
 // 字段声明为 [类型, 默认值, 最大值（可选）]；只转换当前协议声明的字段。
 // 不属于该协议的旧字段不会误触发校验，也不会混入解码结果。
-/** @returns {object} 仅包含 declarations 声明字段的新对象；应用默认值并转换类型，保留未设置与显式 false/0 的差异。 */
+/**
+ * 按字段声明读取配置、应用默认值并转换类型。
+ * @returns {object} 仅含声明字段的新对象，保留未设置与显式 false/0 的差异。
+ */
 export function decode(section, declarations) {
 	let result = {};
 	for (let key, spec in declarations) {

@@ -6,15 +6,18 @@ import { build as singbox } from './singbox/config.uc';
 import { build as xray } from './xray/config.uc';
 import { prepare as prepareRouting, build as buildRouting } from './routing.uc';
 
-// 配置生成前统一检查节点和分流监听端口，避免多个入口绑定同一端口。
 /**
+ * 检查节点和分流监听端口是否相互冲突。
  * @param {object[]} nodes
  * @param {object|null} shunt
- * @returns {null} 校验节点及分流监听端口是否重复；通过时不修改节点，重复时抛错。
+ * @returns {null} 无业务返回值；发现重复端口时抛错。
  */
 function validatePorts(nodes, shunt) {
 	let owners = {};
-	/** @returns {null} 登记当前端口的占用者；端口已被登记时抛错。 */
+	/**
+	 * 登记端口占用者，拒绝重复占用。
+	 * @returns {null} 无业务返回值，更新端口登记表。
+	 */
 	function add(port, owner) {
 		if (owners[port]) die(`port ${port} is shared by ${owners[port]} and ${owner}`);
 		owners[port] = owner;
@@ -32,7 +35,8 @@ function validatePorts(nodes, shunt) {
 // Generated：nodes 为 section ID -> 核心 JSON 对象；shunt 只在模板分流开启时出现。
 // render 是纯转换：不写 UCI/文件，不启动进程，失败时不会返回半份配置。
 /**
- * 返回：未指定 target 时为 {nodes, shunt?} 对象，nodes 按 section ID 索引；指定节点 ID 或 shunt 时为对应的核心 JSON 对象。
+ * 校验配置和依赖，生成代理节点或分流的核心配置。
+ * 返回：全部配置 {nodes, shunt?}；指定 target 时只返回对应的核心 JSON 对象。
  * @param {object[]} sections
  * @param {string} [target]
  */
@@ -57,8 +61,9 @@ export function render(sections, target) {
 	return result.nodes[target];
 };
 /**
+ * 检查配置能否生成，服务关闭时仅检查快照结构。
  * @param {object[]} sections
- * @returns {object} 成功返回 {ok: true}；服务禁用时只校验快照结构，启用时也验证完整配置生成。
+ * @returns {object} 校验成功返回 {ok: true}，失败时抛错。
  */
 export function validate(sections) {
 	// 服务关闭时允许保存未完成表单，但输入的 UCI 结构仍必须有效。

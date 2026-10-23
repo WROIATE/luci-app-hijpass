@@ -1,6 +1,9 @@
 // Hysteria2 在 Xray 中使用 hysteria 协议及 version=2；认证位于传输设置。
 // 带宽放在 finalmask.quicParams；未设置与明确为 0 必须区分。
-/** @returns {object} Xray Hysteria2 出站，protocol 为 hysteria，版本为 2，认证和带宽选项位于 streamSettings。 */
+/**
+ * 将 Hysteria2 节点转换为 Xray 原生出站配置。
+ * @returns {object} 使用 hysteria 协议、版本 2 的出站对象，认证和带宽位于 streamSettings。
+ */
 export function build(n) {
 	let stream = {
 		network: 'hysteria', security: 'tls',
@@ -8,7 +11,10 @@ export function build(n) {
 		hysteriaSettings: { version: 2, auth: n.password, udpIdleTimeout: n.udp_idle_timeout },
 	};
 	if (n.up_mbps != null || n.down_mbps != null) {
-		/** @returns {string} Xray 带宽文本：未设置为空字符串，显式零值为 "0"，其余为 "数值 mbps"。 */
+		/**
+		 * 将带宽数值转换成 Xray 所需的文本格式。
+		 * @returns {string} 未设置为 ""，零值为 "0"，其他为 "数值 mbps"。
+		 */
 		function bandwidth(value) { return value == null ? '' : value ? `${value} mbps` : '0'; }
 		stream.finalmask = { quicParams: { brutalUp: bandwidth(n.up_mbps), brutalDown: bandwidth(n.down_mbps) } };
 	}

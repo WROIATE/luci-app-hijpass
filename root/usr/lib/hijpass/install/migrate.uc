@@ -8,8 +8,9 @@ import { RULE_FILES, FILES, CLIENT_DIR, SERVER_DIR, nodeConfig, logPath } from '
 const VERSION = '3';
 
 /**
+ * 把初始版本的核心、DNS 和负载均衡设置转成当前格式。
  * @param {uci.cursor} ctx
- * @returns {null} 在 cursor 中转换初始版本的核心、配置类型、DNS 与负载均衡字段；不提交 UCI。
+ * @returns {null} 无业务返回值；只修改 cursor，不提交 UCI。
  */
 function migrateInitial(ctx) {
     // 迁移规则固定在安装脚本中，不依赖当前协议模型，避免业务扩展改变旧配置转换结果。
@@ -18,7 +19,10 @@ function migrateInitial(ctx) {
         'strategy', 'strategy_expected', 'strategy_max_rtt', 'strategy_tolerance', 'fallback_tag',
         'probe_url', 'probe_connectivity', 'probe_interval', 'probe_timeout', 'probe_sampling', 'probe_http_method',
     ];
-    /** @returns {array} 旧 option/list 的数组表示；缺失或空值返回空数组。 */
+    /**
+     * 将旧配置中的单值和列表统一为数组。
+     * @returns {array} 原数组或单项数组；空值返回空数组。
+     */
     function list(value) { return type(value) == 'array' ? value : value ? [value] : []; }
     let shunt, dns, firewall, names = {}, ports = {};
     ctx.foreach('hijpass', null, s => {
@@ -63,7 +67,10 @@ function migrateInitial(ctx) {
     if (shunt && length(list(shunt.lb_node_list))) {
         let name = 'load-balance', suffix = 2;
         while (names[name]) name = `load-balance-${suffix++}`;
-        /** @returns {string} 尚未占用端口的十进制文本，同时登记该端口；没有可用端口时抛错。 */
+        /**
+         * 查找并登记一个未被已有配置占用的端口。
+         * @returns {string} 十进制端口字符串；没有可用端口时抛错。
+         */
         function available(start) {
             while (ports[start] && start <= 65535) start++;
             if (start > 65535) die('no available load balancing port');
@@ -87,8 +94,9 @@ function migrateInitial(ctx) {
 }
 
 /**
+ * 将旧 Xray VLESS HTTP 传输配置转换为 XHTTP。
  * @param {uci.cursor} ctx
- * @returns {null} 在 cursor 中把自动生成的 Xray VLESS HTTP 字段迁为 XHTTP；不提交 UCI。
+ * @returns {null} 无业务返回值；只修改 cursor，不提交 UCI。
  */
 function migrateHTTP(ctx) {
     ctx.foreach('hijpass', 'proxy_node', s => {
@@ -105,8 +113,9 @@ function migrateHTTP(ctx) {
 }
 
 /**
+ * 创建迁移目标目录及缺失的父目录。
  * @param {string} path
- * @returns {null} 确保迁移目标目录及父目录存在；创建失败抛错。
+ * @returns {null} 无业务返回值；创建失败时抛错。
  */
 function mkdir(path) {
     if (fs.stat(path)?.type == 'directory') return;
@@ -116,10 +125,11 @@ function mkdir(path) {
 }
 
 /**
+ * 通过临时文件原子替换迁移目标，并保留指定权限。
  * content 为已读取的文件文本。
  * @param {string} path 目标路径。
  * @param {integer} mode 文件权限。
- * @returns {null} 按指定内容和权限原子写入文件；失败时清理暂存文件并抛错。
+ * @returns {null} 无业务返回值；失败时清理临时文件并抛错。
  */
 function writeFile(path, content, mode) {
     mkdir(fs.dirname(path));
@@ -136,9 +146,10 @@ function writeFile(path, content, mode) {
 
 // 旧位置的内容优先于软件包默认文件；保留来源，并备份目标原内容，失败可重试。
 /**
+ * 把旧路径的文件复制到固定位置，覆盖前备份已有内容。
  * @param {string|null} source
  * @param {string} target
- * @returns {null} 复制旧文件到固定位置，保留来源并备份被覆盖的目标；源缺失或路径相同时跳过。
+ * @returns {null} 无业务返回值；源文件缺失或路径相同时跳过。
  */
 function copyManagedFile(source, target) {
     if (!source || source == target) return;
@@ -155,9 +166,10 @@ function copyManagedFile(source, target) {
 }
 
 /**
+ * 迁移受管文件，并把旧路径配置替换为当前开关。
  * @param {uci.cursor} ctx
  * @param {string} packageName
- * @returns {null} 复制指定配置包的受管文件，并在 cursor 中以日志开关替换旧路径字段；不提交 UCI。
+ * @returns {null} 无业务返回值；只修改文件和 cursor，不提交 UCI。
  */
 function migratePaths(ctx, packageName) {
     let server = packageName == 'hijserver', global;
@@ -187,8 +199,9 @@ function migratePaths(ctx, packageName) {
 }
 
 /**
+ * 删除旧版本注册的定时任务，保留其他任务。
  * @param {string} path
- * @returns {null} 删除旧版本注册的 cron 项，仅在内容变化时原子写回；文件不存在时跳过。
+ * @returns {null} 无业务返回值；文件不存在或内容未变时跳过。
  */
 function cleanLegacyCron(path) {
     let info = fs.stat(path);

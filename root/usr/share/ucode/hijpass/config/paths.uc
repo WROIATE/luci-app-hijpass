@@ -22,9 +22,10 @@ const LOG_DIR = '/tmp/hijpass/log';
 const SERVER_LOG_DIR = '/tmp/hijserver/log';
 
 /**
+ * 校验节点标识和名称，生成统一文件名。
  * @param {object} section
  * @param {string} [name]
- * @returns {string} 校验后的“节点名称-section ID”文件名主体，不含扩展名；名称缺失时用 section ID。
+ * @returns {string} 不含扩展名的“节点名称-section ID”；名称缺失时使用 section ID。
  */
 export function nodeFilename(section, name) {
     let id = section['.name'];
@@ -35,9 +36,10 @@ export function nodeFilename(section, name) {
     return `${name}-${id}`;
 };
 /**
+ * 确定客户端或服务端节点的配置文件位置。
  * @param {object} section
  * @param {boolean} [server]
- * @returns {string} 代理或服务端节点的 JSON 绝对路径；目录固定，文件名为节点名称-section ID.json。
+ * @returns {string} 固定目录下的节点 JSON 绝对路径。
  */
 export function nodeConfig(section, server) {
     return `${server ? SERVER_DIR : CLIENT_DIR}/${nodeFilename(section)}.json`;
@@ -45,9 +47,10 @@ export function nodeConfig(section, server) {
 
 // 日志位置与开关分离：主日志始终记录，节点及分流只读取 log_enabled。
 /**
+ * 根据配置类型和日志开关确定日志位置。
  * @param {object} section
  * @param {boolean} [server]
- * @returns {string} 日志绝对路径；主日志始终可用，节点/分流日志未启用或 section 不支持日志时返回空字符串。
+ * @returns {string} 日志绝对路径；未启用或不支持日志时为空字符串。
  */
 export function logPath(section, server) {
     if (section['.type'] == 'hijpass') return `${LOG_DIR}/hijpass.log`;

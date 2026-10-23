@@ -10,9 +10,10 @@ import { report } from './report.uc';
 // 描述 curl 请求；addresses 为解析结果。tcpdump/iface/verbose/keep 控制报告与文件保留。
 // chain/comment 以当前 PID 隔离 nft 规则；filter 为已校验字段生成的 BPF 表达式。
 /**
+ * 解析诊断命令参数，校验捕获目标和过滤条件。
  * @param {string[]} args
  * @param {string} [pid]
- * @returns {object} 已校验的捕获参数，包含请求目标、BPF filter 和任务专属 chain/comment；-h 打印帮助后退出。
+ * @returns {object} 捕获参数对象，含过滤条件和任务专属标识。
  */
 export function parse(args, pid) {
 	let c = { mode: 'router', client: '', protocol: 'all', port: 'all', seconds: '8', method: 'HEAD',
@@ -60,7 +61,10 @@ export function parse(args, pid) {
 	return c;
 };
 
-/** @returns {object[]} 现有主日志和节点日志的位置快照，每项含 path、字节偏移 offset 与 inode；无可用日志时为空数组。 */
+/**
+ * 记录当前日志位置，供报告提取本次诊断产生的日志。
+ * @returns {object[]} {path, offset, inode} 数组；无日志时为空数组，offset 单位为字节。
+ */
 function positions() {
 	let sections = [];
 	// 诊断本身不依赖服务已配置；缺少 UCI 时仍可提供 nft/系统日志报告。
@@ -73,9 +77,10 @@ function positions() {
 // PreparedCapture：包含所有已校验的 Capture 字段及 directory（任务目录）。
 // metadata.json 额外保存日志位置快照；Shell 无需解析 UCI 或拼装 nft 表达式。
 /**
+ * 解析诊断目标的 IP，并保存任务参数和日志起点。
  * @param {string|null} pid 命令参数，可缺失；入口拒绝空值。
  * @param {string[]} args
- * @returns {object} 已解析目标地址的捕获参数，并补充任务目录 directory；域名解析失败时保留空 addresses 并报告警告。
+ * @returns {object} 带 addresses 和 directory 的捕获参数；解析失败时 addresses 为空数组。
  */
 export function prepare(pid, args) {
     if (!match(pid || '', /^[0-9]+$/)) die('invalid capture PID');
@@ -106,15 +111,17 @@ export function prepare(pid, args) {
  */
 // 这里只生成 nft 文本；Shell 负责真正加载规则以及处理失败清理。
 /**
+ * 根据捕获参数渲染 nft 追踪规则。
  * @param {Capture} c
- * @returns {string} 当前捕获任务的完整 nft 追踪规则文本；只生成文本，不加载规则。
+ * @returns {string} 完整的 nft 规则文本。
  */
 export function ruleText(c) {
     return renderTemplate('/usr/lib/hijpass/diagnostics/trace.ut', { capture: c });
 };
 /**
+ * 校验任务目录，并从目录名还原 nft 规则标识。
  * @param {string|null} directory
- * @returns {object} 从已校验任务目录推导的 {chain, comment}，用于标识当前任务的 nft 规则。
+ * @returns {object} 任务标识 {chain, comment}。
  */
 function identity(directory) {
     if (type(directory) != 'string' || !match(directory, /^\/tmp\/hijpass-trace[.][0-9]+$/)) die('invalid capture directory');
@@ -122,8 +129,9 @@ function identity(directory) {
     return { chain: `trace-${pid}`, comment: `hijpass-trace-${pid}` };
 }
 /**
+ * 读取诊断元数据，并核对其是否属于当前任务。
  * @param {string|null} directory
- * @returns {object} 身份校验通过的元数据对象：capture 为捕获参数，positions 为开始捕获时的日志位置快照。
+ * @returns {object} {capture, positions}，分别为捕获参数和日志起点。
  */
 function metadata(directory) {
     let expected = identity(directory), data;
@@ -136,9 +144,10 @@ function metadata(directory) {
 }
 // CleanupPlan：rules 为 chain/handle 数组；标识从目录提取，不依赖损坏的 metadata。
 /**
+ * 从 nft 规则快照中找出当前诊断任务需要删除的规则。
  * @param {string|null} directory
  * @param {string} raw
- * @returns {object} 清理计划：chain/comment 标识任务，rules 为需移除的 {chain, handle} 数组；不依赖元数据文件。
+ * @returns {object} {chain, comment, rules}，rules 为 {chain, handle} 数组。
  */
 export function cleanupPlan(directory, raw) {
     let expected = identity(directory), rules = [];
@@ -150,7 +159,10 @@ export function cleanupPlan(directory, raw) {
     }
     return { ...expected, rules };
 };
-/** @returns {null} 不返回业务数据；向 stdout 输出准备参数、nft 文本、清理计划、诊断报告或任务状态，错误由 stderr/退出码报告。 */
+/**
+ * 分发诊断子命令，生成任务参数、追踪规则或诊断报告。
+ * @returns {null} 结果写入 stdout，错误通过 stderr 和退出码报告。
+ */
 export function main() { run(() => {
     let action = shift(ARGV);
     if (action == 'prepare') { let pid = shift(ARGV); return prepare(pid, ARGV); }

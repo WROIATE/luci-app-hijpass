@@ -17,11 +17,17 @@ import { logger } from '../maintenance/logs.uc';
 // Instance 为 procd 的输入：id/name（标识），command（argv），env（KEY=VALUE 数组），
 // user（进程用户），log（文件路径或空），shunt（是否设置核心/no-file 资源限制）。
 // ServicePlan 为 {instances:[Instance]}；所有业务准备完成后才交给 Shell procd 桥接层。
-/** @returns {ServicePlan} 客户端 procd 实例计划 {instances}；禁用时 instances 为空数组，每项的命令、环境、用户和日志位置均已确定。 */
+/**
+ * 整理客户端节点和分流服务的 procd 启动计划。
+ * @returns {ServicePlan} {instances}；服务禁用时 instances 为空数组。
+ */
 export function plan(sections) {
 	let global = first(sections, 'hijpass'), instances = [];
 	if (global.enabled != '1') return { instances };
-	/** @returns {object} 单个 procd 实例，含 id/name、command 参数数组、env、user、log 及 shunt 资源限制标志。 */
+	/**
+	 * 组装单个服务实例的命令、环境和日志设置。
+	 * @returns {object} procd 实例对象，含 command、env、user、log 等字段。
+	 */
 	function instance(section, name, args, shunt) {
 		let env = list(section.procd_env);
 		for (let entry in env) if (!match(entry, /^[A-Za-z_][A-Za-z0-9_]*=/)) die('invalid procd_env');
@@ -60,7 +66,10 @@ export function plan(sections) {
 
 // ConfigFile：path 为目标路径，data 为已完整生成和解析上游域名的 JSON 文本。
 // 单次生成先完成全部转换/DNS，再创建临时文件；已提交的文件在后续错误时恢复。
-/** @returns {object[]} 实际写入的 {path, data} 文件列表，仅包含自动生成节点和模板分流；失败时恢复已替换文件并抛错。 */
+/**
+ * 生成配置文件内容，全部准备成功后再替换现有文件。
+ * @returns {object[]} 已写入的 {path, data} 数组；失败时恢复已替换文件。
+ */
 export function writeConfigs(sections, generated) {
 	let files = [];
 	for (let section in of(sections, 'proxy_node')) {
@@ -98,7 +107,10 @@ export function writeConfigs(sections, generated) {
 	return files;
 };
 // 启停只替换当前服务注册的任务，保留其他命令及参数中的同名文本。
-/** @returns {string[]} 过滤当前服务托管任务后的原有非空 crontab 行，供合并新任务使用。 */
+/**
+ * 筛选 crontab 内容，排除当前服务的已有任务。
+ * @returns {string[]} 保留下来的非空任务行数组。
+ */
 function cronEntries(path, packageName) {
     let entries = [];
     for (let line in split(fs.readfile(path) || '', '\n')) {
@@ -111,7 +123,10 @@ function cronEntries(path, packageName) {
     }
     return entries;
 }
-/** @returns {null} 按 enabled 写入或移除客户端规则更新和日志清理任务，原子替换 crontab，不重启 crond。 */
+/**
+ * 按服务状态注册或移除客户端更新和日志清理任务。
+ * @returns {null} 无业务返回值，原子更新 crontab。
+ */
 function cron(sections, enabled) {
     let path = '/etc/crontabs/root';
     let entries = cronEntries(path, 'hijpass');
@@ -128,8 +143,9 @@ function cron(sections, enabled) {
 // 服务端配置为用户编辑的原生 JSON，保留原文件；这里只声明进程与开放端口。
 // ServerPlan 使用相同的 Instance 字段；ports 为显式 allow_firewall 的监听端口数组。
 /**
+ * 整理服务端节点的启动计划和需开放的端口。
  * @param {object[]} sections
- * @returns {ServicePlan} 服务端进程计划 {instances, ports}；ports 为需向防火墙开放的去重端口，禁用时两数组均为空。
+ * @returns {ServicePlan} {instances, ports}；禁用时两个数组均为空。
  */
 export function serverPlan(sections) {
 	let global = first(sections, 'hijserver'), instances = [], ports = [];
@@ -150,14 +166,20 @@ export function serverPlan(sections) {
 };
 const SERVER_TABLE = '/usr/share/nftables.d/table-post/hijserver.nft';
 const SERVER_CHAIN = '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft';
-/** @returns {null} 根据实例日志开关更新服务端日志清理任务，保留客户端及其他任务，不重启 crond。 */
+/**
+ * 按服务端日志开关注册或移除日志清理任务。
+ * @returns {null} 无业务返回值，更新 crontab 并保留其他服务任务。
+ */
 function serverCron(instances) {
 	let path = '/etc/crontabs/root';
     let entries = cronEntries(path, 'hijserver');
 	if (length(filter(instances, instance => instance.log))) push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijserver');
 	atomic(path, join('\n', entries) + '\n');
 }
-/** @returns {null} 按允许端口写入服务端 nft include；无端口时删除旧 include，不直接重载防火墙。 */
+/**
+ * 生成服务端端口放行规则，没有端口时删除旧规则文件。
+ * @returns {null} 无业务返回值，只更新 nft include 文件。
+ */
 function writeServerRules(sections) {
 	let output = serverPlan(sections);
 	// 只开放明确选中的端口；没有端口时删除旧 include，避免旧服务端仍对 WAN 开放。
@@ -172,9 +194,10 @@ function writeServerRules(sections) {
 // enabled 控制启停，geo_convert 控制 Geo 准备，dns_hook 是后端固定的 Hook 位置，
 // update_interval 为自动更新间隔天数，log_paths 为需要准备目录的日志位置。
 /**
+ * 为 Shell 执行脚本整理服务开关和维护参数。
  * @param {object[]} config
  * @param {boolean} server
- * @returns {object} 执行层设置：enabled、dns_hook、geo_convert、update_interval（天）及 log_paths（日志文件路径列表）。
+ * @returns {object} 含 enabled、dns_hook、geo_convert、update_interval（天）及 log_paths 的对象。
  */
 function settings(config, server) {
     let global = first(config, server ? 'hijserver' : 'hijpass'), shunt = first(config, 'shunt');
@@ -183,7 +206,10 @@ function settings(config, server) {
         update_interval: int(first(config, 'rule').update_interval || '0'),
         log_paths: filter(map(config, item => logPath(item, server)), path => !!path) };
 };
-/** @returns {null} 不返回业务数据；按动作输出进程计划、服务设置或延时文本，也可生成配置/DNS/cron/include 文件，错误由 stderr 报告。 */
+/**
+ * 为服务启停准备配置、进程参数和定时任务。
+ * @returns {null} 查询结果写入 stdout；写入类动作直接更新对应文件。
+ */
 export function main() { run(() => {
     let server = ARGV[0] == 'server';
     if (server) shift(ARGV);

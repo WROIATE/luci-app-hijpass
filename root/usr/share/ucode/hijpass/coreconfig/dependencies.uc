@@ -6,9 +6,10 @@ import { proxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 // 每个节点的 upstream/members 直接引用其依赖节点，供核心配置生成使用。
 // 解析、连接引用、校验分别执行，查询过程没有隐藏的配置校验副作用。
 /**
+ * 收集目标节点及其依赖，并连接上游和均衡成员。
  * @param {object[]} sections
  * @param {string} [target]
- * @returns {object} 依赖结果 {nodes, byID, byName}；包含目标及依赖，索引与 upstream/members 直接引用同一节点对象。
+ * @returns {object} {nodes, byID, byName}，索引和依赖直接引用节点对象。
  */
 export function resolve(sections, target) {
 	let all = of(sections, 'proxy_node'), enabled = {}, selected = [];
@@ -62,12 +63,16 @@ export function resolve(sections, target) {
 };
 
 /**
+ * 检查代理链的循环、长度和负载均衡成员设置。
  * @param {{nodes: object[]}} dependencies
- * @returns {null} 校验通过不返回数据；循环、超过三节点或均衡成员/回退配置无效时抛错。
+ * @returns {null} 无业务返回值；依赖无效时抛错。
  */
 export function validate(dependencies) {
 	let active = {}, heights = {};
-	/** @returns {integer} 当前普通节点到末端上游的链长（含自身）；均衡节点返回 1，成员单独校验，链长会缓存。 */
+	/**
+	 * 递归检查节点依赖，并计算和缓存代理链长度。
+	 * @returns {integer} 含自身的链长；均衡节点为 1，其成员分别检查。
+	 */
 	function visit(n) {
 		if (active[n.id]) die(`proxy dependency cycle at "${n.name}"`);
 		if (heights[n.id]) return heights[n.id];

@@ -30,8 +30,9 @@ import { optional } from './json.uc';
  * @property {string|null} ip_list 按行填写的 IP/CIDR、GeoIP 或规则集。
  */
 /**
+ * 将 UCI 分流规则拆成各类匹配条件。
  * @param {RuleOptions} section UCI shunt_route_rule 的匹配字段。
- * @returns {Match} 规范化匹配条件，各类条件均为数组；包含域名、IP、Geo 标签、规则集及网络/协议/端口限制。
+ * @returns {Match} Match 对象，各类域名、IP、协议和端口条件均为数组。
  */
 export function parse(section) {
 	let r = {
@@ -71,26 +72,29 @@ export function parse(section) {
 	return r;
 };
 /**
+ * 检查规则是否包含域名条件，可按需计入 GeoSite。
  * @param {Match} r
  * @param {boolean} [includeGeoSite] 核心支持 GeoSite 或先转换规则集时纳入 GeoSite。
- * @returns {boolean} 存在域名匹配条件时为 true；includeGeoSite 为真时也将 GeoSite 引用计入。
+ * @returns {boolean} 存在域名条件时为 true。
  */
 export function hasDomain(r, includeGeoSite) {
 	return length(r.domain) + length(r.suffix) + length(r.keyword) + length(r.regex)
 		+ (includeGeoSite ? length(r.geosite) : 0) > 0;
 };
 /**
+ * 按当前核心支持的条件判断规则是否为空。
  * @param {Match} r
  * @param {boolean} geo 是否按 Xray Geo 标签判断匹配条件。
- * @returns {boolean} 当前核心可用的匹配条件全部为空时为 true；geo 决定检查 Geo 标签还是 sing-box 规则集。
+ * @returns {boolean} 没有可用匹配条件时为 true。
  */
 export function empty(r, geo) {
 	return !hasDomain(r) && !length(r.ip) && !length(r.network) && !length(r.protocol)
 		&& !length(r.ports) && !length(r.ranges) && !(geo ? length(r.geoip) + length(r.geosite) : length(r.sets));
 };
 /**
+ * 将 GeoSite 和 GeoIP 引用补充为本地 SRS 规则集引用。
  * @param {Match} r
- * @returns {null} 把 GeoSite/GeoIP 引用追加为 r.sets 中的本地 SRS 规则集，不移除原 Geo 数组。
+ * @returns {null} 无业务返回值；追加到 r.sets，保留原 Geo 数组。
  */
 export function convertGeo(r) {
 	for (let value in [...r.geosite, ...r.geoip]) {
@@ -99,9 +103,10 @@ export function convertGeo(r) {
 	}
 };
 /**
+ * 将匹配条件转换为 sing-box 规则字段。
  * @param {Match} r
  * @param {boolean} dnsOnly
- * @returns {object} 仅含非空字段的 sing-box 匹配条件；dnsOnly 时省略 IP、网络、协议和端口条件。
+ * @returns {object} 仅含非空字段的对象；dnsOnly 时省略 IP、网络、协议和端口。
  */
 export function singboxMatch(r, dnsOnly) {
 	let out = {};
@@ -115,18 +120,20 @@ export function singboxMatch(r, dnsOnly) {
 	return out;
 };
 /**
+ * 将域名条件转换为 Xray 的前缀表达式。
  * @param {Match} r
- * @returns {string[]} Xray 域名表达式列表，补齐 full:/domain:/regexp: 前缀，并保留关键字和 geosite: 引用。
+ * @returns {string[]} 包含 full:/domain:/regexp:、关键字和 geosite: 的字符串数组。
  */
 export function xrayDomains(r) {
 	return [...map(r.domain, d => 'full:' + d), ...map(r.suffix, d => 'domain:' + d), ...r.keyword, ...map(r.regex, d => 'regexp:' + d), ...r.geosite];
 };
 /**
+ * 将域名和 IP 匹配条件分别转换为 Xray 路由规则。
  * @param {Match} r
  * @param {string} name
  * @param {string} exit
  * @param {integer} version 0 表示不限制地址族，4/6 表示 IPv4/IPv6。
- * @returns {object[]} Xray 路由规则数组；域名/IP 分别生成规则，带名称、出口及可选的 IPv4/IPv6 限制。
+ * @returns {object[]} 带出口、名称及可选地址族限制的规则数组。
  */
 export function xrayRules(r, name, exit, version) {
 	let base = { inboundTag: [TAG.tproxy], outboundTag: exit };

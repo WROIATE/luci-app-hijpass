@@ -10,8 +10,9 @@ const resources = {
     ...FILES,
 };
 /**
+ * 校验前端传入的 UCI section ID，拒绝非法字符。
  * @param {string|null} value
- * @returns {string} 经校验的 section ID；空值、非字符串或包含非法字符时抛错。
+ * @returns {string} 有效的 section ID；无效时抛错。
  */
 function identifier(value) {
     if (type(value) != 'string') die('invalid section ID');
@@ -19,8 +20,9 @@ function identifier(value) {
     return value;
 }
 /**
+ * 根据资源名和节点标识定位后端文件。
  * @param {object} request
- * @returns {string} 资源或节点配置的后端绝对路径；目录由后端决定，前端只能提供资源名和节点标识。
+ * @returns {string} 资源或节点配置的绝对路径。
  */
 function editorPath(request) {
     let kind = request.resource;
@@ -32,9 +34,10 @@ function editorPath(request) {
     return nodeConfig({ '.name': id, name: request.name || section?.name }, kind == 'server_config');
 }
 /**
+ * 按资源名读取或保存编辑器内容。
  * @param {{resource: string, section: string, name: string, content: string}} request
  * @param {boolean} write
- * @returns {object} 读取时返回 {content}（文件文本），写入成功返回 {ok: true}；新节点/分流文件缺失时 content 为空字符串。
+ * @returns {object} 读取返回 {content}，保存返回 {ok: true}；尚未创建的节点或分流文件内容为空。
  */
 export function editor(request, write) {
     let path = editorPath(request);
@@ -51,7 +54,10 @@ export function editor(request, write) {
 };
 
 // Log：id 为 package:section 的业务标识；客户端不能提交任意日志路径。
-/** @returns {object} 日志目录 {logs}；每项仅含业务 id、kind 和显示名称 name，不向前端返回文件路径。 */
+/**
+ * 列出可供前端查看的日志，不暴露文件路径。
+ * @returns {object} {logs}，每项含 id、kind 和显示名称 name。
+ */
 export function logs() {
     let result = [];
     for (let packageName in ['hijpass', 'hijserver']) for (let section in read(packageName)) {
@@ -63,8 +69,9 @@ export function logs() {
     return { logs: result };
 };
 /**
+ * 按日志 ID 读取尾部内容、下载全文或清空文件。
  * @param {{id: string, action: string, lines: string}} request
- * @returns {object} read 返回 {content}，download 返回 {content, name}（下载文件名），clear 成功返回 {ok: true}。
+ * @returns {object} 读取返回 {content}，下载返回 {content, name}，清空返回 {ok: true}。
  */
 export function log(request) {
     let parts = split(request.id, ':'), packageName = parts[0];

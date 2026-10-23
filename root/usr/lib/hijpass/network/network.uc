@@ -5,8 +5,9 @@ import { run, text } from 'hijpass.common';
 
 // 地址解析返回 IP 字符串，不改动 TLS 的 server_name，代理链仍可验证原始域名证书。
 /**
+ * 将域名解析为 IP，优先使用 IPv4。
  * @param {string|null} host
- * @returns {string} 首个可用 IPv4 地址，无 A 记录时回退 IPv6；传入 IP 原样返回，解析失败抛错。
+ * @returns {string} IP 字符串；传入 IP 原样返回，解析失败时抛错。
  */
 export function resolve(host) {
 	if (type(host) != 'string') die('invalid argument');
@@ -21,8 +22,9 @@ export function resolve(host) {
 	return address;
 };
 /**
+ * 检查指定端口是否已在本机监听 TCP。
  * @param {string[]} values
- * @returns {object} 按输入端口字符串索引的 TCP 监听状态；true 表示 IPv4/IPv6 任一 TCP 表中正在监听。
+ * @returns {object} 端口到布尔值的映射，true 表示 IPv4 或 IPv6 正在监听。
  */
 export function ports(values) {
 	let occupied = {};
@@ -40,9 +42,10 @@ export function ports(values) {
 };
 
 /**
+ * 把 curl 输出和退出码整理成连接探测报告。
  * @param {{stdout: string, code: integer}} response Shell 提供的标准输出及真实退出状态。
  * @param {string} url 原始 URL，用于报告。
- * @returns {object} 探测报告：含 url/success/exit_code；curl 输出完整时补充 HTTP 状态、远端地址/端口及各阶段耗时（毫秒）。
+ * @returns {object} 含成功状态、退出码的报告；输出完整时附 HTTP、远端地址和耗时（毫秒）。
  */
 export function curlReport(response, url) {
 	let fields = split(response.stdout, '\n');
@@ -59,10 +62,11 @@ export function curlReport(response, url) {
 
 // ProbeRequest：url 是 HTTP(S) 地址，timeout 为秒，socks 为本地 SOCKS 端口或空。
 /**
+ * 校验 HTTP 探测地址、超时和本地代理参数。
  * @param {string|null} url
  * @param {string} [timeout]
  * @param {string} [socks]
- * @returns {object} 已校验的探测参数 {url, timeout, socks}；timeout 为秒，未指定代理时 socks 为空字符串。
+ * @returns {object} {url, timeout, socks}；timeout 单位为秒，无代理时 socks 为空字符串。
  */
 export function request(url, timeout, socks) {
     if (type(url) != 'string') die('only http:// and https:// URLs are supported');
@@ -75,9 +79,10 @@ export function request(url, timeout, socks) {
 };
 // Shell 提供 curl 原始输出及真实退出码；这里仅解析和计算测速数据。
 /**
+ * 从 curl 探测结果提取节点延迟。
  * @param {object} response
  * @param {string} url
- * @returns {object} 测速成功时返回 {ms, total_ms}（毫秒）；失败且非 curl 退出码 56 时返回 {error: "timeout"}。
+ * @returns {object} {ms, total_ms}，单位为毫秒；失败时为 {error: "timeout"}，退出码 56 按现有规则保留结果。
  */
 export function pingReport(response, url) {
     let result = curlReport(response, url);
@@ -86,9 +91,10 @@ export function pingReport(response, url) {
 };
 // IPv4/IPv6 CIDR 比较使用内建字节地址，不需要 Lua/luci.ip。
 /**
+ * 判断 IP 地址是否属于指定 CIDR 网段。
  * @param {string} address
  * @param {string} cidr
- * @returns {boolean} 地址位于 CIDR 内时为 true；地址无效、地址族不同或前缀无效时为 false。
+ * @returns {boolean} 属于时为 true；参数无效或地址族不同时为 false。
  */
 export function contains(address, cidr) {
 	let parts = split(cidr, '/'), host = iptoarr(address), range = iptoarr(parts[0] || '');
@@ -103,7 +109,10 @@ export function contains(address, cidr) {
 	return true;
 };
 
-/** @returns {null} 不返回业务数据；向 stdout 输出解析地址、监听状态、探测参数/报告或地址族文本，失败输出 JSON 错误并退出。 */
+/**
+ * 处理地址解析、端口检查和连接探测的数据请求。
+ * @returns {null} 结果写入 stdout，失败时输出 JSON 错误并退出。
+ */
 export function main() { run(() => {
     let action = shift(ARGV);
     if (action == 'resolve') return { address: resolve(ARGV[0]) };

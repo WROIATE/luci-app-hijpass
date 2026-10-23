@@ -14,8 +14,9 @@ import { optional } from '../../json.uc';
  * @property {string} obfs_password 混淆密码。
  */
 /**
+ * 将 Hysteria2 节点转换为 sing-box 原生出站配置。
  * @param {Hysteria2Options} n 已解码的专用字段；通用地址/TLS 交给 options.uc。
- * @returns {object} sing-box Hysteria2 出站，含 TLS、认证及可选带宽、跳跃端口和混淆配置。
+ * @returns {object} 含 TLS、认证及可选带宽、跳跃端口和混淆设置的出站对象。
  */
 export function build(n) {
 	let out = endpoint(n);

@@ -10,9 +10,10 @@ import { lines, atomic, renderTemplate } from 'hijpass.common';
 // useChn/useGfw 为列表开关，chnList/gfwList 为对应列表路径。
 // 自定义域名文件可以包含 geosite: 标签，启动时提取为 chinadns 的纯域名文件。
 /**
+ * 合并普通域名和已提取的 Geo 域名，去重后写入文件。
  * @param {string} path
  * @param {string} output
- * @returns {null} 合并普通域名和已提取的 Geo 域名后去重写入 output，不返回域名数组。
+ * @returns {null} 无业务返回值，结果写入 output。
  */
 function domains(path, output) {
 	let result = [], tags = [];
@@ -25,13 +26,17 @@ function domains(path, output) {
 	atomic(output, join('\n', uniq(result)) + '\n', 0o644);
 }
 /**
+ * 根据 DNS 配置整理 chinadns-ng 模板参数。
  * @param {object[]} sections
- * @returns {object|null} chinadns 模板参数：监听端口、解析后的直连/代理上游及规则列表开关/路径；非 chinadns-ng 模式返回 null。
+ * @returns {object|null} 模板参数对象；其他 DNS 模式返回 null。
  */
 export function options(sections) {
 	let dns = first(sections, 'dns');
 	if (dns.dns_service != 'chinadns-ng') return null;
-	/** @returns {string} 最终上游地址；custom 使用自定义值，dnsmasq 转为其本机监听地址，缺失或含换行时抛错。 */
+	/**
+	 * 将 DNS 上游选项转换成实际服务器地址。
+	 * @returns {string} 上游地址；缺失或含换行时抛错。
+	 */
 	function upstream(key) {
 		let value = dns[key];
 		if (value == 'custom') value = dns[`${key}_custom`];
@@ -48,8 +53,9 @@ export function options(sections) {
 	};
 };
 /**
+ * 生成 chinadns-ng 配置和域名文件，并准备启动参数。
  * @param {object[]} sections
- * @returns {object|null} 生成 DNS 文件后返回 chinadns-ng 的 procd 实例 {id, name, command, env, user}；其他 DNS 模式返回 null。
+ * @returns {object|null} procd 实例 {id, name, command, env, user}；其他 DNS 模式返回 null。
  */
 export function prepare(sections) {
 	let settings = options(sections);

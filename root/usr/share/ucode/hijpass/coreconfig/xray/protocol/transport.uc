@@ -28,9 +28,10 @@ import { duration } from '../../../config/values.uc';
  * @property {object|null} grpcSettings gRPC 的传输选项。
  */
 /**
+ * 将节点传输选项填入 Xray streamSettings。
  * @param {StreamSettings} stream Xray streamSettings，原地填充传输选项。
  * @param {TransportOptions} n 已经 UCI 解码并校验的传输字段。
- * @returns {null} 原地填充 stream.network 及对应传输设置；未指定传输时不修改，不返回新的 stream 对象。
+ * @returns {null} 无业务返回值；原地修改 stream，未指定传输时跳过。
  */
 export function apply(stream, n) {
 	switch (n.transport_type) {

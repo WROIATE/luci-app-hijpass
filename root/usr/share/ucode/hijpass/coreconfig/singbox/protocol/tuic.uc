@@ -3,7 +3,10 @@ import { optional } from '../../json.uc';
 
 // UUID/password 为认证；congestion_control 为拥塞算法，udp_relay_mode 为 UDP 模式。
 // udp_over_stream/zero_rtt_handshake 为开关，heartbeat 为 QUIC 心跳间隔。
-/** @returns {object} sing-box TUIC 出站，含 TLS、UUID/密码、拥塞控制及 UDP/握手/心跳选项。 */
+/**
+ * 将 TUIC 节点转换为 sing-box 原生出站配置。
+ * @returns {object} 含 TLS、认证、拥塞控制和 UDP 设置的出站对象。
+ */
 export function build(n) {
 	let out = endpoint(n);
 	out.tls = tls(n);

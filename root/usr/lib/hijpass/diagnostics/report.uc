@@ -5,9 +5,10 @@ import { lines } from 'hijpass.common';
 // verbose/tcpdump/iface/chain/comment 为捕获设置；所有日志位于独立任务目录。
 // LogPosition：path/offset/inode，用字节位置读取本次新增日志，兼容日志轮转。
 /**
+ * 从记录的偏移开始读取日志，最多读取 4 MiB。
  * @param {string} path
  * @param {integer} [offset]
- * @returns {string} 从指定偏移读取且最多 4 MiB 的日志尾部；文件无法打开或定位时返回空字符串。
+ * @returns {string} 日志文本；打开或定位失败时为空字符串。
  */
 function tail(path, offset) {
 	let file = fs.open(path, 'r');
@@ -23,9 +24,10 @@ function tail(path, offset) {
 	return data;
 }
 /**
+ * 按 trace ID 收集经过指定链的完整追踪记录。
  * @param {string} text
  * @param {string} chain
- * @returns {string[]} 与指定追踪链关联的全部 trace ID 日志行，包含这些 ID 在其他链中的后续记录。
+ * @returns {string[]} 关联日志行数组，包含这些 trace ID 在其他链中的记录。
  */
 export function filteredTrace(text, chain) {
 	let entries = lines(text), ids = {};
@@ -39,15 +41,17 @@ export function filteredTrace(text, chain) {
 	});
 };
 /**
+ * 将文本行去重、截断，并统一添加缩进。
  * @param {string[]} values
  * @param {integer} limit
  * @param {string} [spaces]
- * @returns {string} 去重、限制行数并添加缩进后的多行文本；未给 spaces 时每行缩进两个空格。
+ * @returns {string} 多行文本；默认每行缩进两个空格。
  */
 function indent(values, limit, spaces) { return join('\n', map(slice(uniq(values), 0, limit), line => (spaces || '  ') + line)); }
 /**
+ * 统计抓包中的协议、TCP 状态和流量分布。
  * @param {string[]} packets
- * @returns {object} 抓包统计：counts 含 TCP 标志、UDP 包数和 TCP 负载包数/字节数；interfaces、flows 分别按接口方向和流统计包数。
+ * @returns {object} {counts, interfaces, flows}，分别为包统计、接口统计和连接统计。
  */
 export function packetSummary(packets) {
 	let counts = { syn: 0, syn_ack: 0, fin: 0, rst: 0, udp: 0, payload_packets: 0, payload_bytes: 0 }, interfaces = {}, flows = {};
@@ -68,9 +72,10 @@ export function packetSummary(packets) {
 	return { counts, interfaces, flows };
 };
 /**
+ * 按目标地址和连接 ID 筛选相关核心日志。
  * @param {string} text
  * @param {array} targets 可含缺失地址；匹配前过滤空值。
- * @returns {string[]} 与目标地址或关联连接 ID 匹配的日志行，去重后最多 100 行。
+ * @returns {string[]} 去重后的日志行数组，最多 100 行。
  */
 function relatedLogs(text, targets) {
 	let all = lines(text), seeds = slice(uniq(filter(all, line => length(filter(targets, target => target && index(line, target) >= 0)))), 0, 80), ids = [];
@@ -102,10 +107,11 @@ function relatedLogs(text, targets) {
  * @property {string} comment 任务专属 nft 注释，用于区分规则。
  */
 /**
+ * 汇总防火墙追踪、抓包和日志，生成诊断报告。
  * @param {Capture} c
  * @param {string} directory
  * @param {object[]} [positions]
- * @returns {string} 包含追踪概况、防火墙、可选抓包及关联核心/系统日志的完整诊断文本，以换行结束。
+ * @returns {string} 完整报告文本，以换行结束。
  */
 export function report(c, directory, positions) {
 	let output = ['\n== Trace summary =='];

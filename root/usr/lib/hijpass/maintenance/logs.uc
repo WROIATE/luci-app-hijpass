@@ -6,8 +6,9 @@ import { mkdir, run, sections } from 'hijpass.common';
 // Logger 返回一个 (level, message) 函数，保留应用日志级别与多行排版。
 // 主日志位置由后端确定，global.log_level 为 DEBUG/INFO/WARN/ERROR。
 /**
+ * 根据配置创建主日志写入函数，并按日志级别过滤消息。
  * @param {object[]} sections
- * @returns {function} 接受 (level, message) 的日志函数，按配置级别过滤后，将带时间戳的消息追加到主日志。
+ * @returns {function} 接受 (level, message) 的日志函数。
  */
 export function logger(sections) {
 	let global = first(sections, 'hijpass'), path = logPath({ '.type': 'hijpass' });
@@ -26,8 +27,9 @@ export function logger(sections) {
 	};
 };
 /**
+ * 裁剪过长日志，只保留最后 30000 行。
  * @param {string} path
- * @returns {null} 原地保留日志最后 30000 行；文件无法打开或行数未超限时不修改。
+ * @returns {null} 无业务返回值；文件打不开或未超限时跳过。
  */
 function trimLog(path) {
 	let file = fs.open(path, 'r');
@@ -43,17 +45,21 @@ function trimLog(path) {
 	file.close();
 }
 /**
+ * 清空指定日志，或裁剪当前服务的全部日志。
  * @param {object[]} sections
  * @param {string} action
  * @param {string|null} [path]
- * @returns {null} clean 动作清空指定文件，其余动作裁剪对应服务日志的旧行；只修改文件，不返回日志内容。
+ * @returns {null} 无业务返回值，直接更新日志文件。
  */
 export function cleanLogs(sections, action, path) {
 	if (action == 'clean') { if (type(path) != 'string') die('missing log path'); if (fs.writefile(path, '') == null) die(`cannot clear ${path}`); return; }
 	for (let s in sections) { let target = logPath(s, action == 'hijserver'); if (target) trimLog(target); }
 };
 
-/** @returns {null} 执行日志追加、清空或按服务轮转；不输出正常结果，错误由 stderr 和退出状态报告。 */
+/**
+ * 处理日志追加、清空和裁剪命令。
+ * @returns {null} 正常执行不输出数据，错误通过 stderr 和退出码报告。
+ */
 export function main() { run(() => {
     let action = shift(ARGV);
     if (action == 'append') { let config = sections(); return logger(config)(ARGV[0], join(' ', slice(ARGV, 1))); }

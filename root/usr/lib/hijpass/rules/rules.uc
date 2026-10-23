@@ -7,7 +7,10 @@ import { contains } from '../network/network.uc';
 
 // RuleSource：key 为 UCI 下载地址字段，path 为目标文件，kind 为 domain/ip4/ip6/geo。
 // 同类多个 URL 分别下载后合并去重；至少一个完整、有效来源成功后才替换旧文件。
-/** @returns {object} 按下载字段索引的资源目录，每项含目标 path 和数据 kind（domain/ip4/ip6/geo），不包含下载 URL。 */
+/**
+ * 定义可更新规则资源的类型和保存位置。
+ * @returns {object} 以下载字段为键的目录，每项含 path 和 kind。
+ */
 function sources() {
 	return {
 		gfw_list: { path: RULE_FILES.gfw_list, kind: 'domain' }, chn_domain_list: { path: RULE_FILES.chn_list, kind: 'domain' },
@@ -16,8 +19,9 @@ function sources() {
 	};
 }
 /**
+ * 从规则文本行中提取有效域名。
  * @param {string} line
- * @returns {string|null} 规范化的小写域名；空行、注释或无法识别的域名记录返回 null。
+ * @returns {string|null} 小写域名；空行、注释或无法识别的记录返回 null。
  */
 export function domain(line) {
 	line = lc(trim(line));
@@ -30,9 +34,10 @@ export function domain(line) {
 	return match(line, /^[a-z0-9.-]+[.][a-z]{2,}$/) ? line : null;
 };
 /**
+ * 清洗域名或 IP 规则，过滤无效项并去重排序。
  * @param {string|null} text
  * @param {string} kind
- * @returns {string[]} 从源文本提取的有效域名或指定地址族 IP/CIDR，去重并排序；无有效记录时为空数组。
+ * @returns {string[]} 有效规则数组；没有有效项时为空数组。
  */
 export function normalize(text, kind) {
 	let result = [];
@@ -49,9 +54,10 @@ export function normalize(text, kind) {
 // UpdatePlan：timeout/retries 是已校验整数；jobs 含 key/kind/path/urls。
 // GeoPlan：database/tag/input/output 只描述业务资源，不携带待执行的命令。
 /**
+ * 按更新动作和 UCI 设置整理规则下载任务。
  * @param {object[]} config
  * @param {string} action
- * @returns {object} 下载计划：timeout/retries 为超时秒数和重试次数，enabled 为服务状态，jobs 含 key/kind/path/urls。
+ * @returns {object} 含 timeout（秒）、retries、enabled 和 jobs 的下载计划。
  */
 export function updatePlan(config, action) {
     let settings = first(config, 'rule'), catalog = sources();
@@ -66,8 +72,9 @@ export function updatePlan(config, action) {
         jobs: map(selected, key => ({ key, ...catalog[key], urls: list(settings[key]) })) };
 };
 /**
+ * 收集分流中的 Geo 引用，安排本地 SRS 转换任务。
  * @param {object[]} config
- * @returns {object} Geo 转换计划 {jobs}；每项含 database、tag、原始库 input 和 SRS 目标 output，无 Geo 引用时 jobs 为空。
+ * @returns {object} {jobs}，每项含 database、tag、input 和 output。
  */
 export function geoPlan(config) {
     let jobs = [];
@@ -86,8 +93,9 @@ export function geoPlan(config) {
     return { jobs };
 };
 /**
+ * 收集 chinadns-ng 规则需要提取的 Geo 域名。
  * @param {object[]} config
- * @returns {object} 域名 Geo 提取计划 {jobs}，每项含标签参数 value 和目标 output；非 chinadns-ng 模式返回空 jobs。
+ * @returns {object} {jobs}，每项含 value 和 output；其他 DNS 模式下 jobs 为空。
  */
 export function dnsPlan(config) {
     if (first(config, 'dns').dns_service != 'chinadns-ng') return { jobs: [] };
@@ -103,10 +111,11 @@ export function dnsPlan(config) {
     return { jobs };
 };
 /**
+ * 校验 Geo 查询或提取请求，确定数据文件和标签。
  * @param {string} action
  * @param {string} kind
  * @param {string[]} args
- * @returns {object} 已校验的 Geo 请求 {kind, extract, input, values}；extract 区分提取/查询，input 为原始库路径。
+ * @returns {object} {kind, extract, input, values}。
  */
 export function geoRequest(action, kind, args) {
     if (index(['geoip', 'geosite'], kind) < 0 || !length(args)) die('invalid geo type or argument');
@@ -116,14 +125,16 @@ export function geoRequest(action, kind, args) {
     return { kind, extract, input: `/usr/share/v2ray/${kind}.dat`, values: args };
 };
 /**
+ * 判断域名是否与规则相同，或属于规则的子域。
  * @param {string} host
  * @param {string} rule
- * @returns {boolean} host 与规则域名相同或属于其子域时为 true，不把仅字符串后缀相同的域名视为命中。
+ * @returns {boolean} 匹配时为 true。
  */
 function suffix(host, rule) { return host == rule || substr(host, -length(rule) - 1) == '.' + rule; }
 /**
+ * 查询目标 IP 或域名命中了哪些规则文件。
  * @param {string} target
- * @returns {string} 命中目标 IP/域名的规则文件名，去重排序后每行一个；无命中时只返回换行。
+ * @returns {string} 去重排序的文件名，每行一个；无命中时只返回换行。
  */
 export function queryFiles(target) {
 	if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
@@ -137,9 +148,10 @@ export function queryFiles(target) {
 	return join('\n', sort(uniq(matched))) + '\n';
 };
 /**
+ * 按配置顺序查找首条匹配的分流规则。
  * @param {object[]} sections
  * @param {string} target
- * @returns {string} 首条命中的启用规则及其出口说明；未命中时返回全局默认策略说明，文本以换行结束。
+ * @returns {string} 命中规则及出口说明；无命中时返回全局默认策略说明。
  */
 export function routeMatch(sections, target, geoTags) {
 	if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) die('invalid query');
@@ -164,7 +176,10 @@ export function routeMatch(sections, target, geoTags) {
 	return `未匹配到任何自定义规则，除去协议、端口等规则外，将使用全局默认策略\n\n规则名称 (Name) : 全局默认\n匹配类型 (Type) : ${ip ? 'IP' : '域名'}\n匹配内容 (Item) : * (全部)\n代理策略 (Node) : ${first(sections, 'shunt').default_proxy_node || ''}\n`;
 };
 
-/** @returns {null} 不返回业务数据；按动作向 stdout 输出更新/转换计划、规范化文本、查询结果或 {success, failed?} 更新结果。 */
+/**
+ * 处理规则更新计划、Geo 转换和规则查询的数据请求。
+ * @returns {null} 结果写入 stdout，包括计划、规则文本、查询说明或更新状态。
+ */
 export function main() { run(() => {
     let action = shift(ARGV);
     if (action == 'plan') { let config = sections(); return updatePlan(config, ARGV[0] || ''); }

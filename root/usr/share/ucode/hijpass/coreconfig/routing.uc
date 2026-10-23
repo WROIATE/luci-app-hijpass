@@ -12,12 +12,16 @@ import * as xr from './xray/config.uc';
 // DNSServer：tag（名称）、type（传输）、address、port（null 表示未设置）。
 // Entry：name/split，exit/v4/v6/dnsExit 出口，dns/strategy DNS 策略，match 匹配条件。
 /**
+ * 解析分流设置，确认代理出口和 DNS 引用有效。
  * @param {object[]} sections
  * @param {{nodes: object[], byName: object}} dependencies
- * @returns {object} 已解析的分流设置，含核心、监听端口、默认出口/DNS、规则集下载策略及带匹配条件的 entries。
+ * @returns {object} 带出口、DNS、规则集策略和 entries 的分流设置对象。
  */
 export function prepare(sections, dependencies) {
-	/** @returns {string} 有效节点名称或直连/阻断内部标签；非必需的空选择返回空字符串，必需项或引用无效时抛错。 */
+	/**
+	 * 将出口选择转换为节点名称或直连、阻断标签。
+	 * @returns {string} 出口标签；可选项未设置时为空字符串，无效引用抛错。
+	 */
 	function exit(name, required) {
 		if (!name && !required) return '';
 		if (name == 'hijpass-direct') return TAG.direct;
@@ -31,7 +35,10 @@ export function prepare(sections, dependencies) {
 		if (servers[s.tag]) die(`duplicate DNS tag "${s.tag}"`);
 		servers[s.tag] = { tag: s.tag, type: s.type, address: s.server, port: s.port ? port(s.port) : null };
 	}
-	/** 返回已启用的 DNS 节点对象 {tag, type, address, port}，未配置端口时 port 为 null；引用无效时抛错。 */
+	/**
+	 * 查找已启用的 DNS 节点，无效引用时报错。
+	 * 返回：节点对象 {tag, type, address, port}；端口未配置时 port 为 null。
+	 */
 	function server(name) {
 		if (!servers[name]) die(`DNS node "${name}" missing or disabled`);
 		return servers[name];
@@ -64,20 +71,22 @@ export function prepare(sections, dependencies) {
 	return settings;
 };
 /**
+ * 将地址族偏好转换为对应核心的 DNS 策略。
  * @param {string} value
  * @param {boolean} singbox
- * @returns {string} 核心原生的 DNS 地址族策略名；没有对应映射时返回空字符串。
+ * @returns {string} 核心原生策略名；没有映射时为空字符串。
  */
 function strategy(value, singbox) {
 	return (singbox ? { '4': 'ipv4_only', '6': 'ipv6_only', '46': 'prefer_ipv4', '64': 'prefer_ipv6' }
 		: { '4': 'UseIPv4', '6': 'UseIPv6', '46': 'UseIP', '64': 'UseIP' })[value] || '';
 }
 /**
+ * 将 DNS 节点转换为指定核心的服务器配置。
  * @param {{tag: string, type: string, address: string, port: integer|null}} s 已解析的 DNS 节点。
  * @param {string} tag
  * @param {string} detour
  * @param {boolean} singbox
- * @returns {object} 原生 DNS 服务器配置：sing-box 使用 type/server/server_port，Xray 使用 address/port，均带指定 tag。
+ * @returns {object} 带 tag 的 sing-box 或 Xray DNS 服务器对象。
  */
 function dnsServer(s, tag, detour, singbox) {
 	if (singbox) {
@@ -102,9 +111,10 @@ function dnsServer(s, tag, detour, singbox) {
 }
 
 /**
+ * 按已解析设置生成完整分流配置，包括 DNS 和路由规则。
  * @param {object} settings
  * @param {{nodes: object[], byName: object}} dependencies
- * @returns {object} 按 settings.core 生成的完整分流配置，包含日志、DNS、入站、出站和路由规则。
+ * @returns {object} 对应核心的配置对象，含日志、入站、出站、DNS 和路由。
  */
 export function build(settings, dependencies) {
 	let s = settings, singbox = s.core == CORE.singbox, config = {};
@@ -149,7 +159,10 @@ export function build(settings, dependencies) {
 		};
 	}
 	let routes = [], dnsExits = {}, exitOrder = [], sets = {}, setOrder = [];
-	/** @returns {null} 原地登记当前规则的 DNS 服务器及分流规则；Xray 同时记录 DNS 请求的出口关联。 */
+	/**
+	 * 把规则对应的 DNS 服务器和请求出口加入分流配置。
+	 * @returns {null} 无业务返回值，直接更新 DNS 和路由相关数组。
+	 */
 	function addDNS(entry, r, exit) {
 		if (exit == TAG.block) die(`rule "${entry.name}" DNS exit cannot be Block`);
 		let tag = entry.name + '-dns', server = dnsServer(entry.dns, tag, exit, singbox);

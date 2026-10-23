@@ -3,9 +3,10 @@ import { run, text } from 'hijpass.common';
 // 此处只校验发布元数据，归档和可执行文件的验证由 Shell 执行。
 const repos = { 'sing-box': 'SagerNet/sing-box', xray: 'XTLS/Xray-core' };
 /**
+ * 根据核心和 CPU 架构确定下载包的平台名称。
  * @param {string} core
  * @param {string} machine
- * @returns {string} 官方归档使用的平台后缀 linux-<架构>；不支持的核心或架构抛错。
+ * @returns {string} linux-<架构> 平台名称；不支持时抛错。
  */
 export function architecture(core, machine) {
 	const suffixes = {
@@ -17,8 +18,9 @@ export function architecture(core, machine) {
 	return 'linux-' + suffix;
 };
 /**
+ * 解析并校验核心的官方发布信息。
  * @param {string} core
- * @returns {object} 版本号已校验的发布对象；tag_name 为版本，assets 保留官方原始资源列表供后续筛选。
+ * @returns {object} 发布对象，保留 tag_name 和原始 assets 列表。
  */
 export function release(core, response) {
 	if (!repos[core]) die('unknown core');
@@ -30,7 +32,10 @@ export function release(core, response) {
 	}
 	catch (e) { die(`invalid ${core} release response: ${e.message}`); }
 };
-/** @returns {object} 安装计划：core/version/number 为版本标识，name/url 为资源，digest 为 SHA-256，destination/archive 为安装位置与格式。 */
+/**
+ * 从发布资源中选出安装包，并校验下载地址和校验和。
+ * @returns {object} 安装计划，含版本、下载地址、SHA-256、安装位置和归档格式。
+ */
 export function assetPlan(core, machine, info) {
 	let arch = architecture(core, machine), number = replace(info.tag_name, /^v/, '');
 	let candidates = core == 'xray' ? [`Xray-${arch}.zip`] : [`sing-box-${number}-${arch}-musl.tar.gz`, `sing-box-${number}-${arch}.tar.gz`];
@@ -50,7 +55,10 @@ export function assetPlan(core, machine, info) {
 };
 // AssetPlan：core/version/number/name/url/digest/destination/archive，均来自已校验的发布数据。
 // Shell 根据这些业务字段下载和安装，不接收拼接好的命令字符串。
-/** @returns {null} 不返回业务数据；按动作向 stdout 输出版本、安装计划、资源地址或更新结果，失败输出 JSON 错误并退出。 */
+/**
+ * 处理核心更新脚本的版本查询、资源选择等数据请求。
+ * @returns {null} 结果写入 stdout，失败时输出 JSON 错误并退出。
+ */
 export function main() { run(() => {
     let action = shift(ARGV), core = shift(ARGV);
     if (!core || !repos[core]) die('core action and name are required');

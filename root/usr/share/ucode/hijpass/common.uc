@@ -2,9 +2,10 @@ import * as fs from 'fs';
 import { read } from './uci/read.uc';
 
 /**
+ * 使用指定参数渲染 ucode 模板，并补充模板错误位置。
  * @param {string} path 模板文件的绝对路径。
  * @param {object} scope 只传入模板需要的已校验字段。
- * @returns {string} 使用 scope 渲染后的模板文本；模板失败时抛出带模板路径的错误。
+ * @returns {string} 渲染后的文本；失败时抛出带模板路径的错误。
  */
 export function renderTemplate(path, scope) {
 	try {
@@ -15,16 +16,21 @@ export function renderTemplate(path, scope) {
 	catch (e) { die(`template "${path}": ${e.message}`); }
 };
 
-/** @returns {string} 按 POSIX Shell 单引号规则转义后的单个参数，包含外围引号，不执行命令。 */
+/**
+ * 将一个参数转义成安全的 Shell 单引号形式。
+ * @returns {string} 带外围单引号的参数字符串。
+ */
 export function quote(value) { return "'" + replace(`${value}`, "'", "'\\''") + "'"; };
 /**
+ * 将参数数组逐项转义，拼成 Shell 命令文本。
  * @param {array} args 作为独立 argv 引用的参数数组。
- * @returns {string} 将各 argv 独立转义并以空格连接的 Shell 命令片段，不执行命令。
+ * @returns {string} 命令字符串；此处不执行命令。
  */
 export function command(args) { return join(' ', map(args, quote)); };
 /**
+ * 将规则文本拆成有效行，去掉空行和注释。
  * @param {string|null} text
- * @returns {string[]} 去掉空行、# / ! 注释并修剪首尾空白后的文本行，保持原顺序。
+ * @returns {string[]} 修剪首尾空白的行数组，保持原顺序。
  */
 export function lines(text) {
 	let result = [];
@@ -35,9 +41,10 @@ export function lines(text) {
 	return result;
 };
 /**
+ * 创建目录及缺失的父目录。
  * @param {string|null} path 路径解析失败返回 null；拒绝无效目录。
  * @param {integer} [mode]
- * @returns {null} 确保目录及父目录存在；已存在时不修改，路径无效或创建失败时抛错。
+ * @returns {null} 无业务返回值；路径无效或创建失败时抛错。
  */
 export function mkdir(path, mode) {
 	if (type(path) != 'string' || !length(path)) die('directory path is empty or invalid');
@@ -48,15 +55,17 @@ export function mkdir(path, mode) {
 };
 let serial = 0;
 /**
+ * 生成目标文件旁的唯一暂存路径。
  * @param {string} path
- * @returns {string} 目标文件旁包含当前 PID 和递增序号的临时路径；只生成名字，不创建文件。
+ * @returns {string} 包含当前 PID 和递增序号的路径；不创建文件。
  */
 export function temporary(path) { return `${path}.new-${fs.readlink('/proc/self')}-${++serial}`; };
 /**
+ * 先完整写入临时文件，再原子替换目标文件。
  * @param {string} path
  * @param {string} data
  * @param {integer} [mode]
- * @returns {null} 将完整数据写入临时文件后原子替换目标；失败清理临时文件并抛错，不返回文件路径。
+ * @returns {null} 无业务返回值；失败时清理临时文件并抛错。
  */
 export function atomic(path, data, mode) {
 	mkdir(fs.dirname(path));
@@ -75,9 +84,10 @@ let configDirectory;
 
 // CLI 数据边界：stdout 只返回数据，错误由 stderr/退出状态或既有 JSON 契约表达。
 /**
+ * 统一处理命令参数、结果输出和异常退出。
  * @param {function} handler
  * @param {boolean} [jsonErrors]
- * @returns {null} 不传递 handler 返回值；非 null 结果写入 stdout（字符串原样，其余编码为 JSON），异常报告错误并退出。
+ * @returns {null} handler 结果写入 stdout，字符串原样输出，其他值编码为 JSON。
  */
 export function run(handler, jsonErrors) {
     try {
@@ -102,15 +112,17 @@ export function run(handler, jsonErrors) {
     }
 };
 /**
+ * 按命令行指定的配置目录读取 UCI 配置。
  * @param {string} [packageName]
- * @returns {object[]} 指定 UCI 包的原始 section 数组，保留元数据和读取顺序，使用当前 CLI 的可选配置目录。
+ * @returns {object[]} 原始 section 数组，保留元数据和配置顺序。
  */
 export function sections(packageName) {
     return read(packageName || 'hijpass', configDirectory);
 };
 /**
+ * 读取完整文件文本，读取失败时报告错误。
  * @param {string|null} path
- * @returns {string} 指定文件的完整原始文本，包含已有空白与换行；路径无效或读取失败时抛错。
+ * @returns {string} 原始文本，保留空白和换行。
  */
 export function text(path) {
     if (type(path) != 'string') die('missing input path');

@@ -26,6 +26,9 @@ function formFixture(defaultTemplate = async () => 'default template\n') {
             } };
             if (name === 'uci') return { load: async () => {}, set: (...args) => hashes.push(args) };
             if (name === 'form') return { ListValue: 'selector', Button: 'button', TextValue: 'editor' };
+            if (name === '@codemirror/language') return { StreamLanguage: { define: language => language } };
+            if (name === '@codemirror/legacy-modes/mode/shell') return { shell: {} };
+            if (name.endsWith('/base/luci/editor')) return { CodeEditorUtils: { configure() {} } };
             if (name.endsWith('/hijpass')) return { LuciFlied: { CONF_NAME: 'hijpass' } };
             if (name.endsWith('/base/luci/form')) return { FormUtils: {
                 simpleHash: () => 123,

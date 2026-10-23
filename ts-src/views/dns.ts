@@ -1,3 +1,6 @@
+import { StreamLanguage } from '@codemirror/language';
+import { shell } from '@codemirror/legacy-modes/mode/shell';
+import { CodeEditorUtils } from '../utils/base/luci/editor';
 import view from "view";
 import uci from "uci";
 import form from "form";
@@ -125,9 +128,10 @@ const v = view.extend({
         useChn.depends('dns_service', 'chinadns-ng');
 
         // Hook 脚本编辑（启动传 start，停止传 stop，脚本资源由后端定位）
-        FormUtils.createTextOption(s, 'dns_hook', 'dns_hook_hash', null,
+        const hook = FormUtils.createTextOption(s, 'dns_hook', 'dns_hook_hash', null,
             _('Edit DNS Hook Script'),
             { resource: 'dns_hook' });
+        CodeEditorUtils.configure(hook, StreamLanguage.define(shell), _('Edit DNS Hook Script'));
 
         // 域名直连列表（仅 chinadns-ng 时通过 subsection 显示）
         let oDomainDirect = s.taboption('domain_direct', form.SectionValue, '_domain_direct',

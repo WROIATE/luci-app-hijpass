@@ -5,6 +5,7 @@ import { HighlightStyle, syntaxHighlighting, bracketMatching } from '@codemirror
 import { tags } from '@lezer/highlight';
 import ui from 'ui';
 import { firewallTemplateLanguage } from './syntax';
+import { codeColors } from '../../base/luci/code';
 
 function showParameters(event: Event) {
     const button = event.currentTarget as HTMLButtonElement;
@@ -59,11 +60,7 @@ function showParameters(event: Event) {
 function mount(widget: HTMLElement, label: string) {
     const textarea = widget.querySelector('textarea') as HTMLTextAreaElement;
     const native = L.dom.findClassInstance(widget) as LuCI.ui.AbstractElement;
-    const color = getComputedStyle(document.body).color.match(/\d+/g)?.slice(0, 3).map(Number) || [0, 0, 0];
-    const dark = color.reduce((sum, value) => sum + value, 0) > 384;
-    const palette = dark
-        ? { keyword: '#8cc8ff', string: '#a5d6a7', number: '#d2a8ff', comment: '#a2adb9', variable: '#ffb86c' }
-        : { keyword: '#005cc5', string: '#116329', number: '#8250df', comment: '#57606a', variable: '#953800' };
+    const { dark, palette } = codeColors();
     const theme = EditorView.theme({
         '&': { width: '100%', minWidth: '0', boxSizing: 'border-box', height: '38rem', minHeight: '18rem', maxWidth: '100%', color: 'inherit', backgroundColor: 'transparent',
             border: '1px solid var(--border-color, #7778)', borderRadius: '3px', resize: 'vertical', overflow: 'hidden' },

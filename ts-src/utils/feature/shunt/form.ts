@@ -6,6 +6,7 @@ import { CORE_TYPE, LuciFlied, ShuntTag } from "../../../enum/hijpass";
 import { FormUtils } from "../../base/luci/form";
 import { NotificationUtils } from "../../base/luci/notification";
 import { GeneratedConfigUtils } from "../config/backend";
+import { ConfigPreviewUtils } from "../config/preview";
 
 function makeSelect(id: string, options: { value: string, label: string }[]) {
     const sel = E('select', {id, class: 'cbi-input-select', style: 'width:100%'}) as HTMLSelectElement;
@@ -58,10 +59,7 @@ const ShuntFormUtils = {
                 E('div', {'class': 'cbi-section'}, [
                     E('div', {'class': 'cbi-section-descr'},
                         _('Generated %s JSON Configuration').format(shuntType)),
-                    E('pre', {
-                        'style': 'max-height: 500px; overflow: auto; padding: 10px; border-radius: 4px;',
-                        'id': 'config-preview-content'
-                    }, configJson)
+                    ConfigPreviewUtils.render(configJson, _('Preview Configuration'))
                 ]),
                 E('div', {
                     'class': 'right',
@@ -76,8 +74,7 @@ const ShuntFormUtils = {
                         'click': function (ev) {
                             ev.preventDefault();
                             ev.stopPropagation();
-                            let content = document.getElementById('config-preview-content').textContent;
-                            navigator.clipboard.writeText(content).then(function () {
+                            navigator.clipboard.writeText(configJson).then(function () {
                                 NotificationUtils.success(_('Success'), _('Configuration copied to clipboard'), 3000);
                             })
                         }

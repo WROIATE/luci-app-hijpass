@@ -8,6 +8,7 @@ import { NotificationUtils } from "../../base/luci/notification";
 import { UciUtils } from "../../base/luci/uci";
 import { ValidationUtils } from "../../base/luci/validation";
 import { GeneratedConfigUtils } from "../config/backend";
+import { ConfigPreviewUtils } from "../config/preview";
 import { ProxyChainUtils } from "./chain";
 import { ImportedProxyConfig, ProxyShareLinkUtils } from "./share-link";
 import { findProxyDependencyCycleFrom } from "./validation";
@@ -381,9 +382,8 @@ const ProxyFormUtils = {
                         conf = { error: e.message };
                     }
                     let name = uci.get(LuciFlied.CONF_NAME, section_id, 'name') || section_id;
-                    let contentEl = E('pre', {
-                        style: 'max-height:500px;overflow:auto;padding:10px;border-radius:4px;white-space:pre;font-size:0.8em'
-                    }, JSON.stringify(conf, JsonUtils.omitEmptyReplacer, 2)) as HTMLElement;
+                    let contentEl = ConfigPreviewUtils.render(
+                        JSON.stringify(conf, JsonUtils.omitEmptyReplacer, 2), _('Config Preview'));
                     ui.showModal(name + ' - ' + _('Config Preview'), [
                         E('div', { class: 'cbi-section' }, [contentEl]),
                         E('div', { class: 'right' }, [

@@ -5,7 +5,9 @@
  * @returns {object} 出站对象，地址和认证字段直接位于 settings。
  */
 export function build(n) {
-	if (n.udp_over_tcp) die('Xray main no longer supports Shadowsocks udp_over_tcp; disable it or select sing-box');
+	if (n.udp_over_tcp) {
+		die('Xray main no longer supports Shadowsocks udp_over_tcp; disable it or select sing-box');
+	}
 	return {
 		protocol: n.type, tag: n.name,
 		settings: { address: n.server, port: n.server_port, method: n.method, password: n.password },

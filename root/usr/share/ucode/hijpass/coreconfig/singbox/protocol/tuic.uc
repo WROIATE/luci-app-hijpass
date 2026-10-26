@@ -12,8 +12,11 @@ export function build(n) {
 	out.tls = tls(n);
 	for (let key in ['uuid', 'password', 'congestion_control', 'udp_relay_mode'])
 		optional(out, key, n[key]);
-	for (let key in ['udp_over_stream', 'zero_rtt_handshake'])
-		if (n[key]) out[key] = true;
+	for (let key in ['udp_over_stream', 'zero_rtt_handshake']) {
+		if (n[key]) {
+			out[key] = true;
+		}
+	}
 	optional(out, 'heartbeat', n.heartbeat);
 	return out;
 };

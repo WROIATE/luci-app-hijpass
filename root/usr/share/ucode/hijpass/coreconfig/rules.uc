@@ -43,7 +43,9 @@ export function parse(section) {
 	for (let key in ['domain_list', 'ip_list']) {
 		for (let line in split(section[key] || '', '\n')) {
 			line = trim(line);
-			if (!line || substr(line, 0, 1) == '#') continue;
+			if (!line || substr(line, 0, 1) == '#') {
+				continue;
+			}
 			let set = match(line, /^rule-set:(local|remote):(.*)$/);
 			if (set) {
 				let filename = split(set[2], '/')[-1];
@@ -54,10 +56,14 @@ export function parse(section) {
 				push(r.sets, entry);
 				continue;
 			}
-			if (key == 'ip_list') push(substr(line, 0, 6) == 'geoip:' ? r.geoip : r.ip, line);
+			if (key == 'ip_list') {
+				push(substr(line, 0, 6) == 'geoip:' ? r.geoip : r.ip, line);
+			}
 			else {
 				let prefix = match(line, /^(full|domain|regexp|geosite):(.*)$/);
-				if (!prefix) push(r.keyword, line);
+				if (!prefix) {
+					push(r.keyword, line);
+				}
 				else {
 					switch (prefix[1]) {
 					case 'full': push(r.domain, prefix[2]); break;
@@ -110,12 +116,20 @@ export function convertGeo(r) {
  */
 export function singboxMatch(r, dnsOnly) {
 	let out = {};
-	for (let key, values in { domain: r.domain, domain_suffix: r.suffix, domain_keyword: r.keyword, domain_regex: r.regex })
-		if (length(values)) out[key] = values;
-	if (length(r.sets)) out.rule_set = map(r.sets, s => s.tag);
+	for (let key, values in { domain: r.domain, domain_suffix: r.suffix, domain_keyword: r.keyword, domain_regex: r.regex }) {
+		if (length(values)) {
+			out[key] = values;
+		}
+	}
+	if (length(r.sets)) {
+		out.rule_set = map(r.sets, s => s.tag);
+	}
 	if (!dnsOnly) {
-		for (let key, values in { ip_cidr: r.ip, network: r.network, protocol: r.protocol, port: r.ports, port_range: r.ranges })
-			if (length(values)) out[key] = values;
+		for (let key, values in { ip_cidr: r.ip, network: r.network, protocol: r.protocol, port: r.ports, port_range: r.ranges }) {
+			if (length(values)) {
+				out[key] = values;
+			}
+		}
 	}
 	return out;
 };
@@ -143,24 +157,42 @@ export function xrayRules(r, name, exit, version) {
 	optional(base, 'port', join(',', [...map(r.ports, p => `${p}`), ...map(r.ranges, p => replace(p, ':', '-'))]));
 	let domains = xrayDomains(r);
 	let ips = [...filter(r.ip, ip => {
-		if (!version) return true;
+		if (!version) {
+			return true;
+		}
 		let value = replace(ip, /^!/, '');
 		// ext: 文件规则和 geoip: 标签可能同时包含 IPv4/IPv6；冒号并不总是 IPv6 地址。
-		if (match(value, /^(ext|geoip):/)) return true;
-		if (index(value, ':') >= 0) return version == 6;
+		if (match(value, /^(ext|geoip):/)) {
+			return true;
+		}
+		if (index(value, ':') >= 0) {
+			return version == 6;
+		}
 		return match(value, /^[0-9]{1,3}([.][0-9]{1,3}){3}(\/[0-9]+)?$/) ? version == 4 : true;
 	}), ...r.geoip];
-	let family = version == 4 ? '0.0.0.0/0' : version == 6 ? '::/0' : null;
+	let family = null;
+	if (version == 4) {
+		family = '0.0.0.0/0';
+	}
+	else if (version == 6) {
+		family = '::/0';
+	}
 	let result = [];
 	// Xray 的域名和 IP 条件分成两条规则，避免在单条规则中意外变成 AND。
 	if (length(domains)) {
 		let rule = { ...base, domain: domains };
-		if (family) rule.ip = [family];
+		if (family) {
+			rule.ip = [family];
+		}
 		push(result, rule);
 	}
-	if (length(ips)) push(result, { ...base, ip: ips });
+	if (length(ips)) {
+		push(result, { ...base, ip: ips });
+	}
 	if (!length(result)) {
-		if (family) base.ip = [family];
+		if (family) {
+			base.ip = [family];
+		}
 		push(result, base);
 	}
 	return result;

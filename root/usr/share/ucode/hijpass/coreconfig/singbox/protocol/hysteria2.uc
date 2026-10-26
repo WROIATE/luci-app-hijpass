@@ -26,7 +26,8 @@ export function build(n) {
 	optional(out, 'down_mbps', n.down_mbps);
 	optional(out, 'server_ports', map(n.server_ports, p => replace(p, '-', ':')));
 	optional(out, 'hop_interval', n.hop_interval);
-	if (n.obfs_type == 'salamander' && n.obfs_password)
+	if (n.obfs_type == 'salamander' && n.obfs_password) {
 		out.obfs = { type: n.obfs_type, password: n.obfs_password };
+	}
 	return out;
 };

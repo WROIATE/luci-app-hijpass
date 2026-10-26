@@ -10,7 +10,9 @@ import { read } from './uci/read.uc';
 export function renderTemplate(path, scope) {
 	try {
 		let output = render(path, scope);
-		if (type(output) != 'string') die('template did not return text');
+		if (type(output) != 'string') {
+			die('template did not return text');
+		}
 		return output;
 	}
 	catch (e) { die(`template "${path}": ${e.message}`); }
@@ -36,7 +38,9 @@ export function lines(text) {
 	let result = [];
 	for (let line in split(text || '', '\n')) {
 		line = trim(line);
-		if (line && substr(line, 0, 1) != '#' && substr(line, 0, 1) != '!') push(result, line);
+		if (line && substr(line, 0, 1) != '#' && substr(line, 0, 1) != '!') {
+			push(result, line);
+		}
 	}
 	return result;
 };
@@ -47,11 +51,19 @@ export function lines(text) {
  * @returns {null} 无业务返回值；路径无效或创建失败时抛错。
  */
 export function mkdir(path, mode) {
-	if (type(path) != 'string' || !length(path)) die('directory path is empty or invalid');
-	if (fs.stat(path)?.type == 'directory') return;
+	if (type(path) != 'string' || !length(path)) {
+		die('directory path is empty or invalid');
+	}
+	if (fs.stat(path)?.type == 'directory') {
+		return;
+	}
 	let parent = fs.dirname(path);
-	if (parent != path && parent != '.') mkdir(parent, mode);
-	if (!fs.mkdir(path, mode || 0o755) && fs.stat(path)?.type != 'directory') die(`cannot create ${path}: ${fs.error()}`);
+	if (parent != path && parent != '.') {
+		mkdir(parent, mode);
+	}
+	if (!fs.mkdir(path, mode || 0o755) && fs.stat(path)?.type != 'directory') {
+		die(`cannot create ${path}: ${fs.error()}`);
+	}
 };
 let serial = 0;
 /**
@@ -70,12 +82,20 @@ export function temporary(path) { return `${path}.new-${fs.readlink('/proc/self'
 export function atomic(path, data, mode) {
 	mkdir(fs.dirname(path));
 	let temp = temporary(path), file = fs.open(temp, 'wx');
-	if (!file) die(`cannot create ${temp}: ${fs.error()}`);
+	if (!file) {
+		die(`cannot create ${temp}: ${fs.error()}`);
+	}
 	try {
-		if (!fs.chmod(temp, mode || 0o600)) die(`cannot chmod ${temp}`);
-		if (file.write(data) != length(data) || !file.flush()) die(`cannot write ${temp}`);
+		if (!fs.chmod(temp, mode || 0o600)) {
+			die(`cannot chmod ${temp}`);
+		}
+		if (file.write(data) != length(data) || !file.flush()) {
+			die(`cannot write ${temp}`);
+		}
 		file.close();
-		if (!fs.rename(temp, path)) die(`cannot replace ${path}: ${fs.error()}`);
+		if (!fs.rename(temp, path)) {
+			die(`cannot replace ${path}: ${fs.error()}`);
+		}
 	}
 	catch (e) { file.close(); fs.unlink(temp); die(e.message); }
 };
@@ -95,19 +115,31 @@ export function run(handler, jsonErrors) {
         let position = index(ARGV, '--configdir');
         if (position != null && position >= 0) {
             configDirectory = ARGV[position + 1];
-            if (!configDirectory) die('missing --configdir');
+            if (!configDirectory) {
+                die('missing --configdir');
+            }
             splice(ARGV, position, 2);
         }
         let result = handler();
         if (result != null) {
-            if (type(result) == 'string') print(result);
-            else printf('%J\n', result);
-            if (type(result) == 'object' && result.success === false) exit(result.exit_code || 1);
+            if (type(result) == 'string') {
+                print(result);
+            }
+            else {
+                printf('%J\n', result);
+            }
+            if (type(result) == 'object' && result.success === false) {
+                exit(result.exit_code || 1);
+            }
         }
     }
     catch (e) {
-        if (jsonErrors) printf('%J\n', { success: false, error: e.message });
-        else warn(`${e.message}\n`);
+        if (jsonErrors) {
+            printf('%J\n', { success: false, error: e.message });
+        }
+        else {
+            warn(`${e.message}\n`);
+        }
         exit(1);
     }
 };
@@ -125,8 +157,12 @@ export function sections(packageName) {
  * @returns {string} 原始文本，保留空白和换行。
  */
 export function text(path) {
-    if (type(path) != 'string') die('missing input path');
+    if (type(path) != 'string') {
+        die('missing input path');
+    }
     let data = fs.readfile(path);
-    if (type(data) != 'string') die(`cannot read ${path}`);
+    if (type(data) != 'string') {
+        die(`cannot read ${path}`);
+    }
     return data;
 };

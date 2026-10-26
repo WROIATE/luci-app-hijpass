@@ -19,7 +19,9 @@ function validatePorts(nodes, shunt) {
 	 * @returns {null} 无业务返回值，更新端口登记表。
 	 */
 	function add(port, owner) {
-		if (owners[port]) die(`port ${port} is shared by ${owners[port]} and ${owner}`);
+		if (owners[port]) {
+			die(`port ${port} is shared by ${owners[port]} and ${owner}`);
+		}
 		owners[port] = owner;
 	}
 	for (let n in nodes) {
@@ -45,19 +47,30 @@ export function render(sections, target) {
 	let dependencies = resolveDependencies(sections, target);
 	validateDependencies(dependencies);
 	let shunt = first(sections, 'shunt'), routing = null;
-	if (target == 'shunt' || !target && shunt.enabled != '0' && shunt.config_type == 'tmpl')
+	if (target == 'shunt' || !target && shunt.enabled != '0' && shunt.config_type == 'tmpl') {
 		routing = prepareRouting(sections, dependencies);
+	}
 	validatePorts(dependencies.nodes, routing);
 	let result = { nodes: {} };
 	for (let n in dependencies.nodes) {
-		if (n.config_type == CONFIG_TYPE.custom) continue;
+		if (n.config_type == CONFIG_TYPE.custom) {
+			continue;
+		}
 		try { result.nodes[n.id] = clean(n.core == CORE.xray ? xray(n) : singbox(n)); }
 		catch (e) { die(`node "${n.name}": ${e.message}`); }
 	}
-	if (routing) result.shunt = clean(buildRouting(routing, dependencies));
-	if (!target) return result;
-	if (target == 'shunt') return result.shunt;
-	if (!result.nodes[target]) die('custom node configuration is not generated');
+	if (routing) {
+		result.shunt = clean(buildRouting(routing, dependencies));
+	}
+	if (!target) {
+		return result;
+	}
+	if (target == 'shunt') {
+		return result.shunt;
+	}
+	if (!result.nodes[target]) {
+		die('custom node configuration is not generated');
+	}
 	return result.nodes[target];
 };
 /**
@@ -67,7 +80,11 @@ export function render(sections, target) {
  */
 export function validate(sections) {
 	// 服务关闭时允许保存未完成表单，但输入的 UCI 结构仍必须有效。
-	if (first(sections, 'hijpass').enabled == '0') validateSections(sections);
-	else render(sections);
+	if (first(sections, 'hijpass').enabled == '0') {
+		validateSections(sections);
+	}
+	else {
+		render(sections);
+	}
 	return { ok: true };
 };

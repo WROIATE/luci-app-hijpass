@@ -51,7 +51,14 @@ export function apply(stream, n) {
 		let path = n.transport_ws_path || '/';
 		if (n.transport_ws_max_early_data) {
 			let hash = index(path, '#') ?? -1, base = hash < 0 ? path : substr(path, 0, hash);
-			path = base + (index(base, '?') < 0 ? '?' : '&') + `ed=${n.transport_ws_max_early_data}` + (hash < 0 ? '' : substr(path, hash));
+			let separator = '?', fragment = '';
+			if (index(base, '?') >= 0) {
+				separator = '&';
+			}
+			if (hash >= 0) {
+				fragment = substr(path, hash);
+			}
+			path = base + separator + `ed=${n.transport_ws_max_early_data}` + fragment;
 		}
 		stream.network = 'websocket';
 		stream.wsSettings = { host: n.transport_ws_host, path };
@@ -63,7 +70,9 @@ export function apply(stream, n) {
 			idle_timeout: int(duration(n.transport_grpc_idle_timeout)) || null,
 			health_check_timeout: int(duration(n.transport_grpc_ping_timeout)) || null,
 		};
-		if (n.transport_grpc_permit_without_stream) stream.grpcSettings.permit_without_stream = true;
+		if (n.transport_grpc_permit_without_stream) {
+			stream.grpcSettings.permit_without_stream = true;
+		}
 		break;
 	default: die(`unsupported Xray transport "${n.transport_type}"`);
 	}

@@ -15,7 +15,15 @@ export function build(n) {
 		 * 将带宽数值转换成 Xray 所需的文本格式。
 		 * @returns {string} 未设置为 ""，零值为 "0"，其他为 "数值 mbps"。
 		 */
-		function bandwidth(value) { return value == null ? '' : value ? `${value} mbps` : '0'; }
+		function bandwidth(value) {
+			if (value == null) {
+				return '';
+			}
+			if (value) {
+				return `${value} mbps`;
+			}
+			return '0';
+		}
 		stream.finalmask = { quicParams: { brutalUp: bandwidth(n.up_mbps), brutalDown: bandwidth(n.down_mbps) } };
 	}
 	return {

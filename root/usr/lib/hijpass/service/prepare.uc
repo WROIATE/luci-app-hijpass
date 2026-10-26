@@ -23,42 +23,62 @@ import { logger } from '../maintenance/logs.uc';
  */
 export function plan(sections) {
 	let global = first(sections, 'hijpass'), instances = [];
-	if (global.enabled != '1') return { instances };
+	if (global.enabled != '1') {
+		return { instances };
+	}
 	/**
 	 * 组装单个服务实例的命令、环境和日志设置。
 	 * @returns {object} procd 实例对象，含 command、env、user、log 等字段。
 	 */
 	function instance(section, name, args, shunt) {
 		let env = list(section.procd_env);
-		for (let entry in env) if (!match(entry, /^[A-Za-z_][A-Za-z0-9_]*=/)) die('invalid procd_env');
-		if (shunt) push(env, 'XRAY_LOCATION_ASSET=/usr/share/v2ray');
+		for (let entry in env) {
+			if (!match(entry, /^[A-Za-z_][A-Za-z0-9_]*=/)) {
+				die('invalid procd_env');
+			}
+		}
+		if (shunt) {
+			push(env, 'XRAY_LOCATION_ASSET=/usr/share/v2ray');
+		}
 		return {
 			id: section['.name'], name, command: args, env, shunt: !!shunt,
 			user: section.nest_proxy == '1' ? 'root' : 'hijpass', log: logPath(section),
 		};
 	}
 	for (let section in of(sections, 'proxy_node')) {
-		if (section.enabled != '1') continue;
+		if (section.enabled != '1') {
+			continue;
+		}
 		let name = section.name || section['.name'];
 		let path = nodeConfig(section);
 		let args;
 		if (configType(section.config_type) == CONFIG_TYPE.custom) {
-			if (!trim(section.command || '')) die(`custom node "${name}" has no command`);
+			if (!trim(section.command || '')) {
+				die(`custom node "${name}" has no command`);
+			}
 			// 自定义节点的 command 本身是用户填写的 Shell 命令；配置路径仍进行引用。
 			args = ['/bin/sh', '-c', replace(section.command, '{conf_path}', command([path]))];
 		}
 		else {
 			let engine = core(section.core);
-			if (engine == CORE.xray) args = ['xray', '-c', path];
-			else if (engine == CORE.singbox) args = ['sing-box', '-c', path, 'run'];
-			else die(`unsupported core "${engine}"`);
+			if (engine == CORE.xray) {
+				args = ['xray', '-c', path];
+			}
+			else if (engine == CORE.singbox) {
+				args = ['sing-box', '-c', path, 'run'];
+			}
+			else {
+				die(`unsupported core "${engine}"`);
+			}
 		}
 		push(instances, instance(section, name, args));
 	}
 	let shunt = first(sections, 'shunt');
 	if (shunt.enabled != '0' && shunt.type) {
 		let engine = core(shunt.type), path = FILES.shunt_conf;
-		if (engine != CORE.xray && engine != CORE.singbox) die('unsupported shunt core');
+		if (engine != CORE.xray && engine != CORE.singbox) {
+			die('unsupported shunt core');
+		}
 		push(instances, instance(shunt, 'shunt', engine == CORE.xray ? ['xray', '-c', path] : ['sing-box', 'run', '-c', path], true));
 	}
 	return { instances };
@@ -74,16 +94,26 @@ export function writeConfigs(sections, generated) {
 	let files = [];
 	for (let section in of(sections, 'proxy_node')) {
 		let config = generated.nodes[section['.name']];
-		if (!config) continue;
+		if (!config) {
+			continue;
+		}
 		if (section.upstream_proxy_node && section.server && !iptoarr(section.server)) {
 			let address = resolve(section.server), outbound = config.outbounds[0];
-			if (outbound.server) outbound.server = address;
-			else if (outbound.settings?.address) outbound.settings.address = address;
-			else die('unsupported proxy server field');
+			if (outbound.server) {
+				outbound.server = address;
+			}
+			else if (outbound.settings?.address) {
+				outbound.settings.address = address;
+			}
+			else {
+				die('unsupported proxy server field');
+			}
 		}
 		push(files, { path: nodeConfig(section), data: sprintf('%.2J\n', config) });
 	}
-	if (generated.shunt) push(files, { path: FILES.shunt_conf, data: sprintf('%.2J\n', generated.shunt) });
+	if (generated.shunt) {
+		push(files, { path: FILES.shunt_conf, data: sprintf('%.2J\n', generated.shunt) });
+	}
 	let staged = [], committed = [];
 	try {
 		for (let file in files) {
@@ -92,14 +122,20 @@ export function writeConfigs(sections, generated) {
 			push(staged, { path: file.path, temp, original, mode });
 		}
 		for (let file in staged) {
-			if (!fs.rename(file.temp, file.path)) die(`cannot replace ${file.path}`);
+			if (!fs.rename(file.temp, file.path)) {
+				die(`cannot replace ${file.path}`);
+			}
 			push(committed, file);
 		}
 	}
 	catch (e) {
 		for (let file in reverse(committed)) {
-			if (file.original == null) fs.unlink(file.path);
-			else atomic(file.path, file.original, file.mode);
+			if (file.original == null) {
+				fs.unlink(file.path);
+			}
+			else {
+				atomic(file.path, file.original, file.mode);
+			}
 		}
 		for (let file in staged) fs.unlink(file.temp);
 		die(e.message);
@@ -114,11 +150,17 @@ export function writeConfigs(sections, generated) {
 function cronEntries(path, packageName) {
     let entries = [];
     for (let line in split(fs.readfile(path) || '', '\n')) {
-        if (!line) continue;
+        if (!line) {
+            continue;
+        }
         let fields = split(trim(line) || '', /[ \t]+/);
         let position = substr(fields[0] || '', 0, 1) == '@' ? 1 : 5;
-        if (fields[position] == '/usr/lib/hijpass/maintenance/logs.sh' && fields[position + 1] == packageName) continue;
-        if (packageName == 'hijpass' && fields[position] == '/usr/lib/hijpass/rules/update.sh') continue;
+        if (fields[position] == '/usr/lib/hijpass/maintenance/logs.sh' && fields[position + 1] == packageName) {
+            continue;
+        }
+        if (packageName == 'hijpass' && fields[position] == '/usr/lib/hijpass/rules/update.sh') {
+            continue;
+        }
         push(entries, line);
     }
     return entries;
@@ -133,10 +175,14 @@ function cron(sections, enabled) {
 	if (enabled) {
 		let schedule = first(sections, 'rule').update_schedule;
 		if (schedule) {
-			if (!match(schedule, /^[A-Za-z0-9*\/,? -]+$/) || length(split(trim(schedule) || '', /[ \t]+/)) != 5) die('invalid update schedule');
+			if (!match(schedule, /^[A-Za-z0-9*\/,? -]+$/) || length(split(trim(schedule) || '', /[ \t]+/)) != 5) {
+				die('invalid update schedule');
+			}
 			push(entries, `${schedule} /usr/lib/hijpass/rules/update.sh update`);
 		}
-		if (length(filter(sections, section => !!logPath(section)))) push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijpass');
+		if (length(filter(sections, section => !!logPath(section)))) {
+			push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijpass');
+		}
 	}
 	atomic(path, join('\n', entries) + '\n');
 }
@@ -149,18 +195,30 @@ function cron(sections, enabled) {
  */
 export function serverPlan(sections) {
 	let global = first(sections, 'hijserver'), instances = [], ports = [];
-	if (global.enabled != '1') return { instances, ports };
+	if (global.enabled != '1') {
+		return { instances, ports };
+	}
 	for (let section in of(sections, 'server_node')) {
-		if (section.enabled != '1') continue;
+		if (section.enabled != '1') {
+			continue;
+		}
 		let name = section.name || section['.name'];
-		if (!section.command) die(`server "${name}" has no command`);
+		if (!section.command) {
+			die(`server "${name}" has no command`);
+		}
 		let env = list(section.procd_env), path = nodeConfig(section, true);
-		for (let entry in env) if (!match(entry, /^[A-Za-z_][A-Za-z0-9_]*=/)) die('invalid procd_env');
+		for (let entry in env) {
+			if (!match(entry, /^[A-Za-z_][A-Za-z0-9_]*=/)) {
+				die('invalid procd_env');
+			}
+		}
 		push(instances, {
 			id: section['.name'], name, command: ['/bin/sh', '-c', replace(section.command, '{conf_path}', command([path]))],
 			env, user: 'root', shunt: false, log: logPath(section, true),
 		});
-		if (section.allow_firewall == '1') push(ports, port(section.listen_port));
+		if (section.allow_firewall == '1') {
+			push(ports, port(section.listen_port));
+		}
 	}
 	return { instances, ports: uniq(ports) };
 };
@@ -173,7 +231,9 @@ const SERVER_CHAIN = '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft';
 function serverCron(instances) {
 	let path = '/etc/crontabs/root';
     let entries = cronEntries(path, 'hijserver');
-	if (length(filter(instances, instance => instance.log))) push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijserver');
+	if (length(filter(instances, instance => instance.log))) {
+		push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijserver');
+	}
 	atomic(path, join('\n', entries) + '\n');
 }
 /**
@@ -187,7 +247,10 @@ function writeServerRules(sections) {
 		atomic(SERVER_TABLE, renderTemplate('/usr/lib/hijpass/service/server.ut', { ports: output.ports }), 0o644);
 		atomic(SERVER_CHAIN, 'jump hijserver comment "hijserver rule"\n', 0o644);
 	}
-	else { fs.unlink(SERVER_TABLE); fs.unlink(SERVER_CHAIN); }
+	else {
+		fs.unlink(SERVER_TABLE);
+		fs.unlink(SERVER_CHAIN);
+	}
 };
 
 // ServiceSettings 是执行层需要的业务值；不包含可执行的通用动作列表。
@@ -212,10 +275,16 @@ function settings(config, server) {
  */
 export function main() { run(() => {
     let server = ARGV[0] == 'server';
-    if (server) shift(ARGV);
+    if (server) {
+        shift(ARGV);
+    }
     let config = sections(server ? 'hijserver' : 'hijpass'), action = shift(ARGV);
-    if (action == 'settings') return settings(config, server);
-    if (action == 'delay') return `${int(first(config, 'hijpass').delay_time || '0')}\n`;
+    if (action == 'settings') {
+        return settings(config, server);
+    }
+    if (action == 'delay') {
+        return `${int(first(config, 'hijpass').delay_time || '0')}\n`;
+    }
     if (action == 'configs') {
         if (first(config, 'hijpass').enabled == '1') {
             // 先生成进程描述，确认自定义命令、环境变量和文件名有效，再替换配置。
@@ -225,21 +294,31 @@ export function main() { run(() => {
         }
         return;
     }
-    if (action == 'plan') return server ? serverPlan(config) : plan(config);
+    if (action == 'plan') {
+        return server ? serverPlan(config) : plan(config);
+    }
     if (action == 'prepare') {
-        if (server) return serverPlan(config);
+        if (server) {
+            return serverPlan(config);
+        }
         let result = plan(config);
         if (first(config, 'hijpass').enabled == '1') {
             let dns = prepareDNS(config);
-            if (dns) push(result.instances, dns);
+            if (dns) {
+                push(result.instances, dns);
+            }
         }
         return result;
     }
     if (action == 'cron') {
-        if (server) return serverCron(ARGV[0] == 'enable' ? serverPlan(config).instances : []);
+        if (server) {
+            return serverCron(ARGV[0] == 'enable' ? serverPlan(config).instances : []);
+        }
         return cron(config, ARGV[0] == 'enable');
     }
-    if (action == 'server-files') return writeServerRules(config);
+    if (action == 'server-files') {
+        return writeServerRules(config);
+    }
     die('unknown service data action');
 });
 };

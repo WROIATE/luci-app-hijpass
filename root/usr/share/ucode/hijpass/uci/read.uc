@@ -11,10 +11,13 @@ import { cursor } from 'uci';
 export function read(packageName, directory) {
 	packageName ||= 'hijpass';
 	let ctx = cursor(directory);
-	if (!ctx) die('cannot create UCI cursor');
+	if (!ctx) {
+		die('cannot create UCI cursor');
+	}
 	let sections = [];
-	if (!ctx.load(packageName))
+	if (!ctx.load(packageName)) {
 		die(`cannot load UCI ${packageName}: ${ctx.error()}`);
+	}
 	ctx.foreach(packageName, null, section => push(sections, section));
 	return sections;
 };

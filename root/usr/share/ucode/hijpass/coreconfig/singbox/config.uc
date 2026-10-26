@@ -44,7 +44,9 @@ export function build(n) {
 	if (n.type == TYPE.balance) {
 		let balance = { type: 'urltest', tag: TAG.balance, outbounds: [] };
 		for (let key in ['url', 'tolerance']) optional(balance, key, n[key]);
-		if (n.interrupt_exist_connections) balance.interrupt_exist_connections = true;
+		if (n.interrupt_exist_connections) {
+			balance.interrupt_exist_connections = true;
+		}
 		for (let key in ['interval', 'idle_timeout']) optional(balance, key, n[key]);
 		push(config.outbounds, balance);
 		for (let i, member in n.members) {
@@ -56,7 +58,9 @@ export function build(n) {
 	}
 	else {
 		let builder = builders[n.type];
-		if (!builder) die(`unsupported sing-box protocol "${n.type}"`);
+		if (!builder) {
+			die(`unsupported sing-box protocol "${n.type}"`);
+		}
 		let outbound = builder(n);
 		push(config.outbounds, outbound);
 		// 上游是已经连接的对象，不需要在构建阶段再次查询节点或做类型断言。

@@ -15,8 +15,12 @@ const resources = {
  * @returns {string} 有效的 section ID；无效时抛错。
  */
 function identifier(value) {
-    if (type(value) != 'string') die('invalid section ID');
-    if (!match(value, /^[A-Za-z0-9_-]+$/)) die('invalid section ID');
+    if (type(value) != 'string') {
+        die('invalid section ID');
+    }
+    if (!match(value, /^[A-Za-z0-9_-]+$/)) {
+        die('invalid section ID');
+    }
     return value;
 }
 /**
@@ -27,9 +31,13 @@ function identifier(value) {
 function editorPath(request) {
     let kind = request.resource;
     let packageName = kind == 'server_config' ? 'hijserver' : 'hijpass';
-    if (exists(resources, kind)) return resources[kind];
+    if (exists(resources, kind)) {
+        return resources[kind];
+    }
     let config = read(packageName);
-    if (kind != 'proxy_config' && kind != 'server_config') die('unknown editor resource');
+    if (kind != 'proxy_config' && kind != 'server_config') {
+        die('unknown editor resource');
+    }
     let id = identifier(request.section), section = filter(config, item => item['.name'] == id)[0];
     return nodeConfig({ '.name': id, name: request.name || section?.name }, kind == 'server_config');
 }
@@ -44,8 +52,9 @@ export function editor(request, write) {
     if (!write) {
         let content = fs.readfile(path);
         // 节点配置在首次保存前不存在；规则和 hook 的读取错误不能伪装为空内容。
-        if (content == null && index(['proxy_config', 'server_config', 'shunt_conf'], request.resource) < 0)
+        if (content == null && index(['proxy_config', 'server_config', 'shunt_conf'], request.resource) < 0) {
             die(`cannot read editor resource: ${request.resource}`);
+        }
         return { content: content || '' };
     }
     let content = replace(trim(request.content), /\r\n/g, '\n');
@@ -60,11 +69,23 @@ export function editor(request, write) {
  */
 export function logs() {
     let result = [];
-    for (let packageName in ['hijpass', 'hijserver']) for (let section in read(packageName)) {
-        if (!logPath(section, packageName == 'hijserver')) continue;
-        let kind = section['.type'] == 'proxy_node' ? 'proxy' : section['.type'] == 'server_node' ? 'server'
-            : section['.type'] == 'shunt' ? 'shunt' : 'main';
-        push(result, { id: `${packageName}:${section['.name']}`, kind, name: section.name || section['.name'] });
+    for (let packageName in ['hijpass', 'hijserver']) {
+        for (let section in read(packageName)) {
+            if (!logPath(section, packageName == 'hijserver')) {
+                continue;
+            }
+        let kind = 'main';
+        if (section['.type'] == 'proxy_node') {
+            kind = 'proxy';
+        }
+        else if (section['.type'] == 'server_node') {
+            kind = 'server';
+        }
+        else if (section['.type'] == 'shunt') {
+            kind = 'shunt';
+        }
+            push(result, { id: `${packageName}:${section['.name']}`, kind, name: section.name || section['.name'] });
+        }
     }
     return { logs: result };
 };
@@ -75,24 +96,36 @@ export function logs() {
  */
 export function log(request) {
     let parts = split(request.id, ':'), packageName = parts[0];
-    if (length(parts) != 2 || index(['hijpass', 'hijserver'], packageName) < 0) die('invalid log ID');
+    if (length(parts) != 2 || index(['hijpass', 'hijserver'], packageName) < 0) {
+        die('invalid log ID');
+    }
     let id = identifier(parts[1]), section = filter(read(packageName), item => item['.name'] == id)[0];
     let path = section ? logPath(section, packageName == 'hijserver') : '';
-    if (!path) die('logging is disabled');
+    if (!path) {
+        die('logging is disabled');
+    }
     if (request.action == 'clear') {
-        if (fs.writefile(path, '') == null) die('cannot clear log');
+        if (fs.writefile(path, '') == null) {
+            die('cannot clear log');
+        }
         return { ok: true };
     }
     let file = fs.open(path, 'r');
-    if (!file) die('cannot open log');
+    if (!file) {
+        die('cannot open log');
+    }
     try {
         if (request.action == 'download') {
             let content = file.read('all') || ''; file.close();
             return { content, name: fs.basename(path) };
         }
-        if (request.action != 'read' || !match(request.lines, /^[0-9]+$/)) die('invalid log request');
+        if (request.action != 'read' || !match(request.lines, /^[0-9]+$/)) {
+            die('invalid log request');
+        }
         let count = int(request.lines);
-        if (count < 1 || count > 1000) die('log line count must be between 1 and 1000');
+        if (count < 1 || count > 1000) {
+            die('log line count must be between 1 and 1000');
+        }
         // 环形缓冲只保留尾部所需的行数，避免为预览加载整份日志。
         let buffer = [], total = 0, line;
         while ((line = file.read('line')) != null) buffer[total++ % count] = line;

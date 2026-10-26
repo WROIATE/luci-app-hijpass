@@ -23,15 +23,21 @@ export function log(level) { return { loglevel: level == 'warn' ? 'warning' : le
  */
 export function inbound(kind, tag, port, shunt) {
 	let out = { protocol: kind == 'socks' ? 'socks' : 'dokodemo-door', port, tag };
-	if (kind == 'socks') out.settings = { udp: true };
+	if (kind == 'socks') {
+		out.settings = { udp: true };
+	}
 	else {
 		out.settings = { network: 'tcp,udp' };
 		if (kind == 'tproxy') {
 			out.settings.followRedirect = true;
 			out.streamSettings = { sockopt: { tproxy: 'tproxy' } };
-			if (shunt) out.sniffing = { enabled: true, destOverride: ['http', 'tls', 'quic'], routeOnly: true };
+			if (shunt) {
+				out.sniffing = { enabled: true, destOverride: ['http', 'tls', 'quic'], routeOnly: true };
+			}
 		}
-		else out.listen = '::';
+		else {
+			out.listen = '::';
+		}
 	}
 	return out;
 };
@@ -52,13 +58,17 @@ export function build(n) {
 		let fallback = TAG.member + '0';
 		for (let i, member in n.members) {
 			let tag = `${TAG.member}${i}`;
-			if (member.name == n.fallback_tag) fallback = tag;
+			if (member.name == n.fallback_tag) {
+				fallback = tag;
+			}
 			push(config.outbounds, socks(tag, member.socks_port));
 		}
 		let strategy = { type: n.strategy || 'leastLoad' };
-		if (strategy.type == 'leastLoad') strategy.settings = {
-			expected: n.strategy_expected ?? 1, maxRTT: n.strategy_max_rtt || '1s', tolerance: n.strategy_tolerance ?? 0.05,
-		};
+		if (strategy.type == 'leastLoad') {
+			strategy.settings = {
+				expected: n.strategy_expected ?? 1, maxRTT: n.strategy_max_rtt || '1s', tolerance: n.strategy_tolerance ?? 0.05,
+			};
+		}
 		config.routing = {
 			domainStrategy: 'AsIs',
 			rules: [{ inboundTag: [TAG.tproxy, TAG.socks], balancerTag: TAG.balance }],
@@ -75,7 +85,9 @@ export function build(n) {
 	}
 	else {
 		let builder = builders[n.type];
-		if (!builder) die(`unsupported Xray protocol "${n.type}"`);
+		if (!builder) {
+			die(`unsupported Xray protocol "${n.type}"`);
+		}
 		let out = builder(n);
 		push(config.outbounds, out);
 		if (n.upstream) {

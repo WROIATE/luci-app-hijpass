@@ -29,10 +29,13 @@ const SERVER_LOG_DIR = '/tmp/hijserver/log';
  */
 export function nodeFilename(section, name) {
     let id = section['.name'];
-    if (type(id) != 'string' || !match(id, /^[A-Za-z0-9_-]+$/)) die('invalid section ID');
+    if (type(id) != 'string' || !match(id, /^[A-Za-z0-9_-]+$/)) {
+        die('invalid section ID');
+    }
     name ||= section.name || id;
-    if (type(name) != 'string' || match(name, /[\/\\\r\n]/) || index(name, sprintf('%c', 0)) >= 0)
+    if (type(name) != 'string' || match(name, /[\/\\\r\n]/) || index(name, sprintf('%c', 0)) >= 0) {
         die('invalid node name');
+    }
     return `${name}-${id}`;
 };
 /**
@@ -53,10 +56,20 @@ export function nodeConfig(section, server) {
  * @returns {string} 日志绝对路径；未启用或不支持日志时为空字符串。
  */
 export function logPath(section, server) {
-    if (section['.type'] == 'hijpass') return `${LOG_DIR}/hijpass.log`;
-    if (section.log_enabled != '1') return '';
-    if (section['.type'] == 'shunt') return `${LOG_DIR}/shunt.log`;
-    if (section['.type'] == 'proxy_node') return `${LOG_DIR}/${nodeFilename(section)}.log`;
-    if (server && section['.type'] == 'server_node') return `${SERVER_LOG_DIR}/${nodeFilename(section)}.log`;
+    if (section['.type'] == 'hijpass') {
+        return `${LOG_DIR}/hijpass.log`;
+    }
+    if (section.log_enabled != '1') {
+        return '';
+    }
+    if (section['.type'] == 'shunt') {
+        return `${LOG_DIR}/shunt.log`;
+    }
+    if (section['.type'] == 'proxy_node') {
+        return `${LOG_DIR}/${nodeFilename(section)}.log`;
+    }
+    if (server && section['.type'] == 'server_node') {
+        return `${SERVER_LOG_DIR}/${nodeFilename(section)}.log`;
+    }
     return '';
 };

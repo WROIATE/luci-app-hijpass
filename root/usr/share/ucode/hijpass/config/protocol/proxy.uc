@@ -22,7 +22,9 @@ export const CONFIG_TYPE = { generated: 'generated', custom: 'custom' };
  */
 export function configType(value) {
 	value ||= CONFIG_TYPE.generated;
-	if (index(values(CONFIG_TYPE), value) < 0) die(`unsupported config_type "${value}"`);
+	if (index(values(CONFIG_TYPE), value) < 0) {
+		die(`unsupported config_type "${value}"`);
+	}
 	return value;
 };
 
@@ -50,9 +52,13 @@ const commandFields = {
 export function proxy(section) {
 	let mode = configType(section.config_type), custom = mode == CONFIG_TYPE.custom;
 	let engine = custom ? '' : core(section.core);
-	if (!custom && index(values(CORE), engine) < 0) die(`unsupported core "${engine}"`);
+	if (!custom && index(values(CORE), engine) < 0) {
+		die(`unsupported core "${engine}"`);
+	}
 	let fields = custom ? commandFields : protocols[section.type];
-	if (!fields) die(`unsupported proxy type "${section.type}"`);
+	if (!fields) {
+		die(`unsupported proxy type "${section.type}"`);
+	}
 	let n = decode(section, fields);
 	n.id = section['.name'];
 	n.name = section.name || n.id;
@@ -61,12 +67,18 @@ export function proxy(section) {
 	n.core = engine;
 	n.upstream = null;
 	n.members = [];
-	if (custom && !trim(n.command)) die(`custom node "${n.name}" has no command`);
-	if (!n.listen_port || !n.socks_port) die('invalid listen_port or socks_port');
-	if (!custom && n.type != TYPE.balance && (!n.server || !n.server_port))
+	if (custom && !trim(n.command)) {
+		die(`custom node "${n.name}" has no command`);
+	}
+	if (!n.listen_port || !n.socks_port) {
+		die('invalid listen_port or socks_port');
+	}
+	if (!custom && n.type != TYPE.balance && (!n.server || !n.server_port)) {
 		die('invalid server or server_port');
+	}
 	if (n.type == TYPE.vless && engine == CORE.xray && n.transport_type == 'grpc'
-		&& (duration(n.transport_grpc_idle_timeout) > 2147483647 || duration(n.transport_grpc_ping_timeout) > 2147483647))
+		&& (duration(n.transport_grpc_idle_timeout) > 2147483647 || duration(n.transport_grpc_ping_timeout) > 2147483647)) {
 		die('gRPC timeout exceeds 32-bit range');
+	}
 	return n;
 };

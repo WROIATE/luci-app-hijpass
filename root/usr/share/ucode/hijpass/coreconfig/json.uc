@@ -5,8 +5,9 @@
  */
 export function optional(object, key, value) {
 	// 未设置与明确设置 false/0 不同；只省略空值，与 TS 的 JsonUtils 一致。
-	if (value != null && value !== '' && (type(value) != 'array' || length(value)))
+	if (value != null && value !== '' && (type(value) != 'array' || length(value))) {
 		object[key] = value;
+	}
 	return object;
 };
 
@@ -17,13 +18,21 @@ export function optional(object, key, value) {
  * @returns {object|array|string|number|boolean|null} 清理后的值；对象和数组生成副本，空白字符串和空数组转为 null。
  */
 export function clean(value) {
-	if (type(value) == 'array') return length(value) ? map(value, clean) : null;
-	if (type(value) == 'string' && !length(trim(value))) return null;
-	if (type(value) != 'object') return value;
+	if (type(value) == 'array') {
+		return length(value) ? map(value, clean) : null;
+	}
+	if (type(value) == 'string' && !length(trim(value))) {
+		return null;
+	}
+	if (type(value) != 'object') {
+		return value;
+	}
 	let result = {};
 	for (let key, item in value) {
 		let output = clean(item);
-		if (output != null) result[key] = output;
+		if (output != null) {
+			result[key] = output;
+		}
 	}
 	return result;
 };

@@ -23,16 +23,28 @@ export function prepare(sections, dependencies) {
 	 * @returns {string} 出口标签；可选项未设置时为空字符串，无效引用抛错。
 	 */
 	function exit(name, required) {
-		if (!name && !required) return '';
-		if (name == 'hijpass-direct') return TAG.direct;
-		if (name == 'hijpass-block') return TAG.block;
-		if (dependencies.byName[name]) return name;
+		if (!name && !required) {
+			return '';
+		}
+		if (name == 'hijpass-direct') {
+			return TAG.direct;
+		}
+		if (name == 'hijpass-block') {
+			return TAG.block;
+		}
+		if (dependencies.byName[name]) {
+			return name;
+		}
 		die(name ? `proxy node "${name}" missing or disabled` : 'proxy exit is required');
 	}
 	let servers = {};
 	for (let s in of(sections, 'shunt_dns_node')) {
-		if (s.enabled == '0') continue;
-		if (servers[s.tag]) die(`duplicate DNS tag "${s.tag}"`);
+		if (s.enabled == '0') {
+			continue;
+		}
+		if (servers[s.tag]) {
+			die(`duplicate DNS tag "${s.tag}"`);
+		}
 		servers[s.tag] = { tag: s.tag, type: s.type, address: s.server, port: s.port ? port(s.port) : null };
 	}
 	/**
@@ -40,7 +52,9 @@ export function prepare(sections, dependencies) {
 	 * 返回：节点对象 {tag, type, address, port}；端口未配置时 port 为 null。
 	 */
 	function server(name) {
-		if (!servers[name]) die(`DNS node "${name}" missing or disabled`);
+		if (!servers[name]) {
+			die(`DNS node "${name}" missing or disabled`);
+		}
 		return servers[name];
 	}
 	let s = first(sections, 'shunt');
@@ -50,16 +64,28 @@ export function prepare(sections, dependencies) {
 		convert: s.ruleset_convert == '1', final: exit(s.default_proxy_node, true), dns: server(s.default_dns_node),
 		rulesetExit: exit(s.ruleset_out_node, false), rulesetDNS: null, entries: [],
 	};
-	if (settings.core != CORE.singbox && settings.core != CORE.xray) die(`unsupported shunt core "${settings.core}"`);
-	if (settings.final == TAG.block) die('default DNS exit cannot be Block');
+	if (settings.core != CORE.singbox && settings.core != CORE.xray) {
+		die(`unsupported shunt core "${settings.core}"`);
+	}
+	if (settings.final == TAG.block) {
+		die('default DNS exit cannot be Block');
+	}
 	if (settings.core == CORE.singbox && settings.rulesetExit) {
-		if (settings.rulesetExit == TAG.block) die('rule-set download exit cannot be Block');
-		if (s.ruleset_dns_node) settings.rulesetDNS = server(s.ruleset_dns_node);
+		if (settings.rulesetExit == TAG.block) {
+			die('rule-set download exit cannot be Block');
+		}
+		if (s.ruleset_dns_node) {
+			settings.rulesetDNS = server(s.ruleset_dns_node);
+		}
 	}
 	for (let r in of(sections, 'shunt_route_rule')) {
-		if (r.enabled != '1') continue;
+		if (r.enabled != '1') {
+			continue;
+		}
 		let split = r.ip_version_split == '1';
-		if (split && !r.proxy_node_v4 && !r.proxy_node_v6) die(`split rule "${r.name}" requires a proxy exit`);
+		if (split && !r.proxy_node_v4 && !r.proxy_node_v6) {
+			die(`split rule "${r.name}" requires a proxy exit`);
+		}
 		push(settings.entries, {
 			name: r.name || '', split,
 			exit: split ? '' : exit(r.proxy_node, true),
@@ -77,8 +103,10 @@ export function prepare(sections, dependencies) {
  * @returns {string} 核心原生策略名；没有映射时为空字符串。
  */
 function strategy(value, singbox) {
-	return (singbox ? { '4': 'ipv4_only', '6': 'ipv6_only', '46': 'prefer_ipv4', '64': 'prefer_ipv6' }
-		: { '4': 'UseIPv4', '6': 'UseIPv6', '46': 'UseIP', '64': 'UseIP' })[value] || '';
+	if (singbox) {
+		return { '4': 'ipv4_only', '6': 'ipv6_only', '46': 'prefer_ipv4', '64': 'prefer_ipv6' }[value] || '';
+	}
+	return { '4': 'UseIPv4', '6': 'UseIPv6', '46': 'UseIP', '64': 'UseIP' }[value] || '';
 }
 /**
  * 将 DNS 节点转换为指定核心的服务器配置。
@@ -90,20 +118,30 @@ function strategy(value, singbox) {
  */
 function dnsServer(s, tag, detour, singbox) {
 	if (singbox) {
-		if (index(['udp', 'tcp', 'tls', 'quic', 'https', 'local'], s.type) < 0) die(`invalid sing-box DNS type "${s.type}"`);
+		if (index(['udp', 'tcp', 'tls', 'quic', 'https', 'local'], s.type) < 0) {
+			die(`invalid sing-box DNS type "${s.type}"`);
+		}
 		let out = { type: s.type, tag };
 		if (s.type != 'local') {
 			out.server = s.address;
 			optional(out, 'server_port', s.port);
-			if (detour != TAG.direct) optional(out, 'detour', detour);
+			if (detour != TAG.direct) {
+				optional(out, 'detour', detour);
+			}
 		}
 		return out;
 	}
-	if (index(['udp', 'tcp', 'quic', 'https'], s.type) < 0) die(`invalid Xray DNS type "${s.type}"`);
+	if (index(['udp', 'tcp', 'quic', 'https'], s.type) < 0) {
+		die(`invalid Xray DNS type "${s.type}"`);
+	}
 	let address = s.address, out = { tag, skipFallback: true };
-	if (s.type == 'https') address = 'https://' + (index(address, ':') >= 0 ? `[${address}]` : address) + (s.port ? `:${s.port}` : '') + '/dns-query';
+	if (s.type == 'https') {
+		address = 'https://' + (index(address, ':') >= 0 ? `[${address}]` : address) + (s.port ? `:${s.port}` : '') + '/dns-query';
+	}
 	else {
-		if (s.type != 'udp') address = `${s.type}://${address}`;
+		if (s.type != 'udp') {
+			address = `${s.type}://${address}`;
+		}
 		optional(out, 'port', s.port);
 	}
 	out.address = address;
@@ -164,7 +202,9 @@ export function build(settings, dependencies) {
 	 * @returns {null} 无业务返回值，直接更新 DNS 和路由相关数组。
 	 */
 	function addDNS(entry, r, exit) {
-		if (exit == TAG.block) die(`rule "${entry.name}" DNS exit cannot be Block`);
+		if (exit == TAG.block) {
+			die(`rule "${entry.name}" DNS exit cannot be Block`);
+		}
 		let tag = entry.name + '-dns', server = dnsServer(entry.dns, tag, exit, singbox);
 		push(dnsServers, server);
 		if (singbox) {
@@ -175,56 +215,103 @@ export function build(settings, dependencies) {
 		else {
 			optional(server, 'domains', xrayDomains(r));
 			optional(server, 'queryStrategy', strategy(entry.strategy, false));
-			if (!dnsExits[exit]) { dnsExits[exit] = []; push(exitOrder, exit); }
+			if (!dnsExits[exit]) {
+				dnsExits[exit] = [];
+				push(exitOrder, exit);
+			}
 			dnsExits[exit] = [...dnsExits[exit], tag];
 		}
 	}
 	for (let entry in s.entries) {
 		let splitMatch = null;
 		// 与 TS 的 getRouteRuleVariants 一致：只为已选择出口的地址族创建规则。
-		let versions = entry.split ? filter([4, 6], v => v == 4 ? entry.v4 : entry.v6) : [0];
+		let versions = [0];
+		if (entry.split) {
+			versions = filter([4, 6], v => v == 4 ? entry.v4 : entry.v6);
+		}
 		for (let version in versions) {
 			let r = { ...entry.match, sets: [...entry.match.sets] };
 			let name = entry.name + (version && entry.name ? `-ipv${version}` : '');
-			let exit = version == 4 ? entry.v4 : version == 6 ? entry.v6 : entry.exit;
+			let exit = entry.exit;
+			if (version == 4) {
+				exit = entry.v4;
+			}
+			else if (version == 6) {
+				exit = entry.v6;
+			}
 			// Xray 原生处理 GeoSite；sing-box 仅在启用转换时将其视为域名条件。
 			let hasDNS = hasDomain(r, !singbox || s.convert) || singbox && length(r.sets) > 0;
 			if (singbox) {
-				if (s.convert) convertGeo(r);
-				else if (length(r.geoip) + length(r.geosite) && !hasDomain(r) && !length(r.ip) && !length(r.sets)) continue;
-				if (empty(r, false)) continue;
+				if (s.convert) {
+					convertGeo(r);
+				}
+				else if (length(r.geoip) + length(r.geosite) && !hasDomain(r) && !length(r.ip) && !length(r.sets)) {
+					continue;
+				}
+				if (empty(r, false)) {
+					continue;
+				}
 				for (let set in r.sets) {
 					let value = { ...set };
-					if (value.type == 'remote' && s.rulesetExit) value.http_client = { detour: TAG.ruleset };
-					if (!sets[set.tag]) push(setOrder, set.tag);
+					if (value.type == 'remote' && s.rulesetExit) {
+						value.http_client = { detour: TAG.ruleset };
+					}
+					if (!sets[set.tag]) {
+						push(setOrder, set.tag);
+					}
 					sets[set.tag] = value;
 				}
 				let rule = singboxMatch(r, false);
-				if (version) rule.ip_version = version;
-				if (exit == TAG.block) rule.action = 'reject';
-				else { rule.action = 'route'; rule.outbound = exit; }
+				if (version) {
+					rule.ip_version = version;
+				}
+				if (exit == TAG.block) {
+					rule.action = 'reject';
+				}
+				else {
+					rule.action = 'route';
+					rule.outbound = exit;
+				}
 				push(routeRules, rule);
 			}
 			else {
-				if (empty(r, true) || length(r.sets) && !hasDomain(r) && !length(r.ip) && !length(r.geosite) && !length(r.geoip)) continue;
-				for (let proto in r.protocol) if (index(['http', 'tls', 'quic', 'bittorrent'], proto) < 0) die(`unsupported Xray route protocol "${proto}"`);
+				if (empty(r, true) || length(r.sets) && !hasDomain(r) && !length(r.ip) && !length(r.geosite) && !length(r.geoip)) {
+					continue;
+				}
+				for (let proto in r.protocol) {
+					if (index(['http', 'tls', 'quic', 'bittorrent'], proto) < 0) {
+						die(`unsupported Xray route protocol "${proto}"`);
+					}
+				}
 				push(routes, ...xrayRules(r, name, exit, version));
 			}
-			if (exit == TAG.block) continue;
-			if (entry.split) {
-				if (hasDNS && !splitMatch) splitMatch = r;
+			if (exit == TAG.block) {
+				continue;
 			}
-			else if (hasDNS || singbox && (length(r.ip) + length(r.sets))) addDNS(entry, r, entry.dnsExit || exit);
+			if (entry.split) {
+				if (hasDNS && !splitMatch) {
+					splitMatch = r;
+				}
+			}
+			else if (hasDNS || singbox && (length(r.ip) + length(r.sets))) {
+				addDNS(entry, r, entry.dnsExit || exit);
+			}
 		}
 		// IPv4/IPv6 两条路由共用一条 DNS 策略，必须明确指定 DNS 请求走哪个出口。
 		if (splitMatch) {
-			if (!entry.dnsExit) die(`split rule "${entry.name}" requires a DNS exit`);
+			if (!entry.dnsExit) {
+				die(`split rule "${entry.name}" requires a DNS exit`);
+			}
 			addDNS(entry, splitMatch, entry.dnsExit);
 		}
 	}
 	if (singbox) {
-		if (length(dnsRules)) config.dns.rules = dnsRules;
-		if (length(setOrder)) config.route.rule_set = map(setOrder, tag => sets[tag]);
+		if (length(dnsRules)) {
+			config.dns.rules = dnsRules;
+		}
+		if (length(setOrder)) {
+			config.route.rule_set = map(setOrder, tag => sets[tag]);
+		}
 	}
 	else {
 		let server = dnsServer(s.dns, 'default-dns', '', false);

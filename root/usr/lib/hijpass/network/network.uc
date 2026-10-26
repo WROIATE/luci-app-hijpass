@@ -10,15 +10,27 @@ import { run, text } from 'hijpass.common';
  * @returns {string} IP 字符串；传入 IP 原样返回，解析失败时抛错。
  */
 export function resolve(host) {
-	if (type(host) != 'string') die('invalid argument');
-	if (iptoarr(host)) return host;
-	if (!match(host || '', /^[A-Za-z0-9.-]+$/)) die('invalid argument');
+	if (type(host) != 'string') {
+		die('invalid argument');
+	}
+	if (iptoarr(host)) {
+		return host;
+	}
+	if (!match(host || '', /^[A-Za-z0-9.-]+$/)) {
+		die('invalid argument');
+	}
 	let answer = query(host, { type: ['A', 'AAAA'], timeout: 5000 });
 	let addresses = answer?.[host]?.A || answer?.A || [];
-	if (!length(addresses)) addresses = answer?.[host]?.AAAA || answer?.AAAA || [];
-	if (!length(addresses)) die(`resolve failed: ${host}`);
+	if (!length(addresses)) {
+		addresses = answer?.[host]?.AAAA || answer?.AAAA || [];
+	}
+	if (!length(addresses)) {
+		die(`resolve failed: ${host}`);
+	}
 	let address = addresses[0];
-	if (type(address) != 'string' || !iptoarr(address)) die(`invalid DNS answer: ${host}`);
+	if (type(address) != 'string' || !iptoarr(address)) {
+		die(`invalid DNS answer: ${host}`);
+	}
 	return address;
 };
 /**
@@ -32,12 +44,17 @@ export function ports(values) {
 	for (let path in ['/proc/net/tcp', '/proc/net/tcp6']) {
 		for (let line in split(fs.readfile(path) || '', '\n')) {
 			let fields = split(trim(line), /[ \t]+/);
-			if (fields[3] != '0A') continue;
+			if (fields[3] != '0A') {
+				continue;
+			}
 			occupied[hex(split(fields[1] || '', ':')[1])] = true;
 		}
 	}
 	let result = {};
-	for (let value in values) { port(value); result[value] = !!occupied[int(value)]; }
+	for (let value in values) {
+		port(value);
+		result[value] = !!occupied[int(value)];
+	}
 	return result;
 };
 
@@ -69,12 +86,22 @@ export function curlReport(response, url) {
  * @returns {object} {url, timeout, socks}；timeout 单位为秒，无代理时 socks 为空字符串。
  */
 export function request(url, timeout, socks) {
-    if (type(url) != 'string') die('only http:// and https:// URLs are supported');
-    if (!match(url || '', /^https?:\/\//)) die('only http:// and https:// URLs are supported');
-    if (!match(timeout || '5', /^[0-9]+$/)) die('timeout must be an integer');
+    if (type(url) != 'string') {
+        die('only http:// and https:// URLs are supported');
+    }
+    if (!match(url || '', /^https?:\/\//)) {
+        die('only http:// and https:// URLs are supported');
+    }
+    if (!match(timeout || '5', /^[0-9]+$/)) {
+        die('timeout must be an integer');
+    }
     let seconds = int(timeout || '5');
-    if (seconds < 1 || seconds > 120) die('timeout must be between 1 and 120');
-    if (socks) port(socks);
+    if (seconds < 1 || seconds > 120) {
+        die('timeout must be between 1 and 120');
+    }
+    if (socks) {
+        port(socks);
+    }
     return { url, timeout: seconds, socks: socks || '' };
 };
 // Shell 提供 curl 原始输出及真实退出码；这里仅解析和计算测速数据。
@@ -86,7 +113,9 @@ export function request(url, timeout, socks) {
  */
 export function pingReport(response, url) {
     let result = curlReport(response, url);
-    if (!result.success && result.exit_code != 56) return { error: 'timeout' };
+    if (!result.success && result.exit_code != 56) {
+        return { error: 'timeout' };
+    }
     return { ms: result.first_byte_time_ms - result.dns_lookup_time_ms, total_ms: result.total_time_ms };
 };
 // IPv4/IPv6 CIDR 比较使用内建字节地址，不需要 Lua/luci.ip。
@@ -99,12 +128,18 @@ export function pingReport(response, url) {
 export function contains(address, cidr) {
 	let parts = split(cidr, '/'), host = iptoarr(address), range = iptoarr(parts[0] || '');
 	let prefix = parts[1] || '';
-	if (!host || !range || length(host) != length(range)) return false;
+	if (!host || !range || length(host) != length(range)) {
+		return false;
+	}
 	let bits = parts[1] == null ? length(host) * 8 : int(parts[1]);
-	if (bits < 0 || bits > length(host) * 8 || parts[1] != null && !match(prefix, /^[0-9]+$/)) return false;
+	if (bits < 0 || bits > length(host) * 8 || parts[1] != null && !match(prefix, /^[0-9]+$/)) {
+		return false;
+	}
 	for (let i = 0; i < length(host) && bits > 0; i++, bits -= 8) {
 		let mask = (0xff << (8 - min(bits, 8))) & 0xff;
-		if ((host[i] & mask) != (range[i] & mask)) return false;
+		if ((host[i] & mask) != (range[i] & mask)) {
+			return false;
+		}
 	}
 	return true;
 };
@@ -115,14 +150,22 @@ export function contains(address, cidr) {
  */
 export function main() { run(() => {
     let action = shift(ARGV);
-    if (action == 'resolve') return { address: resolve(ARGV[0]) };
-    if (action == 'port') return ports(ARGV);
+    if (action == 'resolve') {
+        return { address: resolve(ARGV[0]) };
+    }
+    if (action == 'port') {
+        return ports(ARGV);
+    }
     if (action == 'iptype') {
         let bytes = iptoarr(split(ARGV[0] || '', '/')[0] || '');
-        if (!bytes) exit(1);
+        if (!bytes) {
+            exit(1);
+        }
         return `${length(bytes) == 4 ? 4 : 6}\n`;
     }
-    if (action == 'request') return request(ARGV[0], ARGV[1], ARGV[2]);
+    if (action == 'request') {
+        return request(ARGV[0], ARGV[1], ARGV[2]);
+    }
     if (action == 'report' || action == 'ping-report') {
         let response = { stdout: text(ARGV[0]), code: int(ARGV[1]) };
         return action == 'report' ? curlReport(response, ARGV[2] || '') : pingReport(response, ARGV[2] || '');

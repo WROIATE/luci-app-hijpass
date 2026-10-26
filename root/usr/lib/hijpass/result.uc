@@ -26,10 +26,16 @@ run(() => {
     }
     if (action == 'output' || action == 'job') {
         let directory = ARGV[0];
-        if (type(directory) != 'string') die('missing result directory');
-        if (action == 'job' && !fs.stat(directory + '/exit')) return { running: true };
+        if (type(directory) != 'string') {
+            die('missing result directory');
+        }
+        if (action == 'job' && !fs.stat(directory + '/exit')) {
+            return { running: true };
+        }
         let code = int(action == 'job' ? text(directory + '/exit') : ARGV[1]);
-        if (type(code) != 'int' || code < 0 || code > 255) die('invalid command exit code');
+        if (type(code) != 'int' || code < 0 || code > 255) {
+            die('invalid command exit code');
+        }
         let output = commandOutput(directory, code);
         return action == 'job' ? { running: false, ...output } : output;
     }

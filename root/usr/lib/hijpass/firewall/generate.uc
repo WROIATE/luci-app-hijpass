@@ -30,19 +30,31 @@ function networkState(raw) {
 	let addresses = raw.addresses, interfaces = raw.interfaces;
 	// 命令的 JSON 解析失败时报告来源；不能用残缺网络状态继续生成绕过规则。
 	try {
-		if (!addresses.code) for (let iface in json(addresses.stdout)) {
-			for (let addr in iface.addr_info || []) push(addr.family == 'inet6' ? state.local6 : state.local4, `${addr.local}/${addr.prefixlen}`);
+		if (!addresses.code) {
+			for (let iface in json(addresses.stdout)) {
+				for (let addr in iface.addr_info || []) push(addr.family == 'inet6' ? state.local6 : state.local4, `${addr.local}/${addr.prefixlen}`);
+			}
 		}
-		if (!interfaces.code) for (let iface in json(interfaces.stdout).interface || []) {
-			if (!length(filter(iface.route || [], route => route.mask == 0))) continue;
-			for (let name in [iface.device, iface.l3_device]) if (name && name != 'br-lan') push(state.wan, name);
+		if (!interfaces.code) {
+			for (let iface in json(interfaces.stdout).interface || []) {
+				if (!length(filter(iface.route || [], route => route.mask == 0))) {
+					continue;
+				}
+				for (let name in [iface.device, iface.l3_device]) {
+					if (name && name != 'br-lan') {
+						push(state.wan, name);
+					}
+				}
+			}
 		}
 	}
 	catch (e) { die(`invalid network state JSON: ${e.message}`); }
 	let dhcp = first(read('dhcp'), 'dnsmasq');
 	for (let line in lines(fs.readfile(dhcp.resolvfile))) {
 		let fields = split(line, /[ \t]+/), address = split(fields[1] || '', '%')[0] || '', bytes = iptoarr(address);
-		if (fields[0] != 'nameserver' || !bytes || index(['0.0.0.0', '127.0.0.1', '::', '::1'], address) >= 0) continue;
+		if (fields[0] != 'nameserver' || !bytes || index(['0.0.0.0', '127.0.0.1', '::', '::1'], address) >= 0) {
+			continue;
+		}
 		push(length(bytes) == 4 ? state.dns4 : state.dns6, address);
 	}
 	state.wan = uniq(state.wan);
@@ -57,7 +69,9 @@ function networkState(raw) {
 function ipList(path, version) {
 	return filter(lines(fs.readfile(path)), value => {
 		let parts = split(value, '/'), bytes = iptoarr(parts[0] || ''), prefix = parts[1] || '';
-		if (!bytes || length(bytes) != (version == 4 ? 4 : 16)) return false;
+		if (!bytes || length(bytes) != (version == 4 ? 4 : 16)) {
+			return false;
+		}
 		return parts[1] == null || match(prefix, /^[0-9]+$/) && int(parts[1]) <= length(bytes) * 8;
 	});
 }
@@ -84,18 +98,32 @@ function options(config, state) {
     let f = first(config, 'firewall');
     let dns = first(config, 'dns'), shunt = first(config, 'shunt');
     let forward = '';
-    if (f.dns_forward == 'pre-routing' && dns.dns_service == 'chinadns-ng') forward = dns.cdg_port;
-    if (f.dns_forward == 'routing' && shunt.enabled != '0') forward = shunt.dns_listen_port;
+    if (f.dns_forward == 'pre-routing' && dns.dns_service == 'chinadns-ng') {
+        forward = dns.cdg_port;
+    }
+    if (f.dns_forward == 'routing' && shunt.enabled != '0') {
+        forward = shunt.dns_listen_port;
+    }
     // option 'tcp,udp' 与 list 两种写法均转换为协议数组。
     let protocols = filter(split(join(',', list(f.tproxy_proto)), /[, \t]+/), value => value != '');
-    if (!length(protocols)) die('tproxy_proto is required');
-    for (let value in protocols) if (index(['tcp', 'udp'], value) < 0) die('invalid tproxy_proto');
+    if (!length(protocols)) {
+        die('tproxy_proto is required');
+    }
+    for (let value in protocols) {
+        if (index(['tcp', 'udp'], value) < 0) {
+            die('invalid tproxy_proto');
+        }
+    }
     /**
      * 校验访问控制中的 MAC 地址，发现非法值时报错。
      * @returns {string[]} 原 MAC 地址数组。
      */
     function macs(values) {
-        for (let value in values) if (!match(value, /^[A-Fa-f0-9]{2}(:[A-Fa-f0-9]{2}){5}$/)) die('invalid proxy MAC');
+        for (let value in values) {
+            if (!match(value, /^[A-Fa-f0-9]{2}(:[A-Fa-f0-9]{2}){5}$/)) {
+                die('invalid proxy MAC');
+            }
+        }
         return values;
     }
     /**
@@ -103,7 +131,11 @@ function options(config, state) {
      * @returns {string[]} 原接口名称数组。
      */
     function interfaces(values) {
-        for (let value in values) if (!match(value, /^[A-Za-z0-9_.:@-]+$/)) die('invalid proxy interface');
+        for (let value in values) {
+            if (!match(value, /^[A-Za-z0-9_.:@-]+$/)) {
+                die('invalid proxy interface');
+            }
+        }
         return values;
     }
     /**
@@ -129,11 +161,18 @@ function options(config, state) {
     result.wanNames = quoteNames(result.wan);
     result.interfaceNames = quoteNames(result.interfaces);
     result.excludedInterfaceNames = quoteNames(result.excludedInterfaces);
-    for (let version in [4, 6]) result[`ip${version}`] = {
-        direct: uniq([...state[`dns${version}`], ...state[`local${version}`], ...ipList(RULE_FILES.ip_direct, version)]),
-        proxy: uniq(ipList(RULE_FILES.ip_proxy, version)),
-        china: result.useChnRoute ? uniq(ipList(version == 4 ? RULE_FILES.chn_route : RULE_FILES.chn_route6, version)) : [],
-    };
+    for (let version in [4, 6]) {
+        let lists = {
+            direct: uniq([...state[`dns${version}`], ...state[`local${version}`], ...ipList(RULE_FILES.ip_direct, version)]),
+            proxy: uniq(ipList(RULE_FILES.ip_proxy, version)),
+            china: [],
+        };
+        if (result.useChnRoute) {
+            let routeFile = version == 4 ? RULE_FILES.chn_route : RULE_FILES.chn_route6;
+            lists.china = uniq(ipList(routeFile, version));
+        }
+        result[`ip${version}`] = lists;
+    }
     return result;
 }
 /**
@@ -144,12 +183,18 @@ function options(config, state) {
  */
 export function generate(config, state) {
     let f = first(config, 'firewall');
-    if (!f.proxy_port && !f.shunt_port) return '';
+    if (!f.proxy_port && !f.shunt_port) {
+        return '';
+    }
     let path = FILES.firewall_template;
-    if (type(path) != 'string') die('invalid firewall template path');
+    if (type(path) != 'string') {
+        die('invalid firewall template path');
+    }
     let output = renderTemplate(path, { options: options(config, state) });
     // 空模板不能让已启用的防火墙被当作关闭处理。
-    if (!length(trim(output))) die('firewall template rendered no rules');
+    if (!length(trim(output))) {
+        die('firewall template rendered no rules');
+    }
     return output;
 };
 
@@ -159,7 +204,9 @@ export function generate(config, state) {
  * @returns {null} Hook 路径或生成的 nft 文本写入 stdout。
  */
 export function main() { run(() => {
-    if (ARGV[0] == 'hook') return FILES.nft_hook + '\n';
+    if (ARGV[0] == 'hook') {
+        return FILES.nft_hook + '\n';
+    }
     let config = sections(), directory = ARGV[0];
     let raw = { wan: text(directory + '/wan'),
         addresses: { stdout: text(directory + '/addresses'), code: int(text(directory + '/addresses.code')) },

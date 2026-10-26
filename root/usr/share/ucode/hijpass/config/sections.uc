@@ -26,18 +26,28 @@ export function first(sections, kind) {
  * @returns {null} 无业务返回值；结构无效时抛错。
  */
 export function validateSections(sections) {
-	if (type(sections) != 'array' || !length(sections))
+	if (type(sections) != 'array' || !length(sections)) {
 		die('configuration is empty or cannot unmarshal sections array');
+	}
 	let ids = {};
 	for (let s in sections) {
-		if (type(s) != 'object' || !s['.name'] || !s['.type'])
+		if (type(s) != 'object' || !s['.name'] || !s['.type']) {
 			die('section requires .name and .type');
-		if (ids[s['.name']]) die(`duplicate section "${s['.name']}"`);
+		}
+		if (ids[s['.name']]) {
+			die(`duplicate section "${s['.name']}"`);
+		}
 		ids[s['.name']] = true;
 		for (let key, value in s) {
-			if (substr(key, 0, 1) == '.') continue;
-			if (type(value) == 'string') continue;
-			if (type(value) == 'array' && !length(filter(value, v => type(v) != 'string'))) continue;
+			if (substr(key, 0, 1) == '.') {
+				continue;
+			}
+			if (type(value) == 'string') {
+				continue;
+			}
+			if (type(value) == 'array' && !length(filter(value, v => type(v) != 'string'))) {
+				continue;
+			}
 			die(`${s['.name']}: ${key} must be a string or string list`);
 		}
 	}

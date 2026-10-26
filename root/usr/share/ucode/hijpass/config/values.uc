@@ -6,8 +6,12 @@
  * @returns {string[]} 原数组或单项数组；缺失或空值返回空数组。
  */
 export function list(value) {
-	if (type(value) == 'array') return value;
-	if (type(value) == 'string' && value) return [value];
+	if (type(value) == 'array') {
+		return value;
+	}
+	if (type(value) == 'string' && value) {
+		return [value];
+	}
 	return [];
 };
 
@@ -16,8 +20,9 @@ export function list(value) {
  * @returns {integer} 1–65535 的端口整数；格式或范围无效时抛错。
  */
 export function port(value) {
-	if (type(value) != 'string' || !match(value, /^[0-9]+$/) || int(value) < 1 || int(value) > 65535)
+	if (type(value) != 'string' || !match(value, /^[0-9]+$/) || int(value) < 1 || int(value) > 65535) {
 		die(`invalid port "${value}"`);
+	}
 	return int(value);
 };
 
@@ -28,16 +33,22 @@ export function port(value) {
  * @returns {number} 秒数，可含小数；空字符串或 "0" 返回 0。
  */
 export function duration(value) {
-	if (value == '' || value == '0') return 0;
+	if (value == '' || value == '0') {
+		return 0;
+	}
 	let remaining = value, seconds = 0;
 	const units = { ns: 1e-9, us: 1e-6, 'µs': 1e-6, ms: 0.001, s: 1, m: 60, h: 3600 };
 	while (length(remaining)) {
 		let m = match(remaining, /^([0-9]+([.][0-9]*)?|[.][0-9]+)(ns|us|µs|ms|s|m|h)/);
-		if (!m) die(`invalid duration "${value}"`);
+		if (!m) {
+			die(`invalid duration "${value}"`);
+		}
 		seconds += +m[1] * units[m[3]];
 		remaining = substr(remaining, length(m[0]));
 	}
-	if (seconds > 9223372036) die('duration out of range');
+	if (seconds > 9223372036) {
+		die('duration out of range');
+	}
 	return seconds;
 };
 
@@ -51,25 +62,43 @@ export function decode(section, declarations) {
 	let result = {};
 	for (let key, spec in declarations) {
 		let value = section[key];
-		if (value == null) { result[key] = spec[1]; continue; }
-		if (spec[0] == 'list') { result[key] = list(value); continue; }
-		if (type(value) != 'string') die(`${key} must be a string`);
+		if (value == null) {
+			result[key] = spec[1];
+			continue;
+		}
+		if (spec[0] == 'list') {
+			result[key] = list(value);
+			continue;
+		}
+		if (type(value) != 'string') {
+			die(`${key} must be a string`);
+		}
 		switch (spec[0]) {
 		case 'text': result[key] = value; break;
 		case 'port': result[key] = value ? port(value) : 0; break;
 		case 'bool':
-			if (value != '' && value != '0' && value != '1') die(`invalid UCI boolean "${value}"`);
+			if (value != '' && value != '0' && value != '1') {
+				die(`invalid UCI boolean "${value}"`);
+			}
 			result[key] = value == '1'; break;
 		case 'duration': duration(value); result[key] = value; break;
 		case 'integer':
-			if (value && !match(value, /^[+]?[0-9]+$/)) die(`invalid nonnegative integer "${value}"`);
+			if (value && !match(value, /^[+]?[0-9]+$/)) {
+				die(`invalid nonnegative integer "${value}"`);
+			}
 			result[key] = value ? int(value) : 0;
-			if (result[key] < 0 || result[key] > (spec[2] || 9223372036854775807)) die(`${key}: numeric option out of range`);
+			if (result[key] < 0 || result[key] > (spec[2] || 9223372036854775807)) {
+				die(`${key}: numeric option out of range`);
+			}
 			break;
 		case 'number':
-			if (value && !match(value, /^[+]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/)) die(`invalid number "${value}"`);
+			if (value && !match(value, /^[+]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/)) {
+				die(`invalid number "${value}"`);
+			}
 			result[key] = value ? +value : 0;
-			if (result[key] != result[key] || result[key] < 0 || result[key] > 1.7976931348623157e308) die(`${key}: invalid number`);
+			if (result[key] != result[key] || result[key] < 0 || result[key] > 1.7976931348623157e308) {
+				die(`${key}: invalid number`);
+			}
 			break;
 		}
 	}

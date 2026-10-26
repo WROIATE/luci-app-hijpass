@@ -22,7 +22,9 @@ export function tls(n) {
  * @returns {object|null} multiplex 对象；未启用时为 null。
  */
 export function multiplex(n) {
-	if (!n.multiplex_enabled) return null;
+	if (!n.multiplex_enabled) {
+		return null;
+	}
 	let out = { enabled: true, protocol: n.multiplex_protocol };
 	for (let key in ['max_connections', 'min_streams', 'max_streams']) optional(out, key, n[`multiplex_${key}`]);
 	if (n.multiplex_brutal_enabled) {
@@ -38,7 +40,9 @@ export function multiplex(n) {
  */
 export function transport(n) {
 	let kind = n.transport_type;
-	if (!kind) return null;
+	if (!kind) {
+		return null;
+	}
 	let out = { type: kind };
 	switch (kind) {
 	case 'http':
@@ -52,13 +56,17 @@ export function transport(n) {
 		optional(out, 'path', n.transport_ws_path);
 		optional(out, 'max_early_data', n.transport_ws_max_early_data);
 		optional(out, 'early_data_header_name', n.transport_ws_early_data_header_name);
-		if (n.transport_ws_host) out.headers = { Host: n.transport_ws_host };
+		if (n.transport_ws_host) {
+			out.headers = { Host: n.transport_ws_host };
+		}
 		break;
 	case 'grpc':
 		optional(out, 'service_name', n.transport_grpc_service_name);
 		optional(out, 'idle_timeout', n.transport_grpc_idle_timeout);
 		optional(out, 'ping_timeout', n.transport_grpc_ping_timeout);
-		if (n.transport_grpc_permit_without_stream) out.permit_without_stream = true;
+		if (n.transport_grpc_permit_without_stream) {
+			out.permit_without_stream = true;
+		}
 		break;
 	case 'httpupgrade':
 		optional(out, 'host', n.transport_httpupgrade_host);

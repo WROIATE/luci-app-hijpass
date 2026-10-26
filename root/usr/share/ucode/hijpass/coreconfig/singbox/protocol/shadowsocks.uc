@@ -14,6 +14,8 @@ export function build(n) {
 	optional(out, 'plugin', n.plugin);
 	optional(out, 'plugin_opts', n.plugin_opts);
 	optional(out, 'multiplex', multiplex(n));
-	if (n.udp_over_tcp) out.udp_over_tcp = true;
+	if (n.udp_over_tcp) {
+		out.udp_over_tcp = true;
+	}
 	return out;
 };

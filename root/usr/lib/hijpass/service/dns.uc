@@ -18,11 +18,20 @@ import { lines, atomic, renderTemplate } from 'hijpass.common';
 function domains(path, output) {
 	let result = [], tags = [];
 	for (let line in lines(fs.readfile(path))) {
-		if (substr(line, 0, 8) == 'geosite:') push(tags, substr(line, 8));
-		else { let value = domain(line); if (value) push(result, value); }
+		if (substr(line, 0, 8) == 'geosite:') {
+			push(tags, substr(line, 8));
+		}
+		else {
+			let value = domain(line);
+			if (value) {
+				push(result, value);
+			}
+		}
 	}
 	// Geo 提取由 Shell 完成；此处只合并提取结果与用户域名。
-	if (length(tags)) push(result, ...map(lines(fs.readfile(replace(output, /[.]txt$/, '-geo.txt'))), lc));
+	if (length(tags)) {
+		push(result, ...map(lines(fs.readfile(replace(output, /[.]txt$/, '-geo.txt'))), lc));
+	}
 	atomic(output, join('\n', uniq(result)) + '\n', 0o644);
 }
 /**
@@ -32,18 +41,24 @@ function domains(path, output) {
  */
 export function options(sections) {
 	let dns = first(sections, 'dns');
-	if (dns.dns_service != 'chinadns-ng') return null;
+	if (dns.dns_service != 'chinadns-ng') {
+		return null;
+	}
 	/**
 	 * 将 DNS 上游选项转换成实际服务器地址。
 	 * @returns {string} 上游地址；缺失或含换行时抛错。
 	 */
 	function upstream(key) {
 		let value = dns[key];
-		if (value == 'custom') value = dns[`${key}_custom`];
+		if (value == 'custom') {
+			value = dns[`${key}_custom`];
+		}
 		if (value == 'dnsmasq') {
 			value = `127.0.0.1#${first(read('dhcp'), 'dnsmasq').port || '53'}`;
 		}
-		if (!value || match(value, /[\r\n]/)) die(`invalid ${key}`);
+		if (!value || match(value, /[\r\n]/)) {
+			die(`invalid ${key}`);
+		}
 		return value;
 	}
 	return {
@@ -59,7 +74,9 @@ export function options(sections) {
  */
 export function prepare(sections) {
 	let settings = options(sections);
-	if (!settings) return null;
+	if (!settings) {
+		return null;
+	}
 	let dns = first(sections, 'dns');
 	domains(RULE_FILES.domain_proxy, '/tmp/hijpass/domain-proxy.txt');
 	domains(RULE_FILES.domain_direct, '/tmp/hijpass/domain-direct.txt');

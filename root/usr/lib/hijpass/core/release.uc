@@ -14,7 +14,9 @@ export function architecture(core, machine) {
 		xray: { x86_64: '64', aarch64: 'arm64-v8a', arm64: 'arm64-v8a', armv7l: 'arm32-v7a', armv6l: 'arm32-v6', mips: 'mips32', mipsle: 'mips32le', mips64: 'mips64', mips64le: 'mips64le' },
 	};
 	let suffix = suffixes[core]?.[machine];
-	if (!suffix) die(`unsupported architecture: ${machine}`);
+	if (!suffix) {
+		die(`unsupported architecture: ${machine}`);
+	}
 	return 'linux-' + suffix;
 };
 /**
@@ -23,11 +25,17 @@ export function architecture(core, machine) {
  * @returns {object} 发布对象，保留 tag_name 和原始 assets 列表。
  */
 export function release(core, response) {
-	if (!repos[core]) die('unknown core');
+	if (!repos[core]) {
+		die('unknown core');
+	}
 	try {
 		let info = json(response);
-		if (type(info) != 'object') die('release response must be an object');
-		if (!match(info.tag_name || '', /^v?[0-9]+[.][0-9]+[.][0-9]+[A-Za-z0-9.+-]*$/)) die('invalid release version');
+		if (type(info) != 'object') {
+			die('release response must be an object');
+		}
+		if (!match(info.tag_name || '', /^v?[0-9]+[.][0-9]+[.][0-9]+[A-Za-z0-9.+-]*$/)) {
+			die('invalid release version');
+		}
 		return info;
 	}
 	catch (e) { die(`invalid ${core} release response: ${e.message}`); }
@@ -42,14 +50,22 @@ export function assetPlan(core, machine, info) {
 	let asset;
 	for (let name in candidates) {
 		asset = filter(info.assets || [], a => a.name == name && a.state == 'uploaded')[0];
-		if (asset) break;
+		if (asset) {
+			break;
+		}
 	}
-	if (!asset || !match(asset.digest || '', /^sha256:[a-fA-F0-9]{64}$/)) die('release asset or checksum is missing');
+	if (!asset || !match(asset.digest || '', /^sha256:[a-fA-F0-9]{64}$/)) {
+		die('release asset or checksum is missing');
+	}
 	let expectedURL = `https://github.com/${repos[core]}/releases/download/${info.tag_name}/${asset.name}`;
-	if (asset.browser_download_url != expectedURL) die('unexpected release asset URL');
+	if (asset.browser_download_url != expectedURL) {
+		die('unexpected release asset URL');
+	}
 
     let digest = asset.digest;
-    if (type(digest) != 'string') die('release checksum is missing');
+    if (type(digest) != 'string') {
+        die('release checksum is missing');
+    }
     return { core, version: info.tag_name, number, name: asset.name, url: expectedURL,
         digest: lc(substr(digest, 7)), destination: `/usr/bin/${core}`, archive: core == 'xray' ? 'zip' : 'tar' };
 };
@@ -61,11 +77,17 @@ export function assetPlan(core, machine, info) {
  */
 export function main() { run(() => {
     let action = shift(ARGV), core = shift(ARGV);
-    if (!core || !repos[core]) die('core action and name are required');
-    if (action == 'source') return `https://api.github.com/repos/${repos[core]}/releases/latest\n`;
+    if (!core || !repos[core]) {
+        die('core action and name are required');
+    }
+    if (action == 'source') {
+        return `https://api.github.com/repos/${repos[core]}/releases/latest\n`;
+    }
     if (action == 'member') {
         let member = filter(split(text(ARGV[0]), '\n'), entry => match(entry, /^sing-box-[A-Za-z0-9.+-]+\/sing-box$/))[0];
-        if (!member) die('binary not found in archive');
+        if (!member) {
+            die('binary not found in archive');
+        }
         return member + '\n';
     }
     if (action == 'version') {
@@ -76,8 +98,12 @@ export function main() { run(() => {
         let info = release(core, text(ARGV[0]));
         return action == 'latest' ? { core, version: info.tag_name } : assetPlan(core, ARGV[1], info);
     }
-    if (action == 'error') return { success: false, error: ARGV[0] || 'core update failed' };
-    if (action == 'result') return { success: true, version: ARGV[0] };
+    if (action == 'error') {
+        return { success: false, error: ARGV[0] || 'core update failed' };
+    }
+    if (action == 'result') {
+        return { success: true, version: ARGV[0] };
+    }
     die('unknown core data action');
 }, true);
 };

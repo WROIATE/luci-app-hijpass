@@ -224,7 +224,7 @@ export function build(settings, dependencies) {
 	}
 	for (let entry in s.entries) {
 		let splitMatch = null;
-		// 与 TS 的 getRouteRuleVariants 一致：只为已选择出口的地址族创建规则。
+		// 只为已选择出口的地址族创建规则。
 		let versions = [0];
 		if (entry.split) {
 			versions = filter([4, 6], v => v == 4 ? entry.v4 : entry.v6);

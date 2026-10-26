@@ -92,11 +92,10 @@ test('Save & Apply consumes backend output before applying UCI and stops on gene
                 if (fail) throw new Error('invalid configuration');
                 return {};
             } } },
-            '../../feature/shunt/georules': { GeoRuleUtils: { updateGeoRules: () => events.push('geo') } },
             './precheck': { PrecheckUtils: { runSaveApplyPrechecks: async () => true } },
         }).SaveApplyUtils.genHandleSaveApply();
         await handler.call({ handleSave: async () => events.push('form') }, {}, 1);
-        assert.deepEqual(events, fail ? ['form', 'write', 'error'] : ['form', 'write', 'geo', 'save', 'cleanup', 'apply']);
+        assert.deepEqual(events, fail ? ['form', 'write', 'error'] : ['form', 'write', 'save', 'cleanup', 'apply']);
     }
 });
 
@@ -108,29 +107,6 @@ test('init delegates lifecycle to Shell while preserving argv passed to procd', 
     assert.ok(source.indexOf('hijpass_start_instances "$plan"') < source.indexOf('$RUNTIME activate'));
     assert.match(bridge, /set -- "\$@" "\$value"/);
     assert.doesNotMatch(source + bridge, /uci -q|config_foreach|geoview[.]sh/);
-});
-
-test('Geo metadata remains in UCI for the native converter', () => {
-    const writes = [];
-    const utils = loadTS('utils/feature/shunt/georules.ts', {
-        uci: {
-            get_first: (_conf, _section, key) => ({ type: 'sing-box', ruleset_convert: '1', enabled: '1' }[key]),
-            set_first: (...args) => writes.push(args),
-        },
-        '../../../enum/hijpass': { LuciFlied: { CONF_NAME: 'hijpass', SHUNT_SECTION_TYPE: 'shunt' } },
-        './section': { ShuntUtils: {
-            getRouteSection: () => ({ rules: [{ enabled: '1' }, { enabled: '0' }] }),
-            parseRuleList: rule => {
-                assert.equal(rule.enabled, '1');
-                return { geoSite: ['geosite:cn', 'geosite:cn'], geoIp: ['geoip:private'] };
-            },
-        } },
-    }).GeoRuleUtils;
-    utils.updateGeoRules();
-    assert.deepEqual(JSON.parse(JSON.stringify(writes)), [
-        ['hijpass', 'shunt', 'geosite_ruleset', ['cn']],
-        ['hijpass', 'shunt', 'geoip_ruleset', ['private']],
-    ]);
 });
 
 test('LuCI uses the same default core and ignores protocol dependencies on custom commands', async () => {

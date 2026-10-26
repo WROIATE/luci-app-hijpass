@@ -22,6 +22,7 @@ case 'plan': result = service.plan(request.sections); break;
 case 'server-plan': result = service.serverPlan(request.sections); break;
 case 'write': result = service.writeConfigs(request.sections, request.generated || render(request.sections)); break;
 case 'normalize': result = rules.normalize(request.text, request.kind); break;
+case 'geo-plan': result = rules.geoPlan(request.sections); break;
 case 'contains': result = map(request.cases, pair => network.contains(pair[0], pair[1])); break;
 case 'command': result = system.command(request.args); break;
 case 'arch': result = architecture(request.core, request.machine); break;

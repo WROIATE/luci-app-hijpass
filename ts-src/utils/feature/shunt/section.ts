@@ -1,12 +1,8 @@
 import { LuciFlied } from "../../../enum/hijpass";
 import {
-    DnsNode,
-    DnsSection,
     RouteSection,
     RuleDTO,
-    ShuntRouteRuleVariant,
-    ShuntRouteRule,
-    ShuntSection
+    ShuntRouteRule
 } from "../../../module/luci";
 import uci from "uci";
 import { UciUtils } from "../../base/luci/uci";
@@ -15,15 +11,6 @@ type RuleListSource = Pick<ShuntRouteRule, 'domainList' | 'ipList'>
     & Partial<Pick<ShuntRouteRule, 'network' | 'protocol' | 'port' | 'portRange'>>;
 
 const ShuntUtils = {
-    getShuntSection: function () {
-        let shuntSection = new ShuntSection();
-        let uSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
-        UciUtils.transFromUci(shuntSection, uSection)
-        shuntSection.dns = ShuntUtils.getDnsSection()
-        shuntSection.route = ShuntUtils.getRouteSection()
-        return shuntSection;
-    },
-
     getRouteSection: function () {
         let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
         let routeSection = new RouteSection();
@@ -35,44 +22,6 @@ const ShuntUtils = {
             routeSection.rules.push(rule)
         })
         return routeSection;
-    },
-
-    getRouteRuleVariants: function (rule: ShuntRouteRule): ShuntRouteRuleVariant[] {
-        if (rule.ipVersionSplit !== '1') {
-            return [{ rule, proxyNode: rule.proxyNode }];
-        }
-
-        const variants: ShuntRouteRuleVariant[] = [];
-        if (rule.proxyNodeV4) {
-            const v4Rule = Object.assign(new ShuntRouteRule(), rule);
-            v4Rule.name = rule.name ? rule.name + '-ipv4' : rule.name;
-            v4Rule.proxyNode = rule.proxyNodeV4;
-            variants.push({ rule: v4Rule, proxyNode: rule.proxyNodeV4, ipVersion: 4 });
-        }
-        if (rule.proxyNodeV6) {
-            const v6Rule = Object.assign(new ShuntRouteRule(), rule);
-            v6Rule.name = rule.name ? rule.name + '-ipv6' : rule.name;
-            v6Rule.proxyNode = rule.proxyNodeV6;
-            variants.push({ rule: v6Rule, proxyNode: rule.proxyNodeV6, ipVersion: 6 });
-        }
-        return variants;
-    },
-
-    getDnsSection: function () {
-        let shuntSection = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)
-        let dnsSection = new DnsSection();
-        dnsSection.nodes = []
-        UciUtils.transFromUci(dnsSection, shuntSection)
-
-        uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_DNS_NODE_TYPE, function (section) {
-            if (section.enabled === '0') {
-                return;
-            }
-            let server = new DnsNode()
-            UciUtils.transFromUci(server, section)
-            dnsSection.nodes.push(server)
-        })
-        return dnsSection;
     },
 
     /**

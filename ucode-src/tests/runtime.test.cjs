@@ -139,6 +139,17 @@ test('firewall handles shipped comma protocols, DNS/local toggles and removes da
     assert.notEqual(rejected.status, 0);
 });
 
+test('Geo conversion derives unique tags from enabled rules without legacy metadata', () => {
+    const rules = [
+        { '.type': 'shunt_route_rule', enabled: '1', domain_list: 'geosite:cn\ngeosite:cn\nfull:example.org', ip_list: 'geoip:private' },
+        { '.type': 'shunt_route_rule', enabled: '0', domain_list: 'geosite:disabled' },
+    ];
+    for (const metadata of [{}, { geosite_ruleset: ['stale'], geoip_ruleset: ['stale'] }]) {
+        const result = value({ action: 'geo-plan', sections: [{ '.type': 'shunt', ...metadata }, ...rules] });
+        assert.deepEqual(result.jobs.map(({ database, tag }) => [database, tag]), [['geoip', 'private'], ['geosite', 'cn']]);
+    }
+});
+
 test('service plans preserve argv, custom config paths, environments and nesting users', t => {
     const directory = fixture(t);
     const sections = [{ ...global, client_dir: directory }, node('sb', { name: 'space name', procd_env: ['A=a b', 'B=two'] }),

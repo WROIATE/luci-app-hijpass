@@ -5,7 +5,6 @@ import { NodeFileCleanupUtils } from "./node-file-cleanup";
 import { NotificationUtils } from "../../base/luci/notification";
 import { Backend } from "../../backend";
 import { FormUtils } from "../../base/luci/form";
-import { GeoRuleUtils } from "../../feature/shunt/georules";
 import { PrecheckUtils } from "./precheck";
 
 function isGlobalServiceDisabled() {
@@ -31,7 +30,6 @@ const SaveApplyUtils = {
                 const written = await Backend.writeConfigs(JSON.stringify(uci.sections(LuciFlied.CONF_NAME, undefined)));
                 if (written.shunt !== undefined) uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE,
                     'shunt_hash', String(FormUtils.simpleHash(written.shunt)));
-                GeoRuleUtils.updateGeoRules();
 
                 await uci.save();
                 let changes = await uci.changes()

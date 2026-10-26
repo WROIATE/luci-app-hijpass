@@ -1,6 +1,4 @@
-import { StreamLanguage } from '@codemirror/language';
-import { shell } from '@codemirror/legacy-modes/mode/shell';
-import { CodeEditorUtils } from '../utils/base/luci/editor';
+import editor from 'hijpass.editor';
 import view from "view";
 import uci from "uci";
 import form from "form";
@@ -131,7 +129,7 @@ const v = view.extend({
         const hook = FormUtils.createTextOption(s, 'dns_hook', 'dns_hook_hash', null,
             _('Edit DNS Hook Script'),
             { resource: 'dns_hook' });
-        CodeEditorUtils.configure(hook, StreamLanguage.define(shell), _('Edit DNS Hook Script'));
+        editor.configure(hook, 'shell', _('Edit DNS Hook Script'));
 
         // 域名直连列表（仅 chinadns-ng 时通过 subsection 显示）
         let oDomainDirect = s.taboption('domain_direct', form.SectionValue, '_domain_direct',

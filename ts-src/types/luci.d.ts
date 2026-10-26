@@ -406,3 +406,12 @@ declare module 'network' {
     const u: LuCI.network.Network;
     export default u;
 }
+
+declare module 'hijpass.editor' {
+    type Language = 'json' | 'shell' | 'firewall';
+    const editor: {
+        mount(widget: HTMLElement, language: Language, label: string): void;
+        configure(option: LuCI.form.TextValue, language: Language, label: string): void;
+    };
+    export default editor;
+}

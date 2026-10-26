@@ -1,6 +1,4 @@
-import { StreamLanguage } from '@codemirror/language';
-import { shell } from '@codemirror/legacy-modes/mode/shell';
-import { CodeEditorUtils } from '../utils/base/luci/editor';
+import codeEditor from 'hijpass.editor';
 import view from "view";
 import { Backend } from "../utils/backend";
 import uci from "uci";
@@ -165,7 +163,7 @@ function createTextOptions(s: LuCI.form.AbstractSection) {
     const hook = FormUtils.createTextOption(s, 'hook', 'nft_hook_hash', null,
         _('Executed after HiJpass attempts to load its generated nftables rules during firewall start or reload. Runs only when the generated rules file and this script exist; it may also run if loading the rules fails.'),
         { resource: 'nft_hook' });
-    CodeEditorUtils.configure(hook, StreamLanguage.define(shell), _('Custom Script'));
+    codeEditor.configure(hook, 'shell', _('Custom Script'));
 }
 
 // 创建所有标签页

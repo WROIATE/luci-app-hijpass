@@ -1,6 +1,5 @@
+import editor from 'hijpass.editor';
 import ui from 'ui';
-import { firewallTemplateLanguage } from './syntax';
-import { CodeEditorUtils } from '../../base/luci/editor';
 
 function showParameters(event: Event) {
     const button = event.currentTarget as HTMLButtonElement;
@@ -53,7 +52,7 @@ function showParameters(event: Event) {
 }
 
 function mount(widget: HTMLElement, label: string) {
-    CodeEditorUtils.mount(widget, firewallTemplateLanguage, label);
+    editor.mount(widget, 'firewall', label);
 }
 
 export const FirewallEditorUtils = { mount, showParameters };

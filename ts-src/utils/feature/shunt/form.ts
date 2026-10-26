@@ -1,5 +1,4 @@
-import { json } from '@codemirror/lang-json';
-import { CodeEditorUtils } from '../../base/luci/editor';
+import editor from 'hijpass.editor';
 import { Backend } from "../../backend";
 import form from "form";
 import uci from "uci";
@@ -51,7 +50,7 @@ const ShuntFormUtils = {
             }
         };
         o.rmempty = false;
-        CodeEditorUtils.configure(o, json(), _('Edit Shunt Configuration File'));
+        editor.configure(o, 'json', _('Edit Shunt Configuration File'));
     },
 
     showPreview: async function () {

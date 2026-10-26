@@ -15,7 +15,7 @@ const runtimePackages = new Set();
 
 // 限定哪些 from 模块名当作 luci 模块（name = require name）
 const luciModuleNames = new Set(
-    ['view', 'fs', 'form', 'uci', 'ui', 'network', 'baseclass', 'rpc', 'poll']);
+    ['view', 'fs', 'form', 'uci', 'ui', 'network', 'baseclass', 'rpc', 'poll', 'hijpass.editor']);
 
 /**
  * 扫描 views 目录下的所有 .ts 文件，返回绝对路径列表
@@ -40,7 +40,7 @@ function scanEntryFiles(dir) {
 /**
  * 为单个入口文件构建（entryPath 为绝对路径）
  */
-async function buildOne(entryPath) {
+async function buildOne(entryPath, outFile = path.join(DIST_DIR, path.relative(VIEWS_DIR, entryPath).replace(/\.ts$/, '.js'))) {
     // 本次构建中用到的 luci 模块名
     const usedModules = new Set();
 
@@ -61,7 +61,7 @@ async function buildOne(entryPath) {
                 const moduleName = args.path;
                 const code = `
           // Virtual luci module: ${moduleName}
-          export default ${moduleName};
+          export default ${moduleName.replace(/[^a-zA-Z0-9_]/g, '_')};
         `;
                 return {
                     contents: code,
@@ -70,11 +70,6 @@ async function buildOne(entryPath) {
             });
         }
     };
-
-    // 计算输出文件名：views/demo.ts → dist/demo.js
-    const rel = path.relative(VIEWS_DIR, entryPath); // demo.ts
-    const baseName = rel.replace(/\.ts$/, '');       // demo
-    const outFile = path.join(DIST_DIR, `${baseName}.js`);
 
     const result = await build({
         entryPoints: [entryPath],
@@ -119,6 +114,7 @@ return LuciView.default;
  * 主流程：扫描 views 目录并构建所有 .ts
  */
 async function bundleAll() {
+    await buildOne(path.join(__dirname, 'modules/editor.ts'), path.join(DIST_DIR, '../../hijpass/editor.js'));
     const entries = scanEntryFiles(VIEWS_DIR);
     if (entries.length === 0) {
         console.warn('No .ts files found in views/ directory');

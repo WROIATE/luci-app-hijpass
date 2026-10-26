@@ -44,6 +44,7 @@ function mount(widget: HTMLElement, language: Extension, label: string) {
         ] }),
     });
     textarea.hidden = true;
+    textarea.style.display = 'none';
     const setValue = native.setValue.bind(native);
     native.setValue = value => {
         const text = value == null ? '' : String(value);

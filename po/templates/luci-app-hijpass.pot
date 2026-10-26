@@ -3245,3 +3245,18 @@ msgstr ""
 #: ts-src/utils/feature/firewall/editor.ts
 msgid "IPv6 lists: direct (local, DNS and bypass addresses), proxy (force proxy), china (CHN routes)."
 msgstr ""
+
+msgid "Firewall template requires manual migration"
+msgstr ""
+
+msgid "Legacy and current firewall templates use different formats and cannot be upgraded automatically. Reapply your custom changes in the new template under Firewall Rules."
+msgstr ""
+
+msgid "Previous template: %s"
+msgstr ""
+
+msgid "Open Firewall Configuration"
+msgstr ""
+
+msgid "Hide this migration notice"
+msgstr ""

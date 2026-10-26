@@ -10,6 +10,7 @@ import { FirewallEditorUtils } from "../utils/feature/firewall/editor";
 import { FirewallFormUtils } from "../utils/feature/firewall/form";
 import { NotificationUtils } from "../utils/base/luci/notification";
 import { FirewallDnsForwardUtils } from "../utils/feature/firewall/dns-forward";
+import { FirewallMigrationUtils } from "../utils/feature/firewall/migration";
 
 
 const v = view.extend({
@@ -39,7 +40,7 @@ const v = view.extend({
         // 创建文本编辑选项
         createTextOptions(s);
 
-        return m.render();
+        return E('div', {}, [...FirewallMigrationUtils.renderNotice(), await m.render()]);
     }
 });
 
@@ -110,6 +111,7 @@ function createListOptions(s: LuCI.form.AbstractSection) {
 
 // 创建所有文本编辑选项
 function createTextOptions(s: LuCI.form.AbstractSection) {
+    FirewallMigrationUtils.createDismissOption(s);
     // IP 直连列表（IPv4 + IPv6）
     FormUtils.createTextOption(s, 'ip_direct', 'ip_direct_hash', null,
         _('Edit IP Direct List'),

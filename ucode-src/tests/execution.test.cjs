@@ -315,7 +315,7 @@ test('uci-defaults 首次安装自动迁移并注册防火墙，重复安装不�
     const first = f.run('install/firstboot.sh', [], env);
     assert.equal(first.status, 0, first.stderr);
     const migrated = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
-    assert.match(migrated, /schema_version '3'/);
+    assert.match(migrated, /schema_version '4'/);
     assert.match(migrated, /config_type 'custom'/);
     assert.doesNotMatch(migrated, /option (core|type) /);
     assert.match(fs.readFileSync(path.join(directory, 'firewall'), 'utf8'), /option type 'script'/);

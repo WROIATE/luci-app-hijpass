@@ -5,7 +5,32 @@ import { RULE_FILES, FILES, CLIENT_DIR, SERVER_DIR, nodeConfig, logPath } from '
 
 // 安装专用：历史字段按 schema_version 分阶段转换；业务模块只读取当前格式。
 // 版本号在全部迁移成功后提交；同版本重复安装跳过，失败则保留入口供重试。
-const VERSION = '3';
+const VERSION = '4';
+
+// 旧 Shell 变量模板与 ucode 模板格式不同，只保留来源供用户手动迁移。
+function markLegacyFirewallTemplate(ctx, global) {
+    let source = global.nft;
+    const previous = ['/etc/hijpass/fw4-template.nft', '/etc/hijpass/fw4-template.ut'];
+    if (!source && index(previous, global.firewall_template) >= 0) {
+        source = global.firewall_template;
+    }
+    if (!source && !global.legacy_firewall_template && (!global.firewall_template || global.firewall_template == FILES.firewall_template)) {
+        // schema 1–3 已删除 nft 字段；仍存在的默认旧文件也需要提醒。
+        for (let name in ['fw4-template.nft', 'fw4-template.ut']) {
+            let path = fs.dirname(FILES.firewall_template) + '/' + name;
+            if (fs.stat(path)?.type == 'file') {
+                source = path;
+                break;
+            }
+        }
+    }
+    if (source) {
+        ctx.set('hijpass', global['.name'], 'legacy_firewall_template', source);
+        // 不把旧格式文件当作可用的新模板覆盖软件包提供的默认模板。
+        ctx.delete('hijpass', global['.name'], 'firewall_template');
+        warn(`Legacy firewall template ${source} requires manual migration; see the Firewall page.\n`);
+    }
+}
 
 /**
  * 把初始版本的核心、DNS 和负载均衡设置转成当前格式。
@@ -36,11 +61,6 @@ function migrateInitial(ctx) {
     ctx.foreach('hijpass', null, s => {
         let id = s['.name'];
         if (s['.type'] == 'hijpass') {
-            let path = s.firewall_template || s.nft;
-            if (!path || index(['/etc/hijpass/fw4-template.nft', '/etc/hijpass/fw4-template.ut'], path) >= 0) {
-                path = '/etc/hijpass/firewall.ut';
-            }
-            ctx.set('hijpass', id, 'firewall_template', path);
             ctx.delete('hijpass', id, 'nft');
             ctx.delete('hijpass', id, 'firewall_rules');
         }
@@ -365,18 +385,19 @@ try {
     if (version == VERSION) {
         exit(0);
     }
-    if (index(['0', '1', '2'], version) < 0) {
+    if (index(['0', '1', '2', '3'], version) < 0) {
         die(`unsupported schema_version "${version}"`);
     }
     if (version == '0') {
         migrateInitial(ctx);
     }
-    if (version != '2') {
+    if (version == '0' || version == '1') {
         migrateHTTP(ctx);
         cleanLegacyCron(directory ? fs.dirname(directory) + '/crontabs/root' : '/etc/crontabs/root');
     }
-    migratePaths(ctx, 'hijpass');
-    if (fs.stat((directory || '/etc/config') + '/hijserver')) {
+    markLegacyFirewallTemplate(ctx, global);
+    if (version != '3') migratePaths(ctx, 'hijpass');
+    if (version != '3' && fs.stat((directory || '/etc/config') + '/hijserver')) {
         if (!ctx.load('hijserver')) {
             die('cannot load hijserver for migration');
         }

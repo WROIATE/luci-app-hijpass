@@ -37,6 +37,7 @@ function formFixture(defaultTemplate = async () => 'default template\n') {
             } };
             if (name.endsWith('/firewall/editor')) return { FirewallEditorUtils: { mount(widget, label) { widget.querySelector('textarea').setAttribute('aria-label', label); } } };
             if (name.endsWith('/firewall/form')) return { FirewallFormUtils: { createNftViewOption() {} } };
+            if (name.endsWith('/firewall/migration')) return { FirewallMigrationUtils: { createDismissOption() {} } };
             if (name.endsWith('/base/luci/notification')) return { NotificationUtils: { error: (...args) => errors.push(args) } };
             if (name.endsWith('/save-apply/index')) return { SaveApplyUtils: { genHandleSaveApply() {} } };
             return {};

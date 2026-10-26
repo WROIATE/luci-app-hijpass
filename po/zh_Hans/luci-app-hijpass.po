@@ -2479,3 +2479,18 @@ msgstr "自动生成"
 
 msgid "HTTP transport is only supported by sing-box core"
 msgstr "HTTP 传输仅支持 sing-box 核心"
+
+msgid "Firewall template requires manual migration"
+msgstr "防火墙模板需要手动迁移"
+
+msgid "Legacy and current firewall templates use different formats and cannot be upgraded automatically. Reapply your custom changes in the new template under Firewall Rules."
+msgstr "新旧防火墙模板格式不同，无法自动升级。请在「防火墙规则」中对照旧模板，手动迁移自定义内容。"
+
+msgid "Previous template: %s"
+msgstr "旧模板位置：%s"
+
+msgid "Open Firewall Configuration"
+msgstr "打开防火墙配置"
+
+msgid "Hide this migration notice"
+msgstr "隐藏此迁移提醒"

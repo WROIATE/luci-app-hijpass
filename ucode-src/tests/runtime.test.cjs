@@ -255,13 +255,14 @@ test('native UCI migration is idempotent and moves legacy balance references wit
     const result = value({ action: 'migrate', directory });
     assert.equal(result.find(s => s['.name'] === 'global').firewall_template, undefined);
     assert.equal(result.find(s => s['.name'] === 'global').nft, undefined);
+    assert.equal(result.find(s => s['.name'] === 'global').legacy_firewall_template, '/etc/hijpass/fw4-template.nft');
     const balance = result.find(s => s.type === 'load_balance');
     assert.equal(balance.listen_port, '7892'); assert.equal(balance.socks_port, '7893');
     assert.deepEqual(balance.member_node, ['member']);
     assert.equal(result.find(s => s['.name'] === 's').default_proxy_node, balance.name);
     assert.equal(result.find(s => s['.name'] === 'a').core, 'sing-box');
     assert.equal(result.find(s => s['.name'] === 'a').config_type, 'generated');
-    assert.equal(result.find(s => s['.name'] === 'global').schema_version, '3');
+    assert.equal(result.find(s => s['.name'] === 'global').schema_version, '4');
     assert.equal(result.find(s => s['.name'] === 'dns').direct_dns, 'dnsmasq');
     assert.equal(result.find(s => s['.name'] === 'fw').proxy_local, '0');
     const text = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
@@ -297,7 +298,7 @@ test('迁移失败不写入完成标记，修复配置后可以重试', t => {
     assert.notEqual(failed.status, 0);
     assert.equal(fs.readFileSync(file, 'utf8'), invalid);
     fs.writeFileSync(file, "config hijpass 'global'\n");
-    assert.equal(value({ action: 'migrate', directory })[0].schema_version, '3');
+    assert.equal(value({ action: 'migrate', directory })[0].schema_version, '4');
 });
 
 test('schema 1 升级只迁移 Xray HTTP 和旧 cron，保留 sing-box、自定义配置及其他任务', t => {
@@ -345,7 +346,7 @@ config proxy_node 'manual'
     assert.equal(Object.keys(node).some(key => key.startsWith('transport_http_')), false);
     assert.equal(sections.find(s => s['.name'] === 'sb').transport_type, 'http');
     assert.equal(sections.find(s => s['.name'] === 'manual').transport_type, 'http');
-    assert.equal(sections.find(s => s['.name'] === 'global').schema_version, '3');
+    assert.equal(sections.find(s => s['.name'] === 'global').schema_version, '4');
     const generated = run('root/usr/bin/hijpass-config', ['render', '--stdin'], sections);
     assert.equal(generated.status, 0, generated.stderr);
     assert.deepEqual(JSON.parse(generated.stdout).nodes.xr.outbounds[0].streamSettings.xhttpSettings,
@@ -369,9 +370,9 @@ test('cron 迁移失败时不提交新版本，修复后可以重试；未知版
     assert.match(failed.stderr, /cron path is not a file/);
     assert.equal(fs.readFileSync(file, 'utf8'), original);
     fs.rmdirSync(cron); fs.writeFileSync(cron, '0 * * * * /usr/lib/hijpass/rules.sh update\n');
-    assert.equal(value({ action: 'migrate', directory: configDir })[0].schema_version, '3');
+    assert.equal(value({ action: 'migrate', directory: configDir })[0].schema_version, '4');
     assert.equal(fs.readFileSync(cron, 'utf8'), '');
-    const future = "config hijpass 'global'\n option schema_version '4'\n";
+    const future = "config hijpass 'global'\n option schema_version '5'\n";
     fs.writeFileSync(file, future);
     assert.notEqual(invoke({ action: 'migrate', directory: configDir }).status, 0);
     assert.equal(fs.readFileSync(file, 'utf8'), future);
@@ -635,17 +636,40 @@ test('单文件模板完整控制表和链，空输出不能关闭已启用的�
     }
 });
 
-test('迁移保留旧自定义整表内容，并清理全部路径字段', t => {
+test('旧模板仅保留并提示手动迁移，不覆盖新格式模板', t => {
     const directory = fixture(t), template = path.join(directory, 'custom.ut');
-    fs.writeFileSync(template, 'table inet hijpass { chain custom {} }\n');
+    const legacy = 'table inet hijpass { chain custom { $TPROXY_SHUNT } }\n';
+    const current = fs.readFileSync(path.join(root, 'root/etc/hijpass/firewall.ut'), 'utf8');
+    fs.writeFileSync(template, legacy);
     fs.writeFileSync(path.join(directory, 'hijpass'), `config hijpass 'global'\n option nft '${template}'\n option firewall_rules '/custom/chains'\n`);
     const paths = { '/etc/hijpass/firewall.ut': path.join(directory, 'firewall.ut') };
+    fs.writeFileSync(paths['/etc/hijpass/firewall.ut'], current);
+    const migrated = run('root/usr/lib/hijpass/install/migrate.uc', ['--configdir', directory], undefined, { paths });
+    assert.equal(migrated.status, 0, migrated.stderr);
+    assert.match(migrated.stderr, /requires manual migration/);
     const sections = value({ action: 'migrate', directory, paths });
+    assert.equal(sections[0].legacy_firewall_template, template);
     assert.equal(sections[0].firewall_template, undefined);
     assert.equal(sections[0].nft, undefined);
     assert.equal(sections[0].firewall_rules, undefined);
-    assert.match(value({ action: 'firewall', paths, sections: [...sections, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp' }],
-        state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] } }), /chain custom/);
+    assert.equal(fs.readFileSync(template, 'utf8'), legacy);
+    assert.equal(fs.readFileSync(paths['/etc/hijpass/firewall.ut'], 'utf8'), current);
+});
+
+test('schema 3 补充旧默认模板提醒，重复安装保留用户确认，新装不提示', t => {
+    const directory = fixture(t), file = path.join(directory, 'hijpass');
+    const paths = { '/etc/hijpass/firewall.ut': path.join(directory, 'firewall.ut') };
+    fs.writeFileSync(file, "config hijpass 'global'\n");
+    assert.equal(value({ action: 'migrate', directory, paths })[0].legacy_firewall_template, undefined);
+    fs.writeFileSync(file, "config hijpass 'global'\n option schema_version '3'\n");
+    const legacy = path.join(directory, 'fw4-template.nft');
+    fs.writeFileSync(legacy, '# user custom template\n');
+    assert.equal(value({ action: 'migrate', directory, paths })[0].legacy_firewall_template, legacy);
+    fs.appendFileSync(file, "\toption firewall_template_migration_ack '1'\n");
+    const confirmed = fs.readFileSync(file, 'utf8');
+    assert.equal(value({ action: 'migrate', directory, paths })[0].firewall_template_migration_ack, '1');
+    assert.equal(fs.readFileSync(file, 'utf8'), confirmed);
+    assert.equal(fs.readFileSync(legacy, 'utf8'), '# user custom template\n');
 });
 
 test('schema 2 路径迁移保留规则、模板、Hook、自定义配置和日志，前端只需日志开关', t => {
@@ -670,7 +694,7 @@ test('schema 2 路径迁移保留规则、模板、Hook、自定义配置和日�
     fs.writeFileSync(path.join(directory, 'hijpass'), source);
     fs.writeFileSync(path.join(directory, 'hijserver'), `config hijserver 'global'\n option server_dir '${old}'\n option log_dir '${old}'\nconfig server_node 'b'\n option name 'server'\n option log_path '${old}/server.log'\n`);
     const sections = value({ action: 'migrate', directory, paths });
-    assert.equal(sections[0].schema_version, '3');
+    assert.equal(sections[0].schema_version, '4');
     for (const [key, file] of Object.entries(resources)) {
         assert.equal(sections[0][key], undefined);
         assert.equal(fs.readFileSync(path.join(target, file), 'utf8'), key + ' user content\n');
@@ -703,6 +727,6 @@ test('路径迁移写入失败时保留旧 UCI，修复后可重试且备份不�
     assert.notEqual(invoke(request).status, 0);
     assert.equal(fs.readFileSync(path.join(directory, 'hijpass'), 'utf8'), original);
     fs.unlinkSync(target);
-    assert.equal(value(request)[0].schema_version, '3');
+    assert.equal(value(request)[0].schema_version, '4');
     assert.equal(fs.readFileSync(target + '/template.ut', 'utf8'), 'custom template');
 });

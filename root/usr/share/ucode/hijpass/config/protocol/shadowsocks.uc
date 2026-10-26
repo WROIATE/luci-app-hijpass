@@ -1,10 +1,10 @@
-import { BaseOptions, ServerOptions, MultiplexOptions } from './options.uc';
+import { BASE_FIELDS, SERVER_FIELDS, MULTIPLEX_FIELDS } from './options.uc';
 
 // shadowsocks 的字段契约；不包含其它协议的专用字段。
 export const fields = {
-	...BaseOptions,
-	...ServerOptions,
-	...MultiplexOptions,
+	...BASE_FIELDS,
+	...SERVER_FIELDS,
+	...MULTIPLEX_FIELDS,
 	password: ["text", ""], // 远端认证密码
 	network: ["text", ""], // 允许的网络（tcp/udp 或组合）；空值使用核心默认值
 	method: ["text", ""], // Shadowsocks 加密方法

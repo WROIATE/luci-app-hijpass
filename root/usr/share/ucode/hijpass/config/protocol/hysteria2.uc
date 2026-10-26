@@ -1,10 +1,10 @@
-import { BaseOptions, ServerOptions, TLSOptions } from './options.uc';
+import { BASE_FIELDS, SERVER_FIELDS, TLS_FIELDS } from './options.uc';
 
 // hysteria2 的字段契约；不包含其它协议的专用字段。
 export const fields = {
-	...BaseOptions,
-	...ServerOptions,
-	...TLSOptions,
+	...BASE_FIELDS,
+	...SERVER_FIELDS,
+	...TLS_FIELDS,
 	password: ["text", ""], // 远端认证密码
 	network: ["text", ""], // 允许的网络（tcp/udp 或组合）；空值使用核心默认值
 	up_mbps: ["integer", null, 2147483647], // Hysteria2 上行 Mbps；null 表示未设置，0 为明确设置零值

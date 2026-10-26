@@ -17,7 +17,7 @@ import { report } from './report.uc';
  * @returns {object} 捕获参数对象，含过滤条件和任务专属标识。
  */
 export function parse(args, pid) {
-	let c = { mode: 'router', client: '', protocol: 'all', port: 'all', seconds: '8', method: 'HEAD',
+	let capture = { mode: 'router', client: '', protocol: 'all', port: 'all', seconds: '8', method: 'HEAD',
 		tcpdump: false, iface: 'any', verbose: false, keep: false, addresses: [] }, urls = [];
 	const options = { '-c': 'client', '-n': 'protocol', '-P': 'port', '-t': 'seconds', '-X': 'method', '-i': 'iface' };
 	for (let i = 0; i < length(args); i++) {
@@ -26,16 +26,16 @@ export function parse(args, pid) {
 			if (args[i + 1] == null) {
 				die(`missing value for ${arg}`);
 			}
-			c[options[arg]] = args[++i];
+			capture[options[arg]] = args[++i];
 		}
 		else if (arg == '-p') {
-			c.tcpdump = true;
+			capture.tcpdump = true;
 		}
 		else if (arg == '-v') {
-			c.verbose = true;
+			capture.verbose = true;
 		}
 		else if (arg == '-K') {
-			c.keep = true;
+			capture.keep = true;
 		}
 		else if (arg == '-h') {
 			print('capture.sh [-t 1..120] [-X HEAD|GET] [-p] [-i iface] [-v] [-K] URL\ncapture.sh -c IP [-n all|tcp|udp] [-P port|all] [-t 1..120] [-p] [-i iface] [-v] [-K]\n');
@@ -48,43 +48,43 @@ export function parse(args, pid) {
 			push(urls, arg);
 		}
 	}
-	if (!match(c.seconds, /^[0-9]+$/)) {
+	if (!match(capture.seconds, /^[0-9]+$/)) {
 		die('timeout must be an integer');
 	}
-	c.seconds = int(c.seconds);
-	if (c.seconds < 1) {
+	capture.seconds = int(capture.seconds);
+	if (capture.seconds < 1) {
 		die('timeout must be >= 1');
 	}
-	if (c.seconds > 120) {
+	if (capture.seconds > 120) {
 		die('timeout must be <= 120');
 	}
-	if (index(['all', 'tcp', 'udp'], c.protocol) < 0) {
+	if (index(['all', 'tcp', 'udp'], capture.protocol) < 0) {
 		die('protocol must be all, tcp or udp');
 	}
-	if (c.port != 'all' && (!match(c.port, /^[0-9]+$/) || int(c.port) < 1 || int(c.port) > 65535)) {
+	if (capture.port != 'all' && (!match(capture.port, /^[0-9]+$/) || int(capture.port) < 1 || int(capture.port) > 65535)) {
 		die('invalid destination port');
 	}
-	if (!match(c.iface, /^[A-Za-z0-9_.:@-]+$/)) {
+	if (!match(capture.iface, /^[A-Za-z0-9_.:@-]+$/)) {
 		die('invalid tcpdump interface');
 	}
-	c.method = uc(c.method);
-	if (index(['HEAD', 'GET'], c.method) < 0) {
+	capture.method = uc(capture.method);
+	if (index(['HEAD', 'GET'], capture.method) < 0) {
 		die('method must be HEAD or GET');
 	}
-	if (c.client) {
-		c.mode = 'client';
-		if (!iptoarr(c.client || '')) {
+	if (capture.client) {
+		capture.mode = 'client';
+		if (!iptoarr(capture.client || '')) {
 			die('invalid client IP');
 		}
 		if (length(urls)) {
 			die('client mode does not take a URL');
 		}
-		c.filter = c.port == 'all' ? `host ${c.client}` : `((src host ${c.client} and dst port ${c.port}) or (dst host ${c.client} and src port ${c.port}))`;
-		if (c.protocol != 'all') {
-			c.filter += ` and ${c.protocol}`;
+		capture.filter = capture.port == 'all' ? `host ${capture.client}` : `((src host ${capture.client} and dst port ${capture.port}) or (dst host ${capture.client} and src port ${capture.port}))`;
+		if (capture.protocol != 'all') {
+			capture.filter += ` and ${capture.protocol}`;
 		}
-		else if (c.port != 'all') {
-			c.filter += ' and (tcp or udp)';
+		else if (capture.port != 'all') {
+			capture.filter += ' and (tcp or udp)';
 		}
 	}
 	else {
@@ -95,19 +95,19 @@ export function parse(args, pid) {
 		if (type(url) != 'string') {
 			die('invalid HTTP URL');
 		}
-		c.url = url;
+		capture.url = url;
 		let m = match(url, /^(https?):\/\/(\[[A-Fa-f0-9:.]+\]|[A-Za-z0-9_.-]+)(:([0-9]+))?([/?#]|$)/);
 		if (!m) {
 			die('invalid HTTP URL');
 		}
-		c.host = replace(m[2], /^\[|\]$/g, ''); c.targetPort = int(m[4] || (m[1] == 'https' ? '443' : '80'));
-		if (c.targetPort < 1 || c.targetPort > 65535) {
+		capture.host = replace(m[2], /^\[|\]$/g, ''); capture.targetPort = int(m[4] || (m[1] == 'https' ? '443' : '80'));
+		if (capture.targetPort < 1 || capture.targetPort > 65535) {
 			die('invalid URL port');
 		}
-		c.filter = `tcp port ${c.targetPort}`;
+		capture.filter = `tcp port ${capture.targetPort}`;
 	}
-	pid ||= fs.readlink('/proc/self'); c.chain = `trace-${pid}`; c.comment = `hijpass-trace-${pid}`;
-	return c;
+	pid ||= fs.readlink('/proc/self'); capture.chain = `trace-${pid}`; capture.comment = `hijpass-trace-${pid}`;
+	return capture;
 };
 
 /**
@@ -126,7 +126,8 @@ function positions(configDirectory) {
 // PreparedCapture：包含所有已校验的 Capture 字段及 directory（任务目录）。
 // metadata.json 额外保存日志位置快照；Shell 无需解析 UCI 或拼装 nft 表达式。
 /**
- * 解析诊断目标的 IP，并保存任务参数和日志起点。
+ * 校验捕获参数并解析目标 IP，返回任务目录和过滤条件；解析失败时告警。
+ * 任务元数据和日志起点由 rules 命令在生成追踪规则前写入。
  * @param {string|null} pid 命令参数，可缺失；入口拒绝空值。
  * @param {string[]} args
  * @returns {object} 带 addresses 和 directory 的捕获参数；解析失败时 addresses 为空数组。
@@ -135,12 +136,12 @@ export function prepare(pid, args) {
     if (!match(pid || '', /^[0-9]+$/)) {
         die('invalid capture PID');
     }
-    let c = parse(args, pid);
-    if (c.mode == 'router') {
-        try { c.addresses = [resolve(c.host)]; } catch (e) { warn(`${e.message}\n`); }
+    let capture = parse(args, pid);
+    if (capture.mode == 'router') {
+        try { capture.addresses = [resolve(capture.host)]; } catch (e) { warn(`${e.message}\n`); }
     }
-    c.directory = `/tmp/hijpass-trace.${pid}`;
-    return c;
+    capture.directory = `/tmp/hijpass-trace.${pid}`;
+    return capture;
 };
 
 /**
@@ -165,11 +166,11 @@ export function prepare(pid, args) {
 // 这里只生成 nft 文本；Shell 负责真正加载规则以及处理失败清理。
 /**
  * 根据捕获参数渲染 nft 追踪规则。
- * @param {Capture} c
+ * @param {Capture} capture
  * @returns {string} 完整的 nft 规则文本。
  */
-export function ruleText(c) {
-    return renderTemplate('/usr/lib/hijpass/diagnostics/trace.ut', { capture: c });
+export function ruleText(capture) {
+    return renderTemplate('/usr/lib/hijpass/diagnostics/trace.ut', { capture });
 };
 /**
  * 校验任务目录，并从目录名还原 nft 规则标识。
@@ -195,8 +196,8 @@ function metadata(directory) {
     if (type(data) != 'object' || type(data.capture) != 'object') {
         die('invalid capture metadata');
     }
-    let c = data.capture;
-    if (c.chain != expected.chain || c.comment != expected.comment || (c.mode != 'client' && c.mode != 'router')) {
+    let capture = data.capture;
+    if (capture.chain != expected.chain || capture.comment != expected.comment || (capture.mode != 'client' && capture.mode != 'router')) {
         die('invalid capture identity');
     }
     return data;
@@ -237,14 +238,14 @@ export function main() { run(ARGV, (args, configDirectory) => {
         if (type(raw) != 'string') {
             die('missing capture data');
         }
-        let c;
-        try { c = json(raw); } catch (e) { die(`invalid capture data: ${e.message}`); }
-        if (type(c) != 'object') {
+        let capture;
+        try { capture = json(raw); } catch (e) { die(`invalid capture data: ${e.message}`); }
+        if (type(capture) != 'object') {
             die('invalid capture data');
         }
-        identity(c.directory);
-        atomic(c.directory + '/metadata.json', sprintf('%J', { capture: c, positions: positions(configDirectory) }));
-        return ruleText(c);
+        identity(capture.directory);
+        atomic(capture.directory + '/metadata.json', sprintf('%J', { capture, positions: positions(configDirectory) }));
+        return ruleText(capture);
     }
     if (action == 'cleanup') {
         return cleanupPlan(args[0], text(args[1]));
@@ -254,8 +255,8 @@ export function main() { run(ARGV, (args, configDirectory) => {
         if (type(directory) != 'string') {
             die('invalid capture directory');
         }
-        let data = metadata(directory), c = data.capture;
-        return report(c, directory, data.positions) + (c.keep === true ? `Temporary files kept: ${args[0]}\n` : '');
+        let data = metadata(directory), capture = data.capture;
+        return report(capture, directory, data.positions) + (capture.keep === true ? `Temporary files kept: ${args[0]}\n` : '');
     }
     if (action == 'keep') {
         return metadata(args[0]).capture.keep === true ? '1\n' : '0\n';

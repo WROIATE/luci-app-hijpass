@@ -1,6 +1,6 @@
 import { of } from '../config/sections.uc';
 import { list } from '../config/values.uc';
-import { proxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
+import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 
 // ResolvedDependencies：nodes 为按发现顺序排列的节点，byID/byName 为查找索引。
 // 每个节点的 upstream/members 直接引用其依赖节点，供核心配置生成使用。
@@ -48,7 +48,7 @@ export function resolve(sections, target) {
 				die(`duplicate proxy name "${name}"`);
 			}
 			let node;
-			try { node = proxy(section); }
+			try { node = decodeProxy(section); }
 			catch (e) { die(`node "${name}": ${e.message}`); }
 			byID[id] = node;
 			byName[name] = node;

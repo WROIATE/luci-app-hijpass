@@ -4,7 +4,7 @@ import { fields as hysteria2 } from './hysteria2.uc';
 import { fields as tuic } from './tuic.uc';
 import { fields as shadowtls } from './shadowtls.uc';
 import { fields as loadbalance } from './loadbalance.uc';
-import { LocalOptions } from './options.uc';
+import { LOCAL_FIELDS } from './options.uc';
 import { decode, duration } from '../values.uc';
 
 // 核心由 core 字段决定；未设置时统一使用 sing-box，不根据协议推断。
@@ -38,7 +38,7 @@ const protocols = {
 };
 // 自定义配置只声明本地接入信息和用户命令，不读取核心、协议或日志级别。
 const commandFields = {
-	...LocalOptions,
+	...LOCAL_FIELDS,
 	command: ['text', ''], // 原样交给 /bin/sh -c；可用 {conf_path} 引用用户配置文件
 };
 
@@ -49,7 +49,7 @@ const commandFields = {
  * 把 UCI 节点转换为对应配置类型，并校验必填字段。
  * 返回：节点对象；upstream 为 null，members 为空数组，等待连接依赖。
  */
-export function proxy(section) {
+export function decodeProxy(section) {
 	let mode = configType(section.config_type), custom = mode == CONFIG_TYPE.custom;
 	let engine = custom ? '' : core(section.core);
 	if (!custom && index(values(CORE), engine) < 0) {
@@ -59,26 +59,26 @@ export function proxy(section) {
 	if (!fields) {
 		die(`unsupported proxy type "${section.type}"`);
 	}
-	let n = decode(section, fields);
-	n.id = section['.name'];
-	n.name = section.name || n.id;
-	n.config_type = mode;
-	n.type = custom ? '' : section.type;
-	n.core = engine;
-	n.upstream = null;
-	n.members = [];
-	if (custom && !trim(n.command)) {
-		die(`custom node "${n.name}" has no command`);
+	let node = decode(section, fields);
+	node.id = section['.name'];
+	node.name = section.name || node.id;
+	node.config_type = mode;
+	node.type = custom ? '' : section.type;
+	node.core = engine;
+	node.upstream = null;
+	node.members = [];
+	if (custom && !trim(node.command)) {
+		die(`custom node "${node.name}" has no command`);
 	}
-	if (!n.listen_port || !n.socks_port) {
+	if (!node.listen_port || !node.socks_port) {
 		die('invalid listen_port or socks_port');
 	}
-	if (!custom && n.type != TYPE.balance && (!n.server || !n.server_port)) {
+	if (!custom && node.type != TYPE.balance && (!node.server || !node.server_port)) {
 		die('invalid server or server_port');
 	}
-	if (n.type == TYPE.vless && engine == CORE.xray && n.transport_type == 'grpc'
-		&& (duration(n.transport_grpc_idle_timeout) > 2147483647 || duration(n.transport_grpc_ping_timeout) > 2147483647)) {
+	if (node.type == TYPE.vless && engine == CORE.xray && node.transport_type == 'grpc'
+		&& (duration(node.transport_grpc_idle_timeout) > 2147483647 || duration(node.transport_grpc_ping_timeout) > 2147483647)) {
 		die('gRPC timeout exceeds 32-bit range');
 	}
-	return n;
+	return node;
 };

@@ -1,36 +1,36 @@
 // 共享字段只由支持该能力的协议组合；每个对象均是明确的字段声明。
-export const LocalOptions = {
+export const LOCAL_FIELDS = {
 	".name": ["text", ""], // UCI section ID；用于文件名和依赖索引，不是显示名称
 	name: ["text", ""], // 节点名称；其它节点通过此名称引用它
 	listen_port: ["port", 0], // 本机透明代理监听端口，1–65535
 	socks_port: ["port", 0], // 本机 SOCKS 监听端口，供代理链/分流访问，1–65535
 };
 
-export const BaseOptions = {
-	...LocalOptions,
+export const BASE_FIELDS = {
+	...LOCAL_FIELDS,
 	config_type: ["text", "generated"], // generated 自动生成配置；custom 由用户维护配置与命令
 	type: ["text", ""], // 协议名，决定选用哪份字段声明和生成器
 	core: ["text", "sing-box"], // 自动生成使用的核心：sing-box/xray
 	log_level: ["text", "info"], // 核心日志级别；默认 info
 };
 
-export const ServerOptions = {
+export const SERVER_FIELDS = {
 	server: ["text", ""], // 远端域名或 IP；链式代理启动前会解析域名
 	server_port: ["port", 0], // 远端服务监听端口，1–65535
 };
 
-export const TLSOptions = {
+export const TLS_FIELDS = {
 	tls_server_name: ["text", ""], // TLS SNI 与证书校验名称；解析 server 不会改写此字段
 	tls_insecure: ["bool", false], // 0/1；允许跳过 TLS 证书校验
 };
 
-export const RealityOptions = {
+export const REALITY_FIELDS = {
 	tls_reality_enabled: ["bool", false], // 0/1；启用 Reality 握手
 	tls_reality_public_key: ["text", ""], // Reality 服务端公钥
 	tls_reality_short_id: ["text", ""], // Reality short ID，十六进制字符串
 };
 
-export const MultiplexOptions = {
+export const MULTIPLEX_FIELDS = {
 	multiplex_enabled: ["bool", false], // 0/1；启用连接复用
 	multiplex_protocol: ["text", "h2mux"], // sing-box 复用协议（h2mux/smux/yamux）
 	multiplex_max_connections: ["integer", null, 2147483647], // sing-box 最大底层连接数；0 使用核心默认值
@@ -41,7 +41,7 @@ export const MultiplexOptions = {
 	multiplex_brutal_down_mbps: ["integer", null, 2147483647], // Brutal 下行带宽，单位 Mbps
 };
 
-export const TransportOptions = {
+export const TRANSPORT_FIELDS = {
 	transport_type: ["text", ""], // 传输封装类型；空值为协议默认传输
 	transport_http_host: ["text", ""], // HTTP 传输的 Host 头
 	transport_http_path: ["text", ""], // HTTP 传输请求路径

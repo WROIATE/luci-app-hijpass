@@ -1,8 +1,8 @@
-import { BaseOptions } from './options.uc';
+import { BASE_FIELDS } from './options.uc';
 
 // loadbalance 的字段契约；不包含其它协议的专用字段。
 export const fields = {
-	...BaseOptions,
+	...BASE_FIELDS,
 	url: ["text", ""], // sing-box URLTest 探测地址；空值使用核心默认值
 	interval: ["duration", ""], // sing-box URLTest 探测间隔，保留时长字符串
 	tolerance: ["integer", null, 65535], // sing-box URLTest 切换容差，单位毫秒

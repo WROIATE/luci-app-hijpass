@@ -5,6 +5,7 @@ import { first } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
 import { lines, text, renderTemplate } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
+import { parseCIDR } from 'hijpass.ip';
 
 // Firewall 的输入仍使用 UCI 字段：proxy_port/shunt_port 为透明代理入口，
 // tproxy_proto 为 tcp/udp 列表，dns_forward 为 none/pre-routing/routing；
@@ -68,13 +69,7 @@ function networkState(raw, resolvText) {
  * @returns {string[]} 地址数组；文件缺失或为空时返回空数组。
  */
 function ipList(path, version) {
-	return filter(lines(fs.readfile(path)), value => {
-		let parts = split(value, '/'), bytes = iptoarr(parts[0] || ''), prefix = parts[1] || '';
-		if (!bytes || length(bytes) != (version == 4 ? 4 : 16)) {
-			return false;
-		}
-		return parts[1] == null || match(prefix, /^[0-9]+$/) && int(parts[1]) <= length(bytes) * 8;
-	});
+	return filter(lines(fs.readfile(path)), value => parseCIDR(value)?.family == version);
 }
 
 // 默认副本由打包流程从可编辑模板生成，升级时更新且不受用户编辑影响。

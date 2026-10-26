@@ -3,6 +3,7 @@ import { query } from 'resolv';
 import { port } from 'hijpass.config.values';
 import { text } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
+import { parseCIDR } from 'hijpass.ip';
 
 // 地址解析返回 IP 字符串，不改动 TLS 的 server_name，代理链仍可验证原始域名证书。
 /**
@@ -127,18 +128,14 @@ export function pingReport(response, url) {
  * @returns {boolean} 属于时为 true；参数无效或地址族不同时为 false。
  */
 export function contains(address, cidr) {
-	let parts = split(cidr, '/'), host = iptoarr(address), range = iptoarr(parts[0] || '');
-	let prefix = parts[1] || '';
-	if (!host || !range || length(host) != length(range)) {
+	let host = iptoarr(address), range = parseCIDR(cidr);
+	if (!host || index(address, chr(0)) >= 0 || !range || length(host) != length(range.bytes)) {
 		return false;
 	}
-	let bits = parts[1] == null ? length(host) * 8 : int(parts[1]);
-	if (bits < 0 || bits > length(host) * 8 || parts[1] != null && !match(prefix, /^[0-9]+$/)) {
-		return false;
-	}
+	let bits = range.prefix;
 	for (let i = 0; i < length(host) && bits > 0; i++, bits -= 8) {
 		let mask = (0xff << (8 - min(bits, 8))) & 0xff;
-		if ((host[i] & mask) != (range[i] & mask)) {
+		if ((host[i] & mask) != (range.bytes[i] & mask)) {
 			return false;
 		}
 	}
@@ -158,11 +155,11 @@ export function main() { run(ARGV, args => {
         return ports(args);
     }
     if (action == 'iptype') {
-        let bytes = iptoarr(split(args[0] || '', '/')[0] || '');
-        if (!bytes) {
+        let range = parseCIDR(args[0]);
+        if (!range) {
             exit(1);
         }
-        return `${length(bytes) == 4 ? 4 : 6}\n`;
+        return `${range.family}\n`;
     }
     if (action == 'request') {
         return request(args[0], args[1], args[2]);

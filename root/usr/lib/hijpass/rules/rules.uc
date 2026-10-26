@@ -5,6 +5,7 @@ import { first, of } from 'hijpass.config.sections';
 import { list } from 'hijpass.config.values';
 import { text, lines } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
+import { parseCIDR } from 'hijpass.ip';
 import { contains } from '../network/network.uc';
 
 // RuleSource：key 为 UCI 下载地址字段，path 为目标文件，kind 为 domain/ip4/ip6/geo。
@@ -61,8 +62,8 @@ export function normalize(text, kind) {
 			}
 		}
 		else {
-			let parts = split(line, '/'), bytes = iptoarr(parts[0] || ''), prefix = parts[1] || '';
-			if (bytes && length(bytes) == (kind == 'ip4' ? 4 : 16) && (parts[1] == null || match(prefix, /^[0-9]+$/) && int(parts[1]) <= length(bytes) * 8)) {
+			let range = parseCIDR(line);
+			if (range && range.family == (kind == 'ip4' ? 4 : 6)) {
 				push(result, line);
 			}
 		}

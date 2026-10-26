@@ -390,6 +390,75 @@ test('domain/IP normalization and CIDR lookup use native address validation', ()
         ['2001:db8::123', '2001:db8::/32'], ['2001:db9::1', '2001:db8::/32'], ['::1', '::/invalid']] }), [true, false, true, false, false]);
 });
 
+const cidrCases = [
+    { family: 4, host: '192.0.2.1', valid: ['192.0.2.1', '192.0.2.0/0', '192.0.2.0/024', '192.0.2.1/32'],
+        invalid: ['192.0.2.0/24/garbage', '192.0.2.0/24/', '192.0.2.0//24', '192.0.2.0/', '192.0.2.0/33',
+            '192.0.2.0/-1', '192.0.2.0/+24', '192.0.2.0/24.0', '192.0.2.0/0x18', '192.0.2.0/ 24',
+            '192.0.2.0/65560', '192.0.2.0/18446744073709551616', '192.0.2.0/255.255.255.0',
+            '192.0.2.256/24', '192.0.2.0\0junk/24', '192.0.2.0/24\0junk', '/24'] },
+    { family: 6, host: '2001:db8::1', valid: ['2001:db8::1', '2001:db8::/0', '2001:db8::/032', '2001:db8::1/128'],
+        invalid: ['2001:db8::/32/garbage', '2001:db8::/32/', '2001:db8:://32', '2001:db8::/', '2001:db8::/129',
+            '2001:db8::/-1', '2001:db8::/+32', '2001:db8::/32.0', '2001:db8::/0x20', '2001:db8::/ 32',
+            '2001:db8::/65568', '2001:db8::/18446744073709551616', '2001:db8::/ffff:ffff::',
+            '2001:db8::g/32', '2001:db8::\0junk/32', '2001:db8::/32\0junk', 'fe80::1%lo/64', '/32'] },
+];
+
+test('CIDR 清洗保留合法地址和十进制前缀，拒绝多余分段、溢出和截断输入', () => {
+    const text = cidrCases.flatMap(group => [...group.valid, ...group.invalid]).join('\n');
+    for (const { family, valid } of cidrCases)
+        assert.deepEqual(value({ action: 'normalize', kind: `ip${family}`, text }), [...valid].sort());
+});
+
+test('CIDR 匹配拒绝无效网段，正确处理地址族、单地址和非整字节前缀', () => {
+    const cases = cidrCases.flatMap(({ host, invalid }) => invalid.map(cidr => [host, cidr, false]));
+    cases.push(
+        ['192.0.2.1', null, false], ['192.0.2.1', 24, false], [null, '192.0.2.0/24', false],
+        ['192.0.2.1\0junk', '192.0.2.0/24', false], ['2001:db8::1\0junk', '2001:db8::/32', false],
+        ['192.0.2.1/32', '192.0.2.0/24', false], ['192.0.2.1', '::/0', false], ['::1', '0.0.0.0/0', false],
+        ['203.0.113.255', '192.0.2.1/0', true], ['ffff::1', '2001:db8::/0', true],
+        ['192.0.2.1', '192.0.2.1', true], ['192.0.2.2', '192.0.2.1', false],
+        ['192.0.2.1', '192.0.2.1/32', true], ['192.0.2.2', '192.0.2.1/32', false],
+        ['192.0.2.1', '192.0.2.0/024', true], ['192.0.3.1', '192.0.2.0/024', false],
+        ['192.0.2.127', '192.0.2.5/25', true], ['192.0.2.128', '192.0.2.5/25', false],
+        ['2001:db8::1', '2001:db8::1', true], ['2001:db8::2', '2001:db8::1', false],
+        ['2001:db8::1', '2001:db8::1/128', true], ['2001:db8::2', '2001:db8::1/128', false],
+        ['2001:db8::1', '2001:db8::/032', true], ['2001:db9::1', '2001:db8::/032', false],
+        ['2001:db8:0:0:7fff::1', '2001:db8::5/65', true], ['2001:db8:0:0:8000::', '2001:db8::5/65', false],
+        ['::ffff:192.0.2.1', '::ffff:192.0.2.0/120', true], ['::ffff:192.0.3.1', '::ffff:192.0.2.0/120', false],
+    );
+    assert.deepEqual(value({ action: 'contains', cases: cases.map(([host, cidr]) => [host, cidr]) }), cases.map(([, , expected]) => expected));
+});
+
+test('防火墙各 IP 列表只输出共享 CIDR 校验通过的对应地址族', t => {
+    const file = path.join(fixture(t), 'ips');
+    fs.writeFileSync(file, cidrCases.flatMap(group => [...group.valid, ...group.invalid]).join('\n'));
+    const paths = Object.fromEntries(['ip-direct', 'ip-proxy', 'chn-route', 'chn-route6'].map(name => [`/etc/hijpass/rules/${name}.txt`, file]));
+    const result = value({ action: 'firewall', paths, templatePath: path.join(root, 'root/etc/hijpass/firewall.ut'),
+        state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] },
+        sections: [global, { '.type': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp', use_chnroute: '1' }] });
+    for (const { family, valid } of cidrCases) for (const name of ['bypass', 'proxy', 'chnroute']) {
+        const body = result.split(`set ${name}${family}list {`)[1]?.split(/\n[ \t]*\}/)[0];
+        assert.ok(body, `missing ${name}${family}list`);
+        const elements = body.match(/elements = \{([^}]*)\}/)?.[1].split(',').map(value => value.trim());
+        assert.deepEqual(elements, valid);
+    }
+});
+
+test('iptype 对 CIDR 使用相同校验，拒绝忽略非法前缀', () => {
+    for (const { family, valid, invalid } of cidrCases) {
+        for (const address of valid) {
+            const result = run('root/usr/lib/hijpass/network/network.sh', ['iptype', address]);
+            assert.equal(result.status, 0, result.stderr);
+            assert.equal(result.stdout, `${family}\n`);
+        }
+        for (const address of invalid.filter(value => !value.includes('\0'))) {
+            const result = run('root/usr/lib/hijpass/network/network.sh', ['iptype', address]);
+            assert.equal(result.status, 1, address);
+            assert.equal(result.stdout, '');
+        }
+    }
+});
+
 test('rule updates preserve old files on HTTP/format failure and merge valid sources', t => {
     const directory = fixture(t), file = path.join(directory, 'domains'); fs.writeFileSync(file, 'old.example.org\n');
     const env = { PATH: directory + ':' + process.env.PATH };

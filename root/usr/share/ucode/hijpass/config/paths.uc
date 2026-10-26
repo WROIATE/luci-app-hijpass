@@ -22,8 +22,18 @@ const LOG_DIR = '/tmp/hijpass/log';
 const SERVER_LOG_DIR = '/tmp/hijserver/log';
 
 /**
+ * 节点文件标识：.name 为 UCI section ID，name 为可选的节点名称。
+ * @typedef {{'.name': string, name: string|null}} NodeSection
+ */
+/**
+ * 日志配置：.type 为 UCI section 类型，log_enabled 为可选的日志开关。
+ * 节点日志必须提供 .name，可选 name；主日志和分流日志不需要节点标识。
+ * @typedef {{'.type': string, '.name': string|null, name: string|null, log_enabled: string|null}} LogSection
+ */
+
+/**
  * 校验节点标识和名称，生成统一文件名。
- * @param {object} section
+ * @param {NodeSection} section
  * @param {string} [name]
  * @returns {string} 不含扩展名的“节点名称-section ID”；名称缺失时使用 section ID。
  */
@@ -40,7 +50,7 @@ export function nodeFilename(section, name) {
 };
 /**
  * 确定客户端或服务端节点的配置文件位置。
- * @param {object} section
+ * @param {NodeSection} section
  * @param {boolean} [server]
  * @returns {string} 固定目录下的节点 JSON 绝对路径。
  */
@@ -51,7 +61,7 @@ export function nodeConfig(section, server) {
 // 日志位置与开关分离：主日志始终记录，节点及分流只读取 log_enabled。
 /**
  * 根据配置类型和日志开关确定日志位置。
- * @param {object} section
+ * @param {LogSection} section
  * @param {boolean} [server]
  * @returns {string} 日志绝对路径；未启用或不支持日志时为空字符串。
  */

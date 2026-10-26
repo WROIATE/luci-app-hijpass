@@ -9,36 +9,9 @@ import { atomic, command, temporary, run, sections, renderTemplate } from 'hijpa
 import { prepare as prepareDNS } from './dns.uc';
 import { logger } from '../maintenance/logs.uc';
 
-// 占位符可能已在单/双引号内，只转义路径，不把额外引号传给程序。
+// 裸占位符和完整的单/双引号占位符统一引用一次；周围语法仍由 Shell 解析。
 function configCommand(source, path) {
-	let result = '', quoted = '';
-	for (let i = 0; i < length(source); i++) {
-		let ch = substr(source, i, 1);
-		if (substr(source, i, 11) == '{conf_path}') {
-			if (quoted == "'") {
-				result += replace(path, "'", "'\\''");
-			}
-			else if (quoted == '"') {
-				result += replace(path, /[\\"$`]/g, ch => '\\' + ch);
-			}
-			else {
-				result += command([path]);
-			}
-			i += 10;
-			continue;
-		}
-		result += ch;
-		if (ch == '\\' && quoted != "'") {
-			result += substr(source, ++i, 1);
-		}
-		else if (ch == quoted) {
-			quoted = '';
-		}
-		else if (!quoted && (ch == "'" || ch == '"')) {
-			quoted = ch;
-		}
-	}
-	return result;
+    return replace(source, /'\{conf_path\}'|"\{conf_path\}"|\{conf_path\}/g, () => command([path]));
 }
 
 /**

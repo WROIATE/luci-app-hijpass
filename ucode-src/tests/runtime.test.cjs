@@ -203,9 +203,14 @@ test('client and server commands open configuration paths with unquoted, single 
     for (const server of [false, true]) {
         const filename = path.join(directory, name + '-custom.json');
         fs.writeFileSync(filename, 'configuration content');
-        for (const argument of ['{conf_path}', '"{conf_path}"', "'{conf_path}'", '"pre{conf_path}post"', "'pre{conf_path}post'"]) {
-            const embedded = argument.includes('pre');
-            const command = embedded ? `printf '%s' ${argument}` : `cat ${argument}`;
+        const commands = [
+            'cat {conf_path}', 'cat "{conf_path}"', "cat '{conf_path}'",
+            `printf '%s' "$(cat {conf_path})"`,
+            `printf '%s' "$(cat "{conf_path}")"`,
+            "# don't parse quotes in comments\ncat \"{conf_path}\"",
+            'cat "{conf_path}"; cat {conf_path}',
+        ];
+        for (const command of commands) {
             const sections = server
                 ? [{ '.type': 'hijserver', enabled: '1' }, { '.type': 'server_node', '.name': 'custom', enabled: '1', name, command }]
                 : [global, node('custom', { name, config_type: 'custom', command })];
@@ -214,7 +219,7 @@ test('client and server commands open configuration paths with unquoted, single 
             const [program, ...args] = result.instances[0].command;
             const executed = spawnSync(program, args, { encoding: 'utf8' });
             assert.equal(executed.status, 0, executed.stderr);
-            assert.equal(executed.stdout, embedded ? `pre${filename}post` : 'configuration content');
+            assert.equal(executed.stdout, 'configuration content'.repeat(command.includes('; cat') ? 2 : 1));
         }
     }
 });

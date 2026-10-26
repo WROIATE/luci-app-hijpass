@@ -9,6 +9,38 @@ import { atomic, command, temporary, run, sections, renderTemplate } from 'hijpa
 import { prepare as prepareDNS } from './dns.uc';
 import { logger } from '../maintenance/logs.uc';
 
+// 占位符可能已在单/双引号内，只转义路径，不把额外引号传给程序。
+function configCommand(source, path) {
+	let result = '', quoted = '';
+	for (let i = 0; i < length(source); i++) {
+		let ch = substr(source, i, 1);
+		if (substr(source, i, 11) == '{conf_path}') {
+			if (quoted == "'") {
+				result += replace(path, "'", "'\\''");
+			}
+			else if (quoted == '"') {
+				result += replace(path, /[\\"$`]/g, ch => '\\' + ch);
+			}
+			else {
+				result += command([path]);
+			}
+			i += 10;
+			continue;
+		}
+		result += ch;
+		if (ch == '\\' && quoted != "'") {
+			result += substr(source, ++i, 1);
+		}
+		else if (ch == quoted) {
+			quoted = '';
+		}
+		else if (!quoted && (ch == "'" || ch == '"')) {
+			quoted = ch;
+		}
+	}
+	return result;
+}
+
 /**
  * @typedef {object} ServicePlan
  * @property {object[]} instances procd 的进程描述数组。
@@ -57,7 +89,7 @@ export function plan(sections) {
 				die(`custom node "${name}" has no command`);
 			}
 			// 自定义节点的 command 本身是用户填写的 Shell 命令；配置路径仍进行引用。
-			args = ['/bin/sh', '-c', replace(section.command, '{conf_path}', command([path]))];
+			args = ['/bin/sh', '-c', configCommand(section.command, path)];
 		}
 		else {
 			let engine = core(section.core);
@@ -213,7 +245,7 @@ export function serverPlan(sections) {
 			}
 		}
 		push(instances, {
-			id: section['.name'], name, command: ['/bin/sh', '-c', replace(section.command, '{conf_path}', command([path]))],
+			id: section['.name'], name, command: ['/bin/sh', '-c', configCommand(section.command, path)],
 			env, user: 'root', shunt: false, log: logPath(section, true),
 		});
 		if (section.allow_firewall == '1') {

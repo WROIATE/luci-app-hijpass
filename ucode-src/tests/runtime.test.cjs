@@ -186,6 +186,28 @@ test('服务启动和生成采用同一核心缺省值，自定义命令保持 S
     assert.match(invalidMode.stderr, /unsupported config_type/);
 });
 
+test('client and server commands open configuration paths with unquoted, single and double quoted placeholders', t => {
+    const directory = fixture(t);
+    const name = 'space \' " $HOME `id`; & file';
+    for (const server of [false, true]) {
+        const filename = path.join(directory, name + '-custom.json');
+        fs.writeFileSync(filename, 'configuration content');
+        for (const argument of ['{conf_path}', '"{conf_path}"', "'{conf_path}'", '"pre{conf_path}post"', "'pre{conf_path}post'"]) {
+            const embedded = argument.includes('pre');
+            const command = embedded ? `printf '%s' ${argument}` : `cat ${argument}`;
+            const sections = server
+                ? [{ '.type': 'hijserver', enabled: '1' }, { '.type': 'server_node', '.name': 'custom', enabled: '1', name, command }]
+                : [global, node('custom', { name, config_type: 'custom', command })];
+            const result = value({ action: server ? 'server-plan' : 'plan', sections,
+                paths: { [server ? '/etc/hijpass/server' : '/etc/hijpass/client']: directory } });
+            const [program, ...args] = result.instances[0].command;
+            const executed = spawnSync(program, args, { encoding: 'utf8' });
+            assert.equal(executed.status, 0, executed.stderr);
+            assert.equal(executed.stdout, embedded ? `pre${filename}post` : 'configuration content');
+        }
+    }
+});
+
 test('server plan validates allowed ports and leaves manually edited JSON untouched', t => {
     const directory = fixture(t);
     const file = path.join(directory, 'server-a.json'); fs.writeFileSync(file, 'custom JSON');

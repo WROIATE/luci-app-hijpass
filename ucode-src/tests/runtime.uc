@@ -17,10 +17,11 @@ let request = json(fs.stdin.read('all')), result;
 switch (request.action) {
 case 'read': result = read('hijpass', request.directory); break;
 case 'firewall': result = firewall.generate(request.sections, request.state); break;
-case 'chinadns': result = render(request.template, { options: dnsOptions(request.sections) }); break;
+case 'chinadns': result = render(request.template, { options: dnsOptions(request.sections, request.dnsmasq) }); break;
+case 'dns-options': result = dnsOptions(request.sections, request.dnsmasq); break;
 case 'plan': result = service.plan(request.sections); break;
 case 'server-plan': result = service.serverPlan(request.sections); break;
-case 'write': result = service.writeConfigs(request.sections, request.generated || render(request.sections)); break;
+case 'write': result = service.writeConfigs(service.prepareConfigFiles(request.sections, request.generated || render(request.sections))); break;
 case 'normalize': result = rules.normalize(request.text, request.kind); break;
 case 'geo-plan': result = rules.geoPlan(request.sections); break;
 case 'contains': result = map(request.cases, pair => network.contains(pair[0], pair[1])); break;

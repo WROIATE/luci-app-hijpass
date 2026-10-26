@@ -1,8 +1,10 @@
+import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { RULE_FILES } from 'hijpass.config.paths';
 import { first, of } from 'hijpass.config.sections';
 import { list } from 'hijpass.config.values';
-import { run, sections, text, lines } from 'hijpass.common';
+import { text, lines } from 'hijpass.common';
+import { run } from 'hijpass.command.runtime';
 import { contains } from '../network/network.uc';
 
 // RuleSource：key 为 UCI 下载地址字段，path 为目标文件，kind 为 domain/ip4/ip6/geo。
@@ -256,33 +258,33 @@ export function routeMatch(sections, target, geoTags) {
  * 处理规则更新计划、Geo 转换和规则查询的数据请求。
  * @returns {null} 结果写入 stdout，包括计划、规则文本、查询说明或更新状态。
  */
-export function main() { run(() => {
-    let action = shift(ARGV);
+export function main() { run(ARGV, (args, configDirectory) => {
+    let action = shift(args);
     if (action == 'plan') {
-        let config = sections();
-        return updatePlan(config, ARGV[0] || '');
+        let config = read('hijpass', configDirectory);
+        return updatePlan(config, args[0] || '');
     }
     if (action == 'geo-plan') {
-        return geoPlan(sections());
+        return geoPlan(read('hijpass', configDirectory));
     }
     if (action == 'dns-plan') {
-        return dnsPlan(sections());
+        return dnsPlan(read('hijpass', configDirectory));
     }
     if (action == 'geo-request') {
-        let mode = shift(ARGV), kind = shift(ARGV);
-        return geoRequest(mode || '', kind || '', ARGV);
+        let mode = shift(args), kind = shift(args);
+        return geoRequest(mode || '', kind || '', args);
     }
     if (action == 'normalize') {
-        return join('\n', normalize(text(ARGV[1]), ARGV[0] || '')) + '\n';
+        return join('\n', normalize(text(args[1]), args[0] || '')) + '\n';
     }
     if (action == 'merge') {
-        return join('\n', sort(uniq(lines(text(ARGV[0]))))) + '\n';
+        return join('\n', sort(uniq(lines(text(args[0]))))) + '\n';
     }
     if (action == 'query') {
-        return queryFiles(ARGV[0] || '');
+        return queryFiles(args[0] || '');
     }
     if (action == 'match-plan') {
-        let config = sections(), target = ARGV[0] || '';
+        let config = read('hijpass', configDirectory), target = args[0] || '';
         if (!match(target || '', /^[A-Za-z0-9._:\/-]{1,255}$/)) {
             die('invalid query');
         }
@@ -291,14 +293,14 @@ export function main() { run(() => {
         return { kind, lookup };
     }
     if (action == 'match') {
-        let config = sections();
-        return routeMatch(config, ARGV[0] || '', ARGV[1] ? text(ARGV[1]) : '');
+        let config = read('hijpass', configDirectory);
+        return routeMatch(config, args[0] || '', args[1] ? text(args[1]) : '');
     }
     if (action == 'lower') {
-        return lc(text(ARGV[0]));
+        return lc(text(args[0]));
     }
     if (action == 'result') {
-        let failed = ARGV;
+        let failed = args;
         return { success: !length(failed), ...(length(failed) ? { failed } : {}) };
     }
     die('unknown rules data action');

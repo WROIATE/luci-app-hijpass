@@ -161,6 +161,49 @@ test('Chinadns 模板保留列表开关、默认 tag、上游和自定义域名�
             assert.equal(fs.readFileSync(path.join(f.directory, 'domain-proxy.txt'), 'utf8'), 'example.org\nexample.net\n');
         });
     }
+    withConfig([base[0], { ...base[1], direct_dns: 'dnsmasq' }], config => {
+        fs.writeFileSync(path.join(config, 'dhcp'), "config dnsmasq\n option port '1053'\n");
+        const prepared = f.run('service/service.sh', ['prepare', '--configdir', config]);
+        assert.equal(prepared.status, 0, prepared.stderr);
+        assert.match(fs.readFileSync(configFile, 'utf8'), /^china-dns 127\.0\.0\.1#1053$/m);
+    });
+});
+
+test('准备链式代理配置不修改生成对象，也不提前写入文件', t => {
+    const f = fixture(t), fixtures = require('./testdata/compatibility.json');
+    f.patch('service/prepare.uc', "import { resolve } from '../network/network.uc';",
+        "function resolve(host) { return '192.0.2.10'; }");
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/client', f.directory);
+    fs.writeFileSync(path.join(f.runtime, 'prepare-test.uc'), `import * as fs from 'fs';
+import { render } from 'hijpass.coreconfig.render';
+import { prepareConfigFiles } from './service/prepare.uc';
+let sections = json(fs.stdin.read('all')), generated = render(sections);
+let before = sprintf('%J', generated);
+let files = prepareConfigFiles(sections, generated);
+assert(sprintf('%J', generated) == before, 'generated configuration was modified');
+printf('%J\\n', { files, generated });
+`);
+    for (const core of ['sing-box', 'xray']) {
+        const sections = structuredClone(fixtures.find(f => f.name === 'sing-box-chain').sections);
+        for (const section of sections.slice(1)) section.core = core;
+        sections[2].tls_server_name = 'tls.example.org';
+        const result = spawnSync(interpreter, ['-S', '-L', path.join(f.runtime, 'ucode'), '--', path.join(f.runtime, 'prepare-test.uc')],
+            { encoding: 'utf8', input: JSON.stringify(sections) });
+        assert.equal(result.status, 0, result.stderr);
+        const { files, generated } = JSON.parse(result.stdout);
+        const file = files.find(file => file.path.endsWith('/downstream-downstream.json'));
+        assert.equal(fs.existsSync(file.path), false);
+        const original = generated.nodes.downstream.outbounds[0], resolved = JSON.parse(file.data).outbounds[0];
+        if (core === 'sing-box') {
+            assert.equal(original.server, sections[2].server);
+            assert.equal(resolved.server, '192.0.2.10');
+            assert.equal(resolved.tls.server_name, 'tls.example.org');
+        } else {
+            assert.equal(original.settings.address, sections[2].server);
+            assert.equal(resolved.settings.address, '192.0.2.10');
+            assert.equal(resolved.streamSettings.tlsSettings.serverName, 'tls.example.org');
+        }
+    }
 });
 
 test('服务端模板仅开放选中的端口，错误保留旧规则，没有允许端口时删除旧 include', t => {

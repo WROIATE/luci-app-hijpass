@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import { query } from 'resolv';
 import { port } from 'hijpass.config.values';
-import { run, text } from 'hijpass.common';
+import { text } from 'hijpass.common';
+import { run } from 'hijpass.command.runtime';
 
 // 地址解析返回 IP 字符串，不改动 TLS 的 server_name，代理链仍可验证原始域名证书。
 /**
@@ -148,27 +149,27 @@ export function contains(address, cidr) {
  * 处理地址解析、端口检查和连接探测的数据请求。
  * @returns {null} 结果写入 stdout，失败时输出 JSON 错误并退出。
  */
-export function main() { run(() => {
-    let action = shift(ARGV);
+export function main() { run(ARGV, args => {
+    let action = shift(args);
     if (action == 'resolve') {
-        return { address: resolve(ARGV[0]) };
+        return { address: resolve(args[0]) };
     }
     if (action == 'port') {
-        return ports(ARGV);
+        return ports(args);
     }
     if (action == 'iptype') {
-        let bytes = iptoarr(split(ARGV[0] || '', '/')[0] || '');
+        let bytes = iptoarr(split(args[0] || '', '/')[0] || '');
         if (!bytes) {
             exit(1);
         }
         return `${length(bytes) == 4 ? 4 : 6}\n`;
     }
     if (action == 'request') {
-        return request(ARGV[0], ARGV[1], ARGV[2]);
+        return request(args[0], args[1], args[2]);
     }
     if (action == 'report' || action == 'ping-report') {
-        let response = { stdout: text(ARGV[0]), code: int(ARGV[1]) };
-        return action == 'report' ? curlReport(response, ARGV[2] || '') : pingReport(response, ARGV[2] || '');
+        let response = { stdout: text(args[0]), code: int(args[1]) };
+        return action == 'report' ? curlReport(response, args[2] || '') : pingReport(response, args[2] || '');
     }
     die('unknown network data action');
 }, true);

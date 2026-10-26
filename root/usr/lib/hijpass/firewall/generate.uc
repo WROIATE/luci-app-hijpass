@@ -1,9 +1,10 @@
 import * as fs from 'fs';
 import { RULE_FILES, FILES } from 'hijpass.config.paths';
-import { sections as read } from 'hijpass.common';
+import { read } from 'hijpass.uci.read';
 import { first } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
-import { lines, run, sections, text, renderTemplate } from 'hijpass.common';
+import { lines, text, renderTemplate } from 'hijpass.common';
+import { run } from 'hijpass.command.runtime';
 
 // Firewall 的输入仍使用 UCI 字段：proxy_port/shunt_port 为透明代理入口，
 // tproxy_proto 为 tcp/udp 列表，dns_forward 为 none/pre-routing/routing；
@@ -23,9 +24,10 @@ import { lines, run, sections, text, renderTemplate } from 'hijpass.common';
 /**
  * 把 Shell 采集的网络快照整理成防火墙所需的数据。
  * @param {NetworkSnapshot} raw Shell 采集的网络快照。
+ * @param {string|null} resolvText dnsmasq resolvfile 的内容。
  * @returns {object} {wan, local4, local6, dns4, dns6}，分别为绕过设备、本机网段和上游 DNS。
  */
-function networkState(raw) {
+function networkState(raw, resolvText) {
 	let state = { wan: lines(raw.wan), local4: [], local6: [], dns4: [], dns6: [] };
 	let addresses = raw.addresses, interfaces = raw.interfaces;
 	// 命令的 JSON 解析失败时报告来源；不能用残缺网络状态继续生成绕过规则。
@@ -49,8 +51,7 @@ function networkState(raw) {
 		}
 	}
 	catch (e) { die(`invalid network state JSON: ${e.message}`); }
-	let dhcp = first(read('dhcp'), 'dnsmasq');
-	for (let line in lines(fs.readfile(dhcp.resolvfile))) {
+	for (let line in lines(resolvText)) {
 		let fields = split(line, /[ \t]+/), address = split(fields[1] || '', '%')[0] || '', bytes = iptoarr(address);
 		if (fields[0] != 'nameserver' || !bytes || index(['0.0.0.0', '127.0.0.1', '::', '::1'], address) >= 0) {
 			continue;
@@ -203,14 +204,15 @@ export function generate(config, state) {
  * 处理防火墙脚本的 Hook 路径查询或规则生成请求。
  * @returns {null} Hook 路径或生成的 nft 文本写入 stdout。
  */
-export function main() { run(() => {
-    if (ARGV[0] == 'hook') {
+export function main() { run(ARGV, (args, configDirectory) => {
+    if (args[0] == 'hook') {
         return FILES.nft_hook + '\n';
     }
-    let config = sections(), directory = ARGV[0];
+    let config = read('hijpass', configDirectory), directory = args[0];
     let raw = { wan: text(directory + '/wan'),
         addresses: { stdout: text(directory + '/addresses'), code: int(text(directory + '/addresses.code')) },
         interfaces: { stdout: text(directory + '/interfaces'), code: int(text(directory + '/interfaces.code')) } };
-    return generate(config, networkState(raw));
+    let dhcp = first(read('dhcp', configDirectory), 'dnsmasq');
+    return generate(config, networkState(raw, fs.readfile(dhcp.resolvfile)));
 });
 };

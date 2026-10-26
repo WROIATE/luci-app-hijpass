@@ -1,3 +1,4 @@
+import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { FILES, nodeConfig, logPath } from 'hijpass.config.paths';
 import { first, of } from 'hijpass.config.sections';
@@ -5,7 +6,8 @@ import { list, port } from 'hijpass.config.values';
 import { render as renderCore } from 'hijpass.coreconfig.render';
 import { CORE, core, CONFIG_TYPE, configType } from 'hijpass.config.protocol.proxy';
 import { resolve } from '../network/network.uc';
-import { atomic, command, temporary, run, sections, renderTemplate } from 'hijpass.common';
+import { atomic, command, temporary, renderTemplate } from 'hijpass.common';
+import { run } from 'hijpass.command.runtime';
 import { prepare as prepareDNS } from './dns.uc';
 import { logger } from '../maintenance/logs.uc';
 
@@ -90,12 +92,11 @@ export function plan(sections) {
 };
 
 // ConfigFile：path 为目标路径，data 为已完整生成和解析上游域名的 JSON 文本。
-// 单次生成先完成全部转换/DNS，再创建临时文件；已提交的文件在后续错误时恢复。
 /**
- * 生成配置文件内容，全部准备成功后再替换现有文件。
- * @returns {object[]} 已写入的 {path, data} 数组；失败时恢复已替换文件。
+ * 解析链式代理的上游域名，生成待写入的文件内容；不修改 generated 或写文件。
+ * @returns {object[]} 待写入的 {path, data} 数组；域名解析或转换失败时抛错。
  */
-export function writeConfigs(sections, generated) {
+export function prepareConfigFiles(sections, generated) {
 	let files = [];
 	for (let section in of(sections, 'proxy_node')) {
 		let config = generated.nodes[section['.name']];
@@ -103,22 +104,32 @@ export function writeConfigs(sections, generated) {
 			continue;
 		}
 		if (section.upstream_proxy_node && section.server && !iptoarr(section.server)) {
-			let address = resolve(section.server), outbound = config.outbounds[0];
+			let address = resolve(section.server), outbound = { ...config.outbounds[0] };
 			if (outbound.server) {
 				outbound.server = address;
 			}
 			else if (outbound.settings?.address) {
-				outbound.settings.address = address;
+				outbound.settings = { ...outbound.settings, address };
 			}
 			else {
 				die('unsupported proxy server field');
 			}
+			config = { ...config, outbounds: [outbound, ...slice(config.outbounds, 1)] };
 		}
 		push(files, { path: nodeConfig(section), data: sprintf('%.2J\n', config) });
 	}
 	if (generated.shunt) {
 		push(files, { path: FILES.shunt_conf, data: sprintf('%.2J\n', generated.shunt) });
 	}
+	return files;
+};
+
+/**
+ * 将全部已准备的文件先暂存，再替换目标文件；后续提交失败时恢复已替换文件。
+ * @param {object[]} files prepareConfigFiles() 返回的 {path, data} 数组。
+ * @returns {object[]} 已写入的文件数组。
+ */
+export function writeConfigs(files) {
 	let staged = [], committed = [];
 	try {
 		for (let file in files) {
@@ -278,12 +289,12 @@ function settings(config, server) {
  * 为服务启停准备配置、进程参数和定时任务。
  * @returns {null} 查询结果写入 stdout；写入类动作直接更新对应文件。
  */
-export function main() { run(() => {
-    let server = ARGV[0] == 'server';
+export function main() { run(ARGV, (args, configDirectory) => {
+    let server = args[0] == 'server';
     if (server) {
-        shift(ARGV);
+        shift(args);
     }
-    let config = sections(server ? 'hijserver' : 'hijpass'), action = shift(ARGV);
+    let config = read(server ? 'hijserver' : 'hijpass', configDirectory), action = shift(args);
     if (action == 'settings') {
         return settings(config, server);
     }
@@ -295,7 +306,7 @@ export function main() { run(() => {
             // 先生成进程描述，确认自定义命令、环境变量和文件名有效，再替换配置。
             plan(config);
             logger(config)('INFO', 'Preparing proxy configurations');
-            writeConfigs(config, renderCore(config));
+            writeConfigs(prepareConfigFiles(config, renderCore(config)));
         }
         return;
     }
@@ -308,7 +319,7 @@ export function main() { run(() => {
         }
         let result = plan(config);
         if (first(config, 'hijpass').enabled == '1') {
-            let dns = prepareDNS(config);
+            let dns = prepareDNS(config, configDirectory);
             if (dns) {
                 push(result.instances, dns);
             }
@@ -317,9 +328,9 @@ export function main() { run(() => {
     }
     if (action == 'cron') {
         if (server) {
-            return serverCron(ARGV[0] == 'enable' ? serverPlan(config).instances : []);
+            return serverCron(args[0] == 'enable' ? serverPlan(config).instances : []);
         }
-        return cron(config, ARGV[0] == 'enable');
+        return cron(config, args[0] == 'enable');
     }
     if (action == 'server-files') {
         return writeServerRules(config);

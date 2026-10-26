@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import { read } from './uci/read.uc';
 
 /**
  * 使用指定参数渲染 ucode 模板，并补充模板错误位置。
@@ -100,57 +99,6 @@ export function atomic(path, data, mode) {
 	catch (e) { file.close(); fs.unlink(temp); die(e.message); }
 };
 
-let configDirectory;
-
-// CLI 数据边界：stdout 只返回数据，错误由 stderr/退出状态或既有 JSON 契约表达。
-/**
- * 统一处理命令参数、结果输出和异常退出。
- * @param {function} handler
- * @param {boolean} [jsonErrors]
- * @returns {null} handler 结果写入 stdout，字符串原样输出，其他值编码为 JSON。
- */
-export function run(handler, jsonErrors) {
-    try {
-        // 所有数据入口使用同一份可选配置目录，缺失参数在执行前失败。
-        let position = index(ARGV, '--configdir');
-        if (position != null && position >= 0) {
-            configDirectory = ARGV[position + 1];
-            if (!configDirectory) {
-                die('missing --configdir');
-            }
-            splice(ARGV, position, 2);
-        }
-        let result = handler();
-        if (result != null) {
-            if (type(result) == 'string') {
-                print(result);
-            }
-            else {
-                printf('%J\n', result);
-            }
-            if (type(result) == 'object' && result.success === false) {
-                exit(result.exit_code || 1);
-            }
-        }
-    }
-    catch (e) {
-        if (jsonErrors) {
-            printf('%J\n', { success: false, error: e.message });
-        }
-        else {
-            warn(`${e.message}\n`);
-        }
-        exit(1);
-    }
-};
-/**
- * 按命令行指定的配置目录读取 UCI 配置。
- * @param {string} [packageName]
- * @returns {object[]} 原始 section 数组，保留元数据和配置顺序。
- */
-export function sections(packageName) {
-    return read(packageName || 'hijpass', configDirectory);
-};
 /**
  * 读取完整文件文本，读取失败时报告错误。
  * @param {string|null} path

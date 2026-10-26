@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import { defaultTemplate } from '../firewall/generate.uc';
 import { editor, logs, log } from './files.uc';
 import { render } from 'hijpass.coreconfig.render';
-import { writeConfigs } from '../service/prepare.uc';
+import { prepareConfigFiles, writeConfigs } from '../service/prepare.uc';
 
 // RPC 参数是业务数据。没有文件路径或通用 command/argv 入口。
 const methods = {
@@ -76,7 +76,7 @@ try {
         }
         // 快照只提供表单值；文件位置由后端常量决定。
         // 复用服务启动时的生成、上游解析和原子替换，前端不再写生成文件。
-        writeConfigs(sections, generated);
+        writeConfigs(prepareConfigFiles(sections, generated));
         result = generated.shunt ? { shunt: sprintf('%.2J', generated.shunt) } : {};
     }
     else {

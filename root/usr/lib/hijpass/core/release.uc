@@ -1,4 +1,5 @@
-import { run, text } from 'hijpass.common';
+import { text } from 'hijpass.common';
+import { run } from 'hijpass.command.runtime';
 // CoreRelease：tag_name 为官方版本，assets 含 name/state/browser_download_url/digest。
 // 此处只校验发布元数据，归档和可执行文件的验证由 Shell 执行。
 const repos = { 'sing-box': 'SagerNet/sing-box', xray: 'XTLS/Xray-core' };
@@ -75,8 +76,8 @@ export function assetPlan(core, machine, info) {
  * 处理核心更新脚本的版本查询、资源选择等数据请求。
  * @returns {null} 结果写入 stdout，失败时输出 JSON 错误并退出。
  */
-export function main() { run(() => {
-    let action = shift(ARGV), core = shift(ARGV);
+export function main() { run(ARGV, args => {
+    let action = shift(args), core = shift(args);
     if (!core || !repos[core]) {
         die('core action and name are required');
     }
@@ -84,25 +85,25 @@ export function main() { run(() => {
         return `https://api.github.com/repos/${repos[core]}/releases/latest\n`;
     }
     if (action == 'member') {
-        let member = filter(split(text(ARGV[0]), '\n'), entry => match(entry, /^sing-box-[A-Za-z0-9.+-]+\/sing-box$/))[0];
+        let member = filter(split(text(args[0]), '\n'), entry => match(entry, /^sing-box-[A-Za-z0-9.+-]+\/sing-box$/))[0];
         if (!member) {
             die('binary not found in archive');
         }
         return member + '\n';
     }
     if (action == 'version') {
-        let output = text(ARGV[0]), m = match(output, core == 'xray' ? /Xray ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/ : /sing-box version ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/);
+        let output = text(args[0]), m = match(output, core == 'xray' ? /Xray ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/ : /sing-box version ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/);
         return { core, version: m ? m[1] : 'unknown' };
     }
     if (action == 'latest' || action == 'plan') {
-        let info = release(core, text(ARGV[0]));
-        return action == 'latest' ? { core, version: info.tag_name } : assetPlan(core, ARGV[1], info);
+        let info = release(core, text(args[0]));
+        return action == 'latest' ? { core, version: info.tag_name } : assetPlan(core, args[1], info);
     }
     if (action == 'error') {
-        return { success: false, error: ARGV[0] || 'core update failed' };
+        return { success: false, error: args[0] || 'core update failed' };
     }
     if (action == 'result') {
-        return { success: true, version: ARGV[0] };
+        return { success: true, version: args[0] };
     }
     die('unknown core data action');
 }, true);

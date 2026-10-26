@@ -1,6 +1,7 @@
 #!/usr/bin/ucode -S
 import * as fs from 'fs';
-import { run, text } from 'hijpass.common';
+import { text } from 'hijpass.common';
+import { run } from 'hijpass.command.runtime';
 
 /**
  * 读取 Shell 保存的输出文件，组装统一命令结果。
@@ -18,21 +19,21 @@ function commandOutput(directory, code) {
 }
 
 // Shell 只传目录、退出码或短错误；大文本由 ucode 直接读取并编码为 JSON。
-run(() => {
-    let action = shift(ARGV);
+run(ARGV, args => {
+    let action = shift(args);
     if (action == 'error' || action == 'error-file') {
-        let message = action == 'error-file' ? rtrim(text(ARGV[0]), '\n') : ARGV[0];
+        let message = action == 'error-file' ? rtrim(text(args[0]), '\n') : args[0];
         return { success: false, error: message || 'operation failed' };
     }
     if (action == 'output' || action == 'job') {
-        let directory = ARGV[0];
+        let directory = args[0];
         if (type(directory) != 'string') {
             die('missing result directory');
         }
         if (action == 'job' && !fs.stat(directory + '/exit')) {
             return { running: true };
         }
-        let code = int(action == 'job' ? text(directory + '/exit') : ARGV[1]);
+        let code = int(action == 'job' ? text(directory + '/exit') : args[1]);
         if (type(code) != 'int' || code < 0 || code > 255) {
             die('invalid command exit code');
         }

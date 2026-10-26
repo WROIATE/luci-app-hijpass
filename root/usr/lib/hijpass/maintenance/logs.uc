@@ -1,7 +1,9 @@
+import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { logPath } from 'hijpass.config.paths';
 import { first } from 'hijpass.config.sections';
-import { mkdir, run, sections } from 'hijpass.common';
+import { mkdir } from 'hijpass.common';
+import { run } from 'hijpass.command.runtime';
 
 // Logger 返回一个 (level, message) 函数，保留应用日志级别与多行排版。
 // 主日志位置由后端确定，global.log_level 为 DEBUG/INFO/WARN/ERROR。
@@ -89,17 +91,17 @@ export function cleanLogs(sections, action, path) {
  * 处理日志追加、清空和裁剪命令。
  * @returns {null} 正常执行不输出数据，错误通过 stderr 和退出码报告。
  */
-export function main() { run(() => {
-    let action = shift(ARGV);
+export function main() { run(ARGV, (args, configDirectory) => {
+    let action = shift(args);
     if (action == 'append') {
-        let config = sections();
-        return logger(config)(ARGV[0], join(' ', slice(ARGV, 1)));
+        let config = read('hijpass', configDirectory);
+        return logger(config)(args[0], join(' ', slice(args, 1)));
     }
     if (action == 'clean') {
-        return cleanLogs([], 'clean', ARGV[0] || '');
+        return cleanLogs([], 'clean', args[0] || '');
     }
     if (action == 'hijpass' || action == 'hijserver') {
-        return cleanLogs(sections(action), action || '');
+        return cleanLogs(read(action, configDirectory), action || '');
     }
     die('unknown log action');
 });

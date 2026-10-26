@@ -2,7 +2,8 @@ import * as fs from 'fs';
 import { logPath } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
 import { resolve } from '../network/network.uc';
-import { atomic, lines, run, text, renderTemplate } from 'hijpass.common';
+import { atomic, lines, text, renderTemplate } from 'hijpass.common';
+import { run } from 'hijpass.command.runtime';
 import { report } from './report.uc';
 
 // Capture 字段：mode 为 client/router；client 为客户端 IP，protocol 为 all/tcp/udp，
@@ -113,10 +114,10 @@ export function parse(args, pid) {
  * 记录当前日志位置，供报告提取本次诊断产生的日志。
  * @returns {object[]} {path, offset, inode} 数组；无日志时为空数组，offset 单位为字节。
  */
-function positions() {
+function positions(configDirectory) {
 	let sections = [];
 	// 诊断本身不依赖服务已配置；缺少 UCI 时仍可提供 nft/系统日志报告。
-	try { sections = read(); } catch (e) { return []; }
+	try { sections = read('hijpass', configDirectory); } catch (e) { return []; }
 	return filter(map(uniq(map(sections, s => logPath(s))), path => {
 		let stat = path && fs.stat(path);
 		return stat?.type == 'file' ? { path, offset: stat.size, inode: stat.inode } : null;
@@ -225,14 +226,14 @@ export function cleanupPlan(directory, raw) {
  * 分发诊断子命令，生成任务参数、追踪规则或诊断报告。
  * @returns {null} 结果写入 stdout，错误通过 stderr 和退出码报告。
  */
-export function main() { run(() => {
-    let action = shift(ARGV);
+export function main() { run(ARGV, (args, configDirectory) => {
+    let action = shift(args);
     if (action == 'prepare') {
-        let pid = shift(ARGV);
-        return prepare(pid, ARGV);
+        let pid = shift(args);
+        return prepare(pid, args);
     }
     if (action == 'rules') {
-        let raw = ARGV[0];
+        let raw = args[0];
         if (type(raw) != 'string') {
             die('missing capture data');
         }
@@ -242,25 +243,25 @@ export function main() { run(() => {
             die('invalid capture data');
         }
         identity(c.directory);
-        atomic(c.directory + '/metadata.json', sprintf('%J', { capture: c, positions: positions() }));
+        atomic(c.directory + '/metadata.json', sprintf('%J', { capture: c, positions: positions(configDirectory) }));
         return ruleText(c);
     }
     if (action == 'cleanup') {
-        return cleanupPlan(ARGV[0], text(ARGV[1]));
+        return cleanupPlan(args[0], text(args[1]));
     }
     if (action == 'report') {
-        let directory = ARGV[0];
+        let directory = args[0];
         if (type(directory) != 'string') {
             die('invalid capture directory');
         }
         let data = metadata(directory), c = data.capture;
-        return report(c, directory, data.positions) + (c.keep === true ? `Temporary files kept: ${ARGV[0]}\n` : '');
+        return report(c, directory, data.positions) + (c.keep === true ? `Temporary files kept: ${args[0]}\n` : '');
     }
     if (action == 'keep') {
-        return metadata(ARGV[0]).capture.keep === true ? '1\n' : '0\n';
+        return metadata(args[0]).capture.keep === true ? '1\n' : '0\n';
     }
     if (action == 'task-status') {
-        let directory = ARGV[0], active = ARGV[1] == '1';
+        let directory = args[0], active = args[1] == '1';
         return { running: active, code: active ? null : int(fs.readfile(directory + '/exit')),
             stdout: fs.readfile(directory + '/stdout') || '', stderr: fs.readfile(directory + '/stderr') || '' };
     }

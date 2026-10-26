@@ -473,6 +473,33 @@ test('文本工具正常退出，参数错误保持 JSON 工具的错误契约',
     assert.equal(invalid.stderr, '');
 });
 
+test('CLI 参数和配置目录在同一进程的多次调用之间保持独立', t => {
+    const file = path.join(fixture(t), 'cli.uc');
+    fs.writeFileSync(file, `import { run } from 'hijpass.command.runtime';
+let argv = ['plan', '--configdir', '/first'];
+run(argv, (args, directory) => ({ args, directory }));
+assert(length(argv) == 3 && argv[1] == '--configdir', 'input arguments were modified');
+run(['plan'], (args, directory) => ({ args, directory: directory || null }));
+run(['--configdir', '/second', 'plan'], (args, directory) => ({ args, directory }));
+`);
+    const result = run(file);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.stdout.trim().split('\n').map(JSON.parse), [
+        { args: ['plan'], directory: '/first' }, { args: ['plan'], directory: null },
+        { args: ['plan'], directory: '/second' },
+    ]);
+});
+
+test('DNS 模板参数只使用显式传入的 dnsmasq 配置', () => {
+    const sections = [{ '.type': 'dns', dns_service: 'chinadns-ng', cdg_port: '53653',
+        direct_dns: 'dnsmasq', proxy_dns: 'custom', proxy_dns_custom: 'dnsmasq' }];
+    for (const [dnsmasq, port] of [[{}, '53'], [{ port: '1053' }, '1053']]) {
+        const options = value({ action: 'dns-options', sections, dnsmasq });
+        assert.equal(options.direct, `127.0.0.1#${port}`);
+        assert.equal(options.proxy, `127.0.0.1#${port}`);
+    }
+});
+
 test('启用防火墙时，缺失模板不会生成缺少规则的配置', t => {
     const directory = fixture(t);
     const result = invoke({ action: 'firewall', templatePath: path.join(directory, 'missing'),

@@ -1,9 +1,11 @@
+/** @typedef {import('../../../types/proxy.uc').VlessProxy} VlessProxy */
 import { apply } from './transport.uc';
 
 // settings.id 为用户 UUID；encryption 固定 none；streamSettings 保存传输和 TLS。
 // Reality 使用最新 Xray 的 password 公钥字段，TLS ALPN 保留 h2/http1.1。
 /**
  * 将 VLESS 节点转换为 Xray 原生出站配置。
+ * @param {VlessProxy} n
  * @returns {object} 含认证、传输和 TLS/Reality 设置的出站对象。
  */
 export function build(n) {

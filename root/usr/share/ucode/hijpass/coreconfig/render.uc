@@ -1,3 +1,8 @@
+/** @typedef {import('../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../types/core.uc').GeneratedConfigs} GeneratedConfigs */
+/** @typedef {import('../types/config.uc').UciSection} UciSection */
+/** @typedef {import('../types/routing.uc').RoutingSettings} RoutingSettings */
+/** @typedef {import('../types/proxy.uc').ProxyNode} ProxyNode */
 import { first, validateSections } from '../config/sections.uc';
 import { CORE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 import { resolve as resolveDependencies, validate as validateDependencies } from './dependencies.uc';
@@ -8,8 +13,8 @@ import { prepare as prepareRouting, build as buildRouting } from './routing.uc';
 
 /**
  * 检查节点和分流监听端口是否相互冲突。
- * @param {object[]} nodes
- * @param {object|null} shunt
+ * @param {ProxyNode[]} nodes
+ * @param {RoutingSettings|null} shunt
  * @returns {null} 无业务返回值；发现重复端口时抛错。
  */
 function validatePorts(nodes, shunt) {
@@ -39,8 +44,9 @@ function validatePorts(nodes, shunt) {
 /**
  * 校验配置和依赖，生成代理节点或分流的核心配置。
  * 返回：全部配置 {nodes, shunt?}；指定 target 时只返回对应的核心 JSON 对象。
- * @param {object[]} sections
+ * @param {UciSection[]} sections
  * @param {string} [target]
+ * @returns {GeneratedConfigs|CoreConfig}
  */
 export function render(sections, target) {
 	validateSections(sections);
@@ -75,7 +81,7 @@ export function render(sections, target) {
 };
 /**
  * 检查配置能否生成，服务关闭时仅检查快照结构。
- * @param {object[]} sections
+ * @param {UciSection[]} sections
  * @returns {object} 校验成功返回 {ok: true}，失败时抛错。
  */
 export function validate(sections) {

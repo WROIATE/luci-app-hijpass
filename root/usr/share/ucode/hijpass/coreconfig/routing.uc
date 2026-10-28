@@ -1,3 +1,8 @@
+/** @typedef {import('../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../types/routing.uc').DNSServer} DNSServer */
+/** @typedef {import('../types/routing.uc').RoutingSettings} RoutingSettings */
+/** @typedef {import('../types/proxy.uc').RoutingDependencies} RoutingDependencies */
+/** @typedef {import('../types/config.uc').UciSection} UciSection */
 import { of, first } from '../config/sections.uc';
 import { port } from '../config/values.uc';
 import { CORE, core } from '../config/protocol/proxy.uc';
@@ -12,9 +17,9 @@ import { build as buildXray } from './xray/routing.uc';
 // Entry：name/split，exit/v4/v6/dnsExit 出口，dns/strategy DNS 策略，match 匹配条件。
 /**
  * 解析分流设置，确认代理出口和 DNS 引用有效。
- * @param {object[]} sections
- * @param {{nodes: object[], byName: object}} dependencies
- * @returns {object} 带出口、DNS、规则集策略和 entries 的分流设置对象。
+ * @param {UciSection[]} sections
+ * @param {RoutingDependencies} dependencies
+ * @returns {RoutingSettings} 带出口、DNS、规则集策略和 entries 的分流设置对象。
  */
 export function prepare(sections, dependencies) {
 	/**
@@ -49,6 +54,7 @@ export function prepare(sections, dependencies) {
 	/**
 	 * 查找已启用的 DNS 节点，无效引用时报错。
 	 * 返回：节点对象 {tag, type, address, port}；端口未配置时 port 为 null。
+	 * @returns {DNSServer}
 	 */
 	function resolveDNSServer(name) {
 		if (!servers[name]) {
@@ -98,7 +104,9 @@ export function prepare(sections, dependencies) {
 
 /**
  * 将共享分流设置交给对应核心的生成器。
- * @returns {object} 完整核心配置；不修改 settings 或 dependencies。
+ * @param {RoutingSettings} settings
+ * @param {RoutingDependencies} dependencies
+ * @returns {CoreConfig} 完整核心配置；不修改 settings 或 dependencies。
  */
 export function build(settings, dependencies) {
 	return settings.core == CORE.singbox ? buildSingbox(settings, dependencies) : buildXray(settings, dependencies);

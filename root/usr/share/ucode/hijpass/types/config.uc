@@ -18,3 +18,31 @@
  *   log_enabled: string|null
  * }} LogSection
  */
+
+/**
+ * 原生 UCI 或已验证快照中的 section；业务 option/list 保留原始字符串，元数据使用原生类型。
+ * @typedef {{
+ *   '.name': string,
+ *   '.type': string,
+ *   '.index': integer|null,
+ *   '.anonymous': boolean|null,
+ *   [option: string]: string|string[]|integer|boolean|null
+ * }} UciSection
+ */
+
+/**
+ * 字段声明依次为转换种类、缺失值默认值、可选整数上限；duration 的结果仍是字符串。
+ * @typedef {[string, string|string[]|integer|double|boolean|null, integer?]} FieldDeclaration
+ */
+
+/**
+ * @typedef {{
+ *   [field: string]: FieldDeclaration
+ * }} FieldDeclarations
+ */
+
+/**
+ * @typedef {{
+ *   [field: string]: string|string[]|integer|double|boolean|null
+ * }} DecodedValues
+ */

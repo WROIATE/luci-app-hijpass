@@ -1,12 +1,12 @@
+/** @typedef {import('../../../types/proxy.uc').Hysteria2Proxy} Hysteria2Proxy */
 import { endpoint, tls } from './options.uc';
 import { optional } from '../../json.uc';
 
 // up_mbps/down_mbps 为带宽；server_ports 为端口跳跃范围，核心使用冒号分隔。
 // hop_interval 为跳跃间隔；obfs 仅支持有密码的 salamander。
-/** @typedef {import('../../../types/proxy.uc').Hysteria2Options} Hysteria2Options */
 /**
  * 将 Hysteria2 节点转换为 sing-box 原生出站配置。
- * @param {Hysteria2Options} n 已解码的专用字段；通用地址/TLS 交给 options.uc。
+ * @param {Hysteria2Proxy} n 已解码的专用字段；通用地址/TLS 交给 options.uc。
  * @returns {object} 含 TLS、认证及可选带宽、跳跃端口和混淆设置的出站对象。
  */
 export function build(n) {

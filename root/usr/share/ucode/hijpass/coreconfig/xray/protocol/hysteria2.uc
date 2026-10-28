@@ -1,7 +1,9 @@
+/** @typedef {import('../../../types/proxy.uc').Hysteria2Proxy} Hysteria2Proxy */
 // Hysteria2 在 Xray 中使用 hysteria 协议及 version=2；认证位于传输设置。
 // 带宽放在 finalmask.quicParams；未设置与明确为 0 必须区分。
 /**
  * 将 Hysteria2 节点转换为 Xray 原生出站配置。
+ * @param {Hysteria2Proxy} n
  * @returns {object} 使用 hysteria 协议、版本 2 的出站对象，认证和带宽位于 streamSettings。
  */
 export function build(n) {

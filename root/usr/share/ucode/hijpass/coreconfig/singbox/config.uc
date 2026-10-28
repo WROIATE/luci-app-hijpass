@@ -1,3 +1,5 @@
+/** @typedef {import('../../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../../types/proxy.uc').GeneratedProxyNode} GeneratedProxyNode */
 import { build as shadowsocks } from './protocol/shadowsocks.uc';
 import { build as vless } from './protocol/vless.uc';
 import { build as hysteria2 } from './protocol/hysteria2.uc';
@@ -31,7 +33,8 @@ export function inbound(kind, tag, port, address) {
 // outbounds 远端出口；route 匹配规则及默认出口。返回普通 JSON 对象。
 /**
  * 组装单个节点的完整 sing-box 配置。
- * @returns {object} 含日志、DNS、入站、出站和路由的配置对象。
+ * @param {GeneratedProxyNode} n
+ * @returns {CoreConfig} 含日志、DNS、入站、出站和路由的配置对象。
  */
 export function build(n) {
 	let config = {

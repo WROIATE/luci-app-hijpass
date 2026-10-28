@@ -1,3 +1,6 @@
+/** @typedef {import('../types/config.uc').DecodedValues} DecodedValues */
+/** @typedef {import('../types/config.uc').FieldDeclarations} FieldDeclarations */
+/** @typedef {import('../types/config.uc').UciSection} UciSection */
 // 配置字段转换：保留 option/list、未设置和显式 false/0 的差异。
 // 本模块处理业务类型与范围，不解释 UCI 文件语法，也不访问原生 cursor。
 /**
@@ -56,7 +59,9 @@ export function duration(value) {
 // 不属于该协议的旧字段不会误触发校验，也不会混入解码结果。
 /**
  * 按字段声明读取配置、应用默认值并转换类型。
- * @returns {object} 仅含声明字段的新对象，保留未设置与显式 false/0 的差异。
+ * @param {UciSection} section
+ * @param {FieldDeclarations} declarations
+ * @returns {DecodedValues} 仅含声明字段的新对象，保留未设置与显式 false/0 的差异。
  */
 export function decode(section, declarations) {
 	let result = {};

@@ -1,3 +1,5 @@
+/** @typedef {import('../../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../../types/proxy.uc').GeneratedProxyNode} GeneratedProxyNode */
 import { build as shadowsocks } from './protocol/shadowsocks.uc';
 import { build as vless } from './protocol/vless.uc';
 import { build as hysteria2 } from './protocol/hysteria2.uc';
@@ -46,7 +48,8 @@ export function inbound(kind, tag, port, shunt) {
 // burstObservatory.pingConfig 为负载均衡探测参数，时长使用核心字符串格式。
 /**
  * 组装单个节点的完整 Xray 配置。
- * @returns {object} 含日志、入站和出站的配置对象；均衡节点附路由和探测设置。
+ * @param {GeneratedProxyNode} n
+ * @returns {CoreConfig} 含日志、入站和出站的配置对象；均衡节点附路由和探测设置。
  */
 export function build(n) {
 	let config = {

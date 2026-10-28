@@ -1,30 +1,217 @@
-// 共享类型声明；仅用于编辑器，不创建或导出运行时对象。
+// 已解码的节点与能力字段；原始 UCI 字段声明位于 config/protocol/。
 
 /**
- * @typedef {object} Hysteria2Options
- * @property {string} password 远端认证密码。
- * @property {integer|null} up_mbps 上行 Mbps；null 表示未设置。
- * @property {integer|null} down_mbps 下行 Mbps；null 表示未设置。
- * @property {string[]} server_ports 跳跃端口或范围，缺省为空数组。
- * @property {string} hop_interval 跳跃间隔，保留时长字符串。
- * @property {string} obfs_type QUIC 混淆类型。
- * @property {string} obfs_password 混淆密码。
+ * 解码后统一补齐的标识、本地端口和依赖；upstream/members 连接到节点对象。
+ * @typedef {{
+ *   '.name': string,
+ *   name: string,
+ *   listen_port: integer,
+ *   socks_port: integer,
+ *   id: string,
+ *   config_type: string,
+ *   type: string,
+ *   core: string,
+ *   upstream: ProxyNode|null,
+ *   members: ProxyNode[]
+ * }} ProxyIdentity
  */
 
 /**
- * @typedef {object} TransportOptions
- * @property {string} transport_type 传输类型；空值使用协议默认传输。
- * @property {string} transport_xhttp_host XHTTP Host 头。
- * @property {string} transport_xhttp_path XHTTP 路径。
- * @property {string} transport_xhttp_mode XHTTP 模式。
- * @property {string} transport_xhttp_method XHTTP 上行请求方法；空值由核心决定。
- * @property {string} transport_httpupgrade_host HTTPUpgrade Host 头。
- * @property {string} transport_httpupgrade_path HTTPUpgrade 路径。
- * @property {string} transport_ws_host WebSocket Host 头。
- * @property {string} transport_ws_path WebSocket 路径，空值使用 /。
- * @property {integer|null} transport_ws_max_early_data early data 字节数；null 表示未设置。
- * @property {string} transport_grpc_service_name gRPC 服务名称。
- * @property {string} transport_grpc_idle_timeout 空闲时长，生成时转换为秒。
- * @property {string} transport_grpc_ping_timeout ping 等待时长，生成时转换为秒。
- * @property {boolean} transport_grpc_permit_without_stream 没有活动流时是否发送 ping。
+ * @typedef {ProxyIdentity & {
+ *   config_type: 'generated',
+ *   log_level: string
+ * }} GeneratedProxy
+ */
+
+/**
+ * 远端地址与可选网络；ShadowTLS 不声明 network，读取时为 null。
+ * @typedef {GeneratedProxy & {
+ *   server: string,
+ *   server_port: integer,
+ *   network: string|null
+ * }} RemoteProxy
+ */
+
+/**
+ * 经 config/values.decode 转换的字段；布尔、整数与时长字符串不再混用。
+ * @typedef {{
+ *   tls_server_name: string,
+ *   tls_insecure: boolean
+ * }} TLSOptions
+ */
+
+/**
+ * 经 config/values.decode 转换的字段；布尔、整数与时长字符串不再混用。
+ * @typedef {{
+ *   tls_reality_enabled: boolean,
+ *   tls_reality_public_key: string,
+ *   tls_reality_short_id: string
+ * }} RealityOptions
+ */
+
+/**
+ * 经 config/values.decode 转换的字段；布尔、整数与时长字符串不再混用。
+ * @typedef {{
+ *   multiplex_enabled: boolean,
+ *   multiplex_protocol: string,
+ *   multiplex_max_connections: integer|null,
+ *   multiplex_min_streams: integer|null,
+ *   multiplex_max_streams: integer|null,
+ *   multiplex_brutal_enabled: boolean,
+ *   multiplex_brutal_up_mbps: integer|null,
+ *   multiplex_brutal_down_mbps: integer|null
+ * }} MultiplexOptions
+ */
+
+/**
+ * 经 config/values.decode 转换的字段；布尔、整数与时长字符串不再混用。
+ * @typedef {{
+ *   transport_type: string,
+ *   transport_http_host: string,
+ *   transport_http_path: string,
+ *   transport_http_method: string,
+ *   transport_http_idle_timeout: string,
+ *   transport_http_ping_timeout: string,
+ *   transport_ws_host: string,
+ *   transport_ws_path: string,
+ *   transport_ws_max_early_data: integer|null,
+ *   transport_ws_early_data_header_name: string,
+ *   transport_grpc_service_name: string,
+ *   transport_grpc_idle_timeout: string,
+ *   transport_grpc_ping_timeout: string,
+ *   transport_grpc_permit_without_stream: boolean,
+ *   transport_httpupgrade_host: string,
+ *   transport_httpupgrade_path: string,
+ *   transport_xhttp_host: string,
+ *   transport_xhttp_path: string,
+ *   transport_xhttp_mode: string,
+ *   transport_xhttp_method: string
+ * }} TransportOptions
+ */
+
+/**
+ * @typedef {RemoteProxy & MultiplexOptions & {
+ *   type: 'shadowsocks',
+ *   password: string,
+ *   network: string,
+ *   method: string,
+ *   plugin: string,
+ *   plugin_opts: string,
+ *   udp_over_tcp: boolean
+ * }} ShadowsocksProxy
+ */
+
+/**
+ * @typedef {RemoteProxy & TLSOptions & RealityOptions & MultiplexOptions & TransportOptions & {
+ *   type: 'vless',
+ *   uuid: string,
+ *   network: string,
+ *   flow: string,
+ *   packet_encoding: string
+ * }} VlessProxy
+ */
+
+/**
+ * @typedef {RemoteProxy & TLSOptions & {
+ *   type: 'hysteria2',
+ *   password: string,
+ *   network: string,
+ *   up_mbps: integer|null,
+ *   down_mbps: integer|null,
+ *   udp_idle_timeout: integer|null,
+ *   server_ports: string[],
+ *   hop_interval: string,
+ *   obfs_type: string,
+ *   obfs_password: string
+ * }} Hysteria2Proxy
+ */
+
+/**
+ * @typedef {RemoteProxy & TLSOptions & {
+ *   type: 'tuic',
+ *   password: string,
+ *   uuid: string,
+ *   network: string,
+ *   congestion_control: string,
+ *   udp_relay_mode: string,
+ *   udp_over_stream: boolean,
+ *   zero_rtt_handshake: boolean,
+ *   heartbeat: string
+ * }} TuicProxy
+ */
+
+/**
+ * @typedef {RemoteProxy & TLSOptions & {
+ *   type: 'shadowtls',
+ *   password: string,
+ *   version: integer
+ * }} ShadowtlsProxy
+ */
+
+/**
+ * @typedef {GeneratedProxy & {
+ *   type: 'load_balance',
+ *   url: string,
+ *   interval: string,
+ *   tolerance: integer|null,
+ *   idle_timeout: string,
+ *   interrupt_exist_connections: boolean,
+ *   strategy: string,
+ *   strategy_expected: integer,
+ *   strategy_max_rtt: string,
+ *   strategy_tolerance: double,
+ *   fallback_tag: string,
+ *   probe_url: string,
+ *   probe_connectivity: string,
+ *   probe_interval: string,
+ *   probe_timeout: string,
+ *   probe_sampling: integer,
+ *   probe_http_method: string
+ * }} BalanceProxy
+ */
+
+/**
+ * @typedef {ProxyIdentity & {
+ *   config_type: 'custom',
+ *   core: '',
+ *   type: '',
+ *   command: string
+ * }} CustomProxy
+ */
+
+/**
+ * @typedef {ShadowsocksProxy|VlessProxy|Hysteria2Proxy|TuicProxy|ShadowtlsProxy|BalanceProxy} GeneratedProxyNode
+ */
+
+/**
+ * @typedef {CustomProxy|GeneratedProxyNode} ProxyNode
+ */
+
+/**
+ * @typedef {{
+ *   [name: string]: ProxyNode
+ * }} ProxyIndex
+ */
+
+/**
+ * @typedef {{
+ *   nodes: ProxyNode[]
+ * }} ProxyGraph
+ */
+
+/**
+ * @typedef {ProxyGraph & {
+ *   byName: ProxyIndex
+ * }} RoutingDependencies
+ */
+
+/**
+ * @typedef {RoutingDependencies & {
+ *   byID: ProxyIndex
+ * }} ResolvedDependencies
+ */
+
+/**
+ * TLS 公共选项读取的远端节点字段。
+ * @typedef {RemoteProxy & TLSOptions} TLSProxy
  */

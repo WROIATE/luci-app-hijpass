@@ -1,3 +1,7 @@
+/** @typedef {import('../types/proxy.uc').ProxyNode} ProxyNode */
+/** @typedef {import('../types/proxy.uc').ProxyGraph} ProxyGraph */
+/** @typedef {import('../types/proxy.uc').ResolvedDependencies} ResolvedDependencies */
+/** @typedef {import('../types/config.uc').UciSection} UciSection */
 import { of } from '../config/sections.uc';
 import { list } from '../config/values.uc';
 import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
@@ -7,9 +11,9 @@ import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 // 解析、连接引用、校验分别执行，查询过程没有隐藏的配置校验副作用。
 /**
  * 收集目标节点及其依赖，并连接上游和均衡成员。
- * @param {object[]} sections
+ * @param {UciSection[]} sections
  * @param {string} [target] 节点 section ID；shunt 或未指定时解析全部启用节点。
- * @returns {object} {nodes, byID, byName}，索引和依赖直接引用节点对象。
+ * @returns {ResolvedDependencies} {nodes, byID, byName}，索引和依赖直接引用节点对象。
  */
 export function resolve(sections, target) {
 	let proxySections = of(sections, 'proxy_node');
@@ -100,13 +104,14 @@ export function resolve(sections, target) {
 
 /**
  * 检查代理链的循环、长度和负载均衡成员设置。
- * @param {{nodes: object[]}} dependencies
+ * @param {ProxyGraph} dependencies
  * @returns {null} 无业务返回值；依赖无效时抛错。
  */
 export function validate(dependencies) {
 	let active = {}, heights = {};
 	/**
 	 * 递归检查节点依赖，并计算和缓存代理链长度。
+	 * @param {ProxyNode} n
 	 * @returns {integer} 含自身的链长；均衡节点为 1，其成员分别检查。
 	 */
 	function visit(n) {

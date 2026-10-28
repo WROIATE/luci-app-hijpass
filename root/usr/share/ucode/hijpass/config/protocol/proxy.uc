@@ -1,3 +1,5 @@
+/** @typedef {import('../../types/proxy.uc').ProxyNode} ProxyNode */
+/** @typedef {import('../../types/config.uc').UciSection} UciSection */
 import { fields as shadowsocks } from './shadowsocks.uc';
 import { fields as vless } from './vless.uc';
 import { fields as hysteria2 } from './hysteria2.uc';
@@ -48,6 +50,8 @@ const commandFields = {
 /**
  * 把 UCI 节点转换为对应配置类型，并校验必填字段。
  * 返回：节点对象；upstream 为 null，members 为空数组，等待连接依赖。
+ * @param {UciSection} section
+ * @returns {ProxyNode}
  */
 export function decodeProxy(section) {
 	let mode = configType(section.config_type), custom = mode == CONFIG_TYPE.custom;

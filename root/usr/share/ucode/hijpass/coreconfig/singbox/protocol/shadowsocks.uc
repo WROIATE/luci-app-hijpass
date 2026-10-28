@@ -1,3 +1,4 @@
+/** @typedef {import('../../../types/proxy.uc').ShadowsocksProxy} ShadowsocksProxy */
 import { endpoint, multiplex } from './options.uc';
 import { optional } from '../../json.uc';
 
@@ -5,6 +6,7 @@ import { optional } from '../../json.uc';
 // udp_over_tcp 与 multiplex 为 sing-box 原生对象，仅启用时创建。
 /**
  * 将 Shadowsocks 节点转换为 sing-box 原生出站配置。
+ * @param {ShadowsocksProxy} n
  * @returns {object} 含加密认证及可选插件、UDP-over-TCP 和连接复用的出站对象。
  */
 export function build(n) {

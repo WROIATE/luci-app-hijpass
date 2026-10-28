@@ -1,3 +1,9 @@
+/** @typedef {import('../../types/routing.uc').Match} Match */
+/** @typedef {import('../../types/routing.uc').RoutingEntry} RoutingEntry */
+/** @typedef {import('../../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../../types/proxy.uc').RoutingDependencies} RoutingDependencies */
+/** @typedef {import('../../types/routing.uc').RoutingSettings} RoutingSettings */
+/** @typedef {import('../../types/routing.uc').DNSServer} DNSServer */
 import { TAG } from '../constants.uc';
 import { optional } from '../json.uc';
 import { hasDomain, empty, convertGeo, singboxMatch } from '../rules.uc';
@@ -7,6 +13,9 @@ function dnsStrategy(value) {
 	return { '4': 'ipv4_only', '6': 'ipv6_only', '46': 'prefer_ipv4', '64': 'prefer_ipv6' }[value] || '';
 }
 
+/**
+ * @param {DNSServer} server
+ */
 function dnsServer(server, tag, detour) {
 	if (index(['udp', 'tcp', 'tls', 'quic', 'https', 'local'], server.type) < 0) {
 		die(`invalid sing-box DNS type "${server.type}"`);
@@ -24,9 +33,9 @@ function dnsServer(server, tag, detour) {
 
 /**
  * 生成 sing-box 分流配置；规则集转换只作用于本次生成的匹配条件副本。
- * @param {object} settings 共享 routing.prepare() 的结果。
- * @param {{nodes: object[], byName: object}} dependencies
- * @returns {object} 含 DNS、入站、出站和路由的配置。
+ * @param {RoutingSettings} settings 共享 routing.prepare() 的结果。
+ * @param {RoutingDependencies} dependencies
+ * @returns {CoreConfig} 含 DNS、入站、出站和路由的配置。
  */
 export function build(settings, dependencies) {
 	let dnsServers = [dnsServer(settings.dns, settings.dns.tag, settings.final)], dnsRules = [];
@@ -52,6 +61,11 @@ export function build(settings, dependencies) {
 	}
 	let sets = {}, setOrder = [];
 	// DNS 规则与服务器成对登记，保持与路由规则相同的优先级。
+	/**
+	 * @param {RoutingEntry} entry
+	 * @param {Match} ruleMatch
+	 * @param {string} outboundTag
+	 */
 	function addDNS(entry, ruleMatch, outboundTag) {
 		if (outboundTag == TAG.block) {
 			die(`rule "${entry.name}" DNS exit cannot be Block`);

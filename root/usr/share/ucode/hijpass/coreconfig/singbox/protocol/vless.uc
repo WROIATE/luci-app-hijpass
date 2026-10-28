@@ -1,3 +1,4 @@
+/** @typedef {import('../../../types/proxy.uc').VlessProxy} VlessProxy */
 import { endpoint, tls, transport, multiplex } from './options.uc';
 import { optional } from '../../json.uc';
 
@@ -5,6 +6,7 @@ import { optional } from '../../json.uc';
 // Reality 必须有公钥，并同时启用 uTLS，使用 chrome 指纹。
 /**
  * 将 VLESS 节点转换为 sing-box 原生出站配置。
+ * @param {VlessProxy} n
  * @returns {object} 含认证及可选 TLS/Reality、传输和连接复用的出站对象。
  */
 export function build(n) {

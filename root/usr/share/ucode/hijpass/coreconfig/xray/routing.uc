@@ -1,3 +1,9 @@
+/** @typedef {import('../../types/routing.uc').Match} Match */
+/** @typedef {import('../../types/routing.uc').RoutingEntry} RoutingEntry */
+/** @typedef {import('../../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../../types/proxy.uc').RoutingDependencies} RoutingDependencies */
+/** @typedef {import('../../types/routing.uc').RoutingSettings} RoutingSettings */
+/** @typedef {import('../../types/routing.uc').DNSServer} DNSServer */
 import { TAG } from '../constants.uc';
 import { optional } from '../json.uc';
 import { hasDomain, empty, xrayDomains, xrayRules } from '../rules.uc';
@@ -7,6 +13,9 @@ function dnsStrategy(value) {
 	return { '4': 'UseIPv4', '6': 'UseIPv6', '46': 'UseIP', '64': 'UseIP' }[value] || '';
 }
 
+/**
+ * @param {DNSServer} server
+ */
 function dnsServer(server, tag) {
 	if (index(['udp', 'tcp', 'quic', 'https'], server.type) < 0) {
 		die(`invalid Xray DNS type "${server.type}"`);
@@ -27,9 +36,9 @@ function dnsServer(server, tag) {
 
 /**
  * 生成 Xray 分流配置，DNS 请求出口规则排在用户路由之前。
- * @param {object} settings 共享 routing.prepare() 的结果。
- * @param {{nodes: object[], byName: object}} dependencies
- * @returns {object} 含 DNS、入站、出站和路由的配置。
+ * @param {RoutingSettings} settings 共享 routing.prepare() 的结果。
+ * @param {RoutingDependencies} dependencies
+ * @returns {CoreConfig} 含 DNS、入站、出站和路由的配置。
  */
 export function build(settings, dependencies) {
 	let outbounds = map(dependencies.nodes, node => socks(node.name, node.socks_port));
@@ -49,6 +58,11 @@ export function build(settings, dependencies) {
 		dns: { servers: dnsServers, queryStrategy: dnsStrategy(settings.strategy) || 'UseIP', serveExpiredTTL: 3600,
 			disableCache: !settings.cache, serveStale: !settings.cache, disableFallback: false, disableFallbackIfMatch: true },
 	};
+	/**
+	 * @param {RoutingEntry} entry
+	 * @param {Match} ruleMatch
+	 * @param {string} outboundTag
+	 */
 	function addDNS(entry, ruleMatch, outboundTag) {
 		if (outboundTag == TAG.block) {
 			die(`rule "${entry.name}" DNS exit cannot be Block`);

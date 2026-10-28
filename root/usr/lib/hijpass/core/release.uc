@@ -8,7 +8,7 @@ const repos = { 'sing-box': 'SagerNet/sing-box', xray: 'XTLS/Xray-core' };
 /**
  * 根据核心和 CPU 架构确定下载包的平台名称。
  * @param {string} core
- * @param {string} machine
+ * @param {string|null} machine
  * @returns {string} linux-<架构> 平台名称；不支持时抛错。
  */
 export function architecture(core, machine) {
@@ -47,7 +47,7 @@ export function release(core, response) {
 /**
  * 从发布资源中选出安装包，并校验下载地址和校验和。
  * @param {string} core
- * @param {string} machine
+ * @param {string|null} machine
  * @param {CoreRelease} info
  * @returns {AssetPlan} 安装计划，含版本、下载地址、SHA-256、安装位置和归档格式。
  */
@@ -82,7 +82,9 @@ export function assetPlan(core, machine, info) {
  * 处理核心更新脚本的版本查询、资源选择等数据请求。
  * @returns {null} 结果写入 stdout，失败时输出 JSON 错误并退出。
  */
-export function main() { run(ARGV, args => {
+export function main() { run(ARGV,
+    /** @param {string[]} args */
+    args => {
     let action = shift(args), core = shift(args);
     if (!core || !repos[core]) {
         die('core action and name are required');

@@ -260,7 +260,12 @@ export function routeMatch(sections, target, geoTags) {
  * 处理规则更新计划、Geo 转换和规则查询的数据请求。
  * @returns {null} 结果写入 stdout，包括计划、规则文本、查询说明或更新状态。
  */
-export function main() { run(ARGV, (args, configDirectory) => {
+export function main() { run(ARGV,
+    /**
+     * @param {string[]} args
+     * @param {string|null} configDirectory
+     */
+    function(args, configDirectory) {
     let action = shift(args);
     if (action == 'plan') {
         let config = read('hijpass', configDirectory);

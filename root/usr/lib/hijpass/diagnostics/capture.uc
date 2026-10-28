@@ -214,7 +214,12 @@ export function cleanupPlan(directory, raw) {
  * 分发诊断子命令，生成任务参数、追踪规则或诊断报告。
  * @returns {null} 结果写入 stdout，错误通过 stderr 和退出码报告。
  */
-export function main() { run(ARGV, (args, configDirectory) => {
+export function main() { run(ARGV,
+    /**
+     * @param {string[]} args
+     * @param {string|null} configDirectory
+     */
+    function(args, configDirectory) {
     let action = shift(args);
     if (action == 'prepare') {
         let pid = shift(args);

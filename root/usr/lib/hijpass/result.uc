@@ -20,7 +20,9 @@ function commandOutput(directory, code) {
 }
 
 // Shell 只传目录、退出码或短错误；大文本由 ucode 直接读取并编码为 JSON。
-run(ARGV, args => {
+run(ARGV,
+    /** @param {string[]} args */
+    args => {
     let action = shift(args);
     if (action == 'error' || action == 'error-file') {
         let message = action == 'error-file' ? rtrim(text(args[0]), '\n') : args[0];

@@ -92,7 +92,12 @@ export function cleanLogs(sections, action, path) {
  * 处理日志追加、清空和裁剪命令。
  * @returns {null} 正常执行不输出数据，错误通过 stderr 和退出码报告。
  */
-export function main() { run(ARGV, (args, configDirectory) => {
+export function main() { run(ARGV,
+    /**
+     * @param {string[]} args
+     * @param {string|null} configDirectory
+     */
+    function(args, configDirectory) {
     let action = shift(args);
     if (action == 'append') {
         let config = read('hijpass', configDirectory);

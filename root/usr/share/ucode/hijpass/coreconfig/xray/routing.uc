@@ -71,11 +71,13 @@ export function build(settings, dependencies) {
 		optional(server, 'domains', xrayDomains(ruleMatch));
 		optional(server, 'queryStrategy', dnsStrategy(entry.strategy));
 		push(dnsServers, server);
-		if (!dnsExits[outboundTag]) {
-			dnsExits[outboundTag] = [];
+		let serverTags = dnsExits[outboundTag];
+		if (type(serverTags) != 'array') {
+			serverTags = [];
+			dnsExits[outboundTag] = serverTags;
 			push(exitOrder, outboundTag);
 		}
-		push(dnsExits[outboundTag], tag);
+		push(serverTags, tag);
 	}
 	for (let entry in settings.entries) {
 		let splitMatch = null;

@@ -149,7 +149,9 @@ export function contains(address, cidr) {
  * 处理地址解析、端口检查和连接探测的数据请求。
  * @returns {null} 结果写入 stdout，失败时输出 JSON 错误并退出。
  */
-export function main() { run(ARGV, args => {
+export function main() { run(ARGV,
+    /** @param {string[]} args */
+    args => {
     let action = shift(args);
     if (action == 'resolve') {
         return { address: resolve(args[0]) };

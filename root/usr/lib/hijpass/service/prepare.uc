@@ -112,7 +112,8 @@ export function prepareConfigFiles(sections, generated) {
 			continue;
 		}
 		if (section.upstream_proxy_node && section.server && !iptoarr(section.server)) {
-			let address = resolve(section.server), outbound = { ...config.outbounds[0] };
+			let outbounds = [...config.outbounds];
+			let address = resolve(section.server), outbound = { ...outbounds[0] };
 			if (outbound.server) {
 				outbound.server = address;
 			}
@@ -122,7 +123,8 @@ export function prepareConfigFiles(sections, generated) {
 			else {
 				die('unsupported proxy server field');
 			}
-			config = { ...config, outbounds: [outbound, ...slice(config.outbounds, 1)] };
+			outbounds[0] = outbound;
+			config = { ...config, outbounds };
 		}
 		push(files, { path: nodeConfig(section), data: sprintf('%.2J\n', config) });
 	}
@@ -301,7 +303,12 @@ function settings(config, server) {
  * 为服务启停准备配置、进程参数和定时任务。
  * @returns {null} 查询结果写入 stdout；写入类动作直接更新对应文件。
  */
-export function main() { run(ARGV, (args, configDirectory) => {
+export function main() { run(ARGV,
+    /**
+     * @param {string[]} args
+     * @param {string|null} configDirectory
+     */
+    function(args, configDirectory) {
     let server = args[0] == 'server';
     if (server) {
         shift(args);

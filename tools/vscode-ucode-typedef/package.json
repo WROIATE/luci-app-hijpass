@@ -1,8 +1,8 @@
 {
   "name": "ucode-typedef-navigation",
   "displayName": "ucode Typedef Navigation",
-  "description": "Jump from ucode JSDoc type references to their local @typedef definitions.",
-  "version": "0.1.0",
+  "description": "Jump from local and imported ucode JSDoc type references to their @typedef definitions.",
+  "version": "0.2.0",
   "publisher": "hijpass-local",
   "private": true,
   "license": "UNLICENSED",

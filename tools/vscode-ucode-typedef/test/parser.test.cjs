@@ -2,12 +2,16 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { buildTypeIndex, lookupType } = require('../dist/typedefs');
+const { buildTypeIndex, referenceAt } = require('../dist/typedefs');
 
 function lookup(code, text, occurrence = 'last') {
     const offset = occurrence === 'first' ? code.indexOf(text) : code.lastIndexOf(text);
     assert(offset >= 0, `Missing test reference: ${text}`);
-    return lookupType(buildTypeIndex(code), offset);
+    const index = buildTypeIndex(code);
+    const reference = referenceAt(index, offset);
+    if (!reference || reference.modulePath !== undefined) return;
+    const definitions = index.definitions.get(reference.name);
+    return definitions?.length ? { reference, definitions } : undefined;
 }
 
 test('the actual NodeSection and LogSection annotations jump to their exact definitions', () => {
@@ -93,8 +97,43 @@ test('missing types and unclosed comments have no target', () => {
 test('lookup accepts the caret at the end of a selected type name', () => {
     const code = '/** @typedef {object} Node */\n/** @param {Node} value */';
     const index = buildTypeIndex(code), start = code.lastIndexOf('Node');
-    assert.equal(lookupType(index, start - 1), undefined);
-    assert(lookupType(index, start + 3));
-    assert(lookupType(index, start + 4));
-    assert.equal(lookupType(index, start + 5), undefined);
+    assert.equal(referenceAt(index, start - 1), undefined);
+    assert(referenceAt(index, start + 3));
+    assert(referenceAt(index, start + 4));
+    assert.equal(referenceAt(index, start + 5), undefined);
+});
+
+test('import references retain the exact type-name range and relative module path', () => {
+    const code = `/** @typedef {object} LogSection */
+/** @param {{logs: import('../shared/types 日志.uc').LogSection[]|null}} value */`;
+    const reference = referenceAt(buildTypeIndex(code), code.lastIndexOf('LogSection'));
+    assert.equal(reference.name, 'LogSection');
+    assert.equal(reference.modulePath, '../shared/types 日志.uc');
+    assert.equal(code.slice(reference.start, reference.end), 'LogSection');
+    assert.equal(lookup(code, 'LogSection'), undefined, 'An explicit import must not resolve a same-named local type');
+});
+
+test('multiline imports and multiple imports in one expression keep their own paths', () => {
+    const code = `/** @returns {
+ * import(
+ *   "./first"
+ * ).First | import('./second.uc').Second
+ * } */`;
+    const index = buildTypeIndex(code);
+    assert.equal(referenceAt(index, code.indexOf('First')).modulePath, './first');
+    assert.equal(referenceAt(index, code.indexOf('Second')).modulePath, './second.uc');
+});
+
+test('only pure local/import aliases are followed, not records, unions or arrays', () => {
+    const code = `/** @typedef {import('./types.uc').LogSection} Imported */
+/** @typedef {Imported} Alias */
+/** @typedef {{log: Imported}} Record */
+/** @typedef {Imported|null} Optional */
+/** @typedef {Imported[]} Logs */`;
+    const definitions = buildTypeIndex(code).definitions;
+    assert.equal(definitions.get('Imported')[0].alias.modulePath, './types.uc');
+    assert.equal(definitions.get('Alias')[0].alias.name, 'Imported');
+    for (const name of ['Record', 'Optional', 'Logs']) {
+        assert.equal(definitions.get(name)[0].alias, undefined, name);
+    }
 });

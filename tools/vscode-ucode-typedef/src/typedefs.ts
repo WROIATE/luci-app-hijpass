@@ -1,9 +1,14 @@
 interface Span { start: number; end: number }
 interface NamedSpan extends Span { name: string }
-interface Definition extends NamedSpan { commentStart: number; commentEnd: number }
+export interface TypeReference extends NamedSpan { modulePath?: string }
+export interface Definition extends NamedSpan {
+    commentStart: number;
+    commentEnd: number;
+    alias?: TypeReference;
+}
 export interface TypeIndex {
     definitions: Map<string, Definition[]>;
-    references: NamedSpan[];
+    references: TypeReference[];
 }
 
 // A small lexical scan keeps examples in strings, line comments and regexes out
@@ -92,21 +97,42 @@ function typeExpression(text: string, start: number, end: number): Span | undefi
     }
 }
 
-function typeReferences(text: string, expression: Span): NamedSpan[] {
-    const references: NamedSpan[] = [];
-    for (let i = expression.start; i < expression.end;) {
+function expressionText(text: string, expression: Span): string {
+    // Replace only the JSDoc decoration; preserve every UTF-16 offset.
+    return text.slice(expression.start, expression.end).replace(/(^|\n)([ \t]*)\*/g, '$1$2 ');
+}
+
+function importedType(text: string, start: number) {
+    const match = /^import\s*\(\s*(?:'([^'\\\r\n]*)'|"([^"\\\r\n]*)")\s*\)\s*\.\s*([A-Za-z_$][\w$]*)(?![\w$]|\s*\.)/.exec(text.slice(start));
+    if (!match) return;
+    const name = match[3]!;
+    const end = start + match[0].length;
+    return { reference: { name, start: end - name.length, end, modulePath: match[1] ?? match[2]! }, end };
+}
+
+function typeReferences(source: string, expression: Span): TypeReference[] {
+    const text = expressionText(source, expression);
+    const references: TypeReference[] = [];
+    for (let i = 0; i < text.length;) {
         if (text[i] === '"' || text[i] === "'") {
-            i = quotedEnd(text, i, expression.end);
+            i = quotedEnd(text, i);
             continue;
         }
-        const name = nameAt(text, i, expression.end);
+        const name = nameAt(text, i, text.length);
         if (!name) { i++; continue; }
+        const imported = name.name === 'import' ? importedType(text, i) : undefined;
+        if (imported) {
+            references.push({ ...imported.reference,
+                start: expression.start + imported.reference.start,
+                end: expression.start + imported.reference.end });
+            i = imported.end;
+            continue;
+        }
         i = name.end;
-        // Qualified names/import('module').Type belong to other resolvers.
         // Inline record keys (including optional keys) are not type references.
-        const suffix = text.slice(i, expression.end);
-        if (text.slice(expression.start, name.start).trimEnd().endsWith('.') || /^\s*\.(?!\s*<)/.test(suffix) || /^\s*\??\s*:/.test(suffix)) continue;
-        references.push(name);
+        const suffix = text.slice(i);
+        if (text.slice(0, name.start).trimEnd().endsWith('.') || /^\s*\.(?!\s*<)/.test(suffix) || /^\s*\??\s*:/.test(suffix)) continue;
+        references.push({ ...name, start: expression.start + name.start, end: expression.start + name.end });
     }
     return references;
 }
@@ -129,15 +155,21 @@ export function buildTypeIndex(text: string): TypeIndex {
                 if (definition) start = skipSpace(text, definition.end, end);
             }
             const expression = typeExpression(text, start, end);
+            let alias: TypeReference | undefined;
             if (expression) {
-                index.references.push(...typeReferences(text, expression));
+                const references = typeReferences(text, expression);
+                index.references.push(...references);
+                if (references.length === 1) {
+                    const body = expressionText(text, expression).trim();
+                    if (body === references[0]!.name || importedType(body, 0)?.end === body.length) alias = references[0];
+                }
                 if (tag[1] === 'typedef' && !definition) {
                     definition = nameAt(text, skipSpace(text, expression.end + 1, end), end);
                 }
             }
             if (definition) {
                 const definitions = index.definitions.get(definition.name) ?? [];
-                definitions.push({ ...definition, commentStart: comment.start, commentEnd: comment.end });
+                definitions.push({ ...definition, commentStart: comment.start, commentEnd: comment.end, alias });
                 index.definitions.set(definition.name, definitions);
             }
         }
@@ -145,8 +177,6 @@ export function buildTypeIndex(text: string): TypeIndex {
     return index;
 }
 
-export function lookupType(index: TypeIndex, offset: number) {
-    const reference = index.references.find(item => item.start <= offset && offset <= item.end);
-    const definitions = reference && index.definitions.get(reference.name);
-    return reference && definitions?.length ? { reference, definitions } : undefined;
+export function referenceAt(index: TypeIndex, offset: number): TypeReference | undefined {
+    return index.references.find(item => item.start <= offset && offset <= item.end);
 }

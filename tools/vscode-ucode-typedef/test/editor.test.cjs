@@ -66,5 +66,6 @@ print(nodeFilename({name: 'example'}));
         }
         assert(functions.some(item => (item.targetSelectionRange || item.range).start.line === 3), JSON.stringify(functions));
     }
+    await require('./cross-file.test.cjs').run();
     console.log(`Editor integration passed: definition command, exact target, unsaved changes, file scope${companion ? ', original LSP function navigation' : ', standalone activation'}.`);
 };

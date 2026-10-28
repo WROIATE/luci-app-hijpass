@@ -60,6 +60,9 @@ export function editor(request, write) {
         }
         return { content: content || '' };
     }
+    if (type(request.content) != 'string') {
+        die('editor content must be a string');
+    }
     let content = replace(trim(request.content), /\r\n/g, '\n');
     atomic(path, content ? content + '\n' : '', fs.stat(path)?.mode || 0o600);
     return { ok: true };
@@ -122,7 +125,7 @@ export function log(request) {
             let content = file.read('all') || ''; file.close();
             return { content, name: fs.basename(path) };
         }
-        if (request.action != 'read' || !match(request.lines, /^[0-9]+$/)) {
+        if (request.action != 'read' || type(request.lines) != 'string' || !match(request.lines, /^[0-9]+$/)) {
             die('invalid log request');
         }
         let count = int(request.lines);

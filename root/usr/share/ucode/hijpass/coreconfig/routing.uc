@@ -57,10 +57,11 @@ export function prepare(sections, dependencies) {
 	 * @returns {DNSServer}
 	 */
 	function resolveDNSServer(name) {
-		if (!servers[name]) {
+		let server = servers[name];
+		if (!server) {
 			die(`DNS node "${name}" missing or disabled`);
 		}
-		return servers[name];
+		return server;
 	}
 	let shunt = first(sections, 'shunt');
 	let settings = {

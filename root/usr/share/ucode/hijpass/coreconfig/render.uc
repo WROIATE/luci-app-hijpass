@@ -6,7 +6,7 @@
 import { first, validateSections } from '../config/sections.uc';
 import { CORE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 import { resolve as resolveDependencies, validate as validateDependencies } from './dependencies.uc';
-import { clean } from './json.uc';
+import { cleanObject } from './json.uc';
 import { build as singbox } from './singbox/config.uc';
 import { build as xray } from './xray/config.uc';
 import { prepare as prepareRouting, build as buildRouting } from './routing.uc';
@@ -62,11 +62,11 @@ export function render(sections, target) {
 		if (n.config_type == CONFIG_TYPE.custom) {
 			continue;
 		}
-		try { result.nodes[n.id] = clean(n.core == CORE.xray ? xray(n) : singbox(n)); }
+		try { result.nodes[n.id] = cleanObject(n.core == CORE.xray ? xray(n) : singbox(n)); }
 		catch (e) { die(`node "${n.name}": ${e.message}`); }
 	}
 	if (routing) {
-		result.shunt = clean(buildRouting(routing, dependencies));
+		result.shunt = cleanObject(buildRouting(routing, dependencies));
 	}
 	if (!target) {
 		return result;

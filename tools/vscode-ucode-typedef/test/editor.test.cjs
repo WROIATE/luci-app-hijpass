@@ -67,6 +67,7 @@ print(nodeFilename({name: 'example'}));
         assert(functions.some(item => (item.targetSelectionRange || item.range).start.line === 3), JSON.stringify(functions));
     }
     await require('./cross-file.test.cjs').run();
+    await require('./field-navigation.test.cjs').run();
     // Exercise the project's actual aliases and multiline/recursive shared types.
     const projectRoot = path.resolve(__dirname, '../../..', 'root');
     for (const [source, reference, typeFile, name] of [

@@ -1,79 +1,29 @@
-interface Span { start: number; end: number }
+import { quotedEnd, tokens, Span } from './lex';
+
 interface NamedSpan extends Span { name: string }
 export interface TypeReference extends NamedSpan { modulePath?: string }
+export type Shape = { kind: 'reference'; reference: TypeReference }
+    | { kind: 'record'; fields: FieldDefinition[]; index?: Shape }
+    | { kind: 'multiple'; members: Shape[] }
+    | { kind: 'array'; element: Shape }
+    | { kind: 'dictionary'; value: Shape }
+    | { kind: 'unknown' };
+export interface FieldDefinition extends NamedSpan { shape: Shape; commentStart: number; commentEnd: number }
+export interface Annotation extends Span {
+    tag: string;
+    name?: string;
+    shape: Shape;
+}
 export interface Definition extends NamedSpan {
     commentStart: number;
     commentEnd: number;
     alias?: TypeReference;
+    shape: Shape;
 }
 export interface TypeIndex {
     definitions: Map<string, Definition[]>;
     references: TypeReference[];
-}
-
-// A small lexical scan keeps examples in strings, line comments and regexes out
-// of the index. Offsets always refer to the unmodified document (UTF-16).
-function quotedEnd(text: string, start: number, limit = text.length): number {
-    for (let i = start + 1; i < limit; i++) {
-        if (text[i] === '\\') i++;
-        else if (text[i] === text[start]) return i + 1;
-    }
-    return limit;
-}
-
-function regexEnd(text: string, start: number): number {
-    let inClass = false;
-    for (let i = start + 1; i < text.length && text[i] !== '\n'; i++) {
-        if (text[i] === '\\') i++;
-        else if (text[i] === '[') inClass = true;
-        else if (text[i] === ']') inClass = false;
-        else if (text[i] === '/' && !inClass) return i + 1;
-    }
-    return start + 1;
-}
-
-function* docComments(text: string): Generator<Span> {
-    let expressionStart = true;
-    let previous = '';
-    const controlParens: boolean[] = [];
-    const blocks: boolean[] = [];
-    for (let i = 0; i < text.length;) {
-        const char = text[i]!;
-        if (/\s/.test(char)) { i++; continue; }
-        if (char === '"' || char === "'" || char === '`') {
-            i = quotedEnd(text, i);
-            expressionStart = false;
-            previous = 'literal';
-        } else if (text.startsWith('//', i) || (i === 0 && text.startsWith('#!', i))) {
-            const end = text.indexOf('\n', i);
-            i = end < 0 ? text.length : end;
-        } else if (text.startsWith('/*', i)) {
-            const end = text.indexOf('*/', i + 2);
-            if (end < 0) return;
-            if (text[i + 2] === '*') yield { start: i, end: end + 2 };
-            i = end + 2;
-        } else if (char === '/' && expressionStart) {
-            i = regexEnd(text, i);
-            expressionStart = false;
-            previous = 'literal';
-        } else if (/[\w$]/.test(char)) {
-            const start = i++;
-            while (i < text.length && /[\w$]/.test(text[i]!)) i++;
-            previous = text.slice(start, i);
-            expressionStart = /^(return|throw|case|delete|in|else|do)$/.test(previous);
-        } else {
-            if (char === '(') controlParens.push(/^(if|while|for|switch|catch)$/.test(previous));
-            if (char === '{') blocks.push(/^(\)|>|;|\{|\}|else|try|finally|do|)$/.test(previous));
-            expressionStart = char === ')' ? (controlParens.pop() ?? false)
-                : char === '}' ? (blocks.pop() ?? true) : !/[\].]/.test(char);
-            if ((char === '+' || char === '-') && text[i + 1] === char) {
-                expressionStart = false;
-                i++;
-            }
-            previous = char;
-            i++;
-        }
-    }
+    annotations: Annotation[];
 }
 
 function skipSpace(text: string, start: number, end: number): number {
@@ -137,9 +87,72 @@ function typeReferences(source: string, expression: Span): TypeReference[] {
     return references;
 }
 
+// Split only outside records, array/generic brackets, parentheses and strings.
+function parts(text: string, start: number, end: number, separators: string): Span[] {
+    const result: Span[] = [];
+    let depth = 0, first = start;
+    for (let i = start; i < end; i++) {
+        if (text[i] === '"' || text[i] === "'") i = quotedEnd(text, i, end) - 1;
+        else if ('{[(<'.includes(text[i]!)) depth++;
+        else if ('}])>'.includes(text[i]!)) depth--;
+        else if (depth === 0 && separators.includes(text[i]!)) { result.push({ start: first, end: i }); first = i + 1; }
+    }
+    result.push({ start: first, end });
+    return result;
+}
+
+export function parseShape(source: string, expression: Span, comment: Span): Shape {
+    const text = source.slice(0, expression.start)
+        + expressionText(source, expression) + source.slice(expression.end);
+    function parse(start: number, end: number): Shape {
+        while (start < end && /\s/.test(text[start]!)) start++;
+        while (end > start && /\s/.test(text[end - 1]!)) end--;
+        if (start >= end) return { kind: 'unknown' };
+        const unions = parts(text, start, end, '|');
+        if (unions.length > 1) return { kind: 'multiple', members: unions.map(p => parse(p.start, p.end)) };
+        const intersections = parts(text, start, end, '&');
+        if (intersections.length > 1) return { kind: 'multiple', members: intersections.map(p => parse(p.start, p.end)) };
+        if ('?!'.includes(text[start]!)) return parse(start + 1, end);
+        if ('?='.includes(text[end - 1]!)) return parse(start, end - 1);
+        if (text[start] === '(' && text[end - 1] === ')') return parse(start + 1, end - 1);
+        if (text.slice(end - 2, end) === '[]') return { kind: 'array', element: parse(start, end - 2) };
+        const array = /^[Aa]rray\s*\.?\s*</.exec(text.slice(start, end));
+        if (array && text[end - 1] === '>') return { kind: 'array', element: parse(start + array[0].length, end - 1) };
+        const dictionary = /^(Object|Record)\s*</.exec(text.slice(start, end));
+        if (dictionary && text[end - 1] === '>') {
+            const arguments_ = parts(text, start + dictionary[0].length, end - 1, ',');
+            if (arguments_.length === 2) return { kind: 'dictionary', value: parse(arguments_[1]!.start, arguments_[1]!.end) };
+        }
+        if (text[start] === '{' && text[end - 1] === '}') {
+            const fields: FieldDefinition[] = [];
+            let index: Shape | undefined;
+            for (const part of parts(text, start + 1, end - 1, ',;')) {
+                const signature = /^\s*\[[^\]]+\]\s*:/.exec(text.slice(part.start, part.end));
+                if (signature) { index = parse(part.start + signature[0].length, part.end); continue; }
+                const key = /^\s*([A-Za-z_$][\w$]*|'[^'\\]*'|"[^"\\]*")\s*\??\s*:/.exec(text.slice(part.start, part.end));
+                if (!key) continue; // Dynamic index signatures have no single field definition.
+                const quoted = /^["']/.test(key[1]!);
+                const keyStart = part.start + key[0].indexOf(key[1]!) + (quoted ? 1 : 0);
+                const name = quoted ? key[1]!.slice(1, -1) : key[1]!;
+                fields.push({ name, start: keyStart, end: keyStart + name.length,
+                    shape: parse(part.start + key[0].length, part.end), commentStart: comment.start, commentEnd: comment.end });
+            }
+            return { kind: 'record', fields, index };
+        }
+        const imported = importedType(text.slice(start, end), 0);
+        if (imported?.end === end - start) return { kind: 'reference', reference: {
+            ...imported.reference, start: start + imported.reference.start, end: start + imported.reference.end,
+        } };
+        const reference = nameAt(text, start, end);
+        return reference?.end === end ? { kind: 'reference', reference } : { kind: 'unknown' };
+    }
+    return parse(expression.start, expression.end);
+}
+
 export function buildTypeIndex(text: string): TypeIndex {
-    const index: TypeIndex = { definitions: new Map(), references: [] };
-    for (const comment of docComments(text)) {
+    const index: TypeIndex = { definitions: new Map(), references: [], annotations: [] };
+    for (const comment of tokens(text).filter(token => token.kind === 'doc')) {
+        let owner: Definition | undefined;
         const contentStart = comment.start + 3;
         const contentEnd = comment.end - 2;
         const content = text.slice(contentStart, contentEnd);
@@ -156,6 +169,7 @@ export function buildTypeIndex(text: string): TypeIndex {
             }
             const expression = typeExpression(text, start, end);
             let alias: TypeReference | undefined;
+            const shape: Shape = expression ? parseShape(text, expression, comment) : { kind: 'unknown' };
             if (expression) {
                 const references = typeReferences(text, expression);
                 index.references.push(...references);
@@ -166,10 +180,20 @@ export function buildTypeIndex(text: string): TypeIndex {
                 if (tag[1] === 'typedef' && !definition) {
                     definition = nameAt(text, skipSpace(text, expression.end + 1, end), end);
                 }
+                const named = /^\[?([A-Za-z_$][\w$]*)/.exec(text.slice(skipSpace(text, expression.end + 1, end), end));
+                index.annotations.push({ tag: tag[1]!, name: named?.[1], shape, start: comment.start, end: comment.end });
+                if (/^(property|prop)$/.test(tag[1]!) && owner && named) {
+                    const fieldStart = skipSpace(text, expression.end + 1, end) + (text[skipSpace(text, expression.end + 1, end)] === '[' ? 1 : 0);
+                    const field: FieldDefinition = { name: named[1]!, start: fieldStart, end: fieldStart + named[1]!.length,
+                        shape, commentStart: comment.start, commentEnd: comment.end };
+                    if (owner.shape.kind !== 'record') owner.shape = { kind: 'record', fields: [] };
+                    owner.shape.fields.push(field);
+                }
             }
             if (definition) {
                 const definitions = index.definitions.get(definition.name) ?? [];
-                definitions.push({ ...definition, commentStart: comment.start, commentEnd: comment.end, alias });
+                owner = { ...definition, commentStart: comment.start, commentEnd: comment.end, alias, shape };
+                definitions.push(owner);
                 index.definitions.set(definition.name, definitions);
             }
         }

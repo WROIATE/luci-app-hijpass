@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
-import { buildTypeIndex, referenceAt, Definition, TypeIndex, TypeReference } from './typedefs';
+import { buildTypeIndex, referenceAt, Definition, FieldDefinition, Shape, TypeIndex, TypeReference } from './typedefs';
+import { buildMemberReferences, MemberReference } from './members';
+import { Span } from './lex';
 
-interface Target { document: vscode.TextDocument; definition: Definition }
+interface Target { document: vscode.TextDocument; definition: Definition | FieldDefinition }
 
 async function openImport(document: vscode.TextDocument, modulePath: string, cancellation: vscode.CancellationToken) {
     if (document.uri.scheme === 'untitled' || !/^\.\.?\//.test(modulePath) || /[\\\x00\r\n]/.test(modulePath)) return;
@@ -21,7 +23,7 @@ function range(document: vscode.TextDocument, start: number, end: number): vscod
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-    const cache = new WeakMap<vscode.TextDocument, { version: number; index: TypeIndex }>();
+    const cache = new WeakMap<vscode.TextDocument, { version: number; index: TypeIndex; members?: MemberReference[] }>();
 
     function indexFor(document: vscode.TextDocument): TypeIndex {
         let entry = cache.get(document);
@@ -51,15 +53,63 @@ export function activate(context: vscode.ExtensionContext): void {
         return targets;
     }
 
+    async function resolveField(document: vscode.TextDocument, shape: Shape, path: (string | null)[],
+        visited: Set<string>, cancellation: vscode.CancellationToken): Promise<Target[]> {
+        if (cancellation.isCancellationRequested || path.length === 0) return [];
+        if (shape.kind === 'reference') {
+            const reference = shape.reference;
+            const target = reference.modulePath === undefined ? document : await openImport(document, reference.modulePath, cancellation);
+            if (!target) return [];
+            const key = target.uri.toString() + '\0' + reference.name + '\0' + JSON.stringify(path);
+            if (visited.has(key)) return [];
+            visited.add(key);
+            const targets: Target[] = [];
+            for (const definition of indexFor(target).definitions.get(reference.name) ?? []) {
+                targets.push(...await resolveField(target, definition.shape, path, visited, cancellation));
+            }
+            return targets;
+        }
+        if (shape.kind === 'multiple') {
+            const targets: Target[] = [];
+            for (const member of shape.members) targets.push(...await resolveField(document, member, path, visited, cancellation));
+            return targets;
+        }
+        if (shape.kind === 'array') return path[0] === null
+            ? resolveField(document, shape.element, path.slice(1), visited, cancellation) : [];
+        if (shape.kind === 'dictionary') return resolveField(document, shape.value, path.slice(1), visited, cancellation);
+        if (shape.kind !== 'record') return [];
+        const targets: Target[] = [];
+        const fields = shape.fields.filter(f => f.name === path[0]);
+        for (const field of fields) {
+            targets.push(...path.length === 1 ? [{ document, definition: field }]
+                : await resolveField(document, field.shape, path.slice(1), visited, cancellation));
+        }
+        if (!fields.length && shape.index) return resolveField(document, shape.index, path.slice(1), visited, cancellation);
+        return targets;
+    }
+
     context.subscriptions.push(vscode.languages.registerDefinitionProvider('ucode', {
         async provideDefinition(document, position, cancellation) {
             if (cancellation.isCancellationRequested) return;
-            const reference = referenceAt(indexFor(document), document.offsetAt(position));
-            if (!reference) return;
-            const targets = await resolve(document, reference, new Set(), cancellation);
+            const index = indexFor(document), offset = document.offsetAt(position);
+            const reference = referenceAt(index, offset);
+            let origin: Span, targets: Target[];
+            if (reference) {
+                origin = reference;
+                targets = await resolve(document, reference, new Set(), cancellation);
+            }
+            else {
+                const entry = cache.get(document)!;
+                entry.members ??= buildMemberReferences(document.getText(), index);
+                const member = entry.members.find(m => m.start <= offset && offset <= m.end);
+                if (!member) return;
+                origin = member;
+                targets = await resolveField(document, member.shape, member.path, new Set(), cancellation);
+            }
             if (cancellation.isCancellationRequested) return;
-            return targets.map(target => ({
-                originSelectionRange: range(document, reference.start, reference.end),
+            const unique = new Map(targets.map(t => [t.document.uri.toString() + '\0' + t.definition.start, t]));
+            return [...unique.values()].map(target => ({
+                originSelectionRange: range(document, origin.start, origin.end),
                 targetUri: target.document.uri,
                 targetRange: range(target.document, target.definition.commentStart, target.definition.commentEnd),
                 targetSelectionRange: range(target.document, target.definition.start, target.definition.end),

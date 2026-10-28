@@ -1,14 +1,5 @@
 {%
-/**
- * @typedef {object} ChinadnsOptions
- * @property {integer} listenPort 监听端口。
- * @property {string} direct 国内上游地址。
- * @property {string} proxy 代理上游地址。
- * @property {boolean} useChn 国内列表开关。
- * @property {boolean} useGfw 代理列表开关。
- * @property {string|null} chnList 国内列表路径，启用列表时提供。
- * @property {string|null} gfwList 代理列表路径，启用列表时提供。
- */
+/** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ChinadnsOptions} ChinadnsOptions */
 /** @global {ChinadnsOptions} options 由 dns.uc 注入。 */
 %}
 {# options 来自 dns.uc：listenPort/direct/proxy 为已校验端口及上游，useChn/useGfw 控制列表。 -#}

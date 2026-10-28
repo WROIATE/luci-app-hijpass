@@ -14,15 +14,45 @@ function lookup(code, text, occurrence = 'last') {
     return definitions?.length ? { reference, definitions } : undefined;
 }
 
-test('the actual NodeSection and LogSection annotations jump to their exact definitions', () => {
-    const code = fs.readFileSync(path.resolve(__dirname, '../../../root/usr/share/ucode/hijpass/config/paths.uc'), 'utf8');
+test('the actual path annotations reference shared NodeSection and LogSection definitions', () => {
+    const file = path.resolve(__dirname, '../../../root/usr/share/ucode/hijpass/config/paths.uc');
+    const code = fs.readFileSync(file, 'utf8');
     for (const name of ['NodeSection', 'LogSection']) {
         const match = lookup(code, name);
         assert.equal(match.definitions.length, 1);
-        const target = match.definitions[0];
-        assert.equal(code.slice(target.start, target.end), name);
-        assert.equal(target.start, code.indexOf(name));
-        assert(code.slice(target.commentStart, target.commentEnd).includes('@typedef'));
+        const alias = match.definitions[0].alias;
+        assert.equal(alias.name, name);
+        const shared = fs.readFileSync(path.resolve(path.dirname(file), alias.modulePath), 'utf8');
+        const targets = buildTypeIndex(shared).definitions.get(name);
+        assert.equal(targets.length, 1);
+        assert.equal(shared.slice(targets[0].start, targets[0].end), name);
+        assert.equal(targets[0].alias, undefined, 'The shared module owns the full shape');
+    }
+});
+
+test('project type shapes live in dedicated files and every explicit type import resolves', () => {
+    const root = path.resolve(__dirname, '../../../root');
+    const types = path.join(root, 'usr/share/ucode/hijpass/types') + path.sep;
+    function files(directory) {
+        return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+            const file = path.join(directory, entry.name);
+            return entry.isDirectory() ? files(file) : /\.(uc|ut)$/.test(file) ? [file] : [];
+        });
+    }
+    for (const file of files(root)) {
+        const index = buildTypeIndex(fs.readFileSync(file, 'utf8'));
+        if (!file.startsWith(types)) {
+            for (const definitions of index.definitions.values()) {
+                for (const definition of definitions) assert(definition.alias?.modulePath, `${file}: ${definition.name} must reference a shared type`);
+            }
+        }
+        for (const reference of index.references) {
+            if (reference.modulePath === undefined) continue;
+            const target = path.resolve(path.dirname(file), reference.modulePath);
+            assert(fs.existsSync(target), `${file}: missing ${reference.modulePath}`);
+            const definitions = buildTypeIndex(fs.readFileSync(target, 'utf8')).definitions.get(reference.name);
+            assert(definitions?.length, `${file}: ${reference.name} missing from ${target}`);
+        }
     }
 });
 

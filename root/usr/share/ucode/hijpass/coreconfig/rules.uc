@@ -5,30 +5,8 @@ import { optional } from './json.uc';
 // Match 字段均为数组：domain/suffix/keyword/regex 域名条件，ip 为地址或 CIDR，
 // geoip/geosite 为 Geo 标签，network/protocol/ports/ranges 为传输限制。
 // sets 元素：{type, tag, path|url}，表示本地或远端 sing-box 规则集。
-/**
- * @typedef {object} Match
- * @property {string[]} domain 完整域名。
- * @property {string[]} suffix 域名后缀。
- * @property {string[]} keyword 域名关键字。
- * @property {string[]} regex 域名正则表达式。
- * @property {string[]} ip IP 或 CIDR。
- * @property {string[]} geoip GeoIP 标签。
- * @property {string[]} geosite GeoSite 标签。
- * @property {object[]} sets 本地或远端规则集。
- * @property {string[]} network 传输层协议。
- * @property {string[]} protocol 应用层协议。
- * @property {integer[]} ports 目标端口。
- * @property {string[]} ranges 目标端口范围，使用冒号分隔。
- */
-/**
- * @typedef {object} RuleOptions
- * @property {string|string[]|null} network 传输层协议，兼容 option 和 list。
- * @property {string|string[]|null} protocol 应用层协议，兼容 option 和 list。
- * @property {string|string[]|null} port 目标端口，解码时校验 1–65535。
- * @property {string|string[]|null} port_range 目标端口范围，UCI 使用横线分隔。
- * @property {string|null} domain_list 按行填写的域名、GeoSite 或规则集。
- * @property {string|null} ip_list 按行填写的 IP/CIDR、GeoIP 或规则集。
- */
+/** @typedef {import('../types/routing.uc').Match} Match */
+/** @typedef {import('../types/routing.uc').RuleOptions} RuleOptions */
 /**
  * 将 UCI 分流规则拆成各类匹配条件。
  * @param {RuleOptions} section UCI shunt_route_rule 的匹配字段。

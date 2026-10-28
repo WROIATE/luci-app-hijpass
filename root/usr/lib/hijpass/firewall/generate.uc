@@ -11,17 +11,8 @@ import { parseCIDR } from 'hijpass.ip';
 // tproxy_proto 为 tcp/udp 列表，dns_forward 为 none/pre-routing/routing；
 // proxy_local 控制路由器本机，acl_default_allow 与 MAC/接口列表控制客户端。
 // NetworkState：wan 为 WAN 设备名；local4/local6/dns4/dns6 为本地绕过地址数组。
-/**
- * @typedef {object} CommandOutput
- * @property {string} stdout 外部命令输出的原始 JSON 文本。
- * @property {integer} code 命令的退出状态，0 表示成功。
- */
-/**
- * @typedef {object} NetworkSnapshot
- * @property {string} wan fw4 返回的 WAN 设备名，每行一个。
- * @property {CommandOutput} addresses ip -j address 的输出与退出状态。
- * @property {CommandOutput} interfaces ubus network.interface dump 的输出与退出状态。
- */
+/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').CommandOutput} CommandOutput */
+/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').NetworkSnapshot} NetworkSnapshot */
 /**
  * 把 Shell 采集的网络快照整理成防火墙所需的数据。
  * @param {NetworkSnapshot} raw Shell 采集的网络快照。

@@ -16,11 +16,7 @@ function configCommand(source, path) {
     return replace(source, /'\{conf_path\}'|"\{conf_path\}"|\{conf_path\}/g, () => command([path]));
 }
 
-/**
- * @typedef {object} ServicePlan
- * @property {object[]} instances procd 的进程描述数组。
- * @property {number[]} [ports] 服务端允许开放的端口数组。
- */
+/** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ServicePlan} ServicePlan */
 // Instance 为 procd 的输入：id/name（标识），command（argv），env（KEY=VALUE 数组），
 // user（进程用户），log（文件路径或空），shunt（是否设置核心/no-file 资源限制）。
 // ServicePlan 为 {instances:[Instance]}；所有业务准备完成后才交给 Shell procd 桥接层。

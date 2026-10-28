@@ -21,23 +21,8 @@ export const SERVER_DIR = '/etc/hijpass/server';
 const LOG_DIR = '/tmp/hijpass/log';
 const SERVER_LOG_DIR = '/tmp/hijserver/log';
 
-/**
- * 节点文件标识：.name 为 UCI section ID，name 为可选的节点名称。
- * @typedef {{
- *   '.name': string,
- *   name: string|null
- * }} NodeSection
- */
-/**
- * 日志配置：.type 为 UCI section 类型，log_enabled 为可选的日志开关。
- * 节点日志必须提供 .name，可选 name；主日志和分流日志不需要节点标识。
- * @typedef {{
- *   '.type': string,
- *   '.name': string|null,
- *   name: string|null,
- *   log_enabled: string|null
- * }} LogSection
- */
+/** @typedef {import('../types/config.uc').NodeSection} NodeSection */
+/** @typedef {import('../types/config.uc').LogSection} LogSection */
 
 /**
  * 校验节点标识和名称，生成统一文件名。

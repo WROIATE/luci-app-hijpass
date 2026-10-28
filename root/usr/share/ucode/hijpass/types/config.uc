@@ -46,3 +46,13 @@
  *   [field: string]: string|string[]|integer|double|boolean|null
  * }} DecodedValues
  */
+
+/**
+ * 原始 DNS 上游选项；缺失字段保持 null，custom 从对应的 _custom 字段取值。
+ * @typedef {{
+ *   direct_dns: string|null,
+ *   proxy_dns: string|null,
+ *   direct_dns_custom: string|null,
+ *   proxy_dns_custom: string|null
+ * }} DnsUpstreams
+ */

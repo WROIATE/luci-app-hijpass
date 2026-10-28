@@ -1,7 +1,8 @@
+/** @typedef {import('./types/network.uc').CIDRRange} CIDRRange */
 /**
  * 使用原生地址解析校验 IP 或 CIDR，仅接受十进制前缀长度。
  * @param {string} value 裸 IP 或 IP/前缀；不包含空白、作用域或地址形式的掩码。
- * @returns {{bytes: integer[], family: integer, prefix: integer}|null}
+ * @returns {CIDRRange|null}
  * 地址字节、地址族 4/6 和前缀长度；裸 IP 使用完整位数，无效输入返回 null。
  */
 export function parseCIDR(value) {

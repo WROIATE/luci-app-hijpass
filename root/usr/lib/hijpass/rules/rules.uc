@@ -1,3 +1,4 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').UciSection} UciSection */
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { RULE_FILES } from 'hijpass.config.paths';
@@ -75,7 +76,7 @@ export function normalize(text, kind) {
 // GeoPlan：database/tag/input/output 只描述业务资源，不携带待执行的命令。
 /**
  * 按更新动作和 UCI 设置整理规则下载任务。
- * @param {object[]} config
+ * @param {UciSection[]} config
  * @param {string} action
  * @returns {object} 含 timeout（秒）、retries、enabled 和 jobs 的下载计划。
  */
@@ -96,7 +97,7 @@ export function updatePlan(config, action) {
 };
 /**
  * 收集分流中的 Geo 引用，安排本地 SRS 转换任务。
- * @param {object[]} config
+ * @param {UciSection[]} config
  * @returns {object} {jobs}，每项含 database、tag、input 和 output。
  */
 export function geoPlan(config) {
@@ -124,7 +125,7 @@ export function geoPlan(config) {
 };
 /**
  * 收集 chinadns-ng 规则需要提取的 Geo 域名。
- * @param {object[]} config
+ * @param {UciSection[]} config
  * @returns {object} {jobs}，每项含 value 和 output；其他 DNS 模式下 jobs 为空。
  */
 export function dnsPlan(config) {
@@ -207,7 +208,7 @@ export function queryFiles(target) {
 };
 /**
  * 按配置顺序查找首条匹配的分流规则。
- * @param {object[]} sections
+ * @param {UciSection[]} sections
  * @param {string} target
  * @returns {string} 命中规则及出口说明；无命中时返回全局默认策略说明。
  */

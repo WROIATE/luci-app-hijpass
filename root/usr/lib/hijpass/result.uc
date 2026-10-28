@@ -1,4 +1,5 @@
 #!/usr/bin/ucode -S
+/** @typedef {import('../../share/ucode/hijpass/types/network.uc').CommandResult} CommandResult */
 import * as fs from 'fs';
 import { text } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
@@ -7,7 +8,7 @@ import { run } from 'hijpass.command.runtime';
  * 读取 Shell 保存的输出文件，组装统一命令结果。
  * @param {string} directory Shell 采集的输出目录。
  * @param {integer} code 命令退出码。
- * @returns {{code: integer, stdout: string, stderr: string}} {code, stdout, stderr}；保留真实退出码，输出只移除末尾换行。
+ * @returns {CommandResult} {code, stdout, stderr}；保留真实退出码，输出只移除末尾换行。
  */
 function commandOutput(directory, code) {
     // 保持原 Shell 命令替换的行为：只移除末尾换行，不修剪其它空白。

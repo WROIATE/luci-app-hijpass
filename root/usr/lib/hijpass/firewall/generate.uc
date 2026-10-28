@@ -1,3 +1,5 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').UciSection} UciSection */
+/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').NetworkState} NetworkState */
 import * as fs from 'fs';
 import { RULE_FILES, FILES } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
@@ -11,13 +13,12 @@ import { parseCIDR } from 'hijpass.ip';
 // tproxy_proto 为 tcp/udp 列表，dns_forward 为 none/pre-routing/routing；
 // proxy_local 控制路由器本机，acl_default_allow 与 MAC/接口列表控制客户端。
 // NetworkState：wan 为 WAN 设备名；local4/local6/dns4/dns6 为本地绕过地址数组。
-/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').CommandOutput} CommandOutput */
 /** @typedef {import('../../../share/ucode/hijpass/types/network.uc').NetworkSnapshot} NetworkSnapshot */
 /**
  * 把 Shell 采集的网络快照整理成防火墙所需的数据。
  * @param {NetworkSnapshot} raw Shell 采集的网络快照。
  * @param {string|null} resolvText dnsmasq resolvfile 的内容。
- * @returns {object} {wan, local4, local6, dns4, dns6}，分别为绕过设备、本机网段和上游 DNS。
+ * @returns {NetworkState} {wan, local4, local6, dns4, dns6}，分别为绕过设备、本机网段和上游 DNS。
  */
 function networkState(raw, resolvText) {
 	let state = { wan: lines(raw.wan), local4: [], local6: [], dns4: [], dns6: [] };
@@ -77,8 +78,8 @@ export function defaultTemplate() { return text('/usr/lib/hijpass/firewall/defau
 // proxyMark/shuntMark/user 是内部固定参数；*Names 是已引用、转义的 nft 接口列表。
 /**
  * 合并 UCI 设置和网络状态，整理防火墙模板参数。
- * @param {object[]} config
- * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
+ * @param {UciSection[]} config
+ * @param {NetworkState} state
  * @returns {object} 供 firewall.ut 使用的 options 对象。
  */
 function options(config, state) {
@@ -164,8 +165,8 @@ function options(config, state) {
 }
 /**
  * 检查代理入口，并使用当前模板生成防火墙规则。
- * @param {object[]} config
- * @param {{wan: string[], local4: string[], local6: string[], dns4: string[], dns6: string[]}} state
+ * @param {UciSection[]} config
+ * @param {NetworkState} state
  * @returns {string} 完整 nft 表文本；没有代理或分流入口时为空字符串。
  */
 export function generate(config, state) {

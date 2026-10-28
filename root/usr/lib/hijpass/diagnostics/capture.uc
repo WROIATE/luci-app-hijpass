@@ -1,3 +1,8 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/diagnostics.uc').CleanupPlan} CleanupPlan */
+/** @typedef {import('../../../share/ucode/hijpass/types/diagnostics.uc').CaptureMetadata} CaptureMetadata */
+/** @typedef {import('../../../share/ucode/hijpass/types/diagnostics.uc').TraceIdentity} TraceIdentity */
+/** @typedef {import('../../../share/ucode/hijpass/types/diagnostics.uc').PreparedCapture} PreparedCapture */
+/** @typedef {import('../../../share/ucode/hijpass/types/diagnostics.uc').LogPosition} LogPosition */
 import * as fs from 'fs';
 import { logPath } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
@@ -14,7 +19,7 @@ import { report } from './report.uc';
  * 解析诊断命令参数，校验捕获目标和过滤条件。
  * @param {string[]} args
  * @param {string} [pid]
- * @returns {object} 捕获参数对象，含过滤条件和任务专属标识。
+ * @returns {Capture} 捕获参数对象，含过滤条件和任务专属标识。
  */
 export function parse(args, pid) {
 	let capture = { mode: 'router', client: '', protocol: 'all', port: 'all', seconds: '8', method: 'HEAD',
@@ -112,7 +117,7 @@ export function parse(args, pid) {
 
 /**
  * 记录当前日志位置，供报告提取本次诊断产生的日志。
- * @returns {object[]} {path, offset, inode} 数组；无日志时为空数组，offset 单位为字节。
+ * @returns {LogPosition[]} {path, offset, inode} 数组；无日志时为空数组，offset 单位为字节。
  */
 function positions(configDirectory) {
 	let sections = [];
@@ -130,7 +135,7 @@ function positions(configDirectory) {
  * 任务元数据和日志起点由 rules 命令在生成追踪规则前写入。
  * @param {string|null} pid 命令参数，可缺失；入口拒绝空值。
  * @param {string[]} args
- * @returns {object} 带 addresses 和 directory 的捕获参数；解析失败时 addresses 为空数组。
+ * @returns {PreparedCapture} 带 addresses 和 directory 的捕获参数；解析失败时 addresses 为空数组。
  */
 export function prepare(pid, args) {
     if (!match(pid || '', /^[0-9]+$/)) {
@@ -157,7 +162,7 @@ export function ruleText(capture) {
 /**
  * 校验任务目录，并从目录名还原 nft 规则标识。
  * @param {string|null} directory
- * @returns {object} 任务标识 {chain, comment}。
+ * @returns {TraceIdentity} 任务标识 {chain, comment}。
  */
 function identity(directory) {
     if (type(directory) != 'string' || !match(directory, /^\/tmp\/hijpass-trace[.][0-9]+$/)) {
@@ -169,7 +174,7 @@ function identity(directory) {
 /**
  * 读取诊断元数据，并核对其是否属于当前任务。
  * @param {string|null} directory
- * @returns {object} {capture, positions}，分别为捕获参数和日志起点。
+ * @returns {CaptureMetadata} {capture, positions}，分别为捕获参数和日志起点。
  */
 function metadata(directory) {
     let expected = identity(directory), data;
@@ -189,7 +194,7 @@ function metadata(directory) {
  * 从 nft 规则快照中找出当前诊断任务需要删除的规则。
  * @param {string|null} directory
  * @param {string} raw
- * @returns {object} {chain, comment, rules}，rules 为 {chain, handle} 数组。
+ * @returns {CleanupPlan} {chain, comment, rules}，rules 为 {chain, handle} 数组。
  */
 export function cleanupPlan(directory, raw) {
     let expected = identity(directory), rules = [];

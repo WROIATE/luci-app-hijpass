@@ -1,4 +1,5 @@
 #!/usr/bin/ucode -S
+/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').UciSection} UciSection */
 import { cursor } from 'uci';
 import * as fs from 'fs';
 import { RULE_FILES, FILES, CLIENT_DIR, SERVER_DIR, nodeConfig, logPath } from 'hijpass.config.paths';
@@ -8,6 +9,10 @@ import { RULE_FILES, FILES, CLIENT_DIR, SERVER_DIR, nodeConfig, logPath } from '
 const VERSION = '4';
 
 // 旧 Shell 变量模板与 ucode 模板格式不同，只保留来源供用户手动迁移。
+/**
+ * @param {uci.cursor} ctx
+ * @param {UciSection} global
+ */
 function markLegacyFirewallTemplate(ctx, global) {
     let source = global.nft;
     const previous = ['/etc/hijpass/fw4-template.nft', '/etc/hijpass/fw4-template.ut'];

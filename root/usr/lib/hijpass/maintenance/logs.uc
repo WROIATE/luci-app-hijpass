@@ -1,3 +1,4 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').UciSection} UciSection */
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { logPath } from 'hijpass.config.paths';
@@ -9,7 +10,7 @@ import { run } from 'hijpass.command.runtime';
 // 主日志位置由后端确定，global.log_level 为 DEBUG/INFO/WARN/ERROR。
 /**
  * 根据配置创建主日志写入函数，并按日志级别过滤消息。
- * @param {object[]} sections
+ * @param {UciSection[]} sections
  * @returns {function} 接受 (level, message) 的日志函数。
  */
 export function logger(sections) {
@@ -64,7 +65,7 @@ function trimLog(path) {
 }
 /**
  * 清空指定日志，或裁剪当前服务的全部日志。
- * @param {object[]} sections
+ * @param {UciSection[]} sections
  * @param {string} action
  * @param {string|null} [path]
  * @returns {null} 无业务返回值，直接更新日志文件。

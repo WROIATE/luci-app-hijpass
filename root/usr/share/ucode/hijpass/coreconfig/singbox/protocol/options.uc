@@ -1,7 +1,6 @@
 /** @typedef {import('../../../types/proxy.uc').TLSProxy} TLSProxy */
 /** @typedef {import('../../../types/proxy.uc').TransportOptions} TransportOptions */
 /** @typedef {import('../../../types/proxy.uc').MultiplexOptions} MultiplexOptions */
-/** @typedef {import('../../../types/proxy.uc').TLSOptions} TLSOptions */
 /** @typedef {import('../../../types/proxy.uc').RemoteProxy} RemoteProxy */
 import { optional } from '../../json.uc';
 

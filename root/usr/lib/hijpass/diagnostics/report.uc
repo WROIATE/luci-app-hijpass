@@ -1,3 +1,4 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/diagnostics.uc').LogPosition} LogPosition */
 import * as fs from 'fs';
 import { lines } from 'hijpass.common';
 
@@ -120,7 +121,7 @@ function relatedLogs(text, targets) {
  * 汇总防火墙追踪、抓包和日志，生成诊断报告。
  * @param {Capture} capture
  * @param {string} directory
- * @param {object[]} [positions]
+ * @param {LogPosition[]} [positions]
  * @returns {string} 完整报告文本，以换行结束。
  */
 export function report(capture, directory, positions) {

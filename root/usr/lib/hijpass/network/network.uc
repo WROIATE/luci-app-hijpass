@@ -1,3 +1,6 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').ProbeRequest} ProbeRequest */
+/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').CurlReport} CurlReport */
+/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').CommandOutput} CommandOutput */
 import * as fs from 'fs';
 import { query } from 'resolv';
 import { port } from 'hijpass.config.values';
@@ -62,9 +65,9 @@ export function ports(values) {
 
 /**
  * 把 curl 输出和退出码整理成连接探测报告。
- * @param {{stdout: string, code: integer}} response Shell 提供的标准输出及真实退出状态。
+ * @param {CommandOutput} response Shell 提供的标准输出及真实退出状态。
  * @param {string} url 原始 URL，用于报告。
- * @returns {object} 含成功状态、退出码的报告；输出完整时附 HTTP、远端地址和耗时（毫秒）。
+ * @returns {CurlReport} 含成功状态、退出码的报告；输出完整时附 HTTP、远端地址和耗时（毫秒）。
  */
 export function curlReport(response, url) {
 	let fields = split(response.stdout, '\n');
@@ -85,7 +88,7 @@ export function curlReport(response, url) {
  * @param {string|null} url
  * @param {string} [timeout]
  * @param {string} [socks]
- * @returns {object} {url, timeout, socks}；timeout 单位为秒，无代理时 socks 为空字符串。
+ * @returns {ProbeRequest} {url, timeout, socks}；timeout 单位为秒，无代理时 socks 为空字符串。
  */
 export function request(url, timeout, socks) {
     if (type(url) != 'string') {
@@ -109,7 +112,7 @@ export function request(url, timeout, socks) {
 // Shell 提供 curl 原始输出及真实退出码；这里仅解析和计算测速数据。
 /**
  * 从 curl 探测结果提取节点延迟。
- * @param {object} response
+ * @param {CommandOutput} response
  * @param {string} url
  * @returns {object} {ms, total_ms}，单位为毫秒；失败时为 {error: "timeout"}，退出码 56 按现有规则保留结果。
  */

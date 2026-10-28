@@ -1,3 +1,5 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/release.uc').AssetPlan} AssetPlan */
+/** @typedef {import('../../../share/ucode/hijpass/types/release.uc').CoreRelease} CoreRelease */
 import { text } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
 // CoreRelease：tag_name 为官方版本，assets 含 name/state/browser_download_url/digest。
@@ -23,7 +25,8 @@ export function architecture(core, machine) {
 /**
  * 解析并校验核心的官方发布信息。
  * @param {string} core
- * @returns {object} 发布对象，保留 tag_name 和原始 assets 列表。
+ * @param {string} response
+ * @returns {CoreRelease} 发布对象，保留 tag_name 和原始 assets 列表。
  */
 export function release(core, response) {
 	if (!repos[core]) {
@@ -43,7 +46,10 @@ export function release(core, response) {
 };
 /**
  * 从发布资源中选出安装包，并校验下载地址和校验和。
- * @returns {object} 安装计划，含版本、下载地址、SHA-256、安装位置和归档格式。
+ * @param {string} core
+ * @param {string} machine
+ * @param {CoreRelease} info
+ * @returns {AssetPlan} 安装计划，含版本、下载地址、SHA-256、安装位置和归档格式。
  */
 export function assetPlan(core, machine, info) {
 	let arch = architecture(core, machine), number = replace(info.tag_name, /^v/, '');

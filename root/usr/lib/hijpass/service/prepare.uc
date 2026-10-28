@@ -1,3 +1,8 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ServiceSettings} ServiceSettings */
+/** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ConfigFile} ConfigFile */
+/** @typedef {import('../../../share/ucode/hijpass/types/core.uc').GeneratedConfigs} GeneratedConfigs */
+/** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ServiceInstance} ServiceInstance */
+/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').UciSection} UciSection */
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { FILES, nodeConfig, logPath } from 'hijpass.config.paths';
@@ -22,6 +27,7 @@ function configCommand(source, path) {
 // ServicePlan 为 {instances:[Instance]}；所有业务准备完成后才交给 Shell procd 桥接层。
 /**
  * 整理客户端节点和分流服务的 procd 启动计划。
+ * @param {UciSection[]} sections
  * @returns {ServicePlan} {instances}；服务禁用时 instances 为空数组。
  */
 export function plan(sections) {
@@ -31,7 +37,11 @@ export function plan(sections) {
 	}
 	/**
 	 * 组装单个服务实例的命令、环境和日志设置。
-	 * @returns {object} procd 实例对象，含 command、env、user、log 等字段。
+	 * @param {UciSection} section
+	 * @param {string} name
+	 * @param {string[]} args
+	 * @param {boolean|null} shunt
+	 * @returns {ServiceInstance} procd 实例对象，含 command、env、user、log 等字段。
 	 */
 	function instance(section, name, args, shunt) {
 		let env = list(section.procd_env);
@@ -90,7 +100,9 @@ export function plan(sections) {
 // ConfigFile：path 为目标路径，data 为已完整生成和解析上游域名的 JSON 文本。
 /**
  * 解析链式代理的上游域名，生成待写入的文件内容；不修改 generated 或写文件。
- * @returns {object[]} 待写入的 {path, data} 数组；域名解析或转换失败时抛错。
+ * @param {UciSection[]} sections
+ * @param {GeneratedConfigs} generated
+ * @returns {ConfigFile[]} 待写入的 {path, data} 数组；域名解析或转换失败时抛错。
  */
 export function prepareConfigFiles(sections, generated) {
 	let files = [];
@@ -122,8 +134,8 @@ export function prepareConfigFiles(sections, generated) {
 
 /**
  * 将全部已准备的文件先暂存，再替换目标文件；后续提交失败时恢复已替换文件。
- * @param {object[]} files prepareConfigFiles() 返回的 {path, data} 数组。
- * @returns {object[]} 已写入的文件数组。
+ * @param {ConfigFile[]} files prepareConfigFiles() 返回的 {path, data} 数组。
+ * @returns {ConfigFile[]} 已写入的文件数组。
  */
 export function writeConfigs(files) {
 	let staged = [], committed = [];
@@ -179,6 +191,8 @@ function cronEntries(path, packageName) {
 }
 /**
  * 按服务状态注册或移除客户端更新和日志清理任务。
+ * @param {UciSection[]} sections
+ * @param {boolean} enabled
  * @returns {null} 无业务返回值，原子更新 crontab。
  */
 function cron(sections, enabled) {
@@ -202,7 +216,7 @@ function cron(sections, enabled) {
 // ServerPlan 使用相同的 Instance 字段；ports 为显式 allow_firewall 的监听端口数组。
 /**
  * 整理服务端节点的启动计划和需开放的端口。
- * @param {object[]} sections
+ * @param {UciSection[]} sections
  * @returns {ServicePlan} {instances, ports}；禁用时两个数组均为空。
  */
 export function serverPlan(sections) {
@@ -238,6 +252,7 @@ const SERVER_TABLE = '/usr/share/nftables.d/table-post/hijserver.nft';
 const SERVER_CHAIN = '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft';
 /**
  * 按服务端日志开关注册或移除日志清理任务。
+ * @param {ServiceInstance[]} instances
  * @returns {null} 无业务返回值，更新 crontab 并保留其他服务任务。
  */
 function serverCron(instances) {
@@ -250,6 +265,7 @@ function serverCron(instances) {
 }
 /**
  * 生成服务端端口放行规则，没有端口时删除旧规则文件。
+ * @param {UciSection[]} sections
  * @returns {null} 无业务返回值，只更新 nft include 文件。
  */
 function writeServerRules(sections) {
@@ -270,9 +286,9 @@ function writeServerRules(sections) {
 // update_interval 为自动更新间隔天数，log_paths 为需要准备目录的日志位置。
 /**
  * 为 Shell 执行脚本整理服务开关和维护参数。
- * @param {object[]} config
+ * @param {UciSection[]} config
  * @param {boolean} server
- * @returns {object} 含 enabled、dns_hook、geo_convert、update_interval（天）及 log_paths 的对象。
+ * @returns {ServiceSettings} 含 enabled、dns_hook、geo_convert、update_interval（天）及 log_paths 的对象。
  */
 function settings(config, server) {
     let global = first(config, server ? 'hijserver' : 'hijpass'), shunt = first(config, 'shunt');

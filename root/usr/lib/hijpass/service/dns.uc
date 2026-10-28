@@ -1,3 +1,8 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').DnsUpstreams} DnsUpstreams */
+/** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ServiceInstance} ServiceInstance */
+/** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ChinadnsOptions} ChinadnsOptions */
+/** @typedef {import('../../../share/ucode/hijpass/types/service.uc').DnsmasqOptions} DnsmasqOptions */
+/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').UciSection} UciSection */
 import * as fs from 'fs';
 import { RULE_FILES } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
@@ -34,15 +39,19 @@ function domains(path, output) {
 	}
 	atomic(output, join('\n', uniq(result)) + '\n', 0o644);
 }
+/**
+ * @param {DnsUpstreams} dns
+ * @param {string} key
+ */
 function configuredUpstream(dns, key) {
 	return dns[key] == 'custom' ? dns[`${key}_custom`] : dns[key];
 }
 
 /**
  * 根据 DNS 配置整理 chinadns-ng 模板参数。
- * @param {object[]} sections
- * @param {object} dnsmasq dnsmasq section；未配置 port 时采用 53。
- * @returns {object|null} 模板参数对象；其他 DNS 模式返回 null。
+ * @param {UciSection[]} sections
+ * @param {DnsmasqOptions} dnsmasq dnsmasq section；未配置 port 时采用 53。
+ * @returns {ChinadnsOptions|null} 模板参数对象；其他 DNS 模式返回 null。
  */
 export function options(sections, dnsmasq) {
 	let dns = first(sections, 'dns');
@@ -71,9 +80,9 @@ export function options(sections, dnsmasq) {
 };
 /**
  * 生成 chinadns-ng 配置和域名文件，并准备启动参数。
- * @param {object[]} sections
+ * @param {UciSection[]} sections
  * @param {string} [configDirectory] 需要 dnsmasq 时从此目录加载 dhcp 配置。
- * @returns {object|null} procd 实例 {id, name, command, env, user}；其他 DNS 模式返回 null。
+ * @returns {ServiceInstance|null} procd 实例 {id, name, command, env, user}；其他 DNS 模式返回 null。
  */
 export function prepare(sections, configDirectory) {
 	let dns = first(sections, 'dns'), dnsmasq = {};

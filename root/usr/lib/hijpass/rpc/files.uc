@@ -1,3 +1,6 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').LogRequest} LogRequest */
+/** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').EditorRequest} EditorRequest */
+/** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').EditorResource} EditorResource */
 import * as fs from 'fs';
 import { read } from 'hijpass.uci.read';
 import { atomic } from 'hijpass.common';
@@ -25,7 +28,7 @@ function identifier(value) {
 }
 /**
  * 根据资源名和节点标识定位后端文件。
- * @param {object} request
+ * @param {EditorResource} request
  * @returns {string} 资源或节点配置的绝对路径。
  */
 function editorPath(request) {
@@ -43,7 +46,7 @@ function editorPath(request) {
 }
 /**
  * 按资源名读取或保存编辑器内容。
- * @param {{resource: string, section: string, name: string, content: string}} request
+ * @param {EditorRequest} request
  * @param {boolean} write
  * @returns {object} 读取返回 {content}，保存返回 {ok: true}；尚未创建的节点或分流文件内容为空。
  */
@@ -91,7 +94,7 @@ export function logs() {
 };
 /**
  * 按日志 ID 读取尾部内容、下载全文或清空文件。
- * @param {{id: string, action: string, lines: string}} request
+ * @param {LogRequest} request
  * @returns {object} 读取返回 {content}，下载返回 {content, name}，清空返回 {ok: true}。
  */
 export function log(request) {

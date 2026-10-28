@@ -47,7 +47,13 @@ test('project type shapes live in dedicated files and every explicit type import
             }
         }
         for (const reference of index.references) {
-            if (reference.modulePath === undefined) continue;
+            if (reference.modulePath === undefined) {
+                if (/^[A-Z]/.test(reference.name) && reference.name !== 'Object' && reference.name !== 'Array') {
+                    assert(index.definitions.has(reference.name), `${file}: unresolved type ${reference.name}`);
+                }
+                continue;
+            }
+            assert.match(reference.modulePath, /^\.\.?\//, `${file}: type imports must be relative for navigation`);
             const target = path.resolve(path.dirname(file), reference.modulePath);
             assert(fs.existsSync(target), `${file}: missing ${reference.modulePath}`);
             const definitions = buildTypeIndex(fs.readFileSync(target, 'utf8')).definitions.get(reference.name);

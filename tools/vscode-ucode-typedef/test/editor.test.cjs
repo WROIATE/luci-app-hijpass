@@ -67,5 +67,22 @@ print(nodeFilename({name: 'example'}));
         assert(functions.some(item => (item.targetSelectionRange || item.range).start.line === 3), JSON.stringify(functions));
     }
     await require('./cross-file.test.cjs').run();
+    // Exercise the project's actual aliases and multiline/recursive shared types.
+    const projectRoot = path.resolve(__dirname, '../../..', 'root');
+    for (const [source, reference, typeFile, name] of [
+        ['usr/share/ucode/hijpass/config/paths.uc', 'LogSection} section', 'config.uc', 'LogSection'],
+        ['usr/lib/hijpass/service/prepare.uc', 'GeneratedConfigs} generated', 'core.uc', 'GeneratedConfigs'],
+        ['usr/share/ucode/hijpass/coreconfig/singbox/protocol/vless.uc', 'VlessProxy} n', 'proxy.uc', 'VlessProxy'],
+        ['usr/share/ucode/hijpass/types/core.uc', 'JsonObject|null', 'json.uc', 'JsonObject'],
+        ['usr/share/ucode/hijpass/types/proxy.uc', 'ProxyNode[]', 'proxy.uc', 'ProxyNode'],
+    ]) {
+        const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(projectRoot, source)));
+        const targets = await definitions(document, reference, false);
+        const expected = vscode.Uri.file(path.join(projectRoot, 'usr/share/ucode/hijpass/types', typeFile));
+        assert.equal(targets.length, 1, `${source}: ${reference}`);
+        assert.equal((targets[0].targetUri || targets[0].uri).toString(), expected.toString());
+        const shared = await vscode.workspace.openTextDocument(expected);
+        assert.equal(shared.getText(targets[0].targetSelectionRange || targets[0].range), name);
+    }
     console.log(`Editor integration passed: definition command, exact target, unsaved changes, file scope${companion ? ', original LSP function navigation' : ', standalone activation'}.`);
 };

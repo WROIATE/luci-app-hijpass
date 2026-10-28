@@ -3,7 +3,7 @@ import * as fs from 'fs';
 /**
  * 使用指定参数渲染 ucode 模板，并补充模板错误位置。
  * @param {string} path 模板文件的绝对路径。
- * @param {object} scope 只传入模板需要的已校验字段。
+ * @param {object} scope 通用模板命名空间；字段由具体模板决定，调用方只传入已校验值。
  * @returns {string} 渲染后的文本；失败时抛出带模板路径的错误。
  */
 export function renderTemplate(path, scope) {

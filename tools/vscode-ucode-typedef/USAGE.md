@@ -9,7 +9,12 @@
 3. 打开 `.uc` 文件，将光标放在 `@param {NodeSection}` 的 `NodeSection` 上，按 **F12**，或使用“转到定义”。也支持 Ctrl+单击（macOS 为 Cmd+单击）和“查看定义”。
 
 ```ucode
-/** @typedef {{'.name': string, name: string|null}} NodeSection */
+/**
+ * @typedef {{
+ *   '.name': string,
+ *   name: string|null
+ * }} NodeSection
+ */
 
 /** @param {NodeSection} section */
 function nodeFilename(section) {

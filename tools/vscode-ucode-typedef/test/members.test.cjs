@@ -1,9 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { buildTypeIndex } = require('../dist/typedefs');
-const { buildMemberReferences } = require('../dist/members');
+const { buildMemberIndex } = require('../dist/members');
 
-function members(code) { return buildMemberReferences(code, buildTypeIndex(code)); }
+function members(code) { return buildMemberIndex(code, buildTypeIndex(code)).members; }
 function at(code, needle) {
     const offset = code.lastIndexOf(needle);
     assert(offset >= 0, needle);
@@ -44,7 +44,7 @@ test('typed parameters yield paths through optional access, arrays and quoted ke
 export function use(n) { return n.upstream?.members[0]?.['.name']; }`;
     const reference = at(code, '.name');
     assert.deepEqual(reference.path, ['upstream', 'members', null, '.name']);
-    assert.equal(reference.shape.reference.modulePath, './types.uc');
+    assert.equal(reference.origin.shape.reference.modulePath, './types.uc');
     assert.equal(code.slice(reference.start, reference.end), '.name');
 });
 
@@ -53,8 +53,8 @@ test('same parameter names in separate functions retain their own types', () => 
 function first(n) { return n.first; }
 /** @param {Second} n */
 function second(n) { return n.second; }`;
-    assert.equal(at(code, 'first;').shape.reference.name, 'First');
-    assert.equal(at(code, 'second;').shape.reference.name, 'Second');
+    assert.equal(at(code, 'first;').origin.shape.reference.name, 'First');
+    assert.equal(at(code, 'second;').origin.shape.reference.name, 'Second');
 });
 
 test('untyped functions, callbacks and catch bindings shadow outer typed parameters', () => {
@@ -94,8 +94,8 @@ test('@type local variables and function expressions use explicit annotations', 
 let local = {};
 local.field;
 const fn = /** @param {Argument} n */ function(n) { return n.member; };`;
-    assert.equal(at(code, 'field;').shape.reference.name, 'Local');
-    assert.equal(at(code, 'member;').shape.reference.name, 'Argument');
+    assert.equal(at(code, 'field;').origin.shape.reference.name, 'Local');
+    assert.equal(at(code, 'member;').origin.shape.reference.name, 'Argument');
 });
 
 test('reassignment invalidates a root, while field writes and shadowed writes do not', () => {
@@ -123,4 +123,86 @@ test('unannotated roots and dynamic record keys have no guessed declaration', ()
 /** @param {Node} n */
 function typed(n) { return n[key]; }`;
     assert.equal(members(code).length, 0);
+});
+
+test('declared function returns propagate through aliases, projections and loop values', () => {
+    const code = `/** @returns {Graph} */
+function load() { return arbitrary(); }
+let graph = load(), nodes = graph.nodes;
+for (let n in nodes) { n.core; }
+load().nodes[0].name;`;
+    assert.equal(at(code, 'core;').origin.shape.reference.name, 'Graph');
+    assert.deepEqual(at(code, 'core;').path, ['nodes', null, 'core']);
+    assert.deepEqual(at(code, 'name;').path, ['nodes', null, 'name']);
+});
+
+test('named import aliases retain the declared export for return lookup', () => {
+    const code = `import { validate, resolve as resolveDependencies } from './dependencies.uc';
+let dependencies = resolveDependencies(sections, target);
+for (let n in dependencies.nodes) { print(n.core); }`;
+    const member = at(code, 'core');
+    assert.deepEqual(member.origin, { kind: 'return', imported: { modulePath: './dependencies.uc', name: 'resolve' } });
+    assert.deepEqual(member.path, ['nodes', null, 'core']);
+});
+
+test('nested loops and key/value loops track values without guessing key fields', () => {
+    const code = `/** @param {Graph} graph */
+function use(graph) {
+    for (let key, n in graph.nodes) {
+        key.hidden;
+        n.name;
+        for (let child in n.members) child.core;
+    }
+    n.hidden;
+}`;
+    assert.equal(members(code).some(m => m.path.includes('hidden')), false);
+    assert.deepEqual(at(code, 'name;').path, ['nodes', null, 'name']);
+    assert.deepEqual(at(code, 'core;').path, ['nodes', null, 'members', null, 'core']);
+});
+
+test('inferred values respect reassignment, captured aliases and callable shadowing', () => {
+    const code = `import { resolve } from './dependencies.uc';
+let graph = resolve();
+const saved = graph.nodes;
+graph = unknown;
+for (let n in saved) n.visible;
+for (let n in graph.nodes) n.hidden;
+{ let resolve = other; let result = resolve(); result.hidden; }
+function inner(resolve) { return resolve().hidden; }
+resolve = other;
+resolve().hidden;`;
+    assert(at(code, 'visible;'));
+    assert.equal(members(code).some(m => m.path.includes('hidden')), false);
+});
+
+test('cycles, use before declaration and ambiguous initializers have no inferred type', () => {
+    const code = `/** @param {Node} node */
+function use(node) {
+    let cycle = cycle;
+    cycle.hidden;
+    forward.hidden;
+    let forward = node;
+    let conditional = flag ? node : other;
+    conditional.hidden;
+    let alternative = node || other;
+    alternative.hidden;
+    let literal = {hidden: 1};
+    literal.hidden;
+}
+function unknown() { return {hidden: 1}; }
+unknown().hidden;`;
+    assert.equal(members(code).some(m => m.path.includes('hidden')), false);
+});
+
+test('only named exported functions with declared returns enter the export index', () => {
+    const code = `/** @returns {Graph} */
+export function resolve() {}
+/** @return {Node} */
+function local() {}
+export function unknown() {}
+/** @returns {Other} */
+let expression = function named() {};`;
+    const result = buildMemberIndex(code, buildTypeIndex(code));
+    assert.deepEqual([...result.returns.keys()], ['resolve']);
+    assert.equal(result.returns.get('resolve').reference.name, 'Graph');
 });

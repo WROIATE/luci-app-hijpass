@@ -71,7 +71,19 @@ function logPath(section) {
 
 字段路径可以使用点号、可选链、字符串键及数组/字典索引，例如 `node.upstream.name`、`section['.name']`、`nodes[0].name`、`dependencies.byName[id].name`。模板字符串的 `${...}` 内也能导航。联合类型的字段可能有多个声明，此时交给 VS Code 展示候选；共同继承的同一声明只返回一次。
 
-根对象需要通过函数的 `@param` 或变量声明前的 `@type` 显式标注类型。查找考虑函数、块、循环、catch 参数和同名变量遮蔽；根变量被重新赋值后，停止依据旧类型导航。未注释变量、任意函数调用的返回值、动态记录键和带转义的字符串键不进行类型猜测。共享定义的未保存修改会立即参与字段查找。
+类型来源可以是函数的 `@param`、变量声明前的 `@type`，也可以是具名函数声明的 `@returns` / `@return`。支持当前文件的函数，以及通过相对路径具名导入的 `export function`（含 `as` 别名）。例如：
+
+```ucode
+import { resolve as resolveDependencies } from './dependencies.uc';
+let dependencies = resolveDependencies(sections);
+for (let n in dependencies.nodes) {
+    print(n.core);
+}
+```
+
+如果 `resolve()` 声明返回含 `nodes: ProxyNode[]` 的类型，`n.core` 就能跳到 `ProxyNode` 的对应字段。简单变量别名、字段取值、数组/字典索引和嵌套循环都可以沿用这些声明；`for (let key, value in collection)` 只把元素类型传给 `value`。
+
+查找考虑函数、块、循环、catch 参数和同名变量遮蔽；根变量被重新赋值后，停止依据旧类型导航。不会从函数体、对象字面量、条件表达式或变量名猜测类型；没有返回类型注释的函数、匿名函数返回值、动态记录键和带转义的字符串键不参与推断。共享类型和导入函数注释的未保存修改都会立即参与字段查找。插件不分析分支收窄，所以联合类型中已被运行时条件排除的成员仍可能出现在定义候选中。
 
 本扩展提供导航，不提供字段校验，也不会抑制原 ucode-lsp 的诊断。ucode-lsp 0.8.11 尚不能从其他文件读取纯注释 typedef，因此跨文件写法即使可以跳转，原语言插件仍可能报告未知类型或无法推断字段。普通函数和变量的导航继续由原有语言插件提供。本扩展只处理 `.uc`，不处理 `.ut` 模板。
 

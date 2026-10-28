@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { buildTypeIndex, referenceAt, Definition, FieldDefinition, Shape, TypeIndex, TypeReference } from './typedefs';
-import { buildMemberReferences, MemberReference } from './members';
+import { buildMemberIndex, MemberIndex } from './members';
 import { Span } from './lex';
 
 interface Target { document: vscode.TextDocument; definition: Definition | FieldDefinition }
@@ -23,7 +23,7 @@ function range(document: vscode.TextDocument, start: number, end: number): vscod
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-    const cache = new WeakMap<vscode.TextDocument, { version: number; index: TypeIndex; members?: MemberReference[] }>();
+    const cache = new WeakMap<vscode.TextDocument, { version: number; index: TypeIndex; values?: MemberIndex }>();
 
     function indexFor(document: vscode.TextDocument): TypeIndex {
         let entry = cache.get(document);
@@ -32,6 +32,11 @@ export function activate(context: vscode.ExtensionContext): void {
             cache.set(document, entry);
         }
         return entry.index;
+    }
+
+    function valuesFor(document: vscode.TextDocument): MemberIndex {
+        const index = indexFor(document), entry = cache.get(document)!;
+        return entry.values ??= buildMemberIndex(document.getText(), index);
     }
 
     async function resolve(document: vscode.TextDocument, reference: TypeReference,
@@ -99,12 +104,18 @@ export function activate(context: vscode.ExtensionContext): void {
                 targets = await resolve(document, reference, new Set(), cancellation);
             }
             else {
-                const entry = cache.get(document)!;
-                entry.members ??= buildMemberReferences(document.getText(), index);
-                const member = entry.members.find(m => m.start <= offset && offset <= m.end);
+                const member = valuesFor(document).members.find(m => m.start <= offset && offset <= m.end);
                 if (!member) return;
                 origin = member;
-                targets = await resolveField(document, member.shape, member.path, new Set(), cancellation);
+                const value = member.origin;
+                if (value.kind === 'annotation') {
+                    targets = await resolveField(document, value.shape, member.path, new Set(), cancellation);
+                } else {
+                    const imported = await openImport(document, value.imported.modulePath, cancellation);
+                    const shape = imported && valuesFor(imported).returns.get(value.imported.name);
+                    targets = imported && shape
+                        ? await resolveField(imported, shape, member.path, new Set(), cancellation) : [];
+                }
             }
             if (cancellation.isCancellationRequested) return;
             const unique = new Map(targets.map(t => [t.document.uri.toString() + '\0' + t.definition.start, t]));

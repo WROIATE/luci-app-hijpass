@@ -2,7 +2,7 @@
   "name": "ucode-typedef-navigation",
   "displayName": "ucode Typedef Navigation",
   "description": "Jump from ucode JSDoc types and typed object fields to their declarations.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "hijpass-local",
   "private": true,
   "license": "UNLICENSED",

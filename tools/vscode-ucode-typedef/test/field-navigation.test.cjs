@@ -9,7 +9,10 @@ async function file(name, content) {
 }
 
 async function navigate(document, expression, field) {
-    const start = document.getText().indexOf(expression);
+    const text = document.getText();
+    let start = text.indexOf(expression);
+    // A short root such as n.log.label must not match section.log.label.
+    while (start > 0 && /[\w$]/.test(text[start - 1])) start = text.indexOf(expression, start + 1);
     assert(start >= 0, `Missing ${expression}`);
     return await vscode.commands.executeCommand('vscode.executeDefinitionProvider', document.uri,
         document.positionAt(start + expression.lastIndexOf(field) + 1));
@@ -46,7 +49,14 @@ exports.run = async () => {
 /** @typedef {CycleB} CycleA */
 /** @typedef {CycleA} CycleB */
 `);
-    const source = await file('consumer.uc', `/** @typedef {import('./types.uc').Extended} Extended */
+    const factory = await file('factory.uc', `/** @typedef {import('./types.uc').Graph} Graph */
+/** @returns {Graph} */
+export function load() { return {}; }
+export function untyped() { return {}; }
+`);
+    const source = await file('consumer.uc', `import { load as resolveGraph, untyped } from './factory.uc';
+import { load as missing } from './absent.uc';
+/** @typedef {import('./types.uc').Extended} Extended */
 /** @typedef {import('./types.uc').Graph} Graph */
 /** @param {Extended} section */
 export function read(section) {
@@ -69,6 +79,16 @@ graph.nodes[id].log.label;
 graph.byID[id]['.name'];
 /** @param {import('./types.uc').CycleA} cycle */
 function cyclic(cycle) { return cycle.missing; }
+let dependencies = resolveGraph();
+for (let key, n in dependencies.nodes) {
+    key.nope;
+    n.log.label;
+}
+const alias = dependencies.byID[id];
+alias.log.path;
+resolveGraph().byID[id]['.name'];
+untyped().log.label;
+missing().log.label;
 `);
     for (const [expression, name, declaration] of [
         ["section['.name']", '.name', '.name'],
@@ -78,11 +98,25 @@ function cyclic(cycle) { return cycle.missing; }
         ['section.log.label', 'label', 'label'],
         ['graph.nodes[id].log.label', 'label', 'label'],
         ["graph.byID[id]['.name']", '.name', '.name'],
+        ['n.log.label', 'label', 'label'],
+        ['alias.log.path', 'path', 'path'],
+        ["resolveGraph().byID[id]['.name']", '.name', '.name'],
     ]) assertField(await navigate(source, expression, name), shared, name, declaration);
 
-    for (const expression of ['section.nope', 'section.nonexistent', 'cycle.missing']) {
+    for (const expression of ['section.nope', 'section.nonexistent', 'cycle.missing', 'key.nope', 'untyped().log.label', 'missing().log.label']) {
         assert.equal((await navigate(source, expression, expression.split('.').pop())).length, 0, expression);
     }
+    // Changes in an imported function's @returns must invalidate its own cache,
+    // even when neither the calling document nor the shared typedef changed.
+    const returnType = factory.getText().indexOf('{Graph}') + 1;
+    const changeReturn = new vscode.WorkspaceEdit();
+    changeReturn.replace(factory.uri, new vscode.Range(factory.positionAt(returnType), factory.positionAt(returnType + 5)), 'Missing');
+    assert(await vscode.workspace.applyEdit(changeReturn));
+    assert.equal((await navigate(source, 'n.log.label', 'label')).length, 0);
+    const restoreReturn = new vscode.WorkspaceEdit();
+    restoreReturn.replace(factory.uri, new vscode.Range(factory.positionAt(returnType), factory.positionAt(returnType + 7)), 'Graph');
+    assert(await vscode.workspace.applyEdit(restoreReturn));
+    assertField(await navigate(source, 'n.log.label', 'label'), shared, 'label', 'label');
     // Verify VS Code's real F12 command lands on the field line.
     await vscode.window.showTextDocument(source);
     const offset = source.getText().indexOf('section?.log?.label') + 'section?.log?.'.length;
@@ -114,10 +148,22 @@ function cyclic(cycle) { return cycle.missing; }
         ['coreconfig/singbox/routing.uc', 'dependencies.nodes', 'nodes', 'proxy.uc'],
         ['coreconfig/singbox/config.uc', 'n.members', 'members', 'proxy.uc'],
         ['coreconfig/singbox/config.uc', 'n.upstream.name', 'name', 'proxy.uc'],
+        ['coreconfig/render.uc', 'n.listen_port', 'listen_port', 'proxy.uc'],
     ]) {
         const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, sourcePath)));
         const types = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, 'types', typeFile)));
         assertField(await navigate(document, expression, fieldName), types, fieldName);
     }
-    console.log('Field integration passed: exact declarations, nested/optional/array/dictionary access, inherited/union types, scope, F12, dirty edits, cycles and real project fields.');
+    const render = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, 'coreconfig/render.uc')));
+    const proxy = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(root, 'types/proxy.uc')));
+    const coreTargets = await navigate(render, 'n.core == CORE.xray', 'core');
+    // ProxyNode includes both the common core field and CustomProxy's literal override.
+    assert.equal(coreTargets.length, 2);
+    assert.deepEqual(coreTargets.map(target => {
+        assert.equal((target.targetUri || target.uri).toString(), proxy.uri.toString());
+        const selection = target.targetSelectionRange || target.range;
+        assert.equal(proxy.getText(selection), 'core');
+        return proxy.offsetAt(selection.start);
+    }).sort((a, b) => a - b), [proxy.getText().indexOf('core: string'), proxy.getText().indexOf("core: ''")]);
+    console.log('Field integration passed: exact declarations, nested/optional/array/dictionary access, inherited/union types, scope, F12, dirty edits, cycles, declared function returns, loop values and real render n.core.');
 };

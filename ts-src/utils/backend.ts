@@ -59,6 +59,8 @@ export const Backend = {
         (await editorRead(editor.resource, editor.section || '', editor.name || '')).content,
     writeEditor: (editor: Editor, content: string) =>
         editorWrite(editor.resource, editor.section || '', editor.name || '', content),
+    renderConfigs: method('config_render', ['sections', 'target']),
+    validateConfigs: method('config_validate', ['sections']),
     writeConfigs: method('config_write', ['sections']),
     logList: async (): Promise<Log[]> => (await logs()).logs,
     readLog: async (id: string, lines: string = '200'): Promise<string> => (await logRead(id, 'read', lines)).content,

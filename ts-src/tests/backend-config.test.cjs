@@ -17,7 +17,7 @@ function rpc(method, request) {
     return JSON.parse(result.stdout);
 }
 
-test('rpcd advertises only read-only snapshot operations', () => {
+test('configuration CLI retains its snapshot generation and validation protocol', () => {
     const result = config(['list']);
     assert.deepEqual(JSON.parse(result.stdout), { render: { sections: '', target: '' }, validate: { sections: '' } });
     assert.match(rpc('generate', {}).error, /unknown method/);
@@ -38,8 +38,11 @@ test('LuCI sends staged sections and propagates backend errors', async () => {
     const calls = [];
     const sections = fixtures[0].sections;
     let response = { config: { outbounds: [] } };
+    const { Backend } = loadTS('utils/backend.ts', {
+        rpc: { declare: options => async (...args) => { calls.push([options, args]); return response; } },
+    });
     const context = vm.createContext({ exports: {}, require(name) {
-        if (name === 'rpc') return { declare: options => async (...args) => { calls.push([options, args]); return response; } };
+        if (name === '../../backend') return { Backend };
         if (name === 'uci') return { sections: () => sections };
         if (name.endsWith('/hijpass')) return { LuciFlied: { CONF_NAME: 'hijpass' } };
         throw new Error(name);
@@ -48,11 +51,13 @@ test('LuCI sends staged sections and propagates backend errors', async () => {
     vm.runInContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, context);
     const utils = context.exports.GeneratedConfigUtils;
     await utils.preview('node');
-    assert.equal(calls[0][0].object, 'hijpass-config');
+    assert.equal(calls[0][0].object, 'hijpass');
+    assert.equal(calls[0][0].method, 'config_render');
     assert.deepEqual(JSON.parse(calls[0][1][0]), sections);
     assert.equal(calls[0][1][1], 'node');
     response = { error: 'bad dependency' };
     await assert.rejects(utils.validate(), /bad dependency/);
+    assert.equal(calls[1][0].method, 'config_validate');
 });
 
 function loadTS(relative, modules) {

@@ -78,6 +78,33 @@ test('RPC reads the full editable template and serves an immutable default witho
     assert.equal(f.invoke('not_a_method').error, 'unknown RPC method');
 });
 
+test('one RPC object exposes configuration preview, validation and writes with matching ACLs', t => {
+    const f = fixture(t), schema = f.invoke('list');
+    assert.deepEqual(schema.config_render, { sections: '', target: '' });
+    assert.deepEqual(schema.config_validate, { sections: '' });
+    assert.deepEqual(schema.config_write, { sections: '' });
+    assert.throws(() => fs.lstatSync(path.join(root, 'root/usr/libexec/rpcd/hijpass-config')), { code: 'ENOENT' });
+    const acl = JSON.parse(fs.readFileSync(path.join(root, 'root/usr/share/rpcd/acl.d/luci-app-hijpass.json'), 'utf8'))['luci-app-hijpass'];
+    assert.equal(acl.write.ubus['hijpass-config'], undefined);
+    for (const method of ['config_render', 'config_validate', 'config_write']) assert.ok(acl.write.ubus.hijpass.includes(method));
+
+    const sections = require('./testdata/compatibility.json').find(f => f.name === 'sing-box-chain').sections;
+    const snapshot = JSON.stringify(sections);
+    const full = f.invoke('config_render', { sections: snapshot });
+    assert.equal(full.error, undefined, full.error);
+    assert.deepEqual(f.invoke('config_render', { sections: snapshot, target: 'downstream' }).config, full.nodes.downstream);
+    assert.deepEqual(f.invoke('config_validate', { sections: snapshot }), { ok: true });
+    assert.equal(fs.existsSync(path.join(f.directory, 'downstream-downstream.json')), false);
+    assert.match(f.invoke('config_render', { sections: snapshot, target: 'missing' }).error, /not found/);
+    assert.ok(f.invoke('config_validate', { sections: '' }).error);
+    assert.ok(f.invoke('config_render', { sections: '{}' }).error);
+    assert.match(f.invoke('config_render', { sections: 1 }).error, /invalid RPC argument/);
+
+    fs.writeFileSync(path.join(f.directory, 'config/hijpass'), "config hijpass 'global'\n option enabled '0'\n");
+    assert.deepEqual(f.invoke('config_validate'), { ok: true });
+    assert.ok(f.invoke('config_validate', { sections: '' }).error);
+});
+
 test('RPC resolves backend directories and renamed/new node names without client file paths', t => {
     const f = fixture(t);
     assert.equal(f.invoke('editor_read', { resource: 'ip_direct' }).content, 'original\n');

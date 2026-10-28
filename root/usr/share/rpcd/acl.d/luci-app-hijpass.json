@@ -37,12 +37,10 @@
         "hijserver"
       ],
       "ubus": {
-        "hijpass-config": [
-          "render",
-          "validate"
-        ],
         "hijpass": [
           "editor_write",
+          "config_render",
+          "config_validate",
           "config_write",
           "log_clear",
           "cleanup_node",

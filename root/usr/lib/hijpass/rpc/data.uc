@@ -1,13 +1,15 @@
 import * as fs from 'fs';
 import { defaultTemplate } from '../firewall/generate.uc';
 import { editor, logs, log } from './files.uc';
-import { render } from 'hijpass.coreconfig.render';
+import { render, validate } from 'hijpass.coreconfig.render';
+import { read } from 'hijpass.uci.read';
 import { prepareConfigFiles, writeConfigs } from '../service/prepare.uc';
 
 // RPC 参数是业务数据。没有文件路径或通用 command/argv 入口。
 const methods = {
     firewall_template_default: {}, editor_read: { resource: '', section: '', name: '' },
     editor_write: { resource: '', section: '', name: '', content: '' },
+    config_render: { sections: '', target: '' }, config_validate: { sections: '' },
     config_write: { sections: '' }, log_list: {}, log_read: { id: '', action: '', lines: '' },
     log_clear: { id: '' },
     defaults: {}, cleanup_node: { kind: '', section: '', name: '' },
@@ -36,6 +38,7 @@ try {
     if (type(request) != 'object' || !exists(methods, method)) {
         die('unknown RPC method');
     }
+    const hasSections = request.sections != null;
     for (let key, fallback in methods[method]) {
         if (request[key] == null) {
             request[key] = fallback;
@@ -65,6 +68,17 @@ try {
     }
     else if (method == 'defaults') {
         result = { command: '/usr/bin/xray -c {conf_path}' };
+    }
+    else if (method == 'config_render' || method == 'config_validate') {
+        // 显式空快照仍须报错；只有省略 sections 才读取已提交 UCI。
+        let sections = hasSections ? json(request.sections) : read();
+        if (method == 'config_validate') {
+            result = validate(sections);
+        }
+        else {
+            let generated = render(sections, request.target);
+            result = request.target ? { config: generated } : generated;
+        }
     }
     else if (method == 'config_write') {
         let sections = json(request.sections);

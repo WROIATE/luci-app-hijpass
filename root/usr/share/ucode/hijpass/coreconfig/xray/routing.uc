@@ -1,6 +1,6 @@
 /** @typedef {import('../../types/routing.uc').Match} Match */
 /** @typedef {import('../../types/routing.uc').RoutingEntry} RoutingEntry */
-/** @typedef {import('../../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../../types/core.uc').XrayConfig} XrayConfig */
 /** @typedef {import('../../types/proxy.uc').RoutingDependencies} RoutingDependencies */
 /** @typedef {import('../../types/routing.uc').RoutingSettings} RoutingSettings */
 /** @typedef {import('../../types/routing.uc').DNSServer} DNSServer */
@@ -38,7 +38,7 @@ function dnsServer(server, tag) {
  * 生成 Xray 分流配置，DNS 请求出口规则排在用户路由之前。
  * @param {RoutingSettings} settings 共享 routing.prepare() 的结果。
  * @param {RoutingDependencies} dependencies
- * @returns {CoreConfig} 含 DNS、入站、出站和路由的配置。
+ * @returns {XrayConfig} 含 DNS、入站、出站和路由的配置。
  */
 export function build(settings, dependencies) {
 	let outbounds = map(dependencies.nodes, node => socks(node.name, node.socks_port));

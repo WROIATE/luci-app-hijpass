@@ -1,5 +1,5 @@
 /** @typedef {import('../../types/json.uc').JsonObject} JsonObject */
-/** @typedef {import('../../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../../types/core.uc').XrayConfig} XrayConfig */
 /** @typedef {import('../../types/proxy.uc').GeneratedProxyNode} GeneratedProxyNode */
 import { build as shadowsocks } from './protocol/shadowsocks.uc';
 import { build as vless } from './protocol/vless.uc';
@@ -50,7 +50,7 @@ export function inbound(kind, tag, port, shunt) {
 /**
  * 组装单个节点的完整 Xray 配置。
  * @param {GeneratedProxyNode} n
- * @returns {CoreConfig} 含日志、入站和出站的配置对象；均衡节点附路由和探测设置。
+ * @returns {XrayConfig} 含日志、入站和出站的配置对象；均衡节点附路由和探测设置。
  */
 export function build(n) {
 	let config = {

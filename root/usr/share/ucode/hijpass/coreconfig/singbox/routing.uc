@@ -1,6 +1,6 @@
 /** @typedef {import('../../types/routing.uc').Match} Match */
 /** @typedef {import('../../types/routing.uc').RoutingEntry} RoutingEntry */
-/** @typedef {import('../../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../../types/core.uc').SingboxConfig} SingboxConfig */
 /** @typedef {import('../../types/proxy.uc').RoutingDependencies} RoutingDependencies */
 /** @typedef {import('../../types/routing.uc').RoutingSettings} RoutingSettings */
 /** @typedef {import('../../types/routing.uc').DNSServer} DNSServer */
@@ -35,7 +35,7 @@ function dnsServer(server, tag, detour) {
  * 生成 sing-box 分流配置；规则集转换只作用于本次生成的匹配条件副本。
  * @param {RoutingSettings} settings 共享 routing.prepare() 的结果。
  * @param {RoutingDependencies} dependencies
- * @returns {CoreConfig} 含 DNS、入站、出站和路由的配置。
+ * @returns {SingboxConfig} 含 DNS、入站、出站和路由的配置。
  */
 export function build(settings, dependencies) {
 	let dnsServers = [dnsServer(settings.dns, settings.dns.tag, settings.final)], dnsRules = [];

@@ -16,6 +16,19 @@ selected by its runtime decoder in `config/protocol/` and owns its remaining
 protocol fields. `ProxyNodeSection` is a union of those generated protocols,
 custom command nodes and unfinished protocol-selection drafts.
 
+`types/transport.uc` separates HTTP, WebSocket, gRPC, HTTPUpgrade and XHTTP
+options, plus the no-extra-transport case. Each mode has a raw string-based
+contract and a decoded contract. A mode converter accepts its concrete input
+type, such as `GrpcTransportOptions`, so required converted fields remain
+non-null inside that converter. The dispatcher retains the full transport
+union and its existing unsupported-mode errors.
+
+Core JSON results share `CoreConfigBase`; `SingboxConfig` owns `route`, and
+`XrayConfig` owns `routing` and `burstObservatory`. The concrete generators
+return their own core type, while generic rendering uses the `CoreConfig` union.
+Mutable native JSON builders and partial utility views remain separate from
+these complete result contracts.
+
 These are comment-only structural types, using
 [intersection types](https://www.typescriptlang.org/docs/handbook/2/objects.html#intersection-types).
 They create no runtime exports or class instances. Missing business options remain

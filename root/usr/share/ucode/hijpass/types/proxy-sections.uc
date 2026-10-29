@@ -1,3 +1,4 @@
+/** @typedef {import('./transport.uc').RawTransportOptions} RawTransportOptions */
 /** @typedef {import('./sections.uc').NamedNodeSection} NamedNodeSection */
 /** @typedef {import('./sections.uc').RawCommandOptions} RawCommandOptions */
 // 原始代理类型按协议和能力组合；字段仍为 UCI 字符串，解码结果位于 proxy.uc。
@@ -87,31 +88,6 @@
  * }} RawMultiplexOptions
  */
 
-/**
- * 原始 TransportOptions 能力；布尔、整数和时长均在解码时转换。
- * @typedef {{
- *   transport_type: string|null,
- *   transport_http_host: string|null,
- *   transport_http_path: string|null,
- *   transport_http_method: string|null,
- *   transport_http_idle_timeout: string|null,
- *   transport_http_ping_timeout: string|null,
- *   transport_ws_host: string|null,
- *   transport_ws_path: string|null,
- *   transport_ws_max_early_data: string|null,
- *   transport_ws_early_data_header_name: string|null,
- *   transport_grpc_service_name: string|null,
- *   transport_grpc_idle_timeout: string|null,
- *   transport_grpc_ping_timeout: string|null,
- *   transport_grpc_permit_without_stream: string|null,
- *   transport_httpupgrade_host: string|null,
- *   transport_httpupgrade_path: string|null,
- *   transport_xhttp_host: string|null,
- *   transport_xhttp_path: string|null,
- *   transport_xhttp_mode: string|null,
- *   transport_xhttp_method: string|null
- * }} RawTransportOptions
- */
 
 /**
  * shadowsocks 协议的原始字段；只组合该协议实际解码的能力。

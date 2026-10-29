@@ -62,15 +62,36 @@
  */
 
 /**
+ * 两种核心共用的日志、入站、出站和可选 DNS 结构。
  * @typedef {{
  *   log: JsonObject,
  *   inbounds: JsonObject[],
  *   outbounds: OutboundConfig[],
- *   dns: JsonObject|null,
- *   route: JsonObject|null,
+ *   dns: JsonObject|null
+ * }} CoreConfigBase
+ */
+
+/**
+ * sing-box 核心配置；路由规则位于 route。
+ * @typedef {CoreConfigBase & {
+ *   route: JsonObject|null
+ * }} SingboxConfig
+ */
+
+/**
+ * Xray 核心配置；路由与均衡探测位于 routing、burstObservatory。
+ * @typedef {CoreConfigBase & {
  *   routing: JsonObject|null,
  *   burstObservatory: JsonObject|null
- * }} CoreConfig
+ * }} XrayConfig
+ */
+
+/**
+ * 核心配置总入口；具体生成器返回对应核心的子类型。
+ * @typedef {
+ *   SingboxConfig|
+ *   XrayConfig
+ * } CoreConfig
  */
 
 /**

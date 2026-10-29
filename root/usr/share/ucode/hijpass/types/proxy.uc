@@ -1,3 +1,4 @@
+/** @typedef {import('./transport.uc').TransportOptions} TransportOptions */
 // 已解码的节点与能力字段；原始 UCI 字段声明位于 config/protocol/。
 
 /**
@@ -63,31 +64,6 @@
  * }} MultiplexOptions
  */
 
-/**
- * 经 config/values.decode 转换的字段；布尔、整数与时长字符串不再混用。
- * @typedef {{
- *   transport_type: string,
- *   transport_http_host: string,
- *   transport_http_path: string,
- *   transport_http_method: string,
- *   transport_http_idle_timeout: string,
- *   transport_http_ping_timeout: string,
- *   transport_ws_host: string,
- *   transport_ws_path: string,
- *   transport_ws_max_early_data: integer|null,
- *   transport_ws_early_data_header_name: string,
- *   transport_grpc_service_name: string,
- *   transport_grpc_idle_timeout: string,
- *   transport_grpc_ping_timeout: string,
- *   transport_grpc_permit_without_stream: boolean,
- *   transport_httpupgrade_host: string,
- *   transport_httpupgrade_path: string,
- *   transport_xhttp_host: string,
- *   transport_xhttp_path: string,
- *   transport_xhttp_mode: string,
- *   transport_xhttp_method: string
- * }} TransportOptions
- */
 
 /**
  * @typedef {RemoteProxy & MultiplexOptions & {

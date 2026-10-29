@@ -962,3 +962,21 @@ test('配置 CLI 的 JSON 列表和渲染结果重定向保存失败也返回非
         } finally { fs.closeSync(full); }
     }
 });
+
+test('任务在查询存活状态期间完成时，保留已发布的真实结果', t => {
+    const f = fixture(t), id = 'Test1234', job = path.join(f.runtime, 'jobs', id);
+    fs.mkdirSync(job, { recursive: true });
+    fs.writeFileSync(path.join(job, 'pid'), '2147483647\n');
+    fs.writeFileSync(path.join(job, 'stdout'), '{"success":true}\n');
+    fs.writeFileSync(path.join(job, 'stderr'), '');
+    // 仅在安装副本模拟 worker 恰好于存活检查期间发布结果并退出。
+    f.patch('rpc/jobs.sh', 'recover_job() {', `kill() {
+    printf '0\\n' >'${job}/exit'
+    return 1
+}
+recover_job() {`);
+    const result = f.run('rpc/jobs.sh', ['status', id]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { running: false, code: 0, stdout: '{"success":true}', stderr: '' });
+    assert.equal(fs.readFileSync(path.join(job, 'exit'), 'utf8'), '0\n');
+});

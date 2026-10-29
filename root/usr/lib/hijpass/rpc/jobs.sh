@@ -19,6 +19,8 @@ recover_job() {
     pid=$(cat "$directory/pid")
     case "$pid" in ''|*[!0-9]*) pid=0 ;; esac
     if [ "$pid" -eq 0 ] || ! kill -0 "$pid" 2>/dev/null; then
+        # 存活检查期间 worker 可能刚写入结果并退出，不能覆盖它的真实结果。
+        [ ! -f "$directory/exit" ] || return 0
         hijpass_log ERROR job "${LINENO:-}" "${directory##*/}: worker exited without a result"
         printf 'job exited without a result\n' >>"$directory/stderr"
         printf '1\n' >"$directory/exit.tmp"

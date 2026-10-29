@@ -4,6 +4,7 @@ import { editor, logs, log } from './files.uc';
 import { generate, validate } from 'hijpass.config.generate';
 import { read } from 'hijpass.uci.read';
 import { generateAndWriteConfigs } from '../service/prepare.uc';
+import { writeOutput } from 'hijpass.command.runtime';
 
 // RPC 参数是业务数据。没有文件路径或通用 command/argv 入口。
 const methods = {
@@ -24,7 +25,7 @@ const methods = {
 
 try {
     if (ARGV[0] == 'list') {
-        printf('%J\n', methods);
+        writeOutput(sprintf('%J\n', methods));
         exit(0);
     }
     let method = ARGV[1], input = fs.stdin.read(4 * 1024 * 1024 + 1);
@@ -95,6 +96,6 @@ try {
     else {
         die('unknown data method');
     }
-    printf('%J\n', result);
+    writeOutput(sprintf('%J\n', result));
 }
-catch (e) { printf('%J\n', { error: e.message }); }
+catch (e) { writeOutput(sprintf('%J\n', { error: e.message })); }

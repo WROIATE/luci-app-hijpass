@@ -74,6 +74,17 @@ test('structured update failures retain resource names without exposing combined
     assert.equal(f.calls.at(-1)[0], 'job_release');
 });
 
+test('a nonzero script exit cannot be hidden by a success JSON body', async () => {
+    const f = backend(method => {
+        if (method === 'rule_update') return { id: 'Abcd1234' };
+        if (method === 'job_release') return { ok: true };
+        assert.equal(method, 'job_status');
+        return { running: false, code: 1, stdout: '{"success":true}', stderr: 'write failed' };
+    });
+    await assert.rejects(f.api.updateRules(), /Backend operation failed; see main log/);
+    assert.equal(f.calls.at(-1)[0], 'job_release');
+});
+
 test('resuming an existing update polls and acknowledges it without starting another job', async () => {
     const f = backend(method => {
         if (method === 'rule_update_status') return { id: 'Abcd1234' };

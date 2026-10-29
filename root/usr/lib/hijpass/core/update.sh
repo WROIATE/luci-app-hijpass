@@ -66,7 +66,9 @@ json_get_var installed version
 # 同目录临时文件验证成功后再替换，失败始终保留原核心。
 temp="$destination.new.$$"
 stage=installation
-cp "$binary" "$temp" && chmod 755 "$temp" && mv -f "$temp" "$destination" || { hijpass_error 'install failed'; exit 1; }
+hijpass_step core 'Save staged binary' "${LINENO:-}" cp "$binary" "$temp" || { hijpass_error 'cannot save staged core'; exit 1; }
+hijpass_step core 'Set binary permissions' "${LINENO:-}" chmod 755 "$temp" || { hijpass_error 'cannot set core permissions'; exit 1; }
+hijpass_step core 'Replace installed binary' "${LINENO:-}" mv -f "$temp" "$destination" || { hijpass_error 'cannot replace installed core'; exit 1; }
 temp=
 committed=1
 hijpass_log INFO core "${LINENO:-}" "$core installed: version=$number, elapsed=$(($(date +%s) - started))s"

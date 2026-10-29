@@ -353,6 +353,13 @@ fi`);
             assert.equal(fs.existsSync(calls), false);
             fs.writeFileSync(file, original);
         }
+        // 实际向 /dev/full 输出规则，写入失败不能被误认为“没有启用规则”并重载。
+        f.patch('firewall/firewall.sh', '>"$temp"', '>/dev/full');
+        const full = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
+        assert.equal(full.status, 1, full.stderr);
+        assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
+        assert.equal(fs.existsSync(calls), false);
+        f.patch('firewall/firewall.sh', '>/dev/full', '>"$temp"');
         const applied = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
         assert.equal(applied.status, 0, applied.stderr);
         assert.match(fs.readFileSync(rules, 'utf8'), /192\.168\.1\.1\/24/);
@@ -476,8 +483,8 @@ for (const core of ['xray', 'sing-box']) {
         const name = core === 'xray' ? 'Xray-linux-64.zip' : 'sing-box-1.2.3-linux-amd64-musl.tar.gz';
         const archive = path.join(f.directory, name), release = path.join(f.directory, 'release.json');
         f.script('curl', `case "$*" in
-    *api.github.com*) cat "$TEST_RELEASE" ;;
-    *) while [ "$1" != -o ]; do shift; done; cp "$TEST_ARCHIVE" "$2" ;;
+    *api.github.com*) [ "$TEST_CURL_FAIL" != metadata ] || exit 28; cat "$TEST_RELEASE" ;;
+    *) [ "$TEST_CURL_FAIL" != download ] || exit 28; while [ "$1" != -o ]; do shift; done; cp "$TEST_ARCHIVE" "$2" ;;
 esac`);
         function makeArchive(version) {
             const member = core === 'xray' ? 'xray' : 'sing-box-1.2.3-linux-amd64/sing-box';
@@ -489,11 +496,11 @@ esac`);
             assert.equal(packed.status, 0, packed.stderr);
             return createHash('sha256').update(fs.readFileSync(archive)).digest('hex');
         }
-        function update(digest) {
+        function update(digest, extra = {}) {
             const repo = core === 'xray' ? 'XTLS/Xray-core' : 'SagerNet/sing-box';
             fs.writeFileSync(release, JSON.stringify({ tag_name: 'v1.2.3', assets: [{ name, state: 'uploaded', digest: 'sha256:' + digest,
                 browser_download_url: `https://github.com/${repo}/releases/download/v1.2.3/${name}` }] }));
-            return f.run('core/update.sh', ['update', core], { TEST_RELEASE: release, TEST_ARCHIVE: archive });
+            return f.run('core/update.sh', ['update', core], { TEST_RELEASE: release, TEST_ARCHIVE: archive, ...extra });
         }
         makeArchive('1.2.3');
         const checksumFailure = update('0'.repeat(64));
@@ -504,7 +511,29 @@ esac`);
         assert.equal(versionFailure.status, 1);
         assert.match(JSON.parse(versionFailure.stdout).error, /binary verification/);
         assert.equal(fs.readFileSync(installed, 'utf8'), 'old-core');
-        const success = update(makeArchive('1.2.3'));
+        const validDigest = makeArchive('1.2.3');
+        for (const failure of ['metadata', 'download']) {
+            const failed = update(validDigest, { TEST_CURL_FAIL: failure });
+            assert.equal(failed.status, 1, failed.stderr);
+            assert.equal(JSON.parse(failed.stdout).success, false);
+            assert.equal(fs.readFileSync(installed, 'utf8'), 'old-core');
+        }
+        for (const [command, body, message] of [
+            ['cp "$binary" "$temp"', 'printf partial >"$2"; echo "copy failed" >&2; exit 1', /save staged/],
+            ['chmod 755 "$temp"', 'echo "chmod failed" >&2; exit 1', /permissions/],
+            ['mv -f "$temp" "$destination"', 'echo "rename failed" >&2; exit 1', /replace installed/],
+        ]) {
+            f.script('install-failure', body);
+            const replacement = `'${f.directory}/install-failure' ` + command.slice(command.indexOf(' ') + 1);
+            f.patch('core/update.sh', command, replacement);
+            const failed = update(validDigest);
+            assert.equal(failed.status, 1, failed.stderr);
+            assert.match(JSON.parse(failed.stdout).error, message);
+            assert.equal(fs.readFileSync(installed, 'utf8'), 'old-core');
+            assert.deepEqual(fs.readdirSync(destination), [core]);
+            f.patch('core/update.sh', replacement, command);
+        }
+        const success = update(validDigest);
         assert.equal(success.status, 0, success.stderr);
         assert.deepEqual(JSON.parse(success.stdout), { success: true, version: 'v1.2.3' });
         assert.equal(fs.statSync(installed).mode & 0o777, 0o755);
@@ -820,4 +849,116 @@ test('DEBUG 来源使用固定列宽，多行正文与首行正文对齐，完�
     assert.equal(lines[1].indexOf('continuation'), 98);
     assert.ok(lines[0].includes('/usr/lib/hijpass/a.sh:7'));
     assert.ok(lines[2].includes('/usr/lib/hijpass/maintenance/cleanup.sh:123'));
+});
+
+test('CLI 字符串和 JSON 输出写入满盘均以非零退出，Shell 可据此停止后续步骤', t => {
+    const f = fixture(t), file = path.join(f.runtime, 'output-test.uc');
+    fs.writeFileSync(file, `import { run } from 'hijpass.command.runtime';
+run(ARGV, args => args[0] == 'string' ? 'example.org\\n' : { success: true }, ARGV[1] == 'json-errors');`);
+    for (const args of [['string'], ['object'], ['object', 'json-errors']]) {
+        const full = fs.openSync('/dev/full', 'w');
+        try {
+            const result = spawnSync(interpreter, ['-S', '-L', path.join(f.runtime, 'ucode'), '--', file, ...args], {
+                encoding: 'utf8', env: process.env, stdio: ['ignore', full, 'pipe'],
+            });
+            assert.equal(result.status, 1, result.stderr);
+            if (!args.includes('json-errors')) assert.match(result.stderr, /cannot write command output/);
+        } finally { fs.closeSync(full); }
+    }
+});
+
+function downloadFixture(t) {
+    const f = fixture(t), rules = path.join(f.directory, 'rules'), calls = path.join(f.directory, 'calls');
+    fs.mkdirSync(rules);
+    fs.writeFileSync(path.join(rules, 'gfw-list.txt'), 'old rules');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', rules);
+    f.patch('rules/rules.uc', '/usr/share/v2ray', f.directory + '/v2ray');
+    f.patch('rules/update-files.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
+    f.script('hijpass-init', `echo restart >>'${calls}'`);
+    f.script('geoview', 'exit 0');
+    f.script('curl', `echo download >>'${calls}'
+case "$*" in *ip4*) line='192.0.2.0/24' ;; *ip6*) line='2001:db8::/32' ;; *) line='server=/example.org/1.1.1.1' ;; esac
+while [ "$1" != -o ]; do shift; done
+output=$2
+if [ "$TEST_WRITE_ERROR" = 1 ]; then echo partial >"$output"; echo 'curl: (23) write failed' >&2; exit 23; fi
+i=0; while [ "$i" -lt 12 ]; do echo "$line"; i=$((i+1)); done >"$output"`);
+    const sections = [{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', retry_count: '3',
+        gfw_list: ['https://example.org/source1', 'https://example.org/source2', 'https://example.org/source3'],
+        chn_domain_list: ['https://example.org/china'], chn_v4_route: ['https://example.org/ip4'],
+        chn_v6_route: ['https://example.org/ip6'], geoip: ['https://example.org/geoip'], geosite: ['https://example.org/geosite'] }];
+    return { ...f, rules, calls, sections };
+}
+
+for (const fault of ['download-write', 'normalize', 'save', 'permissions', 'replace']) {
+    test(`规则 ${fault} 失败直接退出，不尝试后续来源或资源，不触发重启`, t => {
+        const f = downloadFixture(t);
+        if (fault === 'normalize') {
+            f.script('normalize-failure', `count=$(cat '${f.directory}/normalize-count' 2>/dev/null || echo 0)
+count=$((count+1)); echo "$count" >'${f.directory}/normalize-count'
+if [ "$count" -eq 2 ]; then echo partial; echo 'local processing failed' >&2; exit 1; fi
+exec '${interpreter}' -S -L '${f.runtime}/ucode' -- '${f.runtime}/rules/rulescli.uc' normalize "$@"`);
+            f.patch('rules/update-files.sh', 'hijpass_data "$data" normalize', `'${f.directory}/normalize-failure'`);
+        }
+        const command = { save: 'hijpass_data "$data" merge', permissions: 'chmod 644 "$staged"', replace: 'mv -f "$staged" "$path"' }[fault];
+        if (command) {
+            f.script('save-failure', (fault === 'save' ? 'echo partial; ' : '') + 'echo "local file update failed" >&2; exit 1');
+            f.patch('rules/update-files.sh', command, `'${f.directory}/save-failure'`);
+        }
+        withConfig(f.sections, config => {
+            const result = f.run('rules/update.sh', ['update', '--configdir', config], { TEST_WRITE_ERROR: fault === 'download-write' ? '1' : '0' });
+            assert.equal(result.status, 1, result.stderr);
+            assert.deepEqual(JSON.parse(result.stdout), { success: false, failed: ['gfw_list'] });
+        });
+        assert.equal(fs.readFileSync(path.join(f.rules, 'gfw-list.txt'), 'utf8'), 'old rules');
+        const calls = fs.readFileSync(f.calls, 'utf8').trim().split('\n');
+        assert.ok(!calls.includes('restart'));
+        assert.equal(calls.length, fault === 'download-write' ? 1 : fault === 'normalize' ? 2 : 3);
+        assert.deepEqual(fs.readdirSync(f.rules), ['gfw-list.txt']);
+    });
+}
+
+for (const mode of ['convert', 'dns']) for (const fault of ['tool', 'replace']) {
+    test(`Geo ${mode} 的 ${fault} 失败保留旧文件并返回非零，不继续下一项`, t => {
+        const f = fixture(t), calls = path.join(f.directory, 'calls');
+        const target = mode === 'convert' ? path.join(f.directory, 'ruleset/geoip-cn.srs') : path.join(f.directory, 'domain-proxy-geo.txt');
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, 'old geo data');
+        f.patch('rules/rules.uc', '/etc/hijpass/ruleset', f.directory + '/ruleset');
+        f.patch('rules/rules.uc', '/tmp/hijpass/', f.directory + '/');
+        const input = path.join(f.directory, 'domains');
+        fs.writeFileSync(input, 'geosite:cn\n');
+        for (const kind of ['direct', 'proxy']) f.patch('ucode/hijpass/config/paths.uc', `/etc/hijpass/rules/domain-${kind}.txt`, input);
+        f.script('geoview', `echo convert >>'${calls}'
+case "$*" in *-output*) while [ "$1" != -output ]; do shift; done; printf partial >"$2" ;; *) echo partial.example.org ;; esac
+if [ "$GEO_TOOL_FAIL" = 1 ]; then echo 'cannot write Geo output' >&2; exit 1; fi`);
+        if (fault === 'replace') {
+            f.script('geo-replace-failure', 'echo "cannot replace Geo output" >&2; exit 1');
+            f.patch('rules/geoview.sh', 'mv -f "$staged" "$output"', `'${f.directory}/geo-replace-failure'`);
+        }
+        withConfig([{ '.type': 'hijpass', enabled: '1' }, { '.type': 'dns', dns_service: 'chinadns-ng' },
+            { '.type': 'shunt_route_rule', enabled: '1', ip_list: 'geoip:cn', domain_list: 'geosite:cn' }], config => {
+            const result = f.run('rules/geoview.sh', [mode === 'convert' ? '--convert' : 'dns', '--configdir', config], {
+                GEO_TOOL_FAIL: fault === 'tool' ? '1' : '0',
+            });
+            assert.equal(result.status, 1, result.stderr);
+        });
+        assert.equal(fs.readFileSync(target, 'utf8'), 'old geo data');
+        assert.equal(fs.readFileSync(calls, 'utf8'), 'convert\n');
+        assert.ok(!fs.readdirSync(path.dirname(target)).some(name => name.startsWith(path.basename(target) + '.new.')));
+    });
+}
+
+test('配置 CLI 的 JSON 列表和渲染结果重定向保存失败也返回非零', t => {
+    const f = fixture(t), file = path.join(f.runtime, 'config-output-test.uc');
+    fs.writeFileSync(file, `import { main } from 'hijpass.command.config'; main(ARGV);`);
+    for (const args of [['list'], ['render', '--stdin']]) {
+        const full = fs.openSync('/dev/full', 'w');
+        try {
+            const result = spawnSync(interpreter, ['-S', '-L', path.join(f.runtime, 'ucode'), '--', file, ...args], {
+                encoding: 'utf8', env: process.env, stdio: ['pipe', full, 'pipe'], input: JSON.stringify([{ '.name': 'global', '.type': 'hijpass' }]),
+            });
+            assert.notEqual(result.status, 0, result.stderr);
+            assert.match(result.stderr, /cannot write command output/);
+        } finally { fs.closeSync(full); }
+    }
 });

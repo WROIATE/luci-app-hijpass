@@ -108,8 +108,8 @@ test('CLI renders supplied input without runtime commands and rejects generate',
     assert.match(rejected.stderr, /unknown command/);
 });
 
-test('Save & Apply consumes backend output before applying UCI and stops on generation failure', async () => {
-    for (const fail of [false, true]) {
+test('Save & Apply stops before applying UCI when generation, saving or replacement fails', async () => {
+    for (const fail of [null, 'invalid configuration', 'cannot write configuration', 'cannot replace configuration']) {
         const events = [];
         const generated = { nodes: {} };
         const handler = loadTS('utils/actions/save-apply/index.ts', {
@@ -121,7 +121,7 @@ test('Save & Apply consumes backend output before applying UCI and stops on gene
             '../../base/luci/form': { FormUtils: { simpleHash: () => 0 } },
             '../../backend': { Backend: { writeConfigs: async () => {
                 events.push('write');
-                if (fail) throw new Error('invalid configuration');
+                if (fail) throw new Error(fail);
                 return {};
             } } },
             './precheck': { PrecheckUtils: { runSaveApplyPrechecks: async () => true } },

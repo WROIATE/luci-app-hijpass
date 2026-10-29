@@ -2,9 +2,19 @@
 
 `root/usr/share/ucode/hijpass/types/sections.uc` declares the raw UCI hierarchy.
 `UciSection` owns metadata; `EnabledSection` adds the raw enable option, and
-`NamedNodeSection` shares node identity, command, port and process options.
+`NamedNodeSection` shares node identity, port and process options.
+`RawCommandOptions` is composed only by custom proxies and server nodes.
 Each concrete section refines `.type` and declares its own configuration fields.
 The `type` option is separate: it selects a proxy protocol or shunt core.
+
+`types/proxy-sections.uc` declares the raw proxy family separately. Its common
+base contains the node header and local runtime options. Generated nodes add
+core/log settings; remote protocols compose endpoint and upstream capability.
+TLS, Reality, multiplexing, network and password options are independent
+capabilities. Each of the six protocol sections composes only the capabilities
+selected by its runtime decoder in `config/protocol/` and owns its remaining
+protocol fields. `ProxyNodeSection` is a union of those generated protocols,
+custom command nodes and unfinished protocol-selection drafts.
 
 These are comment-only structural types, using
 [intersection types](https://www.typescriptlang.org/docs/handbook/2/objects.html#intersection-types).
@@ -42,8 +52,14 @@ section type; generic decoding and snapshot validation use `UciSection`.
 
 Field navigation should select an explicit inherited field before a catch-all
 index within an intersection. Union alternatives keep their distinct targets.
+An unrefined union can therefore expose several declarations, including an
+index fallback from a variant that does not declare the selected field.
+Concrete protocol inputs have their own explicit field locations; foreign
+or historical options retain only the base index fallback.
 The real-editor tests cover inherited `shunt.enabled`, node fields and named
-return hints alongside the native section-query regression tests.
+return hints alongside the native section-query regression tests. Protocol
+tests derive supported fields from the actual decoder declarations and also
+verify that foreign protocol fields are not explicitly declared.
 
 Stable rule plans, firewall parameters, validation responses, editor responses
 and diagnostic summaries also have named result contracts. Open core JSON

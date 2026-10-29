@@ -3,7 +3,7 @@
 /** @typedef {import('../types/proxy.uc').ResolvedDependencies} ResolvedDependencies */
 /** @typedef {import('../types/proxy.uc').ProxyIndex} ProxyIndex */
 /** @typedef {import('../types/sections.uc').UciSection} UciSection */
-/** @typedef {import('../types/sections.uc').ProxyNodeSection} ProxyNodeSection */
+/** @typedef {import('../types/proxy-sections.uc').ProxyNodeSection} ProxyNodeSection */
 import { filterProxyNodeSections } from '../config/sections.uc';
 import { list } from '../config/values.uc';
 import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';

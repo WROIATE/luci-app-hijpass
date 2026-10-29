@@ -5,7 +5,7 @@
 /** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').UciSection} UciSection */
 /** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').HijpassSection} HijpassSection */
 /** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').HijserverSection} HijserverSection */
-/** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').ProxyNodeSection} ProxyNodeSection */
+/** @typedef {import('../../../share/ucode/hijpass/types/proxy-sections.uc').ProxyNodeSection} ProxyNodeSection */
 /** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').ShuntSection} ShuntSection */
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';

@@ -6,7 +6,7 @@
 /** @typedef {import('../types/sections.uc').FirewallSection} FirewallSection */
 /** @typedef {import('../types/sections.uc').RuleSection} RuleSection */
 /** @typedef {import('../types/sections.uc').DnsmasqSection} DnsmasqSection */
-/** @typedef {import('../types/sections.uc').ProxyNodeSection} ProxyNodeSection */
+/** @typedef {import('../types/proxy-sections.uc').ProxyNodeSection} ProxyNodeSection */
 /** @typedef {import('../types/sections.uc').ServerNodeSection} ServerNodeSection */
 /** @typedef {import('../types/sections.uc').ShuntRouteRuleSection} ShuntRouteRuleSection */
 /** @typedef {import('../types/sections.uc').ShuntDnsNodeSection} ShuntDnsNodeSection */

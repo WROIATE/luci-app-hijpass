@@ -19,15 +19,21 @@
  */
 
 /**
- * 客户端和服务端节点共用的原始名称、端口、命令与进程选项。
+ * 客户端和服务端节点共用的原始名称、端口与进程选项。
  * @typedef {EnabledSection & {
  *   name: string|null,
  *   listen_port: string|null,
- *   command: string|null,
  *   procd_env: string|string[]|null,
- *   log_enabled: string|null,
- *   custom_conf_hash: string|null
+ *   log_enabled: string|null
  * }} NamedNodeSection
+ */
+
+/**
+ * 使用自定义命令和原生 JSON 文件的节点选项；由自定义代理与服务端共用。
+ * @typedef {{
+ *   command: string|null,
+ *   custom_conf_hash: string|null
+ * }} RawCommandOptions
  */
 
 /**
@@ -50,97 +56,8 @@
  */
 
 /**
- * 代理节点的原始协议选项；仅解码时挑选当前协议字段并应用默认值。
- * @typedef {NamedNodeSection & {
- *   '.type': 'proxy_node',
- *   config_type: string|null,
- *   type: string|null,
- *   core: string|null,
- *   log_level: string|null,
- *   socks_port: string|null,
- *   nest_proxy: string|null,
- *   upstream_proxy_node: string|null,
- *   member_node: string|string[]|null,
- *   server: string|null,
- *   server_port: string|null,
- *   network: string|null,
- *   password: string|null,
- *   up_mbps: string|null,
- *   down_mbps: string|null,
- *   udp_idle_timeout: string|null,
- *   server_ports: string|string[]|null,
- *   hop_interval: string|null,
- *   obfs_type: string|null,
- *   obfs_password: string|null,
- *   url: string|null,
- *   interval: string|null,
- *   tolerance: string|null,
- *   idle_timeout: string|null,
- *   interrupt_exist_connections: string|null,
- *   strategy: string|null,
- *   strategy_expected: string|null,
- *   strategy_max_rtt: string|null,
- *   strategy_tolerance: string|null,
- *   fallback_tag: string|null,
- *   probe_url: string|null,
- *   probe_connectivity: string|null,
- *   probe_interval: string|null,
- *   probe_timeout: string|null,
- *   probe_sampling: string|null,
- *   probe_http_method: string|null,
- *   tls_server_name: string|null,
- *   tls_insecure: string|null,
- *   tls_reality_enabled: string|null,
- *   tls_reality_public_key: string|null,
- *   tls_reality_short_id: string|null,
- *   multiplex_enabled: string|null,
- *   multiplex_protocol: string|null,
- *   multiplex_max_connections: string|null,
- *   multiplex_min_streams: string|null,
- *   multiplex_max_streams: string|null,
- *   multiplex_brutal_enabled: string|null,
- *   multiplex_brutal_up_mbps: string|null,
- *   multiplex_brutal_down_mbps: string|null,
- *   transport_type: string|null,
- *   transport_http_host: string|null,
- *   transport_http_path: string|null,
- *   transport_http_method: string|null,
- *   transport_http_idle_timeout: string|null,
- *   transport_http_ping_timeout: string|null,
- *   transport_ws_host: string|null,
- *   transport_ws_path: string|null,
- *   transport_ws_max_early_data: string|null,
- *   transport_ws_early_data_header_name: string|null,
- *   transport_grpc_service_name: string|null,
- *   transport_grpc_idle_timeout: string|null,
- *   transport_grpc_ping_timeout: string|null,
- *   transport_grpc_permit_without_stream: string|null,
- *   transport_httpupgrade_host: string|null,
- *   transport_httpupgrade_path: string|null,
- *   transport_xhttp_host: string|null,
- *   transport_xhttp_path: string|null,
- *   transport_xhttp_mode: string|null,
- *   transport_xhttp_method: string|null,
- *   method: string|null,
- *   plugin: string|null,
- *   plugin_opts: string|null,
- *   udp_over_tcp: string|null,
- *   version: string|null,
- *   uuid: string|null,
- *   congestion_control: string|null,
- *   udp_relay_mode: string|null,
- *   udp_over_stream: string|null,
- *   zero_rtt_handshake: string|null,
- *   heartbeat: string|null,
- *   flow: string|null,
- *   packet_encoding: string|null,
- *   brutal_debug: string|null
- * }} ProxyNodeSection
- */
-
-/**
  * 原生 JSON 服务端节点；command 与监听端口仅用于启动和防火墙放行。
- * @typedef {NamedNodeSection & {
+ * @typedef {NamedNodeSection & RawCommandOptions & {
  *   '.type': 'server_node',
  *   allow_firewall: string|null
  * }} ServerNodeSection

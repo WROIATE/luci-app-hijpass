@@ -1,5 +1,5 @@
 /** @typedef {import('../../types/proxy.uc').DecodedProxyNode} DecodedProxyNode */
-/** @typedef {import('../../types/sections.uc').ProxyNodeSection} ProxyNodeSection */
+/** @typedef {import('../../types/proxy-sections.uc').ProxyNodeSection} ProxyNodeSection */
 import { fields as shadowsocks } from './shadowsocks.uc';
 import { fields as vless } from './vless.uc';
 import { fields as hysteria2 } from './hysteria2.uc';

@@ -283,7 +283,7 @@ hijpass_step core 'Download' "$LINENO" download
     assert.equal(f.invoke('job_release', { id: start.id }).ok, true);
     assert.equal(f.invoke('job_status', { id: start.id }).code, 0);
     const log = fs.readFileSync(path.join(f.directory, 'hijpass.log'), 'utf8');
-    assert.match(log, /WARN\s+\[core\] Download: Warning:/);
+    assert.match(log, /WARN\s+\[core\]\s+Download: Warning:/);
     assert.match(log, /optional hook unavailable/);
     assert.doesNotMatch(log, /\[job\]|task=|diagnostic output/);
     assert.doesNotMatch(log, /private|https:\/\//);

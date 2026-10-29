@@ -73,8 +73,15 @@ export function logger(sections) {
 			if (!date) die('cannot format log timestamp');
 			let stamp = sprintf('%04d-%02d-%02d %02d:%02d:%02d', date.year, date.mon, date.mday, date.hour, date.min, date.sec);
 			let prefix = sprintf('[%s]   %-8s%s', stamp, level, location);
+			let module = match(message, /^(\[[A-Za-z][A-Za-z0-9_-]*\])[ \t]+/);
+			let body = message;
+			if (module) {
+				// 模块标签单独占列，正文与续行保持对齐；较长标签保留完整内容。
+				prefix += sprintf('%-12s  ', module[1]);
+				body = substr(message, length(module[0]));
+			}
 			let indent = replace(prefix, /./g, ' ');
-			let entry = prefix + replace(message, '\n', '\n' + indent) + '\n';
+			let entry = prefix + replace(body, '\n', '\n' + indent) + '\n';
 			if (file.write(entry) != length(entry) || !file.flush()) die('cannot write log');
 			file.close();
 		}

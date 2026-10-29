@@ -72,7 +72,7 @@ test('主日志按配置级别筛选，保留多行上下文并脱敏 URL 和凭
         assert.equal(result.stderr, '');
     });
     const content = fs.readFileSync(log, 'utf8');
-    assert.match(content, /WARN\s+\[test\] failed \[URL redacted\]\n +password=\[redacted\]\n +continuation/);
+    assert.match(content, /WARN\s+\[test\]\s+failed \[URL redacted\]\n +password=\[redacted\]\n +continuation/);
     assert.doesNotMatch(content, /hidden|private|https:\/\//);
 });
 
@@ -107,7 +107,7 @@ i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); don
         assert.deepEqual(JSON.parse(result.stdout), { success: true });
     });
     const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
-    assert.match(content, /WARN\s+\[rules\] chn_domain_list: source 1 unavailable/);
+    assert.match(content, /WARN\s+\[rules\]\s+chn_domain_list: source 1 unavailable/);
     assert.match(content, /sources=1\/2, bytes=12, entries=1/);
     assert.match(content, /Update finished: installed=1, failed=0, elapsed=\d+s/);
 });
@@ -128,7 +128,7 @@ test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变
         assert.equal(result.stderr, '');
     });
     const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
-    assert.match(content, /WARN\s+\[service\] DNS Hook start: Warning:/);
+    assert.match(content, /WARN\s+\[service\]\s+DNS Hook start: Warning:/);
     assert.match(content, /optional DNS service unavailable/);
     assert.match(content, /Activation completed/);
 });
@@ -173,14 +173,14 @@ business();\n`);
     assert.equal(f.data('debug-call.uc', []).status, 0);
     const log = path.join(f.directory, 'logs/hijpass.log');
     let content = fs.readFileSync(log, 'utf8');
-    assert.ok(content.includes(`${entry}:3`) && /:3\s+\[test\] shell location/.test(content), content);
-    assert.ok(content.includes(`${native}:4`) && /:4\s+\[test\] ucode location/.test(content), content);
+    assert.ok(content.includes(`${entry}:3`) && /:3\s+\[test\]\s+shell location/.test(content), content);
+    assert.ok(content.includes(`${native}:4`) && /:4\s+\[test\]\s+ucode location/.test(content), content);
     fs.writeFileSync(log, '');
     withConfig([{ '.type': 'hijpass', log_level: 'INFO' }], config => {
         assert.equal(f.run('debug-call.sh', [config], { HIJPASS_TASK_ID: 'Test1234' }).status, 0);
     });
     content = fs.readFileSync(log, 'utf8');
-    assert.match(content, /INFO\s+\[test\] shell location/);
+    assert.match(content, /INFO\s+\[test\]\s+shell location/);
     assert.doesNotMatch(content, /debug-call|task=/);
 });
 
@@ -834,21 +834,36 @@ exit "$AUTO_RESULT"
     assert.equal(fs.readFileSync(calls, 'utf8'), 'update\nupdate\nupdate\n');
 });
 
-test('DEBUG 来源使用固定列宽，多行正文与首行正文对齐，完整路径和行号保留', t => {
+test('来源和模块使用固定列宽，正文与续行对齐，完整路径和行号保留', t => {
     const f = fixture(t);
-    withConfig([{ '.type': 'hijpass', log_level: 'DEBUG' }], config => {
-        for (const [source, message] of [['/usr/lib/hijpass/a.sh:7', '[test] first\ncontinuation'],
-            ['/usr/lib/hijpass/maintenance/cleanup.sh:123', '[test] second']]) {
-            const result = f.run('maintenance/logs.sh', ['source', 'INFO', source, message, '--configdir', config]);
-            assert.equal(result.status, 0, result.stderr);
+    const log = path.join(f.directory, 'logs/hijpass.log');
+    for (const level of ['DEBUG', 'INFO']) {
+        withConfig([{ '.type': 'hijpass', log_level: level }], config => {
+            for (const [source, message] of [['/usr/lib/hijpass/a.sh:7', '[geo] first\ncontinuation'],
+                ['/usr/lib/hijpass/maintenance/cleanup.sh:123', '[service] second'],
+                ['/usr/lib/hijpass/install/migrate.uc:123', '[migration] third'],
+                ['/usr/lib/hijpass/a.sh:7', '[external-module] long label'],
+                ['/usr/lib/hijpass/a.sh:7', 'plain message\nplain continuation']]) {
+                const result = f.run('maintenance/logs.sh', ['source', 'INFO', source, message, '--configdir', config]);
+                assert.equal(result.status, 0, result.stderr);
+            }
+        });
+        const lines = fs.readFileSync(log, 'utf8').trimEnd().split('\n');
+        const moduleColumn = level === 'DEBUG' ? 98 : 32;
+        for (const [index, tag, body] of [[0, '[geo]', 'first'], [2, '[service]', 'second'], [3, '[migration]', 'third']]) {
+            assert.equal(lines[index].indexOf(tag), moduleColumn);
+            assert.equal(lines[index].indexOf(body), moduleColumn + 14);
         }
-    });
-    const lines = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8').trimEnd().split('\n');
-    assert.equal(lines[0].indexOf('[test]'), 98);
-    assert.equal(lines[2].indexOf('[test]'), 98);
-    assert.equal(lines[1].indexOf('continuation'), 98);
-    assert.ok(lines[0].includes('/usr/lib/hijpass/a.sh:7'));
-    assert.ok(lines[2].includes('/usr/lib/hijpass/maintenance/cleanup.sh:123'));
+        assert.equal(lines[1].indexOf('continuation'), moduleColumn + 14);
+        assert.equal(lines[4].slice(moduleColumn), '[external-module]  long label');
+        assert.equal(lines[5].slice(moduleColumn), 'plain message');
+        assert.equal(lines[6].indexOf('plain continuation'), moduleColumn);
+        if (level === 'DEBUG') {
+            assert.ok(lines[0].includes('/usr/lib/hijpass/a.sh:7'));
+            assert.ok(lines[2].includes('/usr/lib/hijpass/maintenance/cleanup.sh:123'));
+        }
+        fs.unlinkSync(log);
+    }
 });
 
 test('CLI 字符串和 JSON 输出写入满盘均以非零退出，Shell 可据此停止后续步骤', t => {

@@ -32,7 +32,8 @@ for (const fixture of fixtures) {
         assert.deepEqual(generated, fixture.expected);
         assert.deepEqual(rpc('render', sections), generated);
         assert.deepEqual(rpc('validate', sections), { ok: true });
-        for (const [id, expected] of [...Object.entries(generated.nodes), ...(generated.shunt ? [['shunt', generated.shunt]] : [])]) {
+        const shuntID = sections.find(section => section['.type'] === 'shunt')?.['.name'];
+        for (const [id, expected] of [...Object.entries(generated.nodes), ...(generated.shunt ? [[shuntID, generated.shunt]] : [])]) {
             assert.deepEqual(rpc('render', sections, id), { config: expected });
             const preview = config(['render', '--stdin', '--target', id], sections);
             assert.equal(preview.status, 0, preview.stderr);
@@ -45,6 +46,59 @@ function node(id, options = {}) {
     return { '.name': id, '.type': 'proxy_node', name: id, enabled: '1', core: 'sing-box', type: 'shadowsocks',
         server: 'example.org', server_port: '443', listen_port: '10001', socks_port: '10002', ...options };
 }
+
+test('分流预览使用实际 section ID，并解析全部启用的代理出口', () => {
+    for (const core of ['sing-box', 'xray']) {
+        const sections = structuredClone(fixtures.find(f => f.name === `${core}-shunt-default`).sections);
+        const shunt = sections.find(section => section['.type'] === 'shunt');
+        shunt['.name'] = 'cfg123456';
+        shunt.default_proxy_node = '出口 A';
+        sections.push(node('proxy-id', { name: '出口 A' }));
+        const generated = rpc('render', sections);
+        assert.equal(generated.error, undefined);
+        assert.deepEqual(rpc('render', sections, shunt['.name']), { config: generated.shunt });
+        const preview = config(['render', '--stdin', '--target', shunt['.name']], sections);
+        assert.equal(preview.status, 0, preview.stderr);
+        assert.deepEqual(JSON.parse(preview.stdout), generated.shunt);
+        assert.match(rpc('render', sections, 'shunt').error, /not found/);
+
+        shunt.enabled = '0';
+        assert.equal(rpc('render', sections).shunt, undefined);
+        assert.deepEqual(rpc('render', sections, shunt['.name']), { config: generated.shunt });
+    }
+});
+
+test('指定分流 ID 使用该 section，不会读取第一个分流的设置', () => {
+    const first = structuredClone(fixtures.find(f => f.name === 'sing-box-shunt-default').sections);
+    const second = fixtures.find(f => f.name === 'xray-shunt-default');
+    const selected = { ...second.sections.find(section => section['.type'] === 'shunt'), '.name': 'second-shunt' };
+    assert.deepEqual(rpc('render', [...first, selected], selected['.name']), { config: second.expected.shunt });
+});
+
+test('target 只表示 ID，名为 shunt 的关闭代理仍可独立预览', () => {
+    const sections = [node('shunt', { name: 'display-name', enabled: '0' }), node('broken', { type: 'invalid' }),
+        { '.name': 'global', '.type': 'hijpass', enabled: '1' }];
+    const preview = rpc('render', sections, 'shunt');
+    assert.equal(preview.error, undefined);
+    assert.equal(preview.config.outbounds[0].type, 'shadowsocks');
+    assert.match(rpc('render', sections, 'display-name').error, /not found/);
+    assert.match(rpc('render', sections, 'global').error, /unsupported target section type.*hijpass/);
+});
+
+test('CLI 按原生 UCI 生成的匿名 section ID 预览分流', () => {
+    const fixture = fixtures.find(f => f.name === 'sing-box-shunt-default');
+    const sections = structuredClone(fixture.sections);
+    delete sections.find(section => section['.type'] === 'shunt')['.name'];
+    withConfig(sections, directory => {
+        const read = run('ucode-src/tests/runtime.uc', [], { action: 'read', directory });
+        assert.equal(read.status, 0, read.stderr);
+        const id = JSON.parse(read.stdout).find(section => section['.type'] === 'shunt')['.name'];
+        const preview = config(['render', '--configdir', directory, '--target', id]);
+        assert.equal(preview.status, 0, preview.stderr);
+        assert.deepEqual(JSON.parse(preview.stdout), fixture.expected.shunt);
+    });
+});
+
 test('核心选择与协议独立，缺省 VLESS 使用 sing-box，显式 Xray 保持不变', () => {
     for (const core of [undefined, '', 'sing-box', 'xray']) {
         const section = node('a', { core, type: 'vless', uuid: '11111111-1111-4111-8111-111111111111' });

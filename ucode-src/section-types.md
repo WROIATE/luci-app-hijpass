@@ -45,6 +45,16 @@ semantics. Generic queries remain available for unknown section types. Named
 query contracts work with the semantic checker and navigation provider directly;
 they do not require a dependent return type inferred from a string argument.
 
+Configuration rendering accepts an optional `target` section ID for both proxy
+nodes and shunt sections. The entry point finds that ID in the supplied snapshot
+and dispatches by `.type`; unknown IDs and unsupported section types fail
+explicitly. LuCI passes the actual shunt ID, including IDs assigned to anonymous
+sections. The string `shunt` is no longer a special target: it works only when it
+is the actual section ID. Callers using `--target shunt` must pass their section's
+ID instead. Without a target, rendering still uses the first shunt section.
+Dependency resolution accepts only an optional proxy node ID, while routing
+preparation receives the selected `ShuntSection` explicitly.
+
 Raw configuration and converted models describe different stages:
 
 ```text

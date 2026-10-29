@@ -3,7 +3,8 @@
 /** @typedef {import('../types/routing.uc').RoutingSettings} RoutingSettings */
 /** @typedef {import('../types/proxy.uc').RoutingDependencies} RoutingDependencies */
 /** @typedef {import('../types/sections.uc').UciSection} UciSection */
-import { findShuntSection, filterShuntRouteRuleSections, filterShuntDnsNodeSections } from '../config/sections.uc';
+/** @typedef {import('../types/sections.uc').ShuntSection} ShuntSection */
+import { filterShuntRouteRuleSections, filterShuntDnsNodeSections } from '../config/sections.uc';
 import { port } from '../config/values.uc';
 import { CORE, core } from '../config/protocol/proxy.uc';
 import { TAG } from './constants.uc';
@@ -18,10 +19,11 @@ import { build as buildXray } from './xray/routing.uc';
 /**
  * 解析分流设置，确认代理出口和 DNS 引用有效。
  * @param {UciSection[]} sections
+ * @param {ShuntSection} shunt 要生成的分流 section，由调用方选定。
  * @param {RoutingDependencies} dependencies
  * @returns {RoutingSettings} 带出口、DNS、规则集策略和 entries 的分流设置对象。
  */
-export function prepare(sections, dependencies) {
+export function prepare(sections, shunt, dependencies) {
 	/**
 	 * 将出口选择转换为节点名称或直连、阻断标签。
 	 * @returns {string} 出口标签；可选项未设置时为空字符串，无效引用抛错。
@@ -62,10 +64,6 @@ export function prepare(sections, dependencies) {
 			die(`DNS node "${name}" missing or disabled`);
 		}
 		return server;
-	}
-	let shunt = findShuntSection(sections);
-	if (!shunt) {
-		die('shunt section is missing');
 	}
 	let settings = {
 		core: core(shunt.type), listen: port(shunt.shunt_listen_port), dnsPort: port(shunt.dns_listen_port),

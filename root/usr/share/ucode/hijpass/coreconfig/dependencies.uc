@@ -14,10 +14,10 @@ import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 /**
  * 收集目标节点及其依赖，并连接上游和均衡成员。
  * @param {UciSection[]} sections
- * @param {string} [target] 节点 section ID；shunt 或未指定时解析全部启用节点。
+ * @param {string|null} [nodeID] 代理节点 section ID；未指定时解析全部启用节点。
  * @returns {ResolvedDependencies} {nodes, byID, byName}，索引和依赖直接引用节点对象。
  */
-export function resolve(sections, target) {
+export function resolve(sections, nodeID) {
 	let proxySections = filterProxyNodeSections(sections);
 	/** @type {Object<string, ProxyNodeSection[]>} */
 	let enabledProxies = {};
@@ -29,9 +29,9 @@ export function resolve(sections, target) {
 			enabledProxies[name] ||= [];
 			push(enabledProxies[name], section);
 		}
-		// 单节点生成从目标开始；全量生成和分流预览从全部启用节点开始。
-		if (target && target != 'shunt') {
-			if (section['.name'] == target) {
+		// 指定节点时从目标开始，否则从全部启用节点开始。
+		if (nodeID) {
+			if (section['.name'] == nodeID) {
 				push(rootSections, section);
 			}
 		}
@@ -39,7 +39,7 @@ export function resolve(sections, target) {
 			push(rootSections, section);
 		}
 	}
-	if (target && target != 'shunt' && !length(rootSections)) {
+	if (nodeID && !length(rootSections)) {
 		die('node not found');
 	}
 	/** @type {DecodedProxyNode[]} */

@@ -46,16 +46,24 @@ function validatePorts(nodes, shunt) {
  * 校验配置和依赖，生成代理节点或分流的核心配置。
  * 返回：全部配置 {nodes, shunt?}；指定 target 时只返回对应的核心 JSON 对象。
  * @param {UciSection[]} sections
- * @param {string} [target]
+ * @param {string} [target] 要生成的 proxy_node 或 shunt section ID；省略时全量生成。
  * @returns {GeneratedConfigs|CoreConfig}
  */
 export function render(sections, target) {
 	validateSections(sections);
-	let dependencies = resolveDependencies(sections, target);
+	let targetSection = target ? filter(sections, section => section['.name'] == target)[0] : null;
+	if (target && !targetSection) {
+		die('target section not found');
+	}
+	if (targetSection && targetSection['.type'] != 'proxy_node' && targetSection['.type'] != 'shunt') {
+		die(`unsupported target section type "${targetSection['.type']}"`);
+	}
+	let proxyNodeID = targetSection?.['.type'] == 'proxy_node' ? target : null;
+	let dependencies = resolveDependencies(sections, proxyNodeID);
 	validateDependencies(dependencies);
-	let shunt = findShuntSection(sections), routing = null;
-	if (target == 'shunt' || !target && shunt && shunt.enabled != '0' && shunt.config_type == 'tmpl') {
-		routing = prepareRouting(sections, dependencies);
+	let shunt = findShuntSection(targetSection ? [targetSection] : sections), routing = null;
+	if (shunt && (target || shunt.enabled != '0' && shunt.config_type == 'tmpl')) {
+		routing = prepareRouting(sections, shunt, dependencies);
 	}
 	validatePorts(dependencies.nodes, routing);
 	let result = { nodes: {} };
@@ -72,7 +80,7 @@ export function render(sections, target) {
 	if (!target) {
 		return result;
 	}
-	if (target == 'shunt') {
+	if (shunt) {
 		return result.shunt;
 	}
 	if (!result.nodes[target]) {

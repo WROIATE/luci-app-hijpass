@@ -93,6 +93,11 @@ test('one RPC object exposes configuration preview, validation and writes with m
     const full = f.invoke('config_render', { sections: snapshot });
     assert.equal(full.error, undefined, full.error);
     assert.deepEqual(f.invoke('config_render', { sections: snapshot, target: 'downstream' }).config, full.nodes.downstream);
+    const routing = require('./testdata/compatibility.json').find(f => f.name === 'sing-box-shunt-default');
+    const routingSections = structuredClone(routing.sections);
+    routingSections.find(section => section['.type'] === 'shunt')['.name'] = 'cfg123456';
+    assert.deepEqual(f.invoke('config_render', { sections: JSON.stringify(routingSections), target: 'cfg123456' }),
+        { config: routing.expected.shunt });
     assert.deepEqual(f.invoke('config_validate', { sections: snapshot }), { ok: true });
     assert.equal(fs.existsSync(path.join(f.directory, 'downstream-downstream.json')), false);
     assert.match(f.invoke('config_render', { sections: snapshot, target: 'missing' }).error, /not found/);

@@ -60,8 +60,8 @@ test('LuCI sends staged sections and propagates backend errors', async () => {
     assert.equal(calls[1][0].method, 'config_validate');
 });
 
-function loadTS(relative, modules) {
-    const context = vm.createContext({ exports: {}, URLSearchParams, atob, btoa, console: { log() {} }, _: s => s, require(name) {
+function loadTS(relative, modules, globals = {}) {
+    const context = vm.createContext({ exports: {}, URLSearchParams, atob, btoa, console: { log() {} }, _: s => s, ...globals, require(name) {
         if (name in modules) return modules[name];
         throw new Error(`unexpected import ${name}`);
     } });
@@ -70,6 +70,33 @@ function loadTS(relative, modules) {
     vm.runInContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, context);
     return context.exports;
 }
+
+for (const id of ['cfg123456', 'named-routing', null]) test(`shunt preview uses the staged section ID: ${id}`, async () => {
+    const calls = [], modals = [], errors = [], rendered = [];
+    const section = id && { '.name': id, '.type': 'shunt', type: 'sing-box' };
+    const { ShuntFormUtils } = loadTS('utils/feature/shunt/form.ts', {
+        'hijpass.editor': {}, '../../backend': {}, form: {},
+        uci: {
+            sections(config, type) {
+                assert.equal(config, 'hijpass');
+                assert.equal(type, 'shunt');
+                return section ? [section] : [];
+            },
+        },
+        ui: { showModal: (...args) => modals.push(args) },
+        '../../../enum/hijpass': { CORE_TYPE: { XRAY: 'xray' }, LuciFlied: { CONF_NAME: 'hijpass', SHUNT_SECTION_TYPE: 'shunt' } },
+        '../../base/luci/form': {},
+        '../../base/luci/notification': { NotificationUtils: { error: (...args) => errors.push(args) } },
+        '../config/backend': { GeneratedConfigUtils: { preview: async target => { calls.push(target); return { outbounds: [] }; } } },
+        '../config/preview': { ConfigPreviewUtils: { render: value => { rendered.push(value); return value; } } },
+    }, { E: (tag, attributes, children) => ({ tag, attributes, children }) });
+    await ShuntFormUtils.showPreview();
+    assert.deepEqual(calls, id ? [id] : []);
+    assert.equal(modals.length, id ? 1 : 0);
+    assert.equal(errors.length, id ? 0 : 1);
+    if (id) assert.deepEqual(JSON.parse(rendered[0]), { outbounds: [] });
+    else assert.match(errors[0][1], /shunt section is missing/);
+});
 
 test('CLI renders supplied input without runtime commands and rejects generate', () => {
     const fixture = fixtures.find(f => f.name === 'sing-box-chain');

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import { read } from '../uci/read.uc';
 import { render, validate } from '../coreconfig/render.uc';
 
-// RPC Request：sections 为可选的 JSON 快照字符串，target 为可选 section ID。
+// RPC Request：sections 为可选的 JSON 快照字符串，target 为可选的 proxy_node 或 shunt section ID。
 // 未给 sections 时直接读取 /etc/config/hijpass，支持脱离 LuCI 的命令行运行。
 // RPC Response：render 返回 {nodes, shunt?} 或 {config}；validate 返回 {ok:true}；
 // 错误统一为 {error}，供 LuCI 展示；CLI 错误输出到 stderr 并返回非零状态。

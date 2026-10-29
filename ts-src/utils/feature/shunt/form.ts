@@ -55,8 +55,10 @@ const ShuntFormUtils = {
 
     showPreview: async function () {
         try {
-            let configJson = JSON.stringify(await GeneratedConfigUtils.preview('shunt'), null, 2)
-            let shuntType = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'type') || CORE_TYPE.XRAY
+            const shunt = uci.sections(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE)[0];
+            if (!shunt) throw new Error(_('shunt section is missing'));
+            let configJson = JSON.stringify(await GeneratedConfigUtils.preview(shunt['.name']), null, 2)
+            let shuntType = shunt.type || CORE_TYPE.XRAY
             ui.showModal(_('Preview Configuration'), [
                 E('div', {'class': 'cbi-section'}, [
                     E('div', {'class': 'cbi-section-descr'},

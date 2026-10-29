@@ -79,14 +79,14 @@ test('absent optional services produce no instances, DNS settings or firewall ru
     }
 });
 
-test('a missing shunt is optional for rendering but fails an explicit shunt preview', () => {
+test('a missing shunt is optional for rendering but a missing target ID fails explicitly', () => {
     const sections = [{ '.type': 'hijpass', '.name': 'global', enabled: '1' }];
     const all = config(['render', '--stdin'], sections);
     assert.equal(all.status, 0, all.stderr);
     assert.deepEqual(JSON.parse(all.stdout), { nodes: {} });
-    const preview = config(['render', '--stdin', '--target', 'shunt'], sections);
+    const preview = config(['render', '--stdin', '--target', 'cfg123456'], sections);
     assert.notEqual(preview.status, 0);
-    assert.match(preview.stderr, /shunt section is missing/);
+    assert.match(preview.stderr, /target section not found/);
 });
 
 test('a missing DNS section does not enable DNS-maintained firewall sets', () => {

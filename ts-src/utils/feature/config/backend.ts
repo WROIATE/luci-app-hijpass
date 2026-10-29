@@ -6,8 +6,8 @@ function snapshot() {
     return JSON.stringify(uci.sections(LuciFlied.CONF_NAME, undefined));
 }
 
-async function preview(target: string) {
-    const result = await Backend.renderConfigs(snapshot(), target);
+async function preview(sectionId: string) {
+    const result = await Backend.renderConfigs(snapshot(), sectionId);
     return result.config;
 }
 

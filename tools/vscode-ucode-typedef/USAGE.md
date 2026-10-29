@@ -1,6 +1,8 @@
 # ucode Typedef Navigation
 
-独立的 `.uc` 类型与字段导航插件，不需要安装 ucode Language Support，也可与它一起使用。运行时无额外依赖，生成的 VSIX 可复制到其他机器直接安装。
+类型与字段导航已整合到 ucode Language Support 的 **0.9.0 本地修订版**。安装整合版即可同时使用类型检查、注释类型和字段跳转，无需启用本独立插件；整合版 VSIX 可直接复制到其他机器安装。
+
+后续源码和打包统一在 [ucode-lsp 仓库](/home/jarao/ucode-lsp)维护，见[整合说明](/home/jarao/ucode-lsp/docs/unified-navigation.md)。本目录保留 0.4.0 历史实现，以下说明仅适用于旧版独立插件。
 
 ## 安装和使用
 

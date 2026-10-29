@@ -112,6 +112,28 @@ test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变
     assert.match(content, /Activation completed/);
 });
 
+test('命令阶段保留 fw4 信息级别，同时记录真实告警和失败且不改变退出状态', t => {
+    const f = fixture(t), entry = path.join(f.runtime, 'step-test.sh');
+    fs.writeFileSync(entry, `#!/bin/sh
+. '${f.runtime}/common.sh'
+hijpass_step test 'command phase' '${f.directory}/diagnostic-command'
+`);
+    const env = { TEST_DIAGNOSTIC: '[I] firewall feature enabled', TEST_STATUS: '0' };
+    f.script('diagnostic-command', 'printf "%s\\n" "$TEST_DIAGNOSTIC" >&2\nexit "$TEST_STATUS"');
+    const cases = [['[I] firewall feature enabled', '0', 'INFO'],
+        ['[I] informational\nWarning: hook failed', '0', 'WARN'],
+        ['[E] optional operation failed', '0', 'ERROR'], ['failed operation', '7', 'ERROR']];
+    for (const [message, code, level] of cases) {
+        const result = f.run('step-test.sh', [], { ...env, TEST_DIAGNOSTIC: message, TEST_STATUS: code });
+        assert.equal(result.status, Number(code), result.stderr);
+        assert.equal(result.stdout, '');
+        assert.equal(result.stderr, message + '\n');
+        const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
+        assert.match(content, new RegExp(`${level}\\s+\\[test\\] command phase: exit=${code}`));
+        fs.unlinkSync(path.join(f.directory, 'logs/hijpass.log'));
+    }
+});
+
 test('配置提交失败后继续恢复其余文件，同时保留原错误和回滚失败原因', t => {
     const f = fixture(t), first = path.join(f.directory, 'first.json'), second = path.join(f.directory, 'second.json');
     const blocked = path.join(f.directory, 'blocked');

@@ -23,6 +23,17 @@ hijpass_log() (
     exit 0
 )
 
+# fw4 的 [I] 消息也写 stderr；显式信息保持 INFO，其余成功诊断默认 WARN。
+hijpass_diagnostic_level() {
+    if [ "$2" -ne 0 ] || grep -Eq '^[[:space:]]*(\[E\]|ERROR[:[:space:]])' "$1"; then
+        printf 'ERROR\n'
+    elif grep -q '[^[:space:]]' "$1" && ! grep -Eqv '^[[:space:]]*(\[I\][[:space:]]|$)' "$1"; then
+        printf 'INFO\n'
+    else
+        printf 'WARN\n'
+    fi
+}
+
 # 执行有副作用的阶段，保留原始 stderr/退出码；成功返回的告警同样记录。
 hijpass_step() {
     local module="$1" phase="$2" output code level
@@ -35,8 +46,7 @@ hijpass_step() {
     "$@" 2>"$output"
     code=$?
     if [ "$code" -ne 0 ] || [ -s "$output" ]; then
-        level=WARN
-        [ "$code" -eq 0 ] || level=ERROR
+        level=$(hijpass_diagnostic_level "$output" "$code")
         if [ -n "${HIJPASS_TASK_ID:-}" ]; then
             # 后台 worker 统一留存完整 stderr，阶段只记录上下文，避免重复详情。
             hijpass_log "$level" "$module" "$phase: exit=$code; diagnostic output retained by task"

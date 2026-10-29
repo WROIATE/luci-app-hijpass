@@ -14,8 +14,7 @@ code=$?
 level=INFO
 [ "$code" -eq 0 ] || level=ERROR
 if [ -s "$directory/stderr" ]; then
-    detail_level=WARN
-    [ "$code" -eq 0 ] || detail_level=ERROR
+    detail_level=$(hijpass_diagnostic_level "$directory/stderr" "$code")
     hijpass_log "$detail_level" trace "Capture diagnostic output:
 $(head -c 8192 "$directory/stderr")"
 fi

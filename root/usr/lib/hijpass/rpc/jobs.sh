@@ -42,7 +42,8 @@ case "$action" in
         esac >"$directory/stdout" 2>"$directory/stderr"
         code=$?
         if [ "$code" -eq 0 ] && [ -s "$directory/stderr" ]; then
-            hijpass_log WARN job "$id diagnostic output (exit=$code):
+            level=$(hijpass_diagnostic_level "$directory/stderr" "$code")
+            hijpass_log "$level" job "$id diagnostic output (exit=$code):
 $(head -c 8192 "$directory/stderr")"
         fi
         if [ "$code" -eq 0 ]; then

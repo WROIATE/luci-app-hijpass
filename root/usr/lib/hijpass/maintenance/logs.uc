@@ -56,9 +56,11 @@ export function logger(sections) {
 			return;
 		}
 		message = safeMessage(message);
+		let location = '';
 		if (debug) {
 			source = source || callerLocation();
-			if (source) message = `${source} ${message}`;
+			// 原脚本为来源预留 40 列；加入行号后预留 64 列，并保留分隔空格。
+			location = sprintf('%-64s  ', source || '');
 			let task = getenv('HIJPASS_TASK_ID');
 			if (task && match(task, /^[A-Za-z0-9]{8}$/)) message += ` [task=${task}]`;
 		}
@@ -70,7 +72,9 @@ export function logger(sections) {
 			let date = localtime(time());
 			if (!date) die('cannot format log timestamp');
 			let stamp = sprintf('%04d-%02d-%02d %02d:%02d:%02d', date.year, date.mon, date.mday, date.hour, date.min, date.sec);
-			let entry = sprintf('[%s]   %-8s%s\n', stamp, level, replace(message, '\n', '\n                               '));
+			let prefix = sprintf('[%s]   %-8s%s', stamp, level, location);
+			let indent = replace(prefix, /./g, ' ');
+			let entry = prefix + replace(message, '\n', '\n' + indent) + '\n';
 			if (file.write(entry) != length(entry) || !file.flush()) die('cannot write log');
 			file.close();
 		}

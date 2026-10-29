@@ -173,8 +173,8 @@ business();\n`);
     assert.equal(f.data('debug-call.uc', []).status, 0);
     const log = path.join(f.directory, 'logs/hijpass.log');
     let content = fs.readFileSync(log, 'utf8');
-    assert.ok(content.includes(`${entry}:3 [test] shell location`), content);
-    assert.ok(content.includes(`${native}:4 [test] ucode location`), content);
+    assert.ok(content.includes(`${entry}:3`) && /:3\s+\[test\] shell location/.test(content), content);
+    assert.ok(content.includes(`${native}:4`) && /:4\s+\[test\] ucode location/.test(content), content);
     fs.writeFileSync(log, '');
     withConfig([{ '.type': 'hijpass', log_level: 'INFO' }], config => {
         assert.equal(f.run('debug-call.sh', [config], { HIJPASS_TASK_ID: 'Test1234' }).status, 0);
@@ -803,4 +803,21 @@ exit "$AUTO_RESULT"
         }
     });
     assert.equal(fs.readFileSync(calls, 'utf8'), 'update\nupdate\nupdate\n');
+});
+
+test('DEBUG 来源使用固定列宽，多行正文与首行正文对齐，完整路径和行号保留', t => {
+    const f = fixture(t);
+    withConfig([{ '.type': 'hijpass', log_level: 'DEBUG' }], config => {
+        for (const [source, message] of [['/usr/lib/hijpass/a.sh:7', '[test] first\ncontinuation'],
+            ['/usr/lib/hijpass/maintenance/cleanup.sh:123', '[test] second']]) {
+            const result = f.run('maintenance/logs.sh', ['source', 'INFO', source, message, '--configdir', config]);
+            assert.equal(result.status, 0, result.stderr);
+        }
+    });
+    const lines = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8').trimEnd().split('\n');
+    assert.equal(lines[0].indexOf('[test]'), 98);
+    assert.equal(lines[2].indexOf('[test]'), 98);
+    assert.equal(lines[1].indexOf('continuation'), 98);
+    assert.ok(lines[0].includes('/usr/lib/hijpass/a.sh:7'));
+    assert.ok(lines[2].includes('/usr/lib/hijpass/maintenance/cleanup.sh:123'));
 });

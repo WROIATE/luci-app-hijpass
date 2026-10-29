@@ -1,4 +1,6 @@
 /** @typedef {import('./json.uc').JsonObject} JsonObject */
+/** @typedef {import('./proxy-sections.uc').ProxyNodeSection} ProxyNodeSection */
+/** @typedef {import('./routing.uc').RoutingInput} RoutingInput */
 // 核心原生 JSON 的稳定边界；协议专用扩展保留 JSON 字典。
 
 /**
@@ -95,7 +97,16 @@
  */
 
 /**
- * 未指定 target 时的生成结果；nodes 以 section ID 索引，自定义节点没有生成结果。
+ * 上层选定的生成输入；起点和依赖候选独立，底层不解释 enabled 或生成场景。
+ * @typedef {{
+ *   rootProxies: ProxyNodeSection[],
+ *   availableProxies: ProxyNodeSection[],
+ *   routing: RoutingInput|null
+ * }} GenerationInput
+ */
+
+/**
+ * 核心生成结果；nodes 以 section ID 索引，自定义节点没有生成结果。
  * @typedef {{
  *   nodes: Object<string, CoreConfig>,
  *   shunt: CoreConfig|null

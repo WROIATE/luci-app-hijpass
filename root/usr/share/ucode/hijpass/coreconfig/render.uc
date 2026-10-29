@@ -1,10 +1,7 @@
-/** @typedef {import('../types/core.uc').ValidationResult} ValidationResult */
-/** @typedef {import('../types/core.uc').CoreConfig} CoreConfig */
+/** @typedef {import('../types/core.uc').GenerationInput} GenerationInput */
 /** @typedef {import('../types/core.uc').GeneratedConfigs} GeneratedConfigs */
-/** @typedef {import('../types/sections.uc').UciSection} UciSection */
 /** @typedef {import('../types/routing.uc').RoutingSettings} RoutingSettings */
 /** @typedef {import('../types/proxy.uc').DecodedProxyNode} DecodedProxyNode */
-import { findHijpassSection, findShuntSection, validateSections } from '../config/sections.uc';
 import { CORE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 import { resolve as resolveDependencies, validate as validateDependencies } from './dependencies.uc';
 import { cleanObject } from './json.uc';
@@ -40,31 +37,15 @@ function validatePorts(nodes, shunt) {
 	}
 };
 
-// Generated：nodes 为 section ID -> 核心 JSON 对象；shunt 只在模板分流开启时出现。
-// render 是纯转换：不写 UCI/文件，不启动进程，失败时不会返回半份配置。
 /**
- * 校验配置和依赖，生成代理节点或分流的核心配置。
- * 返回：全部配置 {nodes, shunt?}；指定 target 时只返回对应的核心 JSON 对象。
- * @param {UciSection[]} sections
- * @param {string} [target] 要生成的 proxy_node 或 shunt section ID；省略时全量生成。
- * @returns {GeneratedConfigs|CoreConfig}
+ * 解析显式提供的节点和分流输入，校验后生成核心配置；不筛选启用状态或写文件。
+ * @param {GenerationInput} input 调用方选定的代理起点、依赖候选及可选分流输入。
+ * @returns {GeneratedConfigs} nodes 以 section ID 索引；传入分流输入时生成 shunt。
  */
-export function render(sections, target) {
-	validateSections(sections);
-	let targetSection = target ? filter(sections, section => section['.name'] == target)[0] : null;
-	if (target && !targetSection) {
-		die('target section not found');
-	}
-	if (targetSection && targetSection['.type'] != 'proxy_node' && targetSection['.type'] != 'shunt') {
-		die(`unsupported target section type "${targetSection['.type']}"`);
-	}
-	let proxyNodeID = targetSection?.['.type'] == 'proxy_node' ? target : null;
-	let dependencies = resolveDependencies(sections, proxyNodeID);
+export function render(input) {
+	let dependencies = resolveDependencies(input.rootProxies, input.availableProxies);
 	validateDependencies(dependencies);
-	let shunt = findShuntSection(targetSection ? [targetSection] : sections), routing = null;
-	if (shunt && (target || shunt.enabled != '0' && shunt.config_type == 'tmpl')) {
-		routing = prepareRouting(sections, shunt, dependencies);
-	}
+	let routing = input.routing ? prepareRouting(input.routing, dependencies) : null;
 	validatePorts(dependencies.nodes, routing);
 	let result = { nodes: {} };
 	for (let n in dependencies.nodes) {
@@ -77,29 +58,5 @@ export function render(sections, target) {
 	if (routing) {
 		result.shunt = cleanObject(buildRouting(routing, dependencies));
 	}
-	if (!target) {
-		return result;
-	}
-	if (shunt) {
-		return result.shunt;
-	}
-	if (!result.nodes[target]) {
-		die('custom node configuration is not generated');
-	}
-	return result.nodes[target];
-};
-/**
- * 检查配置能否生成，服务关闭时仅检查快照结构。
- * @param {UciSection[]} sections
- * @returns {ValidationResult} 校验成功返回 {ok: true}，失败时抛错。
- */
-export function validate(sections) {
-	// 服务关闭时允许保存未完成表单，但输入的 UCI 结构仍必须有效。
-	if (findHijpassSection(sections)?.enabled == '0') {
-		validateSections(sections);
-	}
-	else {
-		render(sections);
-	}
-	return { ok: true };
+	return result;
 };

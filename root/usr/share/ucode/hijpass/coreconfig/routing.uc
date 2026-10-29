@@ -1,10 +1,8 @@
 /** @typedef {import('../types/core.uc').CoreConfig} CoreConfig */
 /** @typedef {import('../types/routing.uc').DNSServer} DNSServer */
 /** @typedef {import('../types/routing.uc').RoutingSettings} RoutingSettings */
+/** @typedef {import('../types/routing.uc').RoutingInput} RoutingInput */
 /** @typedef {import('../types/proxy.uc').RoutingDependencies} RoutingDependencies */
-/** @typedef {import('../types/sections.uc').UciSection} UciSection */
-/** @typedef {import('../types/sections.uc').ShuntSection} ShuntSection */
-import { filterShuntRouteRuleSections, filterShuntDnsNodeSections } from '../config/sections.uc';
 import { port } from '../config/values.uc';
 import { CORE, core } from '../config/protocol/proxy.uc';
 import { TAG } from './constants.uc';
@@ -18,12 +16,12 @@ import { build as buildXray } from './xray/routing.uc';
 // Entry：name/split，exit/v4/v6/dnsExit 出口，dns/strategy DNS 策略，match 匹配条件。
 /**
  * 解析分流设置，确认代理出口和 DNS 引用有效。
- * @param {UciSection[]} sections
- * @param {ShuntSection} shunt 要生成的分流 section，由调用方选定。
+ * @param {RoutingInput} input 调用方选定的分流 section、DNS 节点和规则，不筛选启用状态。
  * @param {RoutingDependencies} dependencies
  * @returns {RoutingSettings} 带出口、DNS、规则集策略和 entries 的分流设置对象。
  */
-export function prepare(sections, shunt, dependencies) {
+export function prepare(input, dependencies) {
+	let shunt = input.shunt;
 	/**
 	 * 将出口选择转换为节点名称或直连、阻断标签。
 	 * @returns {string} 出口标签；可选项未设置时为空字符串，无效引用抛错。
@@ -41,27 +39,24 @@ export function prepare(sections, shunt, dependencies) {
 		if (dependencies.byName[name]) {
 			return name;
 		}
-		die(name ? `proxy node "${name}" missing or disabled` : 'proxy exit is required');
+		die(name ? `proxy node "${name}" missing from resolved dependencies` : 'proxy exit is required');
 	}
 	let servers = {};
-	for (let section in filterShuntDnsNodeSections(sections)) {
-		if (section.enabled == '0') {
-			continue;
-		}
+	for (let section in input.dnsNodes) {
 		if (servers[section.tag]) {
 			die(`duplicate DNS tag "${section.tag}"`);
 		}
 		servers[section.tag] = { tag: section.tag, type: section.type, address: section.server, port: section.port ? port(section.port) : null };
 	}
 	/**
-	 * 查找已启用的 DNS 节点，无效引用时报错。
+	 * 查找调用方提供的 DNS 节点，无效引用时报错。
 	 * 返回：节点对象 {tag, type, address, port}；端口未配置时 port 为 null。
 	 * @returns {DNSServer}
 	 */
 	function resolveDNSServer(name) {
 		let server = servers[name];
 		if (!server) {
-			die(`DNS node "${name}" missing or disabled`);
+			die(`DNS node "${name}" missing from supplied DNS nodes`);
 		}
 		return server;
 	}
@@ -85,10 +80,7 @@ export function prepare(sections, shunt, dependencies) {
 			settings.rulesetDNS = resolveDNSServer(shunt.ruleset_dns_node);
 		}
 	}
-	for (let rule in filterShuntRouteRuleSections(sections)) {
-		if (rule.enabled != '1') {
-			continue;
-		}
+	for (let rule in input.rules) {
 		let split = rule.ip_version_split == '1';
 		if (split && !rule.proxy_node_v4 && !rule.proxy_node_v6) {
 			die(`split rule "${rule.name}" requires a proxy exit`);

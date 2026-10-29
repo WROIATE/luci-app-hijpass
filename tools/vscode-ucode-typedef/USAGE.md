@@ -77,7 +77,7 @@ function logPath(section) {
 
 ```ucode
 import { resolve as resolveDependencies } from './dependencies.uc';
-let dependencies = resolveDependencies(sections);
+let dependencies = resolveDependencies(rootProxies, availableProxies);
 for (let n in dependencies.nodes) {
     print(n.core);
 }

@@ -12,7 +12,7 @@ import * as fs from 'fs';
 import { FILES, nodeConfig, logPath } from 'hijpass.config.paths';
 import { findHijpassSection, findHijserverSection, findShuntSection, findRuleSection, filterProxyNodeSections, filterServerNodeSections } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
-import { render as renderCore } from 'hijpass.coreconfig.render';
+import { generate } from 'hijpass.config.generate';
 import { CORE, core, CONFIG_TYPE, configType } from 'hijpass.config.protocol.proxy';
 import { resolve } from '../network/network.uc';
 import { atomic, command, temporary, renderTemplate } from 'hijpass.common';
@@ -335,7 +335,7 @@ export function main() { run(ARGV,
             // 先生成进程描述，确认自定义命令、环境变量和文件名有效，再替换配置。
             plan(config);
             logger(config)('INFO', 'Preparing proxy configurations');
-            writeConfigs(prepareConfigFiles(config, renderCore(config)));
+            writeConfigs(prepareConfigFiles(config, generate(config)));
         }
         return;
     }

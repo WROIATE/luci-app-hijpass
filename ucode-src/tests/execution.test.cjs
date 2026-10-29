@@ -175,9 +175,9 @@ test('准备链式代理配置不修改生成对象，也不提前写入文件',
         "function resolve(host) { return '192.0.2.10'; }");
     f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/client', f.directory);
     fs.writeFileSync(path.join(f.runtime, 'prepare-test.uc'), `import * as fs from 'fs';
-import { render } from 'hijpass.coreconfig.render';
+import { generate } from 'hijpass.config.generate';
 import { prepareConfigFiles } from './service/prepare.uc';
-let sections = json(fs.stdin.read('all')), generated = render(sections);
+let sections = json(fs.stdin.read('all')), generated = generate(sections);
 let before = sprintf('%J', generated);
 let files = prepareConfigFiles(sections, generated);
 assert(sprintf('%J', generated) == before, 'generated configuration was modified');

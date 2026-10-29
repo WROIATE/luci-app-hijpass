@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { read } from '../uci/read.uc';
-import { render, validate } from '../coreconfig/render.uc';
+import { generate, validate } from '../config/generate.uc';
 
 // RPC Request：sections 为可选的 JSON 快照字符串，target 为可选的 proxy_node 或 shunt section ID。
 // 未给 sections 时直接读取 /etc/config/hijpass，支持脱离 LuCI 的命令行运行。
@@ -71,7 +71,7 @@ export function main(args) {
 			}
 			sections = useStdin ? json(stdinText()) : read('hijpass', directory);
 		}
-		let result = method == 'validate' ? validate(sections) : render(sections, target);
+		let result = method == 'validate' ? validate(sections) : generate(sections, target);
 		printf('%.2J\n', rpc && target && method == 'render' ? { config: result } : result);
 	}
 	catch (e) {

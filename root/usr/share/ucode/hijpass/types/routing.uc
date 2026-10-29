@@ -1,4 +1,16 @@
+/** @typedef {import('./sections.uc').ShuntSection} ShuntSection */
+/** @typedef {import('./sections.uc').ShuntDnsNodeSection} ShuntDnsNodeSection */
+/** @typedef {import('./sections.uc').ShuntRouteRuleSection} ShuntRouteRuleSection */
 // 共享类型声明；仅用于编辑器，不创建或导出运行时对象。
+
+/**
+ * 上层选定的原始分流输入；DNS 节点和规则数组已确定处理范围。
+ * @typedef {{
+ *   shunt: ShuntSection,
+ *   dnsNodes: ShuntDnsNodeSection[],
+ *   rules: ShuntRouteRuleSection[]
+ * }} RoutingInput
+ */
 
 /**
  * @typedef {object} Match

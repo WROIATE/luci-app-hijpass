@@ -8,7 +8,7 @@ import * as files from '../../root/usr/lib/hijpass/maintenance/logs.uc';
 import * as system from '../../root/usr/share/ucode/hijpass/common.uc';
 import { architecture } from '../../root/usr/lib/hijpass/core/release.uc';
 import { read } from '../../root/usr/share/ucode/hijpass/uci/read.uc';
-import { render } from '../../root/usr/share/ucode/hijpass/coreconfig/render.uc';
+import { generate as render } from '../../root/usr/share/ucode/hijpass/config/generate.uc';
 import { parse } from '../../root/usr/lib/hijpass/diagnostics/capture.uc';
 import { options as dnsOptions } from '../../root/usr/lib/hijpass/service/dns.uc';
 import { packetSummary, report } from '../../root/usr/lib/hijpass/diagnostics/report.uc';

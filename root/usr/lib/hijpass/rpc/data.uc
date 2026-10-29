@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import { defaultTemplate } from '../firewall/generate.uc';
 import { editor, logs, log } from './files.uc';
-import { render, validate } from 'hijpass.coreconfig.render';
+import { generate, validate } from 'hijpass.config.generate';
 import { read } from 'hijpass.uci.read';
 import { prepareConfigFiles, writeConfigs } from '../service/prepare.uc';
 
@@ -76,13 +76,13 @@ try {
             result = validate(sections);
         }
         else {
-            let generated = render(sections, request.target);
+            let generated = generate(sections, request.target);
             result = request.target ? { config: generated } : generated;
         }
     }
     else if (method == 'config_write') {
         let sections = json(request.sections);
-        let generated = render(sections);
+        let generated = generate(sections);
         for (let section in sections) {
             if (!match(section['.name'], /^[A-Za-z0-9_-]+$/)) {
                 die('invalid section ID');

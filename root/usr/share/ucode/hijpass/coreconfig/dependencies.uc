@@ -2,9 +2,7 @@
 /** @typedef {import('../types/proxy.uc').ProxyGraph} ProxyGraph */
 /** @typedef {import('../types/proxy.uc').ResolvedDependencies} ResolvedDependencies */
 /** @typedef {import('../types/proxy.uc').ProxyIndex} ProxyIndex */
-/** @typedef {import('../types/sections.uc').UciSection} UciSection */
 /** @typedef {import('../types/proxy-sections.uc').ProxyNodeSection} ProxyNodeSection */
-import { filterProxyNodeSections } from '../config/sections.uc';
 import { list } from '../config/values.uc';
 import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 
@@ -12,35 +10,18 @@ import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 // 每个节点的 upstream/members 直接引用其依赖节点，供核心配置生成使用。
 // 解析、连接引用、校验分别执行，查询过程没有隐藏的配置校验副作用。
 /**
- * 收集目标节点及其依赖，并连接上游和均衡成员。
- * @param {UciSection[]} sections
- * @param {string|null} [nodeID] 代理节点 section ID；未指定时解析全部启用节点。
+ * 从调用方指定的起点收集依赖，连接上游和均衡成员；不解释启用状态。
+ * @param {ProxyNodeSection[]} rootProxies 要解析的代理起点，空数组表示不生成节点。
+ * @param {ProxyNodeSection[]} availableProxies 可按名称引用的依赖候选，由调用方决定范围。
  * @returns {ResolvedDependencies} {nodes, byID, byName}，索引和依赖直接引用节点对象。
  */
-export function resolve(sections, nodeID) {
-	let proxySections = filterProxyNodeSections(sections);
+export function resolve(rootProxies, availableProxies) {
 	/** @type {Object<string, ProxyNodeSection[]>} */
-	let enabledProxies = {};
-	/** @type {ProxyNodeSection[]} */
-	let rootSections = [];
-	for (let section in proxySections) {
-		if (section.enabled == '1') {
-			let name = section.name || section['.name'];
-			enabledProxies[name] ||= [];
-			push(enabledProxies[name], section);
-		}
-		// 指定节点时从目标开始，否则从全部启用节点开始。
-		if (nodeID) {
-			if (section['.name'] == nodeID) {
-				push(rootSections, section);
-			}
-		}
-		else if (section.enabled == '1') {
-			push(rootSections, section);
-		}
-	}
-	if (nodeID && !length(rootSections)) {
-		die('node not found');
+	let proxiesByName = {};
+	for (let section in availableProxies) {
+		let name = section.name || section['.name'];
+		proxiesByName[name] ||= [];
+		push(proxiesByName[name], section);
 	}
 	/** @type {DecodedProxyNode[]} */
 	let nodes = [];
@@ -52,7 +33,7 @@ export function resolve(sections, nodeID) {
 	let dependencies = {};
 	// 按批次展开依赖，保持发现顺序；每个 ID 只展开一次，循环有界。
 	/** @type {ProxyNodeSection[]} */
-	let pendingSections = rootSections;
+	let pendingSections = rootProxies;
 	while (length(pendingSections)) {
 		/** @type {ProxyNodeSection[]} */
 		let nextSections = [];
@@ -61,7 +42,7 @@ export function resolve(sections, nodeID) {
 			if (byID[id]) {
 				continue;
 			}
-			if (length(filter(enabledProxies[name] || [], other => other['.name'] != id))) {
+			if (byName[name] || length(filter(proxiesByName[name] || [], other => other['.name'] != id))) {
 				die(`duplicate proxy name "${name}"`);
 			}
 			let node;
@@ -87,9 +68,9 @@ export function resolve(sections, nodeID) {
 				dependencyNames = [section.upstream_proxy_node];
 			}
 			for (let dependencyName in dependencyNames) {
-				let matches = enabledProxies[dependencyName] || [];
+				let matches = proxiesByName[dependencyName] || [];
 				if (!length(matches)) {
-					die(`proxy node "${dependencyName}" missing or disabled`);
+					die(`proxy node "${dependencyName}" missing from available proxies`);
 				}
 				if (length(matches) > 1) {
 					die(`duplicate proxy name "${dependencyName}"`);

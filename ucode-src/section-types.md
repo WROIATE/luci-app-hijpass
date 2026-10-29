@@ -52,8 +52,23 @@ explicitly. LuCI passes the actual shunt ID, including IDs assigned to anonymous
 sections. The string `shunt` is no longer a special target: it works only when it
 is the actual section ID. Callers using `--target shunt` must pass their section's
 ID instead. Without a target, rendering still uses the first shunt section.
-Dependency resolution accepts only an optional proxy node ID, while routing
-preparation receives the selected `ShuntSection` explicitly.
+`config/generate.uc` owns enable-state selection and the preview/save policy.
+CLI, RPC and service configuration preparation all use this entry point.
+Normal generation selects enabled proxies and the enabled template shunt;
+explicit previews may select a disabled target, while referenced proxies must
+still be enabled. Existing defaults remain explicit here: proxies and rules
+require `enabled == '1'`, while shunt and DNS nodes default to enabled unless
+`enabled == '0'`. Saving with the main service disabled checks snapshot structure
+without requiring unfinished node forms to generate successfully.
+
+The lower `coreconfig/render.uc` accepts a `GenerationInput` containing
+`rootProxies`, `availableProxies` and an optional `RoutingInput`. It always
+returns `GeneratedConfigs`; it does not read enable flags, select targets or
+vary its return shape by preview mode. Dependency resolution takes the explicit
+root and candidate arrays. Routing preparation consumes the supplied shunt,
+DNS nodes and rules without enable filtering. An empty root array means no
+proxy configuration even when candidates exist. Missing references, duplicate
+names, cycles, protocol errors and port conflicts remain generation errors.
 
 Raw configuration and converted models describe different stages:
 

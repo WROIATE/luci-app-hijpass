@@ -10,10 +10,13 @@ if [ "$action" = query ]; then hijpass_data "$data" query "$@"; exit $?; fi
 plan=$(hijpass_data "$data" plan "$action" "$@") || { hijpass_error 'invalid rules configuration'; exit 1; }
 json_load "$plan" || exit 1
 json_get_vars timeout retries enabled
+connect_timeout=$timeout
+[ "$connect_timeout" -le 10 ] || connect_timeout=10
 json_select jobs
 json_get_keys jobs
 work=$(mktemp -d /tmp/hijpass-rules.XXXXXX) || exit 1
 temp=
+updated=0
 trap 'if [ -n "$temp" ]; then rm -f "$temp" "$temp.text"; fi; rm -rf "$work"' EXIT
 set --
 for job in $jobs; do
@@ -23,6 +26,7 @@ for job in $jobs; do
     json_get_keys urls
     valid=0
     : >"$work/merged"
+    : >"$work/curl-error"
     if [ -n "$path" ] && [ -n "$urls" ] && mkdir -p "$(dirname -- "$path")"; then
         temp=$(mktemp "$path.new.XXXXXX") || temp=
         if [ -n "$temp" ]; then
@@ -33,7 +37,8 @@ for job in $jobs; do
                 downloaded=0
                 # 所有资源共用下载重试；文本资源的合并由 ucode 完成。
                 while [ "$attempt" -lt "$retries" ]; do
-                    if curl -f -sS -L --connect-timeout "$timeout" --max-time "$((timeout * 2))" -o "$temp" -- "$url" && [ "$(wc -c <"$temp")" -gt 100 ]; then
+                    # timeout 限制整次传输；连接最多等待 10 秒，重试错误只保留最后一次。
+                    if curl -f -sS -L --connect-timeout "$connect_timeout" --max-time "$timeout" -o "$temp" -- "$url" 2>"$work/curl-error" && [ "$(wc -c <"$temp")" -gt 100 ]; then
                         downloaded=1
                         break
                     fi
@@ -61,11 +66,18 @@ for job in $jobs; do
             temp=
         fi
     fi
-    if [ "$valid" -ne 1 ]; then echo "$key: no valid download" >&2; set -- "$@" "$key"; fi
+    if [ "$valid" -eq 1 ]; then
+        updated=1
+    else
+        printf '%s: no valid download' "$key" >&2
+        [ ! -s "$work/curl-error" ] || printf ': %s' "$(cat "$work/curl-error")" >&2
+        printf '\n' >&2
+        set -- "$@" "$key"
+    fi
     json_select ..
     json_select ..
 done
-if [ "$action" = update ] && [ "$enabled" = 1 ]; then
+if [ "$action" = update ] && [ "$enabled" = 1 ] && [ "$updated" = 1 ]; then
     /etc/init.d/hijpass restart || set -- "$@" restart
 fi
 hijpass_data "$data" result "$@"

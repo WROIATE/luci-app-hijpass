@@ -26,6 +26,7 @@
  */
 
 /**
+ * 单次下载的总超时为 timeout 秒；连接阶段最多等待 10 秒。
  * @typedef {{
  *   timeout: integer,
  *   retries: integer,

@@ -3260,3 +3260,21 @@ msgstr ""
 
 msgid "Hide this migration notice"
 msgstr ""
+
+msgid "GFW List"
+msgstr ""
+
+msgid "CHN Domain List"
+msgstr ""
+
+msgid "CHN IPv4 Route"
+msgstr ""
+
+msgid "CHN IPv6 Route"
+msgstr ""
+
+msgid "Service Restart"
+msgstr ""
+
+msgid "Details"
+msgstr ""

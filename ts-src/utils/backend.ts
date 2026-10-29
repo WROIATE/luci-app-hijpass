@@ -38,7 +38,10 @@ async function runJob(start: (...args: any[]) => Promise<any>, jsonOutput: boole
                 finished = true;
                 const result = jsonOutput ? JSON.parse(status.stdout || '{}') : status;
                 if (result.error) throw new Error(result.error);
-                if (status.code !== 0) throw new Error(status.stderr || 'Backend job failed');
+                if (status.code !== 0) {
+                    if (jsonOutput && result.success === false) return { ...result, details: status.stderr };
+                    throw new Error(status.stderr || 'Backend job failed');
+                }
                 return result;
             }
             await new Promise(resolve => window.setTimeout(resolve, 1000));

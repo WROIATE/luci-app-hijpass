@@ -60,6 +60,20 @@ for (const code of [0, 7]) test(`long updates poll beyond the RPC limit, report 
     assert.equal(f.calls.at(-1)[0], 'job_release');
 });
 
+test('structured update failures retain resource names and keep command logs as details', async () => {
+    const f = backend(method => {
+        if (method === 'rule_update') return { id: 'Abcd1234' };
+        if (method === 'job_release') return { ok: true };
+        return { running: false, code: 1, stdout: '{"success":false,"failed":["geoip","geosite"]}',
+            stderr: 'curl: (28) timed out\ncustom hook warning' };
+    });
+    const result = await f.api.updateRules();
+    assert.equal(result.success, false);
+    assert.deepEqual(Array.from(result.failed), ['geoip', 'geosite']);
+    assert.equal(result.details, 'curl: (28) timed out\ncustom hook warning');
+    assert.equal(f.calls.at(-1)[0], 'job_release');
+});
+
 test('runtime TypeScript has no device filesystem paths or direct fs access', () => {
     const base = path.join(__dirname, '..');
     for (const folder of ['views', 'utils']) for (const name of fs.readdirSync(path.join(base, folder), { recursive: true })) {

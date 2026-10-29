@@ -1,7 +1,7 @@
 import { Backend } from "../../backend";
 
 type RuleUpdateStatus = 'success' | 'error' | 'neutral';
-type RuleUpdateResult = { success?: boolean };
+type RuleUpdateResult = { success?: boolean; failed?: string[]; details?: string };
 
 function updateRuleFile(statusElement: HTMLElement, updateButton: HTMLButtonElement) {
     updateButton.disabled = true;
@@ -11,7 +11,19 @@ function updateRuleFile(statusElement: HTMLElement, updateButton: HTMLButtonElem
             if (result?.success) {
                 updateUpdateStatus(statusElement, _('Rule Files Updated'), 'success');
             } else {
-                updateUpdateStatus(statusElement, _('Rule File Update Failed: %s').format(_('Update failed')), 'error');
+                const labels: Record<string, string> = {
+                    gfw_list: _('GFW List'), chn_domain_list: _('CHN Domain List'),
+                    chn_v4_route: _('CHN IPv4 Route'), chn_v6_route: _('CHN IPv6 Route'),
+                    geoip: 'GeoIP', geosite: 'GeoSite', restart: _('Service Restart'),
+                };
+                const failed = (result?.failed || []).map(key => labels[key] || key).join(', ');
+                updateUpdateStatus(statusElement, _('Rule File Update Failed: %s').format(failed || _('Update failed')), 'error');
+                if (result?.details) {
+                    statusElement.appendChild(E('details', { style: 'margin-top: 6px;' }, [
+                        E('summary', {}, _('Details')),
+                        E('pre', { style: 'white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto;' }, result.details),
+                    ]));
+                }
             }
         })
         .catch(function (error) {
@@ -136,8 +148,9 @@ function setError(statusElement: HTMLElement) {
 
 const RulePanelUtils = {
     createUpdateButtons: function () {
-        const statusElement = E('span', {
-            'style': 'margin-left: 10px; font-size: 12px; color: #666;'
+        const statusElement = E('div', {
+            'role': 'status', 'aria-live': 'polite',
+            'style': 'margin-top: 8px; font-size: 12px; color: #666; overflow-wrap: anywhere;'
         }) as HTMLElement;
         const updateButton = E('button', {
             'class': 'cbi-button cbi-button-neutral',

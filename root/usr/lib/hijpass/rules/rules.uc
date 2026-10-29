@@ -95,8 +95,8 @@ export function updatePlan(config, action) {
     if (type(selected) != 'array') {
         die('unknown rule action');
     }
-    let timeout = int(settings.download_timeout || '30'), retries = int(settings.retry_count || '3');
-    if (!match(settings.download_timeout || '30', /^[0-9]+$/) || !match(settings.retry_count || '3', /^[0-9]+$/)
+    let timeout = int(settings.download_timeout || '120'), retries = int(settings.retry_count || '3');
+    if (!match(settings.download_timeout || '120', /^[0-9]+$/) || !match(settings.retry_count || '3', /^[0-9]+$/)
         || type(timeout) != 'int' || type(retries) != 'int' || timeout < 1 || timeout > 600 || retries < 1 || retries > 10) {
         die('invalid download timeout or retry count');
     }

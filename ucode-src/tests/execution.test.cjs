@@ -82,6 +82,74 @@ cmp -s "$2" "$VALID_DOWNLOAD"`);
     });
 });
 
+test('规则下载超时是整次传输时限，默认允许大文件下载并保留用户显式设置', t => {
+    const f = fixture(t), calls = path.join(f.directory, 'curl-calls');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', f.directory + '/rules');
+    f.script('curl', `while [ "$#" -gt 0 ]; do
+case "$1" in
+--connect-timeout) connect=$2; shift ;;
+--max-time) total=$2; shift ;;
+-o) output=$2; shift ;;
+esac
+shift
+done
+printf '%s %s\\n' "$connect" "$total" >>"$RULE_TEST_CALLS"
+i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); done >"$output"`);
+    for (const timeout of [undefined, '3', '90']) {
+        const sections = [{ '.type': 'hijpass', enabled: '0' },
+            { '.type': 'rule', retry_count: '1', chn_domain_list: ['https://example.org/domains'],
+                ...(timeout ? { download_timeout: timeout } : {}) }];
+        withConfig(sections, config => {
+            const result = f.run('rules/update.sh', ['chnlist', '--configdir', config], { RULE_TEST_CALLS: calls });
+            assert.equal(result.status, 0, result.stderr);
+        });
+    }
+    assert.deepEqual(fs.readFileSync(calls, 'utf8').trim().split('\n'), ['10 120', '3 3', '10 90']);
+});
+
+test('规则下载重试成功不残留错误，全部重试失败只报告最后一次错误', t => {
+    const f = fixture(t), calls = path.join(f.directory, 'attempts');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', f.directory + '/rules');
+    f.script('sleep', 'exit 0');
+    f.script('curl', `attempt=$(cat "$RULE_TEST_CALLS" 2>/dev/null || echo 0)
+attempt=$((attempt + 1)); printf '%s' "$attempt" >"$RULE_TEST_CALLS"
+if [ "$attempt" -eq 1 ] || [ "$RULE_TEST_FAIL_ALL" = 1 ]; then echo "curl: (28) timed out, attempt $attempt" >&2; exit 28; fi
+while [ "$1" != -o ]; do shift; done
+output=$2
+i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); done >"$output"`);
+    const sections = [{ '.type': 'hijpass', enabled: '0' },
+        { '.type': 'rule', retry_count: '3', chn_domain_list: ['https://example.org/domains'] }];
+    withConfig(sections, config => {
+        const success = f.run('rules/update.sh', ['chnlist', '--configdir', config], { RULE_TEST_CALLS: calls });
+        assert.equal(success.status, 0, success.stderr);
+        assert.equal(success.stderr, '');
+        assert.equal(fs.readFileSync(calls, 'utf8'), '2');
+        fs.unlinkSync(calls);
+        const failed = f.run('rules/update.sh', ['chnlist', '--configdir', config], { RULE_TEST_CALLS: calls, RULE_TEST_FAIL_ALL: '1' });
+        assert.equal(failed.status, 1);
+        assert.equal((failed.stderr.match(/curl: \(28\)/g) || []).length, 1);
+        assert.match(failed.stderr, /attempt 3/);
+    });
+});
+
+test('规则全部下载失败时保留运行服务，不执行重启或 DNS Hook', t => {
+    const f = fixture(t), calls = path.join(f.directory, 'restart-calls');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', f.directory + '/rules');
+    f.patch('rules/rules.uc', '/usr/share/v2ray', f.directory + '/v2ray');
+    f.patch('rules/update.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
+    f.script('curl', 'echo "curl: (28) timed out" >&2\nexit 28');
+    f.script('hijpass-init', 'printf restart >>"$RULE_TEST_CALLS"');
+    const sections = [{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', retry_count: '1',
+        ...Object.fromEntries(['gfw_list', 'chn_domain_list', 'chn_v4_route', 'chn_v6_route', 'geoip', 'geosite']
+            .map(key => [key, 'https://example.org/unavailable'])) }];
+    withConfig(sections, config => {
+        const result = f.run('rules/update.sh', ['update', '--configdir', config], { RULE_TEST_CALLS: calls });
+        assert.equal(result.status, 1, result.stderr);
+        assert.equal(JSON.parse(result.stdout).failed.length, 6);
+        assert.equal(fs.existsSync(calls), false);
+    });
+});
+
 test('防火墙解析网络快照，生成或 nft 校验失败时保留旧规则并停止重载', t => {
     const f = fixture(t), rules = path.join(f.directory, 'rules.nft'), calls = path.join(f.directory, 'calls');
     f.patch('firewall/firewall.sh', '/etc/hijpass/fw4-rules.nft', rules);

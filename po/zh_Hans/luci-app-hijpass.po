@@ -2494,3 +2494,21 @@ msgstr "打开防火墙配置"
 
 msgid "Hide this migration notice"
 msgstr "隐藏此迁移提醒"
+
+msgid "GFW List"
+msgstr "GFW 列表"
+
+msgid "CHN Domain List"
+msgstr "国内域名列表"
+
+msgid "CHN IPv4 Route"
+msgstr "国内 IPv4 网段"
+
+msgid "CHN IPv6 Route"
+msgstr "国内 IPv6 网段"
+
+msgid "Service Restart"
+msgstr "服务重启"
+
+msgid "Details"
+msgstr "详情"

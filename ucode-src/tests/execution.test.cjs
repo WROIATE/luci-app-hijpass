@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { root, interpreter, shellRuntime, withConfig } = require('./helpers.cjs');
 
 // 只在安装副本中替换系统路径，生产代码不增加测试开关或模拟逻辑。
@@ -36,7 +36,28 @@ function fixture(t) {
             { encoding: 'utf8', env: process.env });
     }
     patch('ucode/hijpass/config/paths.uc', '/tmp/hijpass/log', directory + '/logs');
-    return { directory, runtime, patch, script, run, data };
+    function launch(file, args, extra = {}) {
+        const child = spawn('/usr/bin/busybox', ['ash', path.join(runtime, file), ...args], {
+            env: { ...process.env, ...extra, PATH: `${directory}:${runtime}/testbin:${process.env.PATH}` },
+        });
+        let stdout = '', stderr = '';
+        child.stdout.on('data', data => { stdout += data; });
+        child.stderr.on('data', data => { stderr += data; });
+        const result = new Promise((resolve, reject) => {
+            child.on('error', reject);
+            child.on('close', (status, signal) => resolve({ status, signal, stdout, stderr }));
+        });
+        return { child, result };
+    }
+    return { directory, runtime, patch, script, run, data, launch };
+}
+
+async function until(condition) {
+    for (let i = 0; i < 300; i++) {
+        if (condition()) return;
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.fail('timed out waiting for execution fixture');
 }
 
 test('主日志按配置级别筛选，保留多行上下文并脱敏 URL 和凭据', t => {
@@ -208,7 +229,7 @@ cmp -s "$2" "$VALID_DOWNLOAD"`);
     withConfig(sections, config => {
         const failed = f.run('rules/update.sh', ['geo', '--configdir', config], env);
         assert.equal(failed.status, 1, failed.stderr);
-        assert.deepEqual(JSON.parse(failed.stdout), { success: false, failed: ['geoip', 'geosite'] });
+        assert.deepEqual(JSON.parse(failed.stdout), { success: false, failed: ['geosite'] });
         for (const database of ['geoip', 'geosite']) assert.equal(fs.readFileSync(path.join(target, database + '.dat'), 'utf8'), 'old-' + database);
     });
     sections[1].geoip.push('https://example.org/valid');
@@ -271,8 +292,9 @@ i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); don
         fs.unlinkSync(calls);
         const failed = f.run('rules/update.sh', ['chnlist', '--configdir', config], { RULE_TEST_CALLS: calls, RULE_TEST_FAIL_ALL: '1' });
         assert.equal(failed.status, 1);
-        assert.equal((failed.stderr.match(/curl: \(28\)/g) || []).length, 1);
-        assert.match(failed.stderr, /attempt 3/);
+        assert.equal(failed.stderr, '');
+        const log = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
+        assert.match(log, /attempt 3/);
     });
 });
 
@@ -280,7 +302,7 @@ test('规则全部下载失败时保留运行服务，不执行重启或 DNS Hoo
     const f = fixture(t), calls = path.join(f.directory, 'restart-calls');
     f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', f.directory + '/rules');
     f.patch('rules/rules.uc', '/usr/share/v2ray', f.directory + '/v2ray');
-    f.patch('rules/update.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
+    f.patch('rules/update-files.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
     f.script('curl', 'echo "curl: (28) timed out" >&2\nexit 28');
     f.script('hijpass-init', 'printf restart >>"$RULE_TEST_CALLS"');
     const sections = [{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', retry_count: '1',
@@ -289,7 +311,7 @@ test('规则全部下载失败时保留运行服务，不执行重启或 DNS Hoo
     withConfig(sections, config => {
         const result = f.run('rules/update.sh', ['update', '--configdir', config], { RULE_TEST_CALLS: calls });
         assert.equal(result.status, 1, result.stderr);
-        assert.equal(JSON.parse(result.stdout).failed.length, 6);
+        assert.deepEqual(JSON.parse(result.stdout).failed, ['gfw_list']);
         assert.equal(fs.existsSync(calls), false);
     });
 });
@@ -612,4 +634,173 @@ test('服务 cron 只管理当前脚本，客户端与服务端互不删除，�
         assert.equal(contents.includes('/maintenance/logs.sh hijpass'), false);
         assert.equal(contents.includes(`0 5 * * 1 ${f.runtime}/rules/update.sh`), false);
     });
+});
+
+test('页面、定时和命令行更新共用任务状态与执行锁，完成结果可供多个观察者读取', async t => {
+    const f = fixture(t), started = path.join(f.directory, 'started'), release = path.join(f.directory, 'release');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', f.directory + '/rules');
+    f.script('curl', `printf 'download\\n' >>'${started}'
+i=0; while [ ! -f '${release}' ] && [ "$i" -lt 300 ]; do sleep 0.01; i=$((i+1)); done
+while [ "$1" != -o ]; do shift; done
+output=$2
+i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); done >"$output"`);
+    await withConfig([{ '.type': 'hijpass', enabled: '0' }, { '.type': 'rule', retry_count: '1',
+        chn_domain_list: ['https://example.org/domains'] }], async config => {
+        const original = f.launch('rules/update.sh', ['chnlist', '--configdir', config]);
+        await until(() => fs.existsSync(started));
+        const active = JSON.parse(f.run('rpc/jobs.sh', ['current', 'rules']).stdout);
+        assert.match(active.id, /^[A-Za-z0-9]{8}$/);
+        for (const args of [['chnlist', '--configdir', config], ['update', '--scheduled', '--configdir', config]]) {
+            const duplicate = f.run('rules/update.sh', args);
+            assert.equal(duplicate.status, 75, duplicate.stderr);
+            assert.equal(JSON.parse(duplicate.stdout).code, 'UPDATE_BUSY');
+        }
+        const starts = Array.from({ length: 6 }, () => f.launch('rpc/jobs.sh', ['start', 'rules']));
+        const replies = await Promise.all(starts.map(task => task.result));
+        for (const reply of replies) {
+            assert.equal(reply.status, 0, reply.stderr);
+            assert.equal(JSON.parse(reply.stdout).id, active.id);
+            assert.equal(JSON.parse(reply.stdout).code, 'UPDATE_BUSY');
+            assert.equal(JSON.parse(reply.stdout).success, false);
+        }
+        assert.equal(fs.readFileSync(started, 'utf8'), 'download\n');
+        fs.writeFileSync(release, '');
+        const completed = await original.result;
+        assert.equal(completed.status, 0, completed.stderr);
+        assert.equal(JSON.parse(completed.stdout).success, true);
+        assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['current', 'rules']).stdout).id, null);
+        for (let i = 0; i < 2; i++) {
+            assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['release', active.id]).stdout).ok, true);
+            assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['status', active.id]).stdout).code, 0);
+        }
+        assert.equal(f.run('rules/update.sh', ['chnlist', '--configdir', config]).status, 0);
+        assert.equal(fs.readFileSync(started, 'utf8'), 'download\ndownload\n');
+    });
+});
+
+test('协调进程意外退出时，仍运行的下载进程继续持锁，不能重复下载', async t => {
+    const f = fixture(t), started = path.join(f.directory, 'started'), release = path.join(f.directory, 'release');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', f.directory + '/rules');
+    f.script('curl', `echo download >>'${started}'
+i=0; while [ ! -f '${release}' ] && [ "$i" -lt 300 ]; do sleep 0.01; i=$((i+1)); done
+while [ "$1" != -o ]; do shift; done
+output=$2
+i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); done >"$output"`);
+    await withConfig([{ '.type': 'hijpass', enabled: '0' }, { '.type': 'rule', retry_count: '1',
+        chn_domain_list: ['https://example.org/domains'] }], async config => {
+        const original = f.launch('rules/update.sh', ['chnlist', '--configdir', config]);
+        await until(() => fs.existsSync(started));
+        original.child.kill('SIGKILL');
+        await original.result;
+        const blocked = f.run('rules/update.sh', ['chnlist', '--configdir', config]);
+        assert.equal(blocked.status, 75, blocked.stderr);
+        assert.equal(JSON.parse(blocked.stdout).code, 'UPDATE_BUSY');
+        assert.equal(fs.readFileSync(started, 'utf8'), 'download\n');
+        fs.writeFileSync(release, '');
+        await until(() => spawnSync('flock', ['-n', path.join(f.runtime, 'jobs/rules.lock'), 'true']).status === 0);
+        const retry = f.run('rules/update.sh', ['chnlist', '--configdir', config]);
+        assert.equal(retry.status, 0, retry.stderr);
+        assert.equal(fs.readFileSync(started, 'utf8'), 'download\ndownload\n');
+    });
+});
+
+test('部分资源更新后遇到失败立即停止后续下载且不重启，失败文件仍保留旧版', t => {
+    const f = fixture(t), calls = path.join(f.directory, 'calls'), rules = path.join(f.directory, 'rules');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', rules);
+    f.patch('rules/update-files.sh', '/etc/init.d/hijpass', path.join(f.directory, 'hijpass-init'));
+    fs.mkdirSync(rules);
+    fs.writeFileSync(path.join(rules, 'gfw-list.txt'), 'old gfw');
+    fs.writeFileSync(path.join(rules, 'chn-list.txt'), 'old china');
+    f.script('hijpass-init', `echo restart >>'${calls}'`);
+    f.script('curl', `echo download >>'${calls}'
+case "$*" in *unavailable*) echo 'curl: (28) timed out' >&2; exit 28 ;; esac
+while [ "$1" != -o ]; do shift; done
+output=$2
+i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); done >"$output"`);
+    withConfig([{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', retry_count: '1',
+        gfw_list: ['https://example.org/valid'], chn_domain_list: ['https://example.org/unavailable'],
+        chn_v4_route: ['https://example.org/should-not-run'] }], config => {
+        const result = f.run('rules/update.sh', ['update', '--configdir', config]);
+        assert.equal(result.status, 1, result.stderr);
+        assert.deepEqual(JSON.parse(result.stdout), { success: false, failed: ['chn_domain_list'] });
+        assert.equal(result.stderr, '');
+    });
+    assert.equal(fs.readFileSync(calls, 'utf8'), 'download\ndownload\n');
+    assert.equal(fs.readFileSync(path.join(rules, 'gfw-list.txt'), 'utf8'), 'example.org\n');
+    assert.equal(fs.readFileSync(path.join(rules, 'chn-list.txt'), 'utf8'), 'old china');
+    assert.equal(fs.existsSync(path.join(rules, 'chn-route.txt')), false);
+});
+
+test('同时首次发起多个后台更新请求只创建一个任务和一个执行进程', async t => {
+    const f = fixture(t), started = path.join(f.directory, 'started'), release = path.join(f.directory, 'release');
+    fs.writeFileSync(path.join(f.runtime, 'rules/update-files.sh'), `#!/bin/sh
+echo worker >>'${started}'
+i=0; while [ ! -f '${release}' ] && [ "$i" -lt 300 ]; do sleep 0.01; i=$((i+1)); done
+printf '{"success":true}\\n'
+`, { mode: 0o755 });
+    const requests = Array.from({ length: 8 }, () => f.launch('rpc/jobs.sh', ['start', 'rules']));
+    const replies = await Promise.all(requests.map(task => task.result));
+    const ids = replies.map(reply => {
+        assert.equal(reply.status, 0, reply.stderr);
+        return JSON.parse(reply.stdout).id;
+    });
+    assert.equal(new Set(ids).size, 1);
+    await until(() => fs.existsSync(started));
+    assert.equal(fs.readFileSync(started, 'utf8'), 'worker\n');
+    fs.writeFileSync(release, '');
+    await until(() => !JSON.parse(f.run('rpc/jobs.sh', ['status', ids[0]]).stdout).running);
+    const completed = JSON.parse(f.run('rpc/jobs.sh', ['status', ids[0]]).stdout);
+    assert.equal(completed.code, 0, completed.stderr);
+    assert.equal(JSON.parse(completed.stdout).success, true);
+});
+
+test('下载全部成功但应用失败时，仅返回重启阶段失败，底层原文只记录在主日志', t => {
+    const f = fixture(t), calls = path.join(f.directory, 'restart-calls');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', f.directory + '/rules');
+    f.patch('rules/rules.uc', '/usr/share/v2ray', f.directory + '/v2ray');
+    f.patch('rules/update-files.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
+    f.script('geoview', 'exit 0');
+    f.script('hijpass-init', `echo restart >>'${calls}'\necho '[E] underlying service failure' >&2\nexit 7`);
+    f.script('curl', `case "$*" in
+*ip4*) line='192.0.2.0/24' ;;
+*ip6*) line='2001:db8::/32' ;;
+*) line='server=/example.org/1.1.1.1' ;;
+esac
+while [ "$1" != -o ]; do shift; done
+output=$2
+i=0; while [ "$i" -lt 12 ]; do echo "$line"; i=$((i+1)); done >"$output"`);
+    withConfig([{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', retry_count: '1',
+        gfw_list: ['https://example.org/gfw'], chn_domain_list: ['https://example.org/china'],
+        chn_v4_route: ['https://example.org/ip4'], chn_v6_route: ['https://example.org/ip6'],
+        geoip: ['https://example.org/geoip'], geosite: ['https://example.org/geosite'] }], config => {
+        const result = f.run('rules/update.sh', ['update', '--configdir', config]);
+        assert.equal(result.status, 1, result.stderr);
+        assert.deepEqual(JSON.parse(result.stdout), { success: false, failed: ['restart'] });
+        assert.equal(result.stderr, 'Service restart failed; see main log\n');
+    });
+    assert.equal(fs.readFileSync(calls, 'utf8'), 'restart\n');
+    const log = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
+    assert.equal((log.match(/installed, sources=/g) || []).length, 6);
+    assert.equal((log.match(/underlying service failure/g) || []).length, 1);
+    assert.doesNotMatch(log, /diagnostic output|\[job\]/);
+});
+
+test('自动更新将下载与应用交给同一执行器，忙或失败不写完成时间，也不重复重启', t => {
+    const f = fixture(t), last = path.join(f.directory, 'last-update'), calls = path.join(f.directory, 'calls');
+    f.patch('service/service.sh', '/tmp/hijpass_last_update', last);
+    f.patch('service/service.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
+    f.script('hijpass-init', `echo unexpected-restart >>'${calls}'`);
+    fs.writeFileSync(path.join(f.runtime, 'rules/update.sh'), `#!/bin/sh
+printf '%s\\n' "$1" >>'${calls}'
+[ "$1" = update ] || exit 8
+exit "$AUTO_RESULT"
+`, { mode: 0o755 });
+    withConfig([{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', update_interval: '1' }], config => {
+        for (const code of ['75', '1', '0']) {
+            const result = f.run('service/service.sh', ['auto-update', '--configdir', config], { AUTO_RESULT: code });
+            assert.equal(result.status, code === '1' ? 1 : 0, result.stderr);
+            assert.equal(fs.existsSync(last), code === '0');
+        }
+    });
+    assert.equal(fs.readFileSync(calls, 'utf8'), 'update\nupdate\nupdate\n');
 });

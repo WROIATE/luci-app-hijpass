@@ -1,15 +1,18 @@
-import { Backend } from "../../backend";
+import { Backend, RuleUpdateResult } from "../../backend";
 
 type RuleUpdateStatus = 'success' | 'error' | 'neutral';
-type RuleUpdateResult = { success?: boolean; failed?: string[]; details?: string };
 
-function updateRuleFile(statusElement: HTMLElement, updateButton: HTMLButtonElement) {
+function updateRuleFile(statusElement: HTMLElement, updateButton: HTMLButtonElement, taskId?: string) {
     updateButton.disabled = true;
     updateUpdateStatus(statusElement, _('Updating Rule Files'), 'neutral');
-    Backend.updateRules()
+    (taskId ? Backend.resumeRuleUpdate(taskId) : Backend.updateRules())
         .then(function (result: RuleUpdateResult) {
             if (result?.success) {
                 updateUpdateStatus(statusElement, _('Rule Files Updated'), 'success');
+            } else if (result?.code === 'UPDATE_BUSY') {
+                updateUpdateStatus(statusElement, _('Rule update already running'), 'neutral');
+            } else if (result?.failed?.includes('restart')) {
+                updateUpdateStatus(statusElement, _('Rule files updated, but service restart failed; see main log'), 'error');
             } else {
                 const labels: Record<string, string> = {
                     gfw_list: _('GFW List'), chn_domain_list: _('CHN Domain List'),
@@ -18,12 +21,6 @@ function updateRuleFile(statusElement: HTMLElement, updateButton: HTMLButtonElem
                 };
                 const failed = (result?.failed || []).map(key => labels[key] || key).join(', ');
                 updateUpdateStatus(statusElement, _('Rule File Update Failed: %s').format(failed || _('Update failed')), 'error');
-                if (result?.details) {
-                    statusElement.appendChild(E('details', { style: 'margin-top: 6px;' }, [
-                        E('summary', {}, _('Details')),
-                        E('pre', { style: 'white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto;' }, result.details),
-                    ]));
-                }
             }
         })
         .catch(function (error) {
@@ -158,9 +155,19 @@ const RulePanelUtils = {
             'type': 'button',
             'click': function (ev: Event) {
                 ev.preventDefault();
+                if (updateButton.disabled) return;
                 updateRuleFile(statusElement, updateButton);
             }
         }, _('Update Rule Files')) as HTMLButtonElement;
+
+        updateButton.disabled = true;
+        Backend.ruleUpdateStatus().then(({ id }) => {
+            if (id) updateRuleFile(statusElement, updateButton, id);
+            else updateButton.disabled = false;
+        }).catch(error => {
+            updateUpdateStatus(statusElement, _('Error occurred while updating: %s').format(error.message), 'error');
+            updateButton.disabled = false;
+        });
 
         return E('div', {'class': 'cbi-section'}, [
             E('div', {'class': 'cbi-section-node'}, [

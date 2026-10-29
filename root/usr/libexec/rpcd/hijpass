@@ -50,6 +50,7 @@ case "$method" in
         argument port
         structured "$HIJPASS_LIB/network/network.sh" ping "$port" ;;
     rule_update) structured "$HIJPASS_LIB/rpc/jobs.sh" start rules ;;
+    rule_update_status) structured "$HIJPASS_LIB/rpc/jobs.sh" current rules ;;
     rule_query)
         argument keyword
         capture "$HIJPASS_LIB/rules/update.sh" query "$keyword" ;;

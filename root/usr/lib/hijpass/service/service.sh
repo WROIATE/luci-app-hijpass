@@ -67,11 +67,11 @@ case "$action" in
         [ "$enabled" = 1 ] || exit 0
         if [ "$server" = 1 ]; then
             data_call server-files "$@" && hijpass_step "$module" 'Firewall reload' "${LINENO:-}" fw4 reload && cron_update enable || exit 1
-            hijpass_log INFO "$module" "${LINENO:-}" 'Activation completed; process supervision delegated to procd'
+            hijpass_log INFO "$module" "${LINENO:-}" 'Activation completed'
         else
             # 启动错误回滚与命令执行集中在 Shell，ucode 不再驱动服务启停。
             if with_config "$HIJPASS_LIB/firewall/firewall.sh" reset "$@" && "$HIJPASS_LIB/firewall/route.sh" reset && hook start && cron_update enable; then
-                hijpass_log INFO "$module" "${LINENO:-}" "Activation completed: firewall, routes, DNS Hook and cron ready, elapsed=$(($(date +%s) - started))s; process supervision delegated to procd"
+                hijpass_log INFO "$module" "${LINENO:-}" "Activation completed: elapsed=$(($(date +%s) - started))s"
             else
                 hijpass_log WARN "$module" "${LINENO:-}" 'Activation failed; rolling back service resources'
                 if stop_client; then hijpass_log WARN "$module" "${LINENO:-}" 'Rollback completed'; else hijpass_log ERROR "$module" "${LINENO:-}" 'Rollback incomplete; check preceding phase errors'; fi
@@ -98,8 +98,11 @@ case "$action" in
         hijpass_log INFO rules "${LINENO:-}" 'Scheduled update is due'
         HIJPASS_UPDATE_SOURCE=scheduled
         export HIJPASS_UPDATE_SOURCE
-        with_config "$HIJPASS_LIB/rules/update.sh" all "$@" >/dev/null || exit 1
-        printf '%s\n' "$now" >"$last" || exit 1
-        [ "$enabled" != 1 ] || hijpass_step "$module" 'Service restart after scheduled update' "${LINENO:-}" /etc/init.d/hijpass restart ;;
+        # 下载和应用都由更新执行器完成，锁覆盖完整过程，外层不再重复重启。
+        with_config "$HIJPASS_LIB/rules/update.sh" update "$@" >/dev/null
+        code=$?
+        [ "$code" -ne 75 ] || exit 0
+        [ "$code" -eq 0 ] || exit "$code"
+        printf '%s\n' "$now" >"$last" || exit 1 ;;
     *) echo 'unknown service action' >&2; exit 1 ;;
 esac

@@ -15,7 +15,7 @@ const methods = {
     defaults: {}, cleanup_node: { kind: '', section: '', name: '' },
     service_restart: {}, firewall_reset: {}, firewall_show: {},
     network_connect: { url: '', timeout: '' }, network_ping: { port: '' },
-    rule_update: {}, rule_query: { keyword: '' }, rule_match: { keyword: '' },
+    rule_update: {}, rule_update_status: {}, rule_query: { keyword: '' }, rule_match: { keyword: '' },
     geo_lookup: { type: '', keyword: '', mode: '' }, geo_query: { keyword: '' },
     core_version: { core: '' }, core_latest: { core: '' }, core_update: { core: '' },
     job_status: { id: '' }, job_release: { id: '' },

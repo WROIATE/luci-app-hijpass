@@ -23,8 +23,8 @@ function fixture(t) {
             .replace("import { read } from 'hijpass.uci.read';", `import { read as readConfig } from 'hijpass.uci.read';
 function read(packageName) { return readConfig(packageName, '${config}'); }`));
     }
-    const jobs = path.join(runtime, 'rpc/jobs.sh');
-    fs.writeFileSync(jobs, fs.readFileSync(jobs, 'utf8').replaceAll('/tmp/hijpass-jobs', path.join(directory, 'jobs')));
+    const common = path.join(runtime, 'common.sh');
+    fs.writeFileSync(common, fs.readFileSync(common, 'utf8').replaceAll(runtime + '/jobs', path.join(directory, 'jobs')));
     const rules = path.join(directory, 'firewall.ut');
     fs.copyFileSync(path.join(root, 'root/etc/hijpass/firewall.ut'), rules);
     const editor = path.join(directory, 'direct.txt'), log = path.join(directory, 'original-node.log');
@@ -203,7 +203,8 @@ test('completed jobs return large stdout and stderr without environment-variable
     assert.equal(response.stdout, stdout.replace(/\n+$/, ''));
     assert.equal(response.stderr, stderr.replace(/\n+$/, ''));
     assert.equal(f.invoke('job_release', { id }).ok, true);
-    assert.equal(fs.existsSync(job), false);
+    assert.equal(fs.existsSync(job), true);
+    assert.equal(f.invoke('job_status', { id }).code, 7);
 });
 
 test('jobs whose worker exits before producing output still return the recorded failure', t => {
@@ -280,7 +281,7 @@ hijpass_step core 'Download' "$LINENO" download
     assert.equal(JSON.parse(status.stdout).version, 'test');
     assert.equal(status.stderr, '');
     assert.equal(f.invoke('job_release', { id: start.id }).ok, true);
-    assert.match(f.invoke('job_status', { id: start.id }).error, /job not found/);
+    assert.equal(f.invoke('job_status', { id: start.id }).code, 0);
     const log = fs.readFileSync(path.join(f.directory, 'hijpass.log'), 'utf8');
     assert.match(log, /WARN\s+\[core\] Download: Warning:/);
     assert.match(log, /optional hook unavailable/);

@@ -2512,3 +2512,12 @@ msgstr "服务重启"
 
 msgid "Details"
 msgstr "详情"
+
+msgid "Rule update already running"
+msgstr "规则文件正在更新"
+
+msgid "Rule files updated, but service restart failed; see main log"
+msgstr "规则文件已更新，但服务重启失败，请查看主日志"
+
+msgid "Backend operation failed; see main log"
+msgstr "后台操作失败，请查看主日志"

@@ -24,7 +24,7 @@ function sources() {
 	return {
 		gfw_list: { path: RULE_FILES.gfw_list, kind: 'domain' }, chn_domain_list: { path: RULE_FILES.chn_list, kind: 'domain' },
 		chn_v4_route: { path: RULE_FILES.chn_route, kind: 'ip4' }, chn_v6_route: { path: RULE_FILES.chn_route6, kind: 'ip6' },
-		geoip: { path: '/usr/share/v2ray/geoip.dat', kind: 'geo' }, geosite: { path: '/usr/share/v2ray/geosite.dat', kind: 'geo' },
+		geosite: { path: '/usr/share/v2ray/geosite.dat', kind: 'geo' }, geoip: { path: '/usr/share/v2ray/geoip.dat', kind: 'geo' },
 	};
 }
 /**
@@ -90,7 +90,7 @@ export function updatePlan(config, action) {
     if (!settings) {
         die('rule section is missing');
     }
-    let groups = { chnlist: ['chn_domain_list'], gfw: ['gfw_list'], chnroute: ['chn_v4_route', 'chn_v6_route'], geo: ['geoip', 'geosite'] };
+    let groups = { chnlist: ['chn_domain_list'], gfw: ['gfw_list'], chnroute: ['chn_v4_route', 'chn_v6_route'], geo: ['geosite', 'geoip'] };
     let selected = groups[action] || (action == 'all' || action == 'update' ? keys(catalog) : null);
     if (type(selected) != 'array') {
         die('unknown rule action');
@@ -275,6 +275,7 @@ export function main() { run(ARGV,
      */
     function(args, configDirectory) {
     let action = shift(args);
+    if (action == 'busy') return { success: false, code: 'UPDATE_BUSY', message: 'Rule update already running' };
     if (action == 'plan') {
         let config = read('hijpass', configDirectory);
         return updatePlan(config, args[0] || '');

@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { test } = require('node:test');
 const ts = require('typescript');
 
-function panel(updateRules) {
+function panel(updateRules, ruleUpdateStatus = async () => ({ id: null }), resumeRuleUpdate = updateRules) {
     const nodes = [];
     function E(tag, attributes, children = []) {
         const node = { tag, attributes, style: {}, children: Array.isArray(children) ? children : [children],
@@ -18,7 +18,7 @@ function panel(updateRules) {
         return node;
     }
     const context = vm.createContext({ exports: {}, E, _: value => value,
-        require: () => ({ Backend: { updateRules } }),
+        require: () => ({ Backend: { updateRules, ruleUpdateStatus, resumeRuleUpdate } }),
     });
     vm.runInContext('String.prototype.format = function(value) { return this.replace("%s", value); };', context);
     const source = fs.readFileSync(path.join(__dirname, '../utils/feature/rule/panel.ts'), 'utf8');
@@ -30,22 +30,45 @@ function panel(updateRules) {
         button: nodes.find(node => node.tag === 'button') };
 }
 
-test('rule update failures show resource names with collapsed details, then clear details on success', async () => {
-    const details = 'curl: (28) timed out\n'.repeat(40);
-    const responses = [{ success: false, failed: ['geoip', 'chn_domain_list'], details }, { success: true }];
+test('rule update shows a concise failure without raw command output, then clears on success', async () => {
+    const responses = [{ success: false, failed: ['geoip'], details: 'curl failure\ncustom hook warning' }, { success: true }];
     const f = panel(async () => responses.shift());
+    assert.equal(f.button.disabled, true);
+    await new Promise(setImmediate);
     f.button.attributes.click({ preventDefault() {} });
     assert.equal(f.button.disabled, true);
     await new Promise(setImmediate);
     assert.equal(f.button.disabled, false);
-    assert.equal(f.status.children[0], 'Rule File Update Failed: GeoIP, CHN Domain List');
-    const disclosure = f.status.children.find(node => node.tag === 'details');
-    assert.equal(disclosure.attributes.open, undefined);
-    assert.equal(disclosure.children[1].tag, 'pre');
-    assert.equal(disclosure.children[1].textContent, details);
+    assert.equal(f.status.textContent, 'Rule File Update Failed: GeoIP');
+    assert.equal(f.status.children.length, 1);
     f.button.attributes.click({ preventDefault() {} });
     await new Promise(setImmediate);
     assert.equal(f.status.textContent, 'Rule Files Updated');
-    assert.equal(f.status.children.length, 1);
     assert.equal(f.button.disabled, false);
+});
+
+test('page refresh resumes the existing update and disables repeated clicks', async () => {
+    let starts = 0, resumes = 0, finish;
+    const f = panel(async () => { starts++; return { success: true }; }, async () => ({ id: 'Task1234' }), id => {
+        assert.equal(id, 'Task1234'); resumes++;
+        return new Promise(resolve => { finish = resolve; });
+    });
+    await new Promise(setImmediate);
+    assert.equal(f.button.disabled, true);
+    assert.equal(f.status.textContent, 'Updating Rule Files');
+    f.button.attributes.click({ preventDefault() {} });
+    assert.equal(starts, 0);
+    assert.equal(resumes, 1);
+    finish({ success: true });
+    await new Promise(setImmediate);
+    assert.equal(f.button.disabled, false);
+    assert.equal(f.status.textContent, 'Rule Files Updated');
+});
+
+test('apply failure is distinguished from download failure', async () => {
+    const f = panel(async () => ({ success: false, failed: ['restart'] }));
+    await new Promise(setImmediate);
+    f.button.attributes.click({ preventDefault() {} });
+    await new Promise(setImmediate);
+    assert.equal(f.status.textContent, 'Rule files updated, but service restart failed; see main log');
 });

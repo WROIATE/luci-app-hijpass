@@ -16,7 +16,8 @@ function shellRuntime() {
         for (const file of files) if (file.endsWith('.sh') || file.endsWith('.uc'))
             fs.writeFileSync(file, fs.readFileSync(file, 'utf8')
                 .replace('#!/bin/sh', '#!/usr/bin/busybox ash')
-                .replaceAll('/usr/lib/hijpass', shellDirectory));
+                .replaceAll('/usr/lib/hijpass', shellDirectory)
+                .replaceAll('/tmp/hijpass-jobs', shellDirectory + '/jobs'));
     }
     fs.cpSync(path.join(root, 'root/usr/share/ucode'), path.join(shellDirectory, 'ucode'), { recursive: true });
     const common = path.join(shellDirectory, 'common.sh');
@@ -58,8 +59,13 @@ function withConfig(sections, callback) {
         }
     }
     fs.writeFileSync(path.join(directory, 'hijpass'), source);
-    try { return callback(directory); }
-    finally { fs.rmSync(directory, { recursive: true, force: true }); }
+    const cleanup = () => fs.rmSync(directory, { recursive: true, force: true });
+    let result;
+    try { result = callback(directory); }
+    catch (error) { cleanup(); throw error; }
+    if (result && typeof result.then === 'function') return result.finally(cleanup);
+    cleanup();
+    return result;
 }
 
 function mappedLibrary(paths) {

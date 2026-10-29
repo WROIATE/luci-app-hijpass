@@ -4,6 +4,7 @@ export type EditorResource = 'ip_direct' | 'ip_proxy' | 'domain_direct' | 'domai
     | 'nft_hook' | 'dns_hook' | 'shunt_conf' | 'firewall_template' | 'proxy_config' | 'server_config';
 export type Editor = { resource: EditorResource; section?: string; name?: string };
 export type Log = { id: string; kind: 'main' | 'shunt' | 'proxy' | 'server'; name: string };
+export type RuleUpdateResult = { success: boolean; failed?: string[]; code?: string };
 
 // 页面只使用业务方法。文件布局、命令位置以及参数组装由后端负责。
 function method(name: string, params: string[] = []) {
@@ -27,7 +28,12 @@ const jobRelease = method('job_release', ['id']);
 
 // 每次轮询都是短 RPC；页面等待不会占住一次持续下载的 RPC 请求。
 async function runJob(start: (...args: any[]) => Promise<any>, jsonOutput: boolean, ...args: any[]) {
-    const { id } = await start(...args);
+    const job = await start(...args);
+    if (job.success === false) return job;
+    return waitForJob(job.id, jsonOutput);
+}
+
+async function waitForJob(id: string, jsonOutput: boolean) {
     if (typeof id !== 'string' || !/^[A-Za-z0-9]{8}$/.test(id)) throw new Error('Invalid job ID');
     let finished = false;
     try {
@@ -39,8 +45,8 @@ async function runJob(start: (...args: any[]) => Promise<any>, jsonOutput: boole
                 const result = jsonOutput ? JSON.parse(status.stdout || '{}') : status;
                 if (result.error) throw new Error(result.error);
                 if (status.code !== 0) {
-                    if (jsonOutput && result.success === false) return { ...result, details: status.stderr };
-                    throw new Error(status.stderr || 'Backend job failed');
+                    if (jsonOutput && result.success === false) return result;
+                    throw new Error(_('Backend operation failed; see main log'));
                 }
                 return result;
             }
@@ -80,7 +86,9 @@ export const Backend = {
     },
     connect: method('network_connect', ['url', 'timeout']),
     ping: method('network_ping', ['port']),
-    updateRules: () => runJob(method('rule_update'), true),
+    updateRules: (): Promise<RuleUpdateResult> => runJob(method('rule_update'), true),
+    ruleUpdateStatus: (): Promise<{ id: string | null }> => method('rule_update_status')(),
+    resumeRuleUpdate: (id: string): Promise<RuleUpdateResult> => waitForJob(id, true),
     queryRules: method('rule_query', ['keyword']),
     matchRule: method('rule_match', ['keyword']),
     lookupGeo: method('geo_lookup', ['type', 'keyword', 'mode']),

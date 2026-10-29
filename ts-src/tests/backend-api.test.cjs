@@ -8,7 +8,7 @@ const ts = require('typescript');
 function backend(handler, clock = { now: 0 }) {
     const source = fs.readFileSync(path.join(__dirname, '../utils/backend.ts'), 'utf8');
     const calls = [];
-    const context = vm.createContext({ exports: {}, console,
+    const context = vm.createContext({ exports: {}, console, _: value => value,
         Date: class extends Date { static now() { return clock.now; } },
         window: { setTimeout(fn, ms) { clock.now += ms; fn(); } },
         require(name) {
@@ -54,13 +54,13 @@ for (const code of [0, 7]) test(`long updates poll beyond the RPC limit, report 
         if (clock.now < 120000) return { running: true };
         return { running: false, code, stdout: code ? '' : '{"success":true}', stderr: code ? 'download failed' : '' };
     }, clock);
-    if (code) await assert.rejects(f.api.updateRules(), /download failed/);
+    if (code) await assert.rejects(f.api.updateRules(), /Backend operation failed; see main log/);
     else assert.equal((await f.api.updateRules()).success, true);
     assert.equal(clock.now, 120000);
     assert.equal(f.calls.at(-1)[0], 'job_release');
 });
 
-test('structured update failures retain resource names and keep command logs as details', async () => {
+test('structured update failures retain resource names without exposing combined command output', async () => {
     const f = backend(method => {
         if (method === 'rule_update') return { id: 'Abcd1234' };
         if (method === 'job_release') return { ok: true };
@@ -70,8 +70,30 @@ test('structured update failures retain resource names and keep command logs as 
     const result = await f.api.updateRules();
     assert.equal(result.success, false);
     assert.deepEqual(Array.from(result.failed), ['geoip', 'geosite']);
-    assert.equal(result.details, 'curl: (28) timed out\ncustom hook warning');
+    assert.equal(result.details, undefined);
     assert.equal(f.calls.at(-1)[0], 'job_release');
+});
+
+test('resuming an existing update polls and acknowledges it without starting another job', async () => {
+    const f = backend(method => {
+        if (method === 'rule_update_status') return { id: 'Abcd1234' };
+        if (method === 'job_release') return { ok: true };
+        assert.equal(method, 'job_status');
+        return { running: false, code: 0, stdout: '{"success":true}', stderr: '[I] informational' };
+    });
+    assert.equal((await f.api.ruleUpdateStatus()).id, 'Abcd1234');
+    assert.equal((await f.api.resumeRuleUpdate('Abcd1234')).success, true);
+    assert.deepEqual(f.calls.map(([method]) => method), ['rule_update_status', 'job_status', 'job_release']);
+});
+
+test('an active partial update is reported as busy instead of claiming a full update succeeded', async () => {
+    const f = backend(method => {
+        assert.equal(method, 'rule_update');
+        return { id: 'Abcd1234', success: false, code: 'UPDATE_BUSY' };
+    });
+    const result = await f.api.updateRules();
+    assert.equal(result.code, 'UPDATE_BUSY');
+    assert.equal(f.calls.length, 1);
 });
 
 test('runtime TypeScript has no device filesystem paths or direct fs access', () => {

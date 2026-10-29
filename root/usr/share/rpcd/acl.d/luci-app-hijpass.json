@@ -21,6 +21,7 @@
           "network_connect",
           "network_ping",
           "rule_query",
+          "rule_update_status",
           "rule_match",
           "geo_lookup",
           "geo_query",

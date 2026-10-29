@@ -257,7 +257,15 @@ test('backend writes preserve TLS while resolving chains and reject snapshot sto
 
 test('download jobs return immediately, publish results and release only after completion', async t => {
     const f = fixture(t);
-    fs.writeFileSync(path.join(f.runtime, 'core/update.sh'), '#!/bin/sh\nsleep 0.1\necho "optional hook unavailable: https://user:private@example.org/path?token=private" >&2\nprintf \'{"success":true,"version":"test"}\\n\'\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(f.runtime, 'core/update.sh'), `#!/bin/sh
+. '${f.runtime}/common.sh'
+sleep 0.1
+download() {
+    echo 'Warning: optional hook unavailable: https://user:private@example.org/path?token=private' >&2
+    printf '{"success":true,"version":"test"}\\n'
+}
+hijpass_step core 'Download' "$LINENO" download
+`, { mode: 0o755 });
     const start = f.invoke('core_update', { core: 'xray' });
     assert.match(start.id, /^[A-Za-z0-9]{8}$/);
     let status;
@@ -270,12 +278,12 @@ test('download jobs return immediately, publish results and release only after c
     assert.equal(status.running, false);
     assert.equal(status.code, 0, status.stderr);
     assert.equal(JSON.parse(status.stdout).version, 'test');
-    assert.match(status.stderr, /optional hook unavailable/);
+    assert.equal(status.stderr, '');
     assert.equal(f.invoke('job_release', { id: start.id }).ok, true);
     assert.match(f.invoke('job_status', { id: start.id }).error, /job not found/);
     const log = fs.readFileSync(path.join(f.directory, 'hijpass.log'), 'utf8');
-    assert.match(log, new RegExp(`WARN\\s+\\[task=${start.id}\\] \\[job\\] xray diagnostic output`));
+    assert.match(log, /WARN\s+\[core\] Download: Warning:/);
     assert.match(log, /optional hook unavailable/);
-    assert.match(log, /xray finished: exit=0/);
+    assert.doesNotMatch(log, /\[job\]|task=|diagnostic output/);
     assert.doesNotMatch(log, /private|https:\/\//);
 });

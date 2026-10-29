@@ -15,8 +15,8 @@ case "$action" in
     reset|remove) ;;
     *) echo "unknown route action: $action" >&2; exit 1 ;;
 esac
-trap 'code=$?; if [ "$code" -ne 0 ]; then hijpass_log ERROR route "$action failed: family=$family, table=$table, mark=$mark, exit=$code"; fi' EXIT
-hijpass_log DEBUG route "$action: table=$table, mark=$mark"
+trap 'code=$?; if [ "$code" -ne 0 ]; then hijpass_log ERROR route "${LINENO:-}" "$action failed: family=$family, table=$table, mark=$mark, exit=$code"; fi' EXIT
+hijpass_log DEBUG route "${LINENO:-}" "$action: table=$table, mark=$mark"
 
 for family in -4 -6; do
     # 清除重复启动留下的同一标记规则；只匹配本应用的 mark 和 table。
@@ -32,4 +32,4 @@ for family in -4 -6; do
         ip "$family" rule add fwmark "$mark" table "$table" || exit $?
     fi
 done
-hijpass_log INFO route "Policy routes $action completed for IPv4 and IPv6"
+hijpass_log INFO route "${LINENO:-}" "Policy routes $action completed for IPv4 and IPv6"

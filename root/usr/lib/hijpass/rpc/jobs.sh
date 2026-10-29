@@ -33,7 +33,7 @@ case "$action" in
         HIJPASS_TASK_ID=${directory##*/}
         export HIJPASS_TASK_ID
         started=$(date +%s)
-        hijpass_log INFO job "$id started"
+        hijpass_log DEBUG job "${LINENO:-}" "$id started"
         case "$id" in
             rules) "$HIJPASS_LIB/rules/update.sh" update ;;
             restart) /etc/init.d/hijpass restart ;;
@@ -41,17 +41,7 @@ case "$action" in
             *) exit 1 ;;
         esac >"$directory/stdout" 2>"$directory/stderr"
         code=$?
-        if [ "$code" -eq 0 ] && [ -s "$directory/stderr" ]; then
-            level=$(hijpass_diagnostic_level "$directory/stderr" "$code")
-            hijpass_log "$level" job "$id diagnostic output (exit=$code):
-$(head -c 8192 "$directory/stderr")"
-        fi
-        if [ "$code" -eq 0 ]; then
-            hijpass_log INFO job "$id finished: exit=$code, elapsed=$(($(date +%s) - started))s"
-        else
-            hijpass_log ERROR job "$id finished: exit=$code, elapsed=$(($(date +%s) - started))s
-$(head -c 8192 "$directory/stderr")"
-        fi
+        hijpass_log DEBUG job "${LINENO:-}" "$id finished: exit=$code, elapsed=$(($(date +%s) - started))s"
         printf '%s\n' "$code" >"$directory/exit.tmp"
         mv "$directory/exit.tmp" "$directory/exit" ;;
     status|release)
@@ -69,7 +59,7 @@ $(head -c 8192 "$directory/stderr")"
         if [ ! -f "$directory/exit" ] && [ -f "$directory/pid" ]; then
             pid=$(cat "$directory/pid")
             if ! kill -0 "$pid" 2>/dev/null; then
-                hijpass_log ERROR job "$id: worker exited without a result"
+                hijpass_log ERROR job "${LINENO:-}" "$id: worker exited without a result"
                 printf 'job exited without a result\n' >>"$directory/stderr"
                 printf '1\n' >"$directory/exit"
             fi

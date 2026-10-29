@@ -15,8 +15,8 @@ for argument in "$@"; do
     previous=$argument
 done
 started=$(date +%s)
-hijpass_log INFO rules "Update started: action=$action, source=${HIJPASS_UPDATE_SOURCE:-manual}"
-plan=$(hijpass_data "$data" plan "$action" "$@") || { hijpass_log ERROR rules 'Cannot prepare update plan: invalid configuration'; hijpass_error 'invalid rules configuration'; exit 1; }
+hijpass_log INFO rules "${LINENO:-}" "Update started: action=$action, source=${HIJPASS_UPDATE_SOURCE:-manual}"
+plan=$(hijpass_data "$data" plan "$action" "$@") || { hijpass_log ERROR rules "${LINENO:-}" 'Cannot prepare update plan: invalid configuration'; hijpass_error 'invalid rules configuration'; exit 1; }
 json_load "$plan" || exit 1
 json_get_vars timeout retries enabled
 connect_timeout=$timeout
@@ -40,7 +40,7 @@ for job in $jobs; do
     total_sources=0
     resource_started=$(date +%s)
     for entry in $urls; do total_sources=$((total_sources + 1)); done
-    hijpass_log INFO rules "$key: downloading from $total_sources source(s), timeout=${timeout}s, attempts=$retries"
+    hijpass_log INFO rules "${LINENO:-}" "$key: downloading from $total_sources source(s), timeout=${timeout}s, attempts=$retries"
     : >"$work/merged"
     : >"$work/curl-error"
     if [ -n "$path" ] && [ -n "$urls" ] && mkdir -p "$(dirname -- "$path")"; then
@@ -60,11 +60,11 @@ for job in $jobs; do
                         break
                     fi
                     attempt=$((attempt + 1))
-                    hijpass_log WARN rules "$key: source $source_index attempt $attempt/$retries failed"
+                    hijpass_log WARN rules "${LINENO:-}" "$key: source $source_index attempt $attempt/$retries failed"
                     [ "$attempt" -ge "$retries" ] || sleep 2
                 done
                 if [ "$downloaded" -ne 1 ]; then
-                    hijpass_log WARN rules "$key: source $source_index unavailable"
+                    hijpass_log WARN rules "${LINENO:-}" "$key: source $source_index unavailable"
                     continue
                 fi
                 if [ "$kind" = geo ]; then
@@ -72,17 +72,17 @@ for job in $jobs; do
                     [ "$key" != geoip ] || probe=1.1.1.1
                     if geoview -type "$key" -action lookup -input "$temp" -value "$probe" >/dev/null 2>&1; then
                         valid=1; sources=$((sources + 1))
-                        hijpass_log INFO rules "$key: source $source_index downloaded and verified"
+                        hijpass_log INFO rules "${LINENO:-}" "$key: source $source_index downloaded and verified"
                         break
                     fi
                 elif hijpass_data "$data" normalize "$kind" "$temp" >"$work/normalized" && grep -q '[^[:space:]]' "$work/normalized"; then
                     cat "$work/normalized" >>"$work/merged"
                     valid=1
                     sources=$((sources + 1))
-                    hijpass_log INFO rules "$key: source $source_index downloaded and normalized"
+                    hijpass_log INFO rules "${LINENO:-}" "$key: source $source_index downloaded and normalized"
                     continue
                 fi
-                hijpass_log WARN rules "$key: source $source_index returned invalid or empty data"
+                hijpass_log WARN rules "${LINENO:-}" "$key: source $source_index returned invalid or empty data"
             done
             if [ "$valid" -eq 1 ]; then
                 if [ "$kind" = geo ]; then
@@ -100,9 +100,9 @@ for job in $jobs; do
         completed=$((completed + 1))
         counts="bytes=$(wc -c <"$path")"
         [ "$kind" = geo ] || counts="$counts, entries=$(wc -l <"$path")"
-        hijpass_log INFO rules "$key: installed, sources=$sources/$total_sources, $counts, elapsed=$(($(date +%s) - resource_started))s"
+        hijpass_log INFO rules "${LINENO:-}" "$key: installed, sources=$sources/$total_sources, $counts, elapsed=$(($(date +%s) - resource_started))s"
     else
-        hijpass_log ERROR rules "$key: update failed; previous file retained
+        hijpass_log ERROR rules "${LINENO:-}" "$key: update failed; previous file retained
 $(head -c 8192 "$work/curl-error")"
         printf '%s: no valid download' "$key" >&2
         [ ! -s "$work/curl-error" ] || printf ': %s' "$(cat "$work/curl-error")" >&2
@@ -113,10 +113,10 @@ $(head -c 8192 "$work/curl-error")"
     json_select ..
 done
 if [ "$action" = update ] && [ "$enabled" = 1 ] && [ "$updated" = 1 ]; then
-    hijpass_log INFO rules 'Applying updated resources: restarting service'
-    hijpass_step rules 'Service restart' /etc/init.d/hijpass restart || set -- "$@" restart
+    hijpass_log INFO rules "${LINENO:-}" 'Applying updated resources: restarting service'
+    hijpass_step rules 'Service restart' "${LINENO:-}" /etc/init.d/hijpass restart || set -- "$@" restart
 fi
 level=INFO
 [ "$#" -eq 0 ] || level=ERROR
-hijpass_log "$level" rules "Update finished: installed=$completed, failed=$#, elapsed=$(($(date +%s) - started))s"
+hijpass_log "$level" rules "${LINENO:-}" "Update finished: installed=$completed, failed=$#, elapsed=$(($(date +%s) - started))s"
 hijpass_data "$data" result "$@"

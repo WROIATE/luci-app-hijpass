@@ -8,16 +8,14 @@ trap '' HUP
 HIJPASS_TASK_ID=${directory##*/}
 export HIJPASS_TASK_ID
 started=$(date +%s)
-hijpass_log INFO trace 'Capture started'
+hijpass_log INFO trace "${LINENO:-}" 'Capture started'
 "/usr/lib/hijpass/diagnostics/capture.sh" "$@" >"$directory/stdout" 2>"$directory/stderr"
 code=$?
 level=INFO
 [ "$code" -eq 0 ] || level=ERROR
 if [ -s "$directory/stderr" ]; then
-    detail_level=$(hijpass_diagnostic_level "$directory/stderr" "$code")
-    hijpass_log "$detail_level" trace "Capture diagnostic output:
-$(head -c 8192 "$directory/stderr")"
+    hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" command trace "$0:${LINENO:-}" "$code" 'Capture' "$directory/stderr" >/dev/null 2>&1 || :
 fi
-hijpass_log "$level" trace "Capture finished: exit=$code, elapsed=$(($(date +%s) - started))s"
+hijpass_log "$level" trace "${LINENO:-}" "Capture finished: exit=$code, elapsed=$(($(date +%s) - started))s"
 printf '%s\n' "$code" >"$directory/exit.tmp"
 mv "$directory/exit.tmp" "$directory/exit"

@@ -104,10 +104,10 @@ test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变
         const result = f.run('service/service.sh', ['activate', '--configdir', config]);
         assert.equal(result.status, 0, result.stderr);
         assert.equal(result.stdout, '');
-        assert.match(result.stderr, /optional DNS service unavailable/);
+        assert.equal(result.stderr, '');
     });
     const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
-    assert.match(content, /WARN\s+\[service\] DNS Hook start: exit=0/);
+    assert.match(content, /WARN\s+\[service\] DNS Hook start: Warning:/);
     assert.match(content, /optional DNS service unavailable/);
     assert.match(content, /Activation completed/);
 });
@@ -116,7 +116,7 @@ test('命令阶段保留 fw4 信息级别，同时记录真实告警和失败且
     const f = fixture(t), entry = path.join(f.runtime, 'step-test.sh');
     fs.writeFileSync(entry, `#!/bin/sh
 . '${f.runtime}/common.sh'
-hijpass_step test 'command phase' '${f.directory}/diagnostic-command'
+hijpass_step test 'command phase' "$LINENO" '${f.directory}/diagnostic-command'
 `);
     const env = { TEST_DIAGNOSTIC: '[I] firewall feature enabled', TEST_STATUS: '0' };
     f.script('diagnostic-command', 'printf "%s\\n" "$TEST_DIAGNOSTIC" >&2\nexit "$TEST_STATUS"');
@@ -127,11 +127,40 @@ hijpass_step test 'command phase' '${f.directory}/diagnostic-command'
         const result = f.run('step-test.sh', [], { ...env, TEST_DIAGNOSTIC: message, TEST_STATUS: code });
         assert.equal(result.status, Number(code), result.stderr);
         assert.equal(result.stdout, '');
-        assert.equal(result.stderr, message + '\n');
+        assert.equal(result.stderr, code === '0' ? '' : 'command phase failed; see main log\n');
         const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
-        assert.match(content, new RegExp(`${level}\\s+\\[test\\] command phase: exit=${code}`));
+        assert.match(content, new RegExp(`${level}\\s+\\[test\\]`));
+        assert.doesNotMatch(content, /\[I\]|\[E\]|diagnostic output|exit=/);
+        assert.equal(content.split('firewall feature enabled').length - 1, message.includes('firewall feature enabled') ? 1 : 0);
         fs.unlinkSync(path.join(f.directory, 'logs/hijpass.log'));
     }
+});
+
+test('DEBUG 为所有级别附加真实 Shell 和 ucode 调用位置，普通模式只显示业务消息', t => {
+    const f = fixture(t), entry = path.join(f.runtime, 'debug-call.sh');
+    fs.writeFileSync(entry, `. '${f.runtime}/common.sh'\nconfig_directory=$1\nhijpass_log INFO test "$LINENO" 'shell location'\n`);
+    withConfig([{ '.type': 'hijpass', log_level: 'DEBUG' }], config => {
+        assert.equal(f.run('debug-call.sh', [config]).status, 0);
+    });
+    const native = path.join(f.runtime, 'debug-call.uc');
+    fs.writeFileSync(native, `import { logger } from './maintenance/logs.uc';
+let log = logger([{ '.type': 'hijpass', log_level: 'DEBUG' }]);
+function business() {
+    log('WARN', '[test] ucode location');
+}
+business();\n`);
+    assert.equal(f.data('debug-call.uc', []).status, 0);
+    const log = path.join(f.directory, 'logs/hijpass.log');
+    let content = fs.readFileSync(log, 'utf8');
+    assert.ok(content.includes(`${entry}:3 [test] shell location`), content);
+    assert.ok(content.includes(`${native}:4 [test] ucode location`), content);
+    fs.writeFileSync(log, '');
+    withConfig([{ '.type': 'hijpass', log_level: 'INFO' }], config => {
+        assert.equal(f.run('debug-call.sh', [config], { HIJPASS_TASK_ID: 'Test1234' }).status, 0);
+    });
+    content = fs.readFileSync(log, 'utf8');
+    assert.match(content, /INFO\s+\[test\] shell location/);
+    assert.doesNotMatch(content, /debug-call|task=/);
 });
 
 test('配置提交失败后继续恢复其余文件，同时保留原错误和回滚失败原因', t => {

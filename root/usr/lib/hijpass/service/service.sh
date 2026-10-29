@@ -29,13 +29,13 @@ json_get_vars enabled geo_convert dns_hook update_interval
 module=service
 [ "$server" = 0 ] || module=server
 started=$(date +%s)
-trap 'code=$?; if [ "$code" -ne 0 ]; then hijpass_log ERROR "$module" "$action failed: exit=$code, elapsed=$(($(date +%s) - started))s"; fi' EXIT
+trap 'code=$?; if [ "$code" -ne 0 ]; then hijpass_log ERROR "$module" "${LINENO:-}" "$action failed: exit=$code, elapsed=$(($(date +%s) - started))s"; fi' EXIT
 
 cron_update() {
     data_call cron "$1" || return 1
-    hijpass_step "$module" 'Cron reload' /etc/init.d/cron restart
+    hijpass_step "$module" 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
 }
-hook() { [ -z "$dns_hook" ] || hijpass_step "$module" "DNS Hook $1" "$dns_hook" "$1"; }
+hook() { [ -z "$dns_hook" ] || hijpass_step "$module" "DNS Hook $1" "${LINENO:-}" "$dns_hook" "$1"; }
 stop_client() {
     # 即使一个步骤失败，其余资源仍继续清理；最后统一返回失败。
     failed=0
@@ -45,11 +45,11 @@ stop_client() {
     cron_update disable || failed=1
     rm -f /etc/hijpass/chinadns-ng.conf /tmp/hijpass/domain-proxy-geo.txt /tmp/hijpass/domain-direct-geo.txt || failed=1
     [ "$failed" -eq 0 ] || return 1
-    hijpass_log INFO "$module" 'Service resources removed'
+    hijpass_log INFO "$module" "${LINENO:-}" 'Service resources removed'
 }
 case "$action" in
     prepare)
-        hijpass_log INFO "$module" "Preparing service: enabled=$enabled"
+        hijpass_log INFO "$module" "${LINENO:-}" "Preparing service: enabled=$enabled"
         if [ "$enabled" = 1 ]; then
             # 数据准备全部完成才交给 procd；外部转换工具由本层调用。
             if [ "$server" = 0 ]; then
@@ -62,30 +62,30 @@ case "$action" in
             for entry in $entries; do json_get_var path "$entry"; mkdir -p "$(dirname -- "$path")" || exit 1; done
             json_select ..
         fi
-        hijpass_step "$module" 'Prepare process instances and DNS' data_call prepare "$@" ;;
+        hijpass_step "$module" 'Prepare process instances and DNS' "${LINENO:-}" data_call prepare "$@" ;;
     activate)
         [ "$enabled" = 1 ] || exit 0
         if [ "$server" = 1 ]; then
-            data_call server-files "$@" && hijpass_step "$module" 'Firewall reload' fw4 reload && cron_update enable || exit 1
-            hijpass_log INFO "$module" 'Activation completed; process supervision delegated to procd'
+            data_call server-files "$@" && hijpass_step "$module" 'Firewall reload' "${LINENO:-}" fw4 reload && cron_update enable || exit 1
+            hijpass_log INFO "$module" "${LINENO:-}" 'Activation completed; process supervision delegated to procd'
         else
             # 启动错误回滚与命令执行集中在 Shell，ucode 不再驱动服务启停。
             if with_config "$HIJPASS_LIB/firewall/firewall.sh" reset "$@" && "$HIJPASS_LIB/firewall/route.sh" reset && hook start && cron_update enable; then
-                hijpass_log INFO "$module" "Activation completed: firewall, routes, DNS Hook and cron ready, elapsed=$(($(date +%s) - started))s; process supervision delegated to procd"
+                hijpass_log INFO "$module" "${LINENO:-}" "Activation completed: firewall, routes, DNS Hook and cron ready, elapsed=$(($(date +%s) - started))s; process supervision delegated to procd"
             else
-                hijpass_log WARN "$module" 'Activation failed; rolling back service resources'
-                if stop_client; then hijpass_log WARN "$module" 'Rollback completed'; else hijpass_log ERROR "$module" 'Rollback incomplete; check preceding phase errors'; fi
+                hijpass_log WARN "$module" "${LINENO:-}" 'Activation failed; rolling back service resources'
+                if stop_client; then hijpass_log WARN "$module" "${LINENO:-}" 'Rollback completed'; else hijpass_log ERROR "$module" "${LINENO:-}" 'Rollback incomplete; check preceding phase errors'; fi
                 exit 1
             fi
         fi ;;
     deactivate)
-        hijpass_log INFO "$module" 'Stopping service resources'
+        hijpass_log INFO "$module" "${LINENO:-}" 'Stopping service resources'
         if [ "$server" = 1 ]; then
             rm -f /usr/share/nftables.d/table-post/hijserver.nft /usr/share/nftables.d/chain-pre/input_wan/hijserver.nft
             failed=0
-            hijpass_step "$module" 'Firewall reload' fw4 reload || failed=1
+            hijpass_step "$module" 'Firewall reload' "${LINENO:-}" fw4 reload || failed=1
             cron_update disable || failed=1
-            [ "$failed" -ne 0 ] || hijpass_log INFO "$module" 'Service resources removed'
+            [ "$failed" -ne 0 ] || hijpass_log INFO "$module" "${LINENO:-}" 'Service resources removed'
             exit "$failed"
         else stop_client; fi ;;
     auto-update)
@@ -95,11 +95,11 @@ case "$action" in
         previous=$(cat "$last" 2>/dev/null) || previous=0
         case "$previous" in ''|*[!0-9]*) previous=0 ;; esac
         [ "$((now - previous))" -ge "$((update_interval * 86400))" ] || exit 0
-        hijpass_log INFO rules 'Scheduled update is due'
+        hijpass_log INFO rules "${LINENO:-}" 'Scheduled update is due'
         HIJPASS_UPDATE_SOURCE=scheduled
         export HIJPASS_UPDATE_SOURCE
         with_config "$HIJPASS_LIB/rules/update.sh" all "$@" >/dev/null || exit 1
         printf '%s\n' "$now" >"$last" || exit 1
-        [ "$enabled" != 1 ] || hijpass_step "$module" 'Service restart after scheduled update' /etc/init.d/hijpass restart ;;
+        [ "$enabled" != 1 ] || hijpass_step "$module" 'Service restart after scheduled update' "${LINENO:-}" /etc/init.d/hijpass restart ;;
     *) echo 'unknown service action' >&2; exit 1 ;;
 esac

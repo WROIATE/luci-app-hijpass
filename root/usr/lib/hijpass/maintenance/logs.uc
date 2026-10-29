@@ -1,4 +1,5 @@
 /** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').UciSection} UciSection */
+/** @typedef {import('../../../share/ucode/hijpass/types/logging.uc').LogFrame} LogFrame */
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { logPath } from 'hijpass.config.paths';
@@ -18,6 +19,25 @@ function safeMessage(message) {
 	return length(message) > 8192 ? substr(message, 0, 8192) + '\n[truncated]' : message;
 }
 
+/**
+ * 仅 DEBUG 模式采集调用栈，跳过日志模块自身的包装层。
+ * @returns {string|null}
+ */
+function callerLocation() {
+	let ownFile = sourcepath();
+	try { die('capture log location'); }
+	catch (e) {
+		/** @type {LogFrame[]} */
+		let frames = e.stacktrace;
+		for (let frame in frames) {
+			if (frame.filename && frame.filename != ownFile) {
+				return frame.line ? `${frame.filename}:${frame.line}` : frame.filename;
+			}
+		}
+	}
+	return null;
+}
+
 // Logger 返回一个 (level, message) 函数，保留应用日志级别与多行排版。
 // 主日志位置由后端确定，global.log_level 为 DEBUG/INFO/WARN/ERROR。
 /**
@@ -28,15 +48,20 @@ function safeMessage(message) {
 export function logger(sections) {
 	let global = findHijpassSection(sections), path = logPath({ '.type': 'hijpass' });
 	const levels = { DEBUG: 1, INFO: 2, WARN: 3, ERROR: 4 };
-	return (level, message) => {
+	let debug = uc(global?.log_level || 'INFO') == 'DEBUG';
+	return (level, message, source) => {
 		level = uc(level) || 'INFO';
 		if (!exists(levels, level)) level = 'INFO';
 		if ((levels[level] || 2) < (levels[uc(global?.log_level || 'INFO')] || 2)) {
 			return;
 		}
 		message = safeMessage(message);
-		let task = getenv('HIJPASS_TASK_ID');
-		if (task && match(task, /^[A-Za-z0-9]{8}$/)) message = `[task=${task}] ${message}`;
+		if (debug) {
+			source = source || callerLocation();
+			if (source) message = `${source} ${message}`;
+			let task = getenv('HIJPASS_TASK_ID');
+			if (task && match(task, /^[A-Za-z0-9]{8}$/)) message += ` [task=${task}]`;
+		}
 		let file;
 		try {
 			mkdir(fs.dirname(path));
@@ -73,6 +98,34 @@ export function configuredLogger(configDirectory) {
 	catch (e) { }
 	return logger(config);
 };
+
+/**
+ * 在执行边界逐条规范化命令诊断；成功时的未知输出只写 DEBUG。
+ * @param {function} log
+ * @param {string} module
+ * @param {string} source
+ * @param {string} phase
+ * @param {string} output
+ * @param {integer} code
+ * @returns {null}
+ */
+function logCommandOutput(log, module, source, phase, output, code) {
+	let reportedError = false;
+	for (let line in split(output, '\n')) {
+		if (!trim(line)) continue;
+		let prefix = match(line, /^[ \t]*\[([IWE])\][ \t]*(.*)$/);
+		let level = code ? 'ERROR' : 'DEBUG';
+		if (prefix) {
+			level = { I: 'INFO', W: 'WARN', E: 'ERROR' }[prefix[1]];
+			line = prefix[2];
+		}
+		else if (match(line, /^[ \t]*(warn|warning)[ :]/i)) level = 'WARN';
+		if (level == 'ERROR') reportedError = true;
+		log(level, `[${module}] ${!prefix || level == 'ERROR' ? phase + ': ' : ''}${line}`, source);
+	}
+	if (code && !reportedError) log('ERROR', `[${module}] ${phase} failed`, source);
+	log('DEBUG', `[${module}] ${phase}: exit=${code}`, source);
+}
 /**
  * 裁剪过长日志，只保留最后 30000 行。
  * @param {string} path
@@ -138,6 +191,19 @@ export function main() { run(ARGV,
     let action = shift(args);
     if (action == 'append') {
         return configuredLogger(configDirectory)(args[0], join(' ', slice(args, 1)));
+    }
+    if (action == 'source') {
+        return configuredLogger(configDirectory)(args[0], join(' ', slice(args, 2)), args[1]);
+    }
+    if (action == 'command') {
+        let module = args[0] || '', source = args[1] || '', phase = args[3] || '', code = int(args[2]);
+        if (!module || !phase || type(code) != 'int' || code < 0 || code > 255) die('invalid command log arguments');
+        let file = fs.open(args[4], 'r');
+        if (!file) die('cannot read command diagnostics');
+        let output = file.read(8192) || '';
+        if (file.read(1)) output += '\n[truncated]';
+        file.close();
+        return logCommandOutput(configuredLogger(configDirectory), module, source, phase, output, code);
     }
     if (action == 'clean') {
         return cleanLogs([], 'clean', args[0] || '');

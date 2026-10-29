@@ -11,51 +11,36 @@ hijpass_data() {
 }
 hijpass_error() { hijpass_data "$HIJPASS_LIB/result.uc" error "$1"; }
 
-# 日志不占用业务 stdout，也不改变调用者的 jshn 命名空间或退出状态。
+# 调用点显式传入 $LINENO；子进程中的日志 CLI 无法恢复 Shell 调用位置。
 hijpass_log() (
-    level=$1 module=$2
-    shift 2
+    level=$1 module=$2 source="$0${3:+:$3}"
+    shift 3
     if [ -n "${config_directory:-}" ]; then
-        hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" append "$level" "[$module] $*" --configdir "$config_directory"
+        hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" source "$level" "$source" "[$module] $*" --configdir "$config_directory"
     else
-        hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" append "$level" "[$module] $*"
+        hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" source "$level" "$source" "[$module] $*"
     fi >/dev/null 2>&1 || logger -t hijpass -p daemon.err 'Application logging failed' >/dev/null 2>&1
     exit 0
 )
 
-# fw4 的 [I] 消息也写 stderr；显式信息保持 INFO，其余成功诊断默认 WARN。
-hijpass_diagnostic_level() {
-    if [ "$2" -ne 0 ] || grep -Eq '^[[:space:]]*(\[E\]|ERROR[:[:space:]])' "$1"; then
-        printf 'ERROR\n'
-    elif grep -q '[^[:space:]]' "$1" && ! grep -Eqv '^[[:space:]]*(\[I\][[:space:]]|$)' "$1"; then
-        printf 'INFO\n'
-    else
-        printf 'WARN\n'
-    fi
-}
-
-# 执行有副作用的阶段，保留原始 stderr/退出码；成功返回的告警同样记录。
+# 只在实际命令边界处理 stderr，保持业务 stdout 和原始退出状态。
 hijpass_step() {
-    local module="$1" phase="$2" output code level
-    shift 2
+    local module="$1" phase="$2" source="$0${3:+:$3}" output code
+    shift 3
     output=$(mktemp /tmp/hijpass-step.XXXXXX) || {
-        hijpass_log WARN "$module" "$phase: cannot capture diagnostic output"
-        "$@"
+        hijpass_log WARN "$module" "${LINENO:-}" "$phase: cannot capture diagnostic output"
+        "$@" 9>&-
         return $?
     }
-    "$@" 2>"$output"
+    # 更新锁不能传给 procd 启动的长期进程；更新控制进程仍持有锁。
+    "$@" 9>&- 2>"$output"
     code=$?
-    if [ "$code" -ne 0 ] || [ -s "$output" ]; then
-        level=$(hijpass_diagnostic_level "$output" "$code")
-        if [ -n "${HIJPASS_TASK_ID:-}" ]; then
-            # 后台 worker 统一留存完整 stderr，阶段只记录上下文，避免重复详情。
-            hijpass_log "$level" "$module" "$phase: exit=$code; diagnostic output retained by task"
-        else
-            hijpass_log "$level" "$module" "$phase: exit=$code
-$(head -c 8192 "$output")"
-        fi
-        cat "$output" >&2
-    fi
+    if [ -n "${config_directory:-}" ]; then
+        hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" command "$module" "$source" "$code" "$phase" "$output" --configdir "$config_directory"
+    else
+        hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" command "$module" "$source" "$code" "$phase" "$output"
+    fi >/dev/null 2>&1 || logger -t hijpass -p daemon.err 'Command logging failed' >/dev/null 2>&1
+    [ "$code" -eq 0 ] || printf '%s failed; see main log\n' "$phase" >&2
     rm -f "$output"
     return "$code"
 }

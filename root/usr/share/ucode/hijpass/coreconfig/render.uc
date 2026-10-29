@@ -3,7 +3,7 @@
 /** @typedef {import('../types/config.uc').UciSection} UciSection */
 /** @typedef {import('../types/routing.uc').RoutingSettings} RoutingSettings */
 /** @typedef {import('../types/proxy.uc').ProxyNode} ProxyNode */
-import { first, validateSections } from '../config/sections.uc';
+import { findFirstSectionByType, validateSections } from '../config/sections.uc';
 import { CORE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 import { resolve as resolveDependencies, validate as validateDependencies } from './dependencies.uc';
 import { cleanObject } from './json.uc';
@@ -52,8 +52,8 @@ export function render(sections, target) {
 	validateSections(sections);
 	let dependencies = resolveDependencies(sections, target);
 	validateDependencies(dependencies);
-	let shunt = first(sections, 'shunt'), routing = null;
-	if (target == 'shunt' || !target && shunt.enabled != '0' && shunt.config_type == 'tmpl') {
+	let shunt = findFirstSectionByType(sections, 'shunt'), routing = null;
+	if (target == 'shunt' || !target && shunt && shunt.enabled != '0' && shunt.config_type == 'tmpl') {
 		routing = prepareRouting(sections, dependencies);
 	}
 	validatePorts(dependencies.nodes, routing);
@@ -86,7 +86,7 @@ export function render(sections, target) {
  */
 export function validate(sections) {
 	// 服务关闭时允许保存未完成表单，但输入的 UCI 结构仍必须有效。
-	if (first(sections, 'hijpass').enabled == '0') {
+	if (findFirstSectionByType(sections, 'hijpass')?.enabled == '0') {
 		validateSections(sections);
 	}
 	else {

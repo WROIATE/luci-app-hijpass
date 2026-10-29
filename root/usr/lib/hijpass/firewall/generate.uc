@@ -3,7 +3,7 @@
 import * as fs from 'fs';
 import { RULE_FILES, FILES } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
-import { first } from 'hijpass.config.sections';
+import { findFirstSectionByType } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
 import { lines, text, renderTemplate } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
@@ -83,13 +83,16 @@ export function defaultTemplate() { return text('/usr/lib/hijpass/firewall/defau
  * @returns {object} 供 firewall.ut 使用的 options 对象。
  */
 function options(config, state) {
-    let f = first(config, 'firewall');
-    let dns = first(config, 'dns'), shunt = first(config, 'shunt');
+    let f = findFirstSectionByType(config, 'firewall');
+    if (!f) {
+        die('firewall section is missing');
+    }
+    let dns = findFirstSectionByType(config, 'dns'), shunt = findFirstSectionByType(config, 'shunt');
     let forward = '';
-    if (f.dns_forward == 'pre-routing' && dns.dns_service == 'chinadns-ng') {
+    if (f.dns_forward == 'pre-routing' && dns && dns.dns_service == 'chinadns-ng') {
         forward = dns.cdg_port;
     }
-    if (f.dns_forward == 'routing' && shunt.enabled != '0') {
+    if (f.dns_forward == 'routing' && shunt && shunt.enabled != '0') {
         forward = shunt.dns_listen_port;
     }
     // option 'tcp,udp' 与 list 两种写法均转换为协议数组。
@@ -141,8 +144,8 @@ function options(config, state) {
         protocols, wan: state.wan,
         proxyMark: 0x1, shuntMark: 0x3, user: 'hijpass',
         proxyLocal: f.proxy_local == '1', allowAll: f.acl_default_allow == '1',
-        useChnRoute: f.use_chnroute == '1', useChn: dns.use_chn == '1', useGfw: dns.use_gfw == '1',
-        domainSets: dns.dns_service != 'custom',
+        useChnRoute: f.use_chnroute == '1', useChn: dns?.use_chn == '1', useGfw: dns?.use_gfw == '1',
+        domainSets: dns != null && dns.dns_service != 'custom',
         macs: macs(list(f.proxy_mac_list)), excludedMacs: macs(list(f.proxy_mac_exclude_list)),
         interfaces: interfaces(list(f.proxy_iface_list)), excludedInterfaces: interfaces(list(f.proxy_iface_exclude_list)),
     };
@@ -170,8 +173,8 @@ function options(config, state) {
  * @returns {string} 完整 nft 表文本；没有代理或分流入口时为空字符串。
  */
 export function generate(config, state) {
-    let f = first(config, 'firewall');
-    if (!f.proxy_port && !f.shunt_port) {
+    let f = findFirstSectionByType(config, 'firewall');
+    if (!f || !f.proxy_port && !f.shunt_port) {
         return '';
     }
     let path = FILES.firewall_template;
@@ -199,7 +202,11 @@ export function main() { run(ARGV, (args, configDirectory) => {
     let raw = { wan: text(directory + '/wan'),
         addresses: { stdout: text(directory + '/addresses'), code: int(text(directory + '/addresses.code')) },
         interfaces: { stdout: text(directory + '/interfaces'), code: int(text(directory + '/interfaces.code')) } };
-    let dhcp = first(read('dhcp', configDirectory), 'dnsmasq');
-    return generate(config, networkState(raw, fs.readfile(dhcp.resolvfile)));
+    let dhcp = findFirstSectionByType(read('dhcp', configDirectory), 'dnsmasq');
+    let resolvText = null;
+    if (dhcp && dhcp.resolvfile) {
+        resolvText = fs.readfile(dhcp.resolvfile);
+    }
+    return generate(config, networkState(raw, resolvText));
 });
 };

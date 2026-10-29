@@ -6,7 +6,7 @@
 import * as fs from 'fs';
 import { RULE_FILES } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
-import { first } from 'hijpass.config.sections';
+import { findFirstSectionByType } from 'hijpass.config.sections';
 import { port } from 'hijpass.config.values';
 import { domain } from '../rules/rules.uc';
 import { lines, atomic, renderTemplate } from 'hijpass.common';
@@ -50,12 +50,12 @@ function configuredUpstream(dns, key) {
 /**
  * 根据 DNS 配置整理 chinadns-ng 模板参数。
  * @param {UciSection[]} sections
- * @param {DnsmasqOptions} dnsmasq dnsmasq section；未配置 port 时采用 53。
+ * @param {DnsmasqOptions|null} dnsmasq dnsmasq section；未配置时使用默认端口 53。
  * @returns {ChinadnsOptions|null} 模板参数对象；其他 DNS 模式返回 null。
  */
 export function options(sections, dnsmasq) {
-	let dns = first(sections, 'dns');
-	if (dns.dns_service != 'chinadns-ng') {
+	let dns = findFirstSectionByType(sections, 'dns');
+	if (!dns || dns.dns_service != 'chinadns-ng') {
 		return null;
 	}
 	/**
@@ -65,7 +65,7 @@ export function options(sections, dnsmasq) {
 	function upstream(key) {
 		let value = configuredUpstream(dns, key);
 		if (value == 'dnsmasq') {
-			value = `127.0.0.1#${dnsmasq.port || '53'}`;
+			value = `127.0.0.1#${dnsmasq?.port || '53'}`;
 		}
 		if (!value || match(value, /[\r\n]/)) {
 			die(`invalid ${key}`);
@@ -85,10 +85,13 @@ export function options(sections, dnsmasq) {
  * @returns {ServiceInstance|null} procd 实例 {id, name, command, env, user}；其他 DNS 模式返回 null。
  */
 export function prepare(sections, configDirectory) {
-	let dns = first(sections, 'dns'), dnsmasq = {};
+	let dns = findFirstSectionByType(sections, 'dns'), dnsmasq = null;
+	if (!dns) {
+		return null;
+	}
 	if (dns.dns_service == 'chinadns-ng'
 		&& index(map(['direct_dns', 'proxy_dns'], key => configuredUpstream(dns, key)), 'dnsmasq') >= 0) {
-		dnsmasq = first(read('dhcp', configDirectory), 'dnsmasq');
+		dnsmasq = findFirstSectionByType(read('dhcp', configDirectory), 'dnsmasq');
 	}
 	let settings = options(sections, dnsmasq);
 	if (!settings) {

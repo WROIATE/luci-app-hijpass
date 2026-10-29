@@ -3,7 +3,7 @@
 /** @typedef {import('../types/routing.uc').RoutingSettings} RoutingSettings */
 /** @typedef {import('../types/proxy.uc').RoutingDependencies} RoutingDependencies */
 /** @typedef {import('../types/config.uc').UciSection} UciSection */
-import { of, first } from '../config/sections.uc';
+import { filterSectionsByType, findFirstSectionByType } from '../config/sections.uc';
 import { port } from '../config/values.uc';
 import { CORE, core } from '../config/protocol/proxy.uc';
 import { TAG } from './constants.uc';
@@ -42,7 +42,7 @@ export function prepare(sections, dependencies) {
 		die(name ? `proxy node "${name}" missing or disabled` : 'proxy exit is required');
 	}
 	let servers = {};
-	for (let section in of(sections, 'shunt_dns_node')) {
+	for (let section in filterSectionsByType(sections, 'shunt_dns_node')) {
 		if (section.enabled == '0') {
 			continue;
 		}
@@ -63,7 +63,10 @@ export function prepare(sections, dependencies) {
 		}
 		return server;
 	}
-	let shunt = first(sections, 'shunt');
+	let shunt = findFirstSectionByType(sections, 'shunt');
+	if (!shunt) {
+		die('shunt section is missing');
+	}
 	let settings = {
 		core: core(shunt.type), listen: port(shunt.shunt_listen_port), dnsPort: port(shunt.dns_listen_port),
 		log: shunt.log_level || 'info', strategy: shunt.default_strategy || '64', cache: shunt.use_cache == '1',
@@ -84,7 +87,7 @@ export function prepare(sections, dependencies) {
 			settings.rulesetDNS = resolveDNSServer(shunt.ruleset_dns_node);
 		}
 	}
-	for (let rule in of(sections, 'shunt_route_rule')) {
+	for (let rule in filterSectionsByType(sections, 'shunt_route_rule')) {
 		if (rule.enabled != '1') {
 			continue;
 		}

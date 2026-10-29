@@ -2,7 +2,7 @@
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { logPath } from 'hijpass.config.paths';
-import { first } from 'hijpass.config.sections';
+import { findFirstSectionByType } from 'hijpass.config.sections';
 import { mkdir } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
 
@@ -14,11 +14,11 @@ import { run } from 'hijpass.command.runtime';
  * @returns {function} 接受 (level, message) 的日志函数。
  */
 export function logger(sections) {
-	let global = first(sections, 'hijpass'), path = logPath({ '.type': 'hijpass' });
+	let global = findFirstSectionByType(sections, 'hijpass'), path = logPath({ '.type': 'hijpass' });
 	const levels = { DEBUG: 1, INFO: 2, WARN: 3, ERROR: 4 };
 	return (level, message) => {
 		level = uc(level);
-		if ((levels[level] || 2) < (levels[uc(global.log_level || 'INFO')] || 2)) {
+		if ((levels[level] || 2) < (levels[uc(global?.log_level || 'INFO')] || 2)) {
 			return;
 		}
 		mkdir(fs.dirname(path));

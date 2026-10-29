@@ -5,20 +5,25 @@
 /**
  * 按类型筛选 UCI section，保持原配置顺序。
  * @param {UciSection[]} sections
- * @param {string} kind
+ * @param {string} sectionType
  * @returns {UciSection[]} 匹配的原对象数组；无匹配时为空数组。
  */
-export function of(sections, kind) {
-	return filter(sections, s => s['.type'] == kind);
+export function filterSectionsByType(sections, sectionType) {
+	return filter(sections, section => section['.type'] == sectionType);
 };
 /**
  * 查找指定类型的第一个 UCI section。
  * @param {UciSection[]} sections
- * @param {string} kind
- * @returns {UciSection|object} 原 section 对象；缺失时为新的空对象。
+ * @param {string} sectionType
+ * @returns {UciSection|null} 原 section 对象；未找到时返回 null，由调用方处理缺失情况。
  */
-export function first(sections, kind) {
-	return of(sections, kind)[0] || {};
+export function findFirstSectionByType(sections, sectionType) {
+	for (let section in sections) {
+		if (section['.type'] == sectionType) {
+			return section;
+		}
+	}
+	return null;
 };
 
 // 校验快照结构，防止外部 JSON 的数字/对象进入只接受 UCI 字符串的业务转换。

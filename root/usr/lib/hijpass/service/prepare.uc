@@ -6,7 +6,7 @@
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { FILES, nodeConfig, logPath } from 'hijpass.config.paths';
-import { first, of } from 'hijpass.config.sections';
+import { findFirstSectionByType, filterSectionsByType } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
 import { render as renderCore } from 'hijpass.coreconfig.render';
 import { CORE, core, CONFIG_TYPE, configType } from 'hijpass.config.protocol.proxy';
@@ -31,8 +31,8 @@ function configCommand(source, path) {
  * @returns {ServicePlan} {instances}；服务禁用时 instances 为空数组。
  */
 export function plan(sections) {
-	let global = first(sections, 'hijpass'), instances = [];
-	if (global.enabled != '1') {
+	let global = findFirstSectionByType(sections, 'hijpass'), instances = [];
+	if (!global || global.enabled != '1') {
 		return { instances };
 	}
 	/**
@@ -58,7 +58,7 @@ export function plan(sections) {
 			user: section.nest_proxy == '1' ? 'root' : 'hijpass', log: logPath(section),
 		};
 	}
-	for (let section in of(sections, 'proxy_node')) {
+	for (let section in filterSectionsByType(sections, 'proxy_node')) {
 		if (section.enabled != '1') {
 			continue;
 		}
@@ -86,8 +86,8 @@ export function plan(sections) {
 		}
 		push(instances, instance(section, name, args));
 	}
-	let shunt = first(sections, 'shunt');
-	if (shunt.enabled != '0' && shunt.type) {
+	let shunt = findFirstSectionByType(sections, 'shunt');
+	if (shunt && shunt.enabled != '0' && shunt.type) {
 		let engine = core(shunt.type), path = FILES.shunt_conf;
 		if (engine != CORE.xray && engine != CORE.singbox) {
 			die('unsupported shunt core');
@@ -106,7 +106,7 @@ export function plan(sections) {
  */
 export function prepareConfigFiles(sections, generated) {
 	let files = [];
-	for (let section in of(sections, 'proxy_node')) {
+	for (let section in filterSectionsByType(sections, 'proxy_node')) {
 		let config = generated.nodes[section['.name']];
 		if (!config) {
 			continue;
@@ -201,7 +201,7 @@ function cron(sections, enabled) {
     let path = '/etc/crontabs/root';
     let entries = cronEntries(path, 'hijpass');
 	if (enabled) {
-		let schedule = first(sections, 'rule').update_schedule;
+		let schedule = findFirstSectionByType(sections, 'rule')?.update_schedule;
 		if (schedule) {
 			if (!match(schedule, /^[A-Za-z0-9*\/,? -]+$/) || length(split(trim(schedule) || '', /[ \t]+/)) != 5) {
 				die('invalid update schedule');
@@ -222,11 +222,11 @@ function cron(sections, enabled) {
  * @returns {ServicePlan} {instances, ports}；禁用时两个数组均为空。
  */
 export function serverPlan(sections) {
-	let global = first(sections, 'hijserver'), instances = [], ports = [];
-	if (global.enabled != '1') {
+	let global = findFirstSectionByType(sections, 'hijserver'), instances = [], ports = [];
+	if (!global || global.enabled != '1') {
 		return { instances, ports };
 	}
-	for (let section in of(sections, 'server_node')) {
+	for (let section in filterSectionsByType(sections, 'server_node')) {
 		if (section.enabled != '1') {
 			continue;
 		}
@@ -293,10 +293,14 @@ function writeServerRules(sections) {
  * @returns {ServiceSettings} 含 enabled、dns_hook、geo_convert、update_interval（天）及 log_paths 的对象。
  */
 function settings(config, server) {
-    let global = first(config, server ? 'hijserver' : 'hijpass'), shunt = first(config, 'shunt');
-    return { enabled: global.enabled == '1', dns_hook: server ? '' : FILES.dns_hook,
-        geo_convert: !server && shunt.enabled != '0' && core(shunt.type) == CORE.singbox && shunt.ruleset_convert == '1',
-        update_interval: int(first(config, 'rule').update_interval || '0'),
+    let global = findFirstSectionByType(config, server ? 'hijserver' : 'hijpass'), shunt = findFirstSectionByType(config, 'shunt');
+    let convert = false;
+    if (!server && shunt) {
+        convert = shunt.enabled != '0' && core(shunt.type) == CORE.singbox && shunt.ruleset_convert == '1';
+    }
+    return { enabled: global?.enabled == '1', dns_hook: server ? '' : FILES.dns_hook,
+        geo_convert: convert,
+        update_interval: int(findFirstSectionByType(config, 'rule')?.update_interval || '0'),
         log_paths: filter(map(config, item => logPath(item, server)), path => !!path) };
 };
 /**
@@ -318,10 +322,10 @@ export function main() { run(ARGV,
         return settings(config, server);
     }
     if (action == 'delay') {
-        return `${int(first(config, 'hijpass').delay_time || '0')}\n`;
+        return `${int(findFirstSectionByType(config, 'hijpass')?.delay_time || '0')}\n`;
     }
     if (action == 'configs') {
-        if (first(config, 'hijpass').enabled == '1') {
+        if (findFirstSectionByType(config, 'hijpass')?.enabled == '1') {
             // 先生成进程描述，确认自定义命令、环境变量和文件名有效，再替换配置。
             plan(config);
             logger(config)('INFO', 'Preparing proxy configurations');
@@ -337,7 +341,7 @@ export function main() { run(ARGV,
             return serverPlan(config);
         }
         let result = plan(config);
-        if (first(config, 'hijpass').enabled == '1') {
+        if (findFirstSectionByType(config, 'hijpass')?.enabled == '1') {
             let dns = prepareDNS(config, configDirectory);
             if (dns) {
                 push(result.instances, dns);

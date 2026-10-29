@@ -45,6 +45,9 @@ export function build(settings, dependencies) {
 	push(outbounds, { protocol: 'freedom', tag: TAG.direct, settings: {}, streamSettings: { sockopt: { domainStrategy: 'UseIP' } } });
 	// Xray 的默认出口由第一项决定，稳定保持其余出口的原顺序。
 	let final = filter(outbounds, outbound => outbound.tag == settings.final)[0];
+	if (!final) {
+		die(`default outbound "${settings.final}" is missing`);
+	}
 	outbounds = [final, ...filter(outbounds, outbound => outbound != final)];
 	push(outbounds, { protocol: 'blackhole', tag: TAG.block }, {
 		protocol: 'dns', tag: TAG.dns, settings: { rules: [{ action: 'hijack', qType: '1,28' }, { action: 'return', rCode: 5 }] },

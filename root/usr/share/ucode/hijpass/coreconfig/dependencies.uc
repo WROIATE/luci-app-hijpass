@@ -2,7 +2,7 @@
 /** @typedef {import('../types/proxy.uc').ProxyGraph} ProxyGraph */
 /** @typedef {import('../types/proxy.uc').ResolvedDependencies} ResolvedDependencies */
 /** @typedef {import('../types/config.uc').UciSection} UciSection */
-import { of } from '../config/sections.uc';
+import { filterSectionsByType } from '../config/sections.uc';
 import { list } from '../config/values.uc';
 import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 
@@ -16,7 +16,7 @@ import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
  * @returns {ResolvedDependencies} {nodes, byID, byName}，索引和依赖直接引用节点对象。
  */
 export function resolve(sections, target) {
-	let proxySections = of(sections, 'proxy_node');
+	let proxySections = filterSectionsByType(sections, 'proxy_node');
 	let enabledProxies = {};
 	let rootSections = [];
 	for (let section in proxySections) {

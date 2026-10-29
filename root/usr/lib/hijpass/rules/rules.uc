@@ -2,7 +2,7 @@
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { RULE_FILES } from 'hijpass.config.paths';
-import { first, of } from 'hijpass.config.sections';
+import { findFirstSectionByType, filterSectionsByType } from 'hijpass.config.sections';
 import { list } from 'hijpass.config.values';
 import { text, lines } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
@@ -81,7 +81,10 @@ export function normalize(text, kind) {
  * @returns {object} 含 timeout（秒）、retries、enabled 和 jobs 的下载计划。
  */
 export function updatePlan(config, action) {
-    let settings = first(config, 'rule'), catalog = sources();
+    let settings = findFirstSectionByType(config, 'rule'), catalog = sources();
+    if (!settings) {
+        die('rule section is missing');
+    }
     let groups = { chnlist: ['chn_domain_list'], gfw: ['gfw_list'], chnroute: ['chn_v4_route', 'chn_v6_route'], geo: ['geoip', 'geosite'] };
     let selected = groups[action] || (action == 'all' || action == 'update' ? keys(catalog) : null);
     if (type(selected) != 'array') {
@@ -92,7 +95,7 @@ export function updatePlan(config, action) {
         || type(timeout) != 'int' || type(retries) != 'int' || timeout < 1 || timeout > 600 || retries < 1 || retries > 10) {
         die('invalid download timeout or retry count');
     }
-    return { timeout, retries, enabled: first(config, 'hijpass').enabled == '1',
+    return { timeout, retries, enabled: findFirstSectionByType(config, 'hijpass')?.enabled == '1',
         jobs: map(selected, key => ({ key, ...catalog[key], urls: list(settings[key]) })) };
 };
 /**
@@ -104,7 +107,7 @@ export function geoPlan(config) {
     let jobs = [];
     for (let database in ['geoip', 'geosite']) {
         let tags = [], key = database == 'geoip' ? 'ip_list' : 'domain_list';
-        for (let rule in of(config, 'shunt_route_rule')) {
+        for (let rule in filterSectionsByType(config, 'shunt_route_rule')) {
             if (rule.enabled != '1') {
                 continue;
             }
@@ -129,7 +132,7 @@ export function geoPlan(config) {
  * @returns {object} {jobs}，每项含 value 和 output；其他 DNS 模式下 jobs 为空。
  */
 export function dnsPlan(config) {
-    if (first(config, 'dns').dns_service != 'chinadns-ng') {
+    if (findFirstSectionByType(config, 'dns')?.dns_service != 'chinadns-ng') {
         return { jobs: [] };
     }
     let jobs = [];
@@ -217,7 +220,7 @@ export function routeMatch(sections, target, geoTags) {
 		die('invalid query');
 	}
 	let ip = !!iptoarr(target), tags = [], loaded = false;
-	for (let rule in of(sections, 'shunt_route_rule')) {
+	for (let rule in filterSectionsByType(sections, 'shunt_route_rule')) {
 		if (rule.enabled != '1') {
 			continue;
 		}
@@ -253,7 +256,7 @@ export function routeMatch(sections, target, geoTags) {
 			}
 		}
 	}
-	return `未匹配到任何自定义规则，除去协议、端口等规则外，将使用全局默认策略\n\n规则名称 (Name) : 全局默认\n匹配类型 (Type) : ${ip ? 'IP' : '域名'}\n匹配内容 (Item) : * (全部)\n代理策略 (Node) : ${first(sections, 'shunt').default_proxy_node || ''}\n`;
+	return `未匹配到任何自定义规则，除去协议、端口等规则外，将使用全局默认策略\n\n规则名称 (Name) : 全局默认\n匹配类型 (Type) : ${ip ? 'IP' : '域名'}\n匹配内容 (Item) : * (全部)\n代理策略 (Node) : ${findFirstSectionByType(sections, 'shunt')?.default_proxy_node || ''}\n`;
 };
 
 /**
@@ -296,7 +299,7 @@ export function main() { run(ARGV,
             die('invalid query');
         }
         let ip = !!iptoarr(target), kind = ip ? 'geoip' : 'geosite';
-        let lookup = length(filter(of(config, 'shunt_route_rule'), rule => rule.enabled == '1' && length(filter(lines(rule[ip ? 'ip_list' : 'domain_list']), line => substr(line, 0, length(kind) + 1) == kind + ':')))) > 0;
+        let lookup = length(filter(filterSectionsByType(config, 'shunt_route_rule'), rule => rule.enabled == '1' && length(filter(lines(rule[ip ? 'ip_list' : 'domain_list']), line => substr(line, 0, length(kind) + 1) == kind + ':')))) > 0;
         return { kind, lookup };
     }
     if (action == 'match') {

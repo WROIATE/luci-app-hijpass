@@ -1,3 +1,4 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/diagnostics.uc').PacketSummary} PacketSummary */
 /** @typedef {import('../../../share/ucode/hijpass/types/diagnostics.uc').LogPosition} LogPosition */
 import * as fs from 'fs';
 import { lines } from 'hijpass.common';
@@ -62,7 +63,7 @@ function indent(values, limit, spaces) { return join('\n', map(slice(uniq(values
 /**
  * 统计抓包中的协议、TCP 状态和流量分布。
  * @param {string[]} packets
- * @returns {object} {counts, interfaces, flows}，分别为包统计、接口统计和连接统计。
+ * @returns {PacketSummary} {counts, interfaces, flows}，分别为包统计、接口统计和连接统计。
  */
 export function packetSummary(packets) {
 	let counts = { syn: 0, syn_ack: 0, fin: 0, rst: 0, udp: 0, payload_packets: 0, payload_bytes: 0 }, interfaces = {}, flows = {};
@@ -103,7 +104,7 @@ export function packetSummary(packets) {
 /**
  * 按目标地址和连接 ID 筛选相关核心日志。
  * @param {string} text
- * @param {array} targets 可含缺失地址；匹配前过滤空值。
+ * @param {(string|null)[]} targets 可含缺失地址；匹配前过滤空值。
  * @returns {string[]} 去重后的日志行数组，最多 100 行。
  */
 function relatedLogs(text, targets) {

@@ -1,3 +1,6 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').EditorResponse} EditorResponse */
+/** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').LogList} LogList */
+/** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').LogResponse} LogResponse */
 /** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').LogRequest} LogRequest */
 /** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').EditorRequest} EditorRequest */
 /** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').EditorResource} EditorResource */
@@ -48,7 +51,7 @@ function editorPath(request) {
  * 按资源名读取或保存编辑器内容。
  * @param {EditorRequest} request
  * @param {boolean} write
- * @returns {object} 读取返回 {content}，保存返回 {ok: true}；尚未创建的节点或分流文件内容为空。
+ * @returns {EditorResponse} 读取返回 {content}，保存返回 {ok: true}；尚未创建的节点或分流文件内容为空。
  */
 export function editor(request, write) {
     let path = editorPath(request);
@@ -71,7 +74,7 @@ export function editor(request, write) {
 // Log：id 为 package:section 的业务标识；客户端不能提交任意日志路径。
 /**
  * 列出可供前端查看的日志，不暴露文件路径。
- * @returns {object} {logs}，每项含 id、kind 和显示名称 name。
+ * @returns {LogList} {logs}，每项含 id、kind 和显示名称 name。
  */
 export function logs() {
     let result = [];
@@ -98,7 +101,7 @@ export function logs() {
 /**
  * 按日志 ID 读取尾部内容、下载全文或清空文件。
  * @param {LogRequest} request
- * @returns {object} 读取返回 {content}，下载返回 {content, name}，清空返回 {ok: true}。
+ * @returns {LogResponse} 读取返回 {content}，下载返回 {content, name}，清空返回 {ok: true}。
  */
 export function log(request) {
     let parts = split(request.id, ':'), packageName = parts[0];

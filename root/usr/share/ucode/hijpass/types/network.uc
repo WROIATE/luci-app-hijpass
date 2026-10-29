@@ -64,3 +64,14 @@
  *   first_byte_time_ms: integer|null
  * }} CurlReport
  */
+
+/** @typedef {Object<string, boolean>} PortStatus */
+
+/**
+ * @typedef {{
+ *   ms: integer,
+ *   total_ms: integer
+ * }} PingTiming
+ */
+
+/** @typedef {PingTiming|{error: string}} PingReport */

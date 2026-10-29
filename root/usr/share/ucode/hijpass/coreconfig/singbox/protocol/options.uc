@@ -1,3 +1,4 @@
+/** @typedef {import('../../../types/json.uc').JsonObject} JsonObject */
 /** @typedef {import('../../../types/proxy.uc').TLSProxy} TLSProxy */
 /** @typedef {import('../../../types/proxy.uc').TransportOptions} TransportOptions */
 /** @typedef {import('../../../types/proxy.uc').MultiplexOptions} MultiplexOptions */
@@ -9,7 +10,7 @@ import { optional } from '../../json.uc';
 /**
  * 填写 sing-box 出站的协议、地址和网络字段。
  * @param {RemoteProxy} n
- * @returns {object} 基础出站对象，供具体协议继续补充。
+ * @returns {JsonObject} 基础出站对象，供具体协议继续补充。
  */
 export function endpoint(n) {
 	let out = { type: n.type, tag: n.name, server: n.server, server_port: n.server_port };
@@ -18,7 +19,7 @@ export function endpoint(n) {
 /**
  * 生成已启用的 TLS 设置，并补上默认服务器名称。
  * @param {TLSProxy} n
- * @returns {object} TLS 对象；SNI 默认使用节点 server。
+ * @returns {JsonObject} TLS 对象；SNI 默认使用节点 server。
  */
 export function tls(n) {
 	return { enabled: true, server_name: n.tls_server_name || n.server, insecure: n.tls_insecure };
@@ -26,7 +27,7 @@ export function tls(n) {
 /**
  * 生成连接复用设置，按需附加 Brutal 参数。
  * @param {MultiplexOptions} n
- * @returns {object|null} multiplex 对象；未启用时为 null。
+ * @returns {JsonObject|null} multiplex 对象；未启用时为 null。
  */
 export function multiplex(n) {
 	if (!n.multiplex_enabled) {
@@ -44,7 +45,7 @@ export function multiplex(n) {
 /**
  * 将节点传输选项转换为 sing-box 传输配置。
  * @param {TransportOptions} n
- * @returns {object|null} transport 对象；未选择传输时为 null，不支持的类型抛错。
+ * @returns {JsonObject|null} transport 对象；未选择传输时为 null，不支持的类型抛错。
  */
 export function transport(n) {
 	let kind = n.transport_type;

@@ -1,8 +1,10 @@
-/** @typedef {import('../types/proxy.uc').ProxyNode} ProxyNode */
+/** @typedef {import('../types/proxy.uc').DecodedProxyNode} DecodedProxyNode */
 /** @typedef {import('../types/proxy.uc').ProxyGraph} ProxyGraph */
 /** @typedef {import('../types/proxy.uc').ResolvedDependencies} ResolvedDependencies */
-/** @typedef {import('../types/config.uc').UciSection} UciSection */
-import { filterSectionsByType } from '../config/sections.uc';
+/** @typedef {import('../types/proxy.uc').ProxyIndex} ProxyIndex */
+/** @typedef {import('../types/sections.uc').UciSection} UciSection */
+/** @typedef {import('../types/sections.uc').ProxyNodeSection} ProxyNodeSection */
+import { filterProxyNodeSections } from '../config/sections.uc';
 import { list } from '../config/values.uc';
 import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 
@@ -16,8 +18,10 @@ import { decodeProxy, TYPE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
  * @returns {ResolvedDependencies} {nodes, byID, byName}，索引和依赖直接引用节点对象。
  */
 export function resolve(sections, target) {
-	let proxySections = filterSectionsByType(sections, 'proxy_node');
+	let proxySections = filterProxyNodeSections(sections);
+	/** @type {Object<string, ProxyNodeSection[]>} */
 	let enabledProxies = {};
+	/** @type {ProxyNodeSection[]} */
 	let rootSections = [];
 	for (let section in proxySections) {
 		if (section.enabled == '1') {
@@ -38,10 +42,19 @@ export function resolve(sections, target) {
 	if (target && target != 'shunt' && !length(rootSections)) {
 		die('node not found');
 	}
-	let nodes = [], byID = {}, byName = {}, dependencies = {};
+	/** @type {DecodedProxyNode[]} */
+	let nodes = [];
+	/** @type {ProxyIndex} */
+	let byID = {};
+	/** @type {ProxyIndex} */
+	let byName = {};
+	/** @type {Object<string, string[]>} */
+	let dependencies = {};
 	// 按批次展开依赖，保持发现顺序；每个 ID 只展开一次，循环有界。
+	/** @type {ProxyNodeSection[]} */
 	let pendingSections = rootSections;
 	while (length(pendingSections)) {
+		/** @type {ProxyNodeSection[]} */
 		let nextSections = [];
 		for (let section in pendingSections) {
 			let id = section['.name'], name = section.name || id;
@@ -111,7 +124,7 @@ export function validate(dependencies) {
 	let active = {}, heights = {};
 	/**
 	 * 递归检查节点依赖，并计算和缓存代理链长度。
-	 * @param {ProxyNode} n
+	 * @param {DecodedProxyNode} n
 	 * @returns {integer} 含自身的链长；均衡节点为 1，其成员分别检查。
 	 */
 	function visit(n) {

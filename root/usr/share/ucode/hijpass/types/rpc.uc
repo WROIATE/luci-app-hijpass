@@ -24,3 +24,27 @@
  *   lines: string|null
  * }} LogRequest
  */
+
+/**
+ * @typedef {{
+ *   content: string
+ * }} EditorContent
+ */
+
+/** @typedef {EditorContent|{ok: boolean}} EditorResponse */
+
+/**
+ * @typedef {{
+ *   id: string,
+ *   kind: string,
+ *   name: string
+ * }} LogEntry
+ */
+
+/**
+ * @typedef {{
+ *   logs: LogEntry[]
+ * }} LogList
+ */
+
+/** @typedef {(EditorContent & {name: string|null})|{ok: boolean}} LogResponse */

@@ -1,9 +1,10 @@
+/** @typedef {import('../types/core.uc').ValidationResult} ValidationResult */
 /** @typedef {import('../types/core.uc').CoreConfig} CoreConfig */
 /** @typedef {import('../types/core.uc').GeneratedConfigs} GeneratedConfigs */
-/** @typedef {import('../types/config.uc').UciSection} UciSection */
+/** @typedef {import('../types/sections.uc').UciSection} UciSection */
 /** @typedef {import('../types/routing.uc').RoutingSettings} RoutingSettings */
-/** @typedef {import('../types/proxy.uc').ProxyNode} ProxyNode */
-import { findFirstSectionByType, validateSections } from '../config/sections.uc';
+/** @typedef {import('../types/proxy.uc').DecodedProxyNode} DecodedProxyNode */
+import { findHijpassSection, findShuntSection, validateSections } from '../config/sections.uc';
 import { CORE, CONFIG_TYPE } from '../config/protocol/proxy.uc';
 import { resolve as resolveDependencies, validate as validateDependencies } from './dependencies.uc';
 import { cleanObject } from './json.uc';
@@ -13,7 +14,7 @@ import { prepare as prepareRouting, build as buildRouting } from './routing.uc';
 
 /**
  * 检查节点和分流监听端口是否相互冲突。
- * @param {ProxyNode[]} nodes
+ * @param {DecodedProxyNode[]} nodes
  * @param {RoutingSettings|null} shunt
  * @returns {null} 无业务返回值；发现重复端口时抛错。
  */
@@ -52,7 +53,7 @@ export function render(sections, target) {
 	validateSections(sections);
 	let dependencies = resolveDependencies(sections, target);
 	validateDependencies(dependencies);
-	let shunt = findFirstSectionByType(sections, 'shunt'), routing = null;
+	let shunt = findShuntSection(sections), routing = null;
 	if (target == 'shunt' || !target && shunt && shunt.enabled != '0' && shunt.config_type == 'tmpl') {
 		routing = prepareRouting(sections, dependencies);
 	}
@@ -82,11 +83,11 @@ export function render(sections, target) {
 /**
  * 检查配置能否生成，服务关闭时仅检查快照结构。
  * @param {UciSection[]} sections
- * @returns {object} 校验成功返回 {ok: true}，失败时抛错。
+ * @returns {ValidationResult} 校验成功返回 {ok: true}，失败时抛错。
  */
 export function validate(sections) {
 	// 服务关闭时允许保存未完成表单，但输入的 UCI 结构仍必须有效。
-	if (findFirstSectionByType(sections, 'hijpass')?.enabled == '0') {
+	if (findHijpassSection(sections)?.enabled == '0') {
 		validateSections(sections);
 	}
 	else {

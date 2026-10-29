@@ -80,3 +80,9 @@
  *   shunt: CoreConfig|null
  * }} GeneratedConfigs
  */
+
+/**
+ * @typedef {{
+ *   ok: boolean
+ * }} ValidationResult
+ */

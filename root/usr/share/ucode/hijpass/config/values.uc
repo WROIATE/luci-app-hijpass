@@ -1,6 +1,6 @@
 /** @typedef {import('../types/config.uc').DecodedValues} DecodedValues */
 /** @typedef {import('../types/config.uc').FieldDeclarations} FieldDeclarations */
-/** @typedef {import('../types/config.uc').UciSection} UciSection */
+/** @typedef {import('../types/sections.uc').UciSection} UciSection */
 // 配置字段转换：保留 option/list、未设置和显式 false/0 的差异。
 // 本模块处理业务类型与范围，不解释 UCI 文件语法，也不访问原生 cursor。
 /**

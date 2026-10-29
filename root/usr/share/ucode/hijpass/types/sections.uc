@@ -1,0 +1,282 @@
+// 原始 UCI section 的结构声明；option/list 保留原值，转换与业务校验由 config 模块完成。
+
+/**
+ * 所有 section 的公共元数据；索引兼容未知或历史字段，不代替子类型的明确字段。
+ * @typedef {{
+ *   '.name': string,
+ *   '.type': string,
+ *   '.index': integer|null,
+ *   '.anonymous': boolean|null,
+ *   [option: string]: string|string[]|integer|boolean|null
+ * }} UciSection
+ */
+
+/**
+ * 具有启停开关的原始配置；缺失值的启停语义由各业务模块决定。
+ * @typedef {UciSection & {
+ *   enabled: string|null
+ * }} EnabledSection
+ */
+
+/**
+ * 客户端和服务端节点共用的原始名称、端口、命令与进程选项。
+ * @typedef {EnabledSection & {
+ *   name: string|null,
+ *   listen_port: string|null,
+ *   command: string|null,
+ *   procd_env: string|string[]|null,
+ *   log_enabled: string|null,
+ *   custom_conf_hash: string|null
+ * }} NamedNodeSection
+ */
+
+/**
+ * 客户端全局配置。
+ * @typedef {EnabledSection & {
+ *   '.type': 'hijpass',
+ *   startup_delay: string|null,
+ *   delay_time: string|null,
+ *   log_level: string|null,
+ *   schema_version: string|null,
+ *   legacy_firewall_template: string|null
+ * }} HijpassSection
+ */
+
+/**
+ * 服务端全局配置。
+ * @typedef {EnabledSection & {
+ *   '.type': 'hijserver'
+ * }} HijserverSection
+ */
+
+/**
+ * 代理节点的原始协议选项；仅解码时挑选当前协议字段并应用默认值。
+ * @typedef {NamedNodeSection & {
+ *   '.type': 'proxy_node',
+ *   config_type: string|null,
+ *   type: string|null,
+ *   core: string|null,
+ *   log_level: string|null,
+ *   socks_port: string|null,
+ *   nest_proxy: string|null,
+ *   upstream_proxy_node: string|null,
+ *   member_node: string|string[]|null,
+ *   server: string|null,
+ *   server_port: string|null,
+ *   network: string|null,
+ *   password: string|null,
+ *   up_mbps: string|null,
+ *   down_mbps: string|null,
+ *   udp_idle_timeout: string|null,
+ *   server_ports: string|string[]|null,
+ *   hop_interval: string|null,
+ *   obfs_type: string|null,
+ *   obfs_password: string|null,
+ *   url: string|null,
+ *   interval: string|null,
+ *   tolerance: string|null,
+ *   idle_timeout: string|null,
+ *   interrupt_exist_connections: string|null,
+ *   strategy: string|null,
+ *   strategy_expected: string|null,
+ *   strategy_max_rtt: string|null,
+ *   strategy_tolerance: string|null,
+ *   fallback_tag: string|null,
+ *   probe_url: string|null,
+ *   probe_connectivity: string|null,
+ *   probe_interval: string|null,
+ *   probe_timeout: string|null,
+ *   probe_sampling: string|null,
+ *   probe_http_method: string|null,
+ *   tls_server_name: string|null,
+ *   tls_insecure: string|null,
+ *   tls_reality_enabled: string|null,
+ *   tls_reality_public_key: string|null,
+ *   tls_reality_short_id: string|null,
+ *   multiplex_enabled: string|null,
+ *   multiplex_protocol: string|null,
+ *   multiplex_max_connections: string|null,
+ *   multiplex_min_streams: string|null,
+ *   multiplex_max_streams: string|null,
+ *   multiplex_brutal_enabled: string|null,
+ *   multiplex_brutal_up_mbps: string|null,
+ *   multiplex_brutal_down_mbps: string|null,
+ *   transport_type: string|null,
+ *   transport_http_host: string|null,
+ *   transport_http_path: string|null,
+ *   transport_http_method: string|null,
+ *   transport_http_idle_timeout: string|null,
+ *   transport_http_ping_timeout: string|null,
+ *   transport_ws_host: string|null,
+ *   transport_ws_path: string|null,
+ *   transport_ws_max_early_data: string|null,
+ *   transport_ws_early_data_header_name: string|null,
+ *   transport_grpc_service_name: string|null,
+ *   transport_grpc_idle_timeout: string|null,
+ *   transport_grpc_ping_timeout: string|null,
+ *   transport_grpc_permit_without_stream: string|null,
+ *   transport_httpupgrade_host: string|null,
+ *   transport_httpupgrade_path: string|null,
+ *   transport_xhttp_host: string|null,
+ *   transport_xhttp_path: string|null,
+ *   transport_xhttp_mode: string|null,
+ *   transport_xhttp_method: string|null,
+ *   method: string|null,
+ *   plugin: string|null,
+ *   plugin_opts: string|null,
+ *   udp_over_tcp: string|null,
+ *   version: string|null,
+ *   uuid: string|null,
+ *   congestion_control: string|null,
+ *   udp_relay_mode: string|null,
+ *   udp_over_stream: string|null,
+ *   zero_rtt_handshake: string|null,
+ *   heartbeat: string|null,
+ *   flow: string|null,
+ *   packet_encoding: string|null,
+ *   brutal_debug: string|null
+ * }} ProxyNodeSection
+ */
+
+/**
+ * 原生 JSON 服务端节点；command 与监听端口仅用于启动和防火墙放行。
+ * @typedef {NamedNodeSection & {
+ *   '.type': 'server_node',
+ *   allow_firewall: string|null
+ * }} ServerNodeSection
+ */
+
+/**
+ * 分流模板原始设置；type 是核心名称，.type 是固定的 section 类型。
+ * @typedef {EnabledSection & {
+ *   '.type': 'shunt',
+ *   type: string|null,
+ *   config_type: string|null,
+ *   shunt_listen_port: string|null,
+ *   dns_listen_port: string|null,
+ *   log_enabled: string|null,
+ *   log_level: string|null,
+ *   ruleset_convert: string|null,
+ *   use_cache: string|null,
+ *   shunt_hash: string|null,
+ *   default_proxy_node: string|null,
+ *   ruleset_out_node: string|null,
+ *   default_dns_node: string|null,
+ *   ruleset_dns_node: string|null,
+ *   default_strategy: string|null,
+ *   procd_env: string|string[]|null,
+ *   nest_proxy: string|null
+ * }} ShuntSection
+ */
+
+/**
+ * DNS 服务和上游选择；启用国内/GFW 列表的开关仍为原始字符串。
+ * @typedef {UciSection & {
+ *   '.type': 'dns',
+ *   dns_service: string|null,
+ *   direct_dns: string|null,
+ *   direct_dns_custom: string|null,
+ *   proxy_dns: string|null,
+ *   proxy_dns_custom: string|null,
+ *   cdg_port: string|null,
+ *   use_chn: string|null,
+ *   use_gfw: string|null,
+ *   domain_proxy_hash: string|null,
+ *   domain_direct_hash: string|null,
+ *   dns_hook_hash: string|null
+ * }} DnsSection
+ */
+
+/**
+ * 防火墙入口、DNS 转发及访问控制。
+ * @typedef {UciSection & {
+ *   '.type': 'firewall',
+ *   tproxy_proto: string|string[]|null,
+ *   proxy_port: string|null,
+ *   shunt_port: string|null,
+ *   dns_forward: string|null,
+ *   proxy_local: string|null,
+ *   use_chnroute: string|null,
+ *   acl_default_allow: string|null,
+ *   proxy_mac_list: string|string[]|null,
+ *   proxy_mac_exclude_list: string|string[]|null,
+ *   proxy_iface_list: string|string[]|null,
+ *   proxy_iface_exclude_list: string|string[]|null,
+ *   ip_direct_hash: string|null,
+ *   ip_proxy_hash: string|null,
+ *   nft_hash: string|null,
+ *   nft_hook_hash: string|null
+ * }} FirewallSection
+ */
+
+/**
+ * 规则下载资源、更新计划和网络重试设置。
+ * @typedef {UciSection & {
+ *   '.type': 'rule',
+ *   chn_domain_list: string|string[]|null,
+ *   chn_v4_route: string|string[]|null,
+ *   chn_v6_route: string|string[]|null,
+ *   gfw_list: string|null,
+ *   geosite: string|null,
+ *   geoip: string|null,
+ *   update_schedule: string|null,
+ *   update_interval: string|null,
+ *   download_timeout: string|null,
+ *   retry_count: string|null
+ * }} RuleSection
+ */
+
+/**
+ * 规则匹配字段视图；供解析器和完整规则 section 共用。
+ * @typedef {{
+ *   network: string|string[]|null,
+ *   protocol: string|string[]|null,
+ *   port: string|string[]|null,
+ *   port_range: string|string[]|null,
+ *   domain_list: string|null,
+ *   ip_list: string|null
+ * }} RuleMatchOptions
+ */
+
+/**
+ * 分流规则的出口、DNS 及匹配条件。
+ * @typedef {EnabledSection & RuleMatchOptions & {
+ *   '.type': 'shunt_route_rule',
+ *   name: string|null,
+ *   proxy_node: string|null,
+ *   ip_version_split: string|null,
+ *   proxy_node_v4: string|null,
+ *   proxy_node_v6: string|null,
+ *   dns_node: string|null,
+ *   dns_proxy_node: string|null,
+ *   dns_strategy: string|null
+ * }} ShuntRouteRuleSection
+ */
+
+/**
+ * 分流核心使用的 DNS 节点；port 在转换前为字符串。
+ * @typedef {EnabledSection & {
+ *   '.type': 'shunt_dns_node',
+ *   type: string|null,
+ *   tag: string|null,
+ *   server: string|null,
+ *   port: string|null
+ * }} ShuntDnsNodeSection
+ */
+
+/**
+ * 外部 dhcp 配置中需要读取的 dnsmasq 原始选项。
+ * @typedef {UciSection & {
+ *   '.type': 'dnsmasq',
+ *   port: string|null,
+ *   resolvfile: string|null
+ * }} DnsmasqSection
+ */
+
+/**
+ * 安装迁移读取的旧模板字段；不参与当前配置生成。
+ * @typedef {HijpassSection & {
+ *   nft: string|null,
+ *   firewall_template: string|null
+ * }} LegacyHijpassSection
+ */

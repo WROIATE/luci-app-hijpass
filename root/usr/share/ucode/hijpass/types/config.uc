@@ -1,11 +1,11 @@
-// 共享类型声明；仅用于编辑器，不创建或导出运行时对象。
+// 共享字段视图与转换声明；完整原始 section 的父子类型位于 sections.uc。
 
 /**
  * 节点文件标识：.name 为 UCI section ID，name 为可选的节点名称。
  * @typedef {{
  *   '.name': string,
  *   name: string|null
- * }} NodeSection
+ * }} NodeIdentity
  */
 
 /**
@@ -16,18 +16,7 @@
  *   '.name': string|null,
  *   name: string|null,
  *   log_enabled: string|null
- * }} LogSection
- */
-
-/**
- * 原生 UCI 或已验证快照中的 section；业务 option/list 保留原始字符串，元数据使用原生类型。
- * @typedef {{
- *   '.name': string,
- *   '.type': string,
- *   '.index': integer|null,
- *   '.anonymous': boolean|null,
- *   [option: string]: string|string[]|integer|boolean|null
- * }} UciSection
+ * }} LogSource
  */
 
 /**
@@ -45,14 +34,4 @@
  * @typedef {{
  *   [field: string]: string|string[]|integer|double|boolean|null
  * }} DecodedValues
- */
-
-/**
- * 原始 DNS 上游选项；缺失字段保持 null，custom 从对应的 _custom 字段取值。
- * @typedef {{
- *   direct_dns: string|null,
- *   proxy_dns: string|null,
- *   direct_dns_custom: string|null,
- *   proxy_dns_custom: string|null
- * }} DnsUpstreams
  */

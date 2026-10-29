@@ -62,3 +62,23 @@
  *   rules: CleanupRule[]
  * }} CleanupPlan
  */
+
+/**
+ * @typedef {{
+ *   syn: integer,
+ *   syn_ack: integer,
+ *   fin: integer,
+ *   rst: integer,
+ *   udp: integer,
+ *   payload_packets: integer,
+ *   payload_bytes: integer
+ * }} PacketCounts
+ */
+
+/**
+ * @typedef {{
+ *   counts: PacketCounts,
+ *   interfaces: Object<string, integer>,
+ *   flows: Object<string, integer>
+ * }} PacketSummary
+ */

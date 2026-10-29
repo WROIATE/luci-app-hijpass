@@ -1,3 +1,4 @@
+/** @typedef {import('../types/json.uc').JsonObject} JsonObject */
 import { list, port } from '../config/values.uc';
 import { TAG } from './constants.uc';
 import { optional } from './json.uc';
@@ -6,10 +7,10 @@ import { optional } from './json.uc';
 // geoip/geosite 为 Geo 标签，network/protocol/ports/ranges 为传输限制。
 // sets 元素：{type, tag, path|url}，表示本地或远端 sing-box 规则集。
 /** @typedef {import('../types/routing.uc').Match} Match */
-/** @typedef {import('../types/routing.uc').RuleOptions} RuleOptions */
+/** @typedef {import('../types/sections.uc').RuleMatchOptions} RuleMatchOptions */
 /**
  * 将 UCI 分流规则拆成各类匹配条件。
- * @param {RuleOptions} section UCI shunt_route_rule 的匹配字段。
+ * @param {RuleMatchOptions} section UCI shunt_route_rule 的匹配字段。
  * @returns {Match} Match 对象，各类域名、IP、协议和端口条件均为数组。
  */
 export function parse(section) {
@@ -90,7 +91,7 @@ export function convertGeo(r) {
  * 将匹配条件转换为 sing-box 规则字段。
  * @param {Match} r
  * @param {boolean} dnsOnly
- * @returns {object} 仅含非空字段的对象；dnsOnly 时省略 IP、网络、协议和端口。
+ * @returns {JsonObject} 仅含非空字段的对象；dnsOnly 时省略 IP、网络、协议和端口。
  */
 export function singboxMatch(r, dnsOnly) {
 	let out = {};
@@ -125,7 +126,7 @@ export function xrayDomains(r) {
  * @param {string} name
  * @param {string} exit
  * @param {integer} version 0 表示不限制地址族，4/6 表示 IPv4/IPv6。
- * @returns {object[]} 带出口、名称及可选地址族限制的规则数组。
+ * @returns {JsonObject[]} 带出口、名称及可选地址族限制的规则数组。
  */
 export function xrayRules(r, name, exit, version) {
 	let base = { inboundTag: [TAG.tproxy], outboundTag: exit };

@@ -1,4 +1,4 @@
-/** @typedef {import('../types/config.uc').UciSection} UciSection */
+/** @typedef {import('../types/sections.uc').UciSection} UciSection */
 import { cursor } from 'uci';
 
 // 使用原生 libuci 读取配置；解析、匿名 section 和 list 都由原生模块处理。

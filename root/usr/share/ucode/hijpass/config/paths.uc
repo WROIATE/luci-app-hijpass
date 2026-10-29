@@ -21,12 +21,12 @@ export const SERVER_DIR = '/etc/hijpass/server';
 const LOG_DIR = '/tmp/hijpass/log';
 const SERVER_LOG_DIR = '/tmp/hijserver/log';
 
-/** @typedef {import('../types/config.uc').NodeSection} NodeSection */
-/** @typedef {import('../types/config.uc').LogSection} LogSection */
+/** @typedef {import('../types/config.uc').NodeIdentity} NodeIdentity */
+/** @typedef {import('../types/config.uc').LogSource} LogSource */
 
 /**
  * 校验节点标识和名称，生成统一文件名。
- * @param {NodeSection} section
+ * @param {NodeIdentity} section
  * @param {string} [name]
  * @returns {string} 不含扩展名的“节点名称-section ID”；名称缺失时使用 section ID。
  */
@@ -43,7 +43,7 @@ export function nodeFilename(section, name) {
 };
 /**
  * 确定客户端或服务端节点的配置文件位置。
- * @param {NodeSection} section
+ * @param {NodeIdentity} section
  * @param {boolean} [server]
  * @returns {string} 固定目录下的节点 JSON 绝对路径。
  */
@@ -54,7 +54,7 @@ export function nodeConfig(section, server) {
 // 日志位置与开关分离：主日志始终记录，节点及分流只读取 log_enabled。
 /**
  * 根据配置类型和日志开关确定日志位置。
- * @param {LogSection} section
+ * @param {LogSource} section
  * @param {boolean} [server]
  * @returns {string} 日志绝对路径；未启用或不支持日志时为空字符串。
  */

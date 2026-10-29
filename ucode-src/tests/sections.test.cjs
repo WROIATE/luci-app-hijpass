@@ -32,6 +32,44 @@ printf('%J', { found, original: sections[1], matches: filterSectionsByType(secti
     assert.deepEqual(value.noMatches, []);
 });
 
+test('typed section queries preserve their discriminator, original references and absence semantics', t => {
+    const singles = { findHijpassSection: 'hijpass', findHijserverSection: 'hijserver', findShuntSection: 'shunt',
+        findDnsSection: 'dns', findFirewallSection: 'firewall', findRuleSection: 'rule', findDnsmasqSection: 'dnsmasq' };
+    const multiples = { filterProxyNodeSections: 'proxy_node', filterServerNodeSections: 'server_node',
+        filterShuntRouteRuleSections: 'shunt_route_rule', filterShuntDnsNodeSections: 'shunt_dns_node' };
+    const names = Object.keys({ ...singles, ...multiples });
+    const sections = Object.values({ ...singles, ...multiples }).flatMap(type => [
+        { '.type': type, '.name': type + '-first', enabled: '1' },
+        { '.type': type, '.name': type + '-second', enabled: '0' },
+    ]);
+    const calls = [
+        ...Object.entries(singles).map(([name, type]) => `{
+            let found = ${name}(sections);
+            found.marker = ${JSON.stringify(type)};
+            push(results, { type: found['.type'], id: found['.name'], missing: ${name}([]),
+                original: filter(sections, section => section['.name'] == found['.name'])[0].marker });
+        }`),
+        ...Object.entries(multiples).map(([name, type]) => `{
+            let matches = ${name}(sections);
+            matches[0].marker = ${JSON.stringify(type)};
+            push(results, { ids: map(matches, section => section['.name']), empty: ${name}([]),
+                original: filter(sections, section => section['.name'] == matches[0]['.name'])[0].marker });
+        }`),
+    ];
+    const result = execute(t, `import { ${names.join(', ')} } from ${modulePath('usr/share/ucode/hijpass/config/sections.uc')};
+let sections = ${JSON.stringify(sections)}, results = [];
+${calls.join('\n')}
+printf('%J', results);`);
+    assert.equal(result.status, 0, result.stderr);
+    const results = JSON.parse(result.stdout);
+    Object.values(singles).forEach((type, index) => assert.deepEqual(results[index], {
+        type, id: type + '-first', missing: null, original: type,
+    }));
+    Object.values(multiples).forEach((type, index) => assert.deepEqual(results[index + Object.keys(singles).length], {
+        ids: [type + '-first', type + '-second'], empty: [], original: type,
+    }));
+});
+
 test('absent optional services produce no instances, DNS settings or firewall rules', () => {
     for (const [action, expected] of [['plan', { instances: [] }], ['server-plan', { instances: [], ports: [] }],
         ['dns-options', null], ['firewall', '']]) {

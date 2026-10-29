@@ -1,8 +1,13 @@
-/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').UciSection} UciSection */
+/** @typedef {import('../../../share/ucode/hijpass/types/rules.uc').RuleSources} RuleSources */
+/** @typedef {import('../../../share/ucode/hijpass/types/rules.uc').RuleDownloadPlan} RuleDownloadPlan */
+/** @typedef {import('../../../share/ucode/hijpass/types/rules.uc').GeoConversionPlan} GeoConversionPlan */
+/** @typedef {import('../../../share/ucode/hijpass/types/rules.uc').DnsGeoPlan} DnsGeoPlan */
+/** @typedef {import('../../../share/ucode/hijpass/types/rules.uc').GeoRequest} GeoRequest */
+/** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').UciSection} UciSection */
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { RULE_FILES } from 'hijpass.config.paths';
-import { findFirstSectionByType, filterSectionsByType } from 'hijpass.config.sections';
+import { findHijpassSection, findShuntSection, findDnsSection, findRuleSection, filterShuntRouteRuleSections } from 'hijpass.config.sections';
 import { list } from 'hijpass.config.values';
 import { text, lines } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
@@ -13,7 +18,7 @@ import { contains } from '../network/network.uc';
 // 同类多个 URL 分别下载后合并去重；至少一个完整、有效来源成功后才替换旧文件。
 /**
  * 定义可更新规则资源的类型和保存位置。
- * @returns {object} 以下载字段为键的目录，每项含 path 和 kind。
+ * @returns {RuleSources} 以下载字段为键的目录，每项含 path 和 kind。
  */
 function sources() {
 	return {
@@ -78,10 +83,10 @@ export function normalize(text, kind) {
  * 按更新动作和 UCI 设置整理规则下载任务。
  * @param {UciSection[]} config
  * @param {string} action
- * @returns {object} 含 timeout（秒）、retries、enabled 和 jobs 的下载计划。
+ * @returns {RuleDownloadPlan} 含 timeout（秒）、retries、enabled 和 jobs 的下载计划。
  */
 export function updatePlan(config, action) {
-    let settings = findFirstSectionByType(config, 'rule'), catalog = sources();
+    let settings = findRuleSection(config), catalog = sources();
     if (!settings) {
         die('rule section is missing');
     }
@@ -95,19 +100,19 @@ export function updatePlan(config, action) {
         || type(timeout) != 'int' || type(retries) != 'int' || timeout < 1 || timeout > 600 || retries < 1 || retries > 10) {
         die('invalid download timeout or retry count');
     }
-    return { timeout, retries, enabled: findFirstSectionByType(config, 'hijpass')?.enabled == '1',
+    return { timeout, retries, enabled: findHijpassSection(config)?.enabled == '1',
         jobs: map(selected, key => ({ key, ...catalog[key], urls: list(settings[key]) })) };
 };
 /**
  * 收集分流中的 Geo 引用，安排本地 SRS 转换任务。
  * @param {UciSection[]} config
- * @returns {object} {jobs}，每项含 database、tag、input 和 output。
+ * @returns {GeoConversionPlan} {jobs}，每项含 database、tag、input 和 output。
  */
 export function geoPlan(config) {
     let jobs = [];
     for (let database in ['geoip', 'geosite']) {
         let tags = [], key = database == 'geoip' ? 'ip_list' : 'domain_list';
-        for (let rule in filterSectionsByType(config, 'shunt_route_rule')) {
+        for (let rule in filterShuntRouteRuleSections(config)) {
             if (rule.enabled != '1') {
                 continue;
             }
@@ -129,10 +134,10 @@ export function geoPlan(config) {
 /**
  * 收集 chinadns-ng 规则需要提取的 Geo 域名。
  * @param {UciSection[]} config
- * @returns {object} {jobs}，每项含 value 和 output；其他 DNS 模式下 jobs 为空。
+ * @returns {DnsGeoPlan} {jobs}，每项含 value 和 output；其他 DNS 模式下 jobs 为空。
  */
 export function dnsPlan(config) {
-    if (findFirstSectionByType(config, 'dns')?.dns_service != 'chinadns-ng') {
+    if (findDnsSection(config)?.dns_service != 'chinadns-ng') {
         return { jobs: [] };
     }
     let jobs = [];
@@ -156,7 +161,7 @@ export function dnsPlan(config) {
  * @param {string} action
  * @param {string} kind
  * @param {string[]} args
- * @returns {object} {kind, extract, input, values}。
+ * @returns {GeoRequest} {kind, extract, input, values}。
  */
 export function geoRequest(action, kind, args) {
     if (index(['geoip', 'geosite'], kind) < 0 || !length(args)) {
@@ -220,7 +225,7 @@ export function routeMatch(sections, target, geoTags) {
 		die('invalid query');
 	}
 	let ip = !!iptoarr(target), tags = [], loaded = false;
-	for (let rule in filterSectionsByType(sections, 'shunt_route_rule')) {
+	for (let rule in filterShuntRouteRuleSections(sections)) {
 		if (rule.enabled != '1') {
 			continue;
 		}
@@ -256,7 +261,7 @@ export function routeMatch(sections, target, geoTags) {
 			}
 		}
 	}
-	return `未匹配到任何自定义规则，除去协议、端口等规则外，将使用全局默认策略\n\n规则名称 (Name) : 全局默认\n匹配类型 (Type) : ${ip ? 'IP' : '域名'}\n匹配内容 (Item) : * (全部)\n代理策略 (Node) : ${findFirstSectionByType(sections, 'shunt')?.default_proxy_node || ''}\n`;
+	return `未匹配到任何自定义规则，除去协议、端口等规则外，将使用全局默认策略\n\n规则名称 (Name) : 全局默认\n匹配类型 (Type) : ${ip ? 'IP' : '域名'}\n匹配内容 (Item) : * (全部)\n代理策略 (Node) : ${findShuntSection(sections)?.default_proxy_node || ''}\n`;
 };
 
 /**
@@ -299,7 +304,7 @@ export function main() { run(ARGV,
             die('invalid query');
         }
         let ip = !!iptoarr(target), kind = ip ? 'geoip' : 'geosite';
-        let lookup = length(filter(filterSectionsByType(config, 'shunt_route_rule'), rule => rule.enabled == '1' && length(filter(lines(rule[ip ? 'ip_list' : 'domain_list']), line => substr(line, 0, length(kind) + 1) == kind + ':')))) > 0;
+        let lookup = length(filter(filterShuntRouteRuleSections(config), rule => rule.enabled == '1' && length(filter(lines(rule[ip ? 'ip_list' : 'domain_list']), line => substr(line, 0, length(kind) + 1) == kind + ':')))) > 0;
         return { kind, lookup };
     }
     if (action == 'match') {

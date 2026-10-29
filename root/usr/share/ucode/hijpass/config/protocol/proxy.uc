@@ -1,5 +1,5 @@
-/** @typedef {import('../../types/proxy.uc').ProxyNode} ProxyNode */
-/** @typedef {import('../../types/config.uc').UciSection} UciSection */
+/** @typedef {import('../../types/proxy.uc').DecodedProxyNode} DecodedProxyNode */
+/** @typedef {import('../../types/sections.uc').ProxyNodeSection} ProxyNodeSection */
 import { fields as shadowsocks } from './shadowsocks.uc';
 import { fields as vless } from './vless.uc';
 import { fields as hysteria2 } from './hysteria2.uc';
@@ -13,6 +13,7 @@ import { decode, duration } from '../values.uc';
 export const CORE = { singbox: 'sing-box', xray: 'xray' };
 /**
  * 为空的核心选项补上默认值。
+ * @param {string|null} [value]
  * @returns {string} 核心名称，默认为 sing-box；此处不校验支持情况。
  */
 export function core(value) { return value || CORE.singbox; };
@@ -20,6 +21,7 @@ export function core(value) { return value || CORE.singbox; };
 export const CONFIG_TYPE = { generated: 'generated', custom: 'custom' };
 /**
  * 规范化配置类型，并拒绝不支持的类型。
+ * @param {string|null} [value]
  * @returns {string} generated 或 custom，默认为 generated。
  */
 export function configType(value) {
@@ -50,8 +52,8 @@ const commandFields = {
 /**
  * 把 UCI 节点转换为对应配置类型，并校验必填字段。
  * 返回：节点对象；upstream 为 null，members 为空数组，等待连接依赖。
- * @param {UciSection} section
- * @returns {ProxyNode}
+ * @param {ProxyNodeSection} section
+ * @returns {DecodedProxyNode}
  */
 export function decodeProxy(section) {
 	let mode = configType(section.config_type), custom = mode == CONFIG_TYPE.custom;

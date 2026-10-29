@@ -1,3 +1,4 @@
+/** @typedef {import('../../../types/json.uc').JsonObject} JsonObject */
 /** @typedef {import('../../../types/proxy.uc').VlessProxy} VlessProxy */
 import { endpoint, tls, transport, multiplex } from './options.uc';
 import { optional } from '../../json.uc';
@@ -7,7 +8,7 @@ import { optional } from '../../json.uc';
 /**
  * 将 VLESS 节点转换为 sing-box 原生出站配置。
  * @param {VlessProxy} n
- * @returns {object} 含认证及可选 TLS/Reality、传输和连接复用的出站对象。
+ * @returns {JsonObject} 含认证及可选 TLS/Reality、传输和连接复用的出站对象。
  */
 export function build(n) {
 	let out = endpoint(n);

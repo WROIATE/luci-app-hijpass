@@ -1,3 +1,4 @@
+/** @typedef {import('../../types/json.uc').JsonObject} JsonObject */
 /** @typedef {import('../../types/core.uc').CoreConfig} CoreConfig */
 /** @typedef {import('../../types/proxy.uc').GeneratedProxyNode} GeneratedProxyNode */
 import { build as shadowsocks } from './protocol/shadowsocks.uc';
@@ -16,14 +17,14 @@ const builders = {
 
 /**
  * 生成连接本机节点端口的 SOCKS5 出站配置。
- * @returns {object} sing-box SOCKS5 出站对象。
+ * @returns {JsonObject} sing-box SOCKS5 出站对象。
  */
 export function socks(tag, port) {
 	return { type: 'socks', tag, server: '127.0.0.1', server_port: port, version: '5' };
 };
 /**
  * 生成 sing-box 入站，默认只监听本机。
- * @returns {object} 含 type、tag、listen 和 listen_port 的入站对象。
+ * @returns {JsonObject} 含 type、tag、listen 和 listen_port 的入站对象。
  */
 export function inbound(kind, tag, port, address) {
 	return { type: kind, tag, listen: address || '127.0.0.1', listen_port: port };

@@ -1,3 +1,4 @@
+/** @typedef {import('../../../types/json.uc').JsonObject} JsonObject */
 /** @typedef {import('../../../types/proxy.uc').VlessProxy} VlessProxy */
 import { apply } from './transport.uc';
 
@@ -6,7 +7,7 @@ import { apply } from './transport.uc';
 /**
  * 将 VLESS 节点转换为 Xray 原生出站配置。
  * @param {VlessProxy} n
- * @returns {object} 含认证、传输和 TLS/Reality 设置的出站对象。
+ * @returns {JsonObject} 含认证、传输和 TLS/Reality 设置的出站对象。
  */
 export function build(n) {
 	let stream = { network: 'raw', security: 'none' };

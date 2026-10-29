@@ -1,3 +1,4 @@
+/** @typedef {import('../../../types/json.uc').JsonObject} JsonObject */
 /** @typedef {import('../../../types/proxy.uc').TuicProxy} TuicProxy */
 import { endpoint, tls } from './options.uc';
 import { optional } from '../../json.uc';
@@ -7,7 +8,7 @@ import { optional } from '../../json.uc';
 /**
  * 将 TUIC 节点转换为 sing-box 原生出站配置。
  * @param {TuicProxy} n
- * @returns {object} 含 TLS、认证、拥塞控制和 UDP 设置的出站对象。
+ * @returns {JsonObject} 含 TLS、认证、拥塞控制和 UDP 设置的出站对象。
  */
 export function build(n) {
 	let out = endpoint(n);

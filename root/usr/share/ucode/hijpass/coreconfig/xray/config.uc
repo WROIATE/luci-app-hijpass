@@ -1,3 +1,4 @@
+/** @typedef {import('../../types/json.uc').JsonObject} JsonObject */
 /** @typedef {import('../../types/core.uc').CoreConfig} CoreConfig */
 /** @typedef {import('../../types/proxy.uc').GeneratedProxyNode} GeneratedProxyNode */
 import { build as shadowsocks } from './protocol/shadowsocks.uc';
@@ -9,19 +10,19 @@ import { TAG } from '../constants.uc';
 const builders = { [TYPE.shadowsocks]: shadowsocks, [TYPE.vless]: vless, [TYPE.hysteria2]: hysteria2 };
 /**
  * 生成连接本机节点端口的 Xray SOCKS 出站配置。
- * @returns {object} Xray SOCKS 出站对象。
+ * @returns {JsonObject} Xray SOCKS 出站对象。
  */
 export function socks(tag, port) {
 	return { protocol: 'socks', tag, settings: { address: '127.0.0.1', port } };
 };
 /**
  * 规范化日志级别，生成 Xray 日志设置。
- * @returns {object} {loglevel, dnsLog}；warn 转为 warning，默认 info。
+ * @returns {JsonObject} {loglevel, dnsLog}；warn 转为 warning，默认 info。
  */
 export function log(level) { return { loglevel: level == 'warn' ? 'warning' : level || 'info', dnsLog: false }; };
 /**
  * 生成 Xray 入站，按类型设置透明代理、UDP 或嗅探。
- * @returns {object} Xray 入站对象。
+ * @returns {JsonObject} Xray 入站对象。
  */
 export function inbound(kind, tag, port, shunt) {
 	let out = { protocol: kind == 'socks' ? 'socks' : 'dokodemo-door', port, tag };

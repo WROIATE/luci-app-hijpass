@@ -17,16 +17,6 @@
  */
 
 /**
- * @typedef {object} RuleOptions
- * @property {string|string[]|null} network 传输层协议，兼容 option 和 list。
- * @property {string|string[]|null} protocol 应用层协议，兼容 option 和 list。
- * @property {string|string[]|null} port 目标端口，解码时校验 1–65535。
- * @property {string|string[]|null} port_range 目标端口范围，UCI 使用横线分隔。
- * @property {string|null} domain_list 按行填写的域名、GeoSite 或规则集。
- * @property {string|null} ip_list 按行填写的 IP/CIDR、GeoIP 或规则集。
- */
-
-/**
  * remote 使用 url，local 使用 path；format 为 source/binary。
  * @typedef {{
  *   type: string,

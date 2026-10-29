@@ -1,3 +1,4 @@
+/** @typedef {import('../../../types/json.uc').JsonObject} JsonObject */
 /** @typedef {import('../../../types/proxy.uc').Hysteria2Proxy} Hysteria2Proxy */
 import { endpoint, tls } from './options.uc';
 import { optional } from '../../json.uc';
@@ -7,7 +8,7 @@ import { optional } from '../../json.uc';
 /**
  * 将 Hysteria2 节点转换为 sing-box 原生出站配置。
  * @param {Hysteria2Proxy} n 已解码的专用字段；通用地址/TLS 交给 options.uc。
- * @returns {object} 含 TLS、认证及可选带宽、跳跃端口和混淆设置的出站对象。
+ * @returns {JsonObject} 含 TLS、认证及可选带宽、跳跃端口和混淆设置的出站对象。
  */
 export function build(n) {
 	let out = endpoint(n);

@@ -1,12 +1,12 @@
-/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').DnsUpstreams} DnsUpstreams */
+/** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').DnsSection} DnsSection */
 /** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ServiceInstance} ServiceInstance */
 /** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ChinadnsOptions} ChinadnsOptions */
 /** @typedef {import('../../../share/ucode/hijpass/types/service.uc').DnsmasqOptions} DnsmasqOptions */
-/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').UciSection} UciSection */
+/** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').UciSection} UciSection */
 import * as fs from 'fs';
 import { RULE_FILES } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
-import { findFirstSectionByType } from 'hijpass.config.sections';
+import { findDnsSection, findDnsmasqSection } from 'hijpass.config.sections';
 import { port } from 'hijpass.config.values';
 import { domain } from '../rules/rules.uc';
 import { lines, atomic, renderTemplate } from 'hijpass.common';
@@ -40,7 +40,7 @@ function domains(path, output) {
 	atomic(output, join('\n', uniq(result)) + '\n', 0o644);
 }
 /**
- * @param {DnsUpstreams} dns
+ * @param {DnsSection} dns
  * @param {string} key
  */
 function configuredUpstream(dns, key) {
@@ -54,7 +54,7 @@ function configuredUpstream(dns, key) {
  * @returns {ChinadnsOptions|null} 模板参数对象；其他 DNS 模式返回 null。
  */
 export function options(sections, dnsmasq) {
-	let dns = findFirstSectionByType(sections, 'dns');
+	let dns = findDnsSection(sections);
 	if (!dns || dns.dns_service != 'chinadns-ng') {
 		return null;
 	}
@@ -85,13 +85,13 @@ export function options(sections, dnsmasq) {
  * @returns {ServiceInstance|null} procd 实例 {id, name, command, env, user}；其他 DNS 模式返回 null。
  */
 export function prepare(sections, configDirectory) {
-	let dns = findFirstSectionByType(sections, 'dns'), dnsmasq = null;
+	let dns = findDnsSection(sections), dnsmasq = null;
 	if (!dns) {
 		return null;
 	}
 	if (dns.dns_service == 'chinadns-ng'
 		&& index(map(['direct_dns', 'proxy_dns'], key => configuredUpstream(dns, key)), 'dnsmasq') >= 0) {
-		dnsmasq = findFirstSectionByType(read('dhcp', configDirectory), 'dnsmasq');
+		dnsmasq = findDnsmasqSection(read('dhcp', configDirectory));
 	}
 	let settings = options(sections, dnsmasq);
 	if (!settings) {

@@ -1,3 +1,4 @@
+/** @typedef {import('../../../types/json.uc').JsonObject} JsonObject */
 /** @typedef {import('../../../types/proxy.uc').ShadowtlsProxy} ShadowtlsProxy */
 import { endpoint, tls } from './options.uc';
 import { optional } from '../../json.uc';
@@ -6,7 +7,7 @@ import { optional } from '../../json.uc';
 /**
  * 将 ShadowTLS 节点转换为 sing-box 原生出站配置。
  * @param {ShadowtlsProxy} n
- * @returns {object} 含 TLS、版本和认证密码的出站对象。
+ * @returns {JsonObject} 含 TLS、版本和认证密码的出站对象。
  */
 export function build(n) {
 	let out = endpoint(n);

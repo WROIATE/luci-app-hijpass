@@ -1,9 +1,10 @@
-/** @typedef {import('../../../share/ucode/hijpass/types/config.uc').UciSection} UciSection */
+/** @typedef {import('../../../share/ucode/hijpass/types/firewall.uc').FirewallOptions} FirewallOptions */
+/** @typedef {import('../../../share/ucode/hijpass/types/sections.uc').UciSection} UciSection */
 /** @typedef {import('../../../share/ucode/hijpass/types/network.uc').NetworkState} NetworkState */
 import * as fs from 'fs';
 import { RULE_FILES, FILES } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
-import { findFirstSectionByType } from 'hijpass.config.sections';
+import { findShuntSection, findDnsSection, findFirewallSection, findDnsmasqSection } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
 import { lines, text, renderTemplate } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
@@ -80,14 +81,14 @@ export function defaultTemplate() { return text('/usr/lib/hijpass/firewall/defau
  * 合并 UCI 设置和网络状态，整理防火墙模板参数。
  * @param {UciSection[]} config
  * @param {NetworkState} state
- * @returns {object} 供 firewall.ut 使用的 options 对象。
+ * @returns {FirewallOptions} 供 firewall.ut 使用的 options 对象。
  */
 function options(config, state) {
-    let f = findFirstSectionByType(config, 'firewall');
+    let f = findFirewallSection(config);
     if (!f) {
         die('firewall section is missing');
     }
-    let dns = findFirstSectionByType(config, 'dns'), shunt = findFirstSectionByType(config, 'shunt');
+    let dns = findDnsSection(config), shunt = findShuntSection(config);
     let forward = '';
     if (f.dns_forward == 'pre-routing' && dns && dns.dns_service == 'chinadns-ng') {
         forward = dns.cdg_port;
@@ -173,7 +174,7 @@ function options(config, state) {
  * @returns {string} 完整 nft 表文本；没有代理或分流入口时为空字符串。
  */
 export function generate(config, state) {
-    let f = findFirstSectionByType(config, 'firewall');
+    let f = findFirewallSection(config);
     if (!f || !f.proxy_port && !f.shunt_port) {
         return '';
     }
@@ -202,7 +203,7 @@ export function main() { run(ARGV, (args, configDirectory) => {
     let raw = { wan: text(directory + '/wan'),
         addresses: { stdout: text(directory + '/addresses'), code: int(text(directory + '/addresses.code')) },
         interfaces: { stdout: text(directory + '/interfaces'), code: int(text(directory + '/interfaces.code')) } };
-    let dhcp = findFirstSectionByType(read('dhcp', configDirectory), 'dnsmasq');
+    let dhcp = findDnsmasqSection(read('dhcp', configDirectory));
     let resolvText = null;
     if (dhcp && dhcp.resolvfile) {
         resolvText = fs.readfile(dhcp.resolvfile);

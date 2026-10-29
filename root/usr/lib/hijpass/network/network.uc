@@ -1,3 +1,5 @@
+/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').PortStatus} PortStatus */
+/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').PingReport} PingReport */
 /** @typedef {import('../../../share/ucode/hijpass/types/network.uc').ProbeRequest} ProbeRequest */
 /** @typedef {import('../../../share/ucode/hijpass/types/network.uc').CurlReport} CurlReport */
 /** @typedef {import('../../../share/ucode/hijpass/types/network.uc').CommandOutput} CommandOutput */
@@ -41,7 +43,7 @@ export function resolve(host) {
 /**
  * 检查指定端口是否已在本机监听 TCP。
  * @param {string[]} values
- * @returns {object} 端口到布尔值的映射，true 表示 IPv4 或 IPv6 正在监听。
+ * @returns {PortStatus} 端口到布尔值的映射，true 表示 IPv4 或 IPv6 正在监听。
  */
 export function ports(values) {
 	let occupied = {};
@@ -114,7 +116,7 @@ export function request(url, timeout, socks) {
  * 从 curl 探测结果提取节点延迟。
  * @param {CommandOutput} response
  * @param {string} url
- * @returns {object} {ms, total_ms}，单位为毫秒；失败时为 {error: "timeout"}，退出码 56 按现有规则保留结果。
+ * @returns {PingReport} {ms, total_ms}，单位为毫秒；失败时为 {error: "timeout"}，退出码 56 按现有规则保留结果。
  */
 export function pingReport(response, url) {
     let result = curlReport(response, url);

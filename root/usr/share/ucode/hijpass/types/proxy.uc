@@ -11,8 +11,8 @@
  *   config_type: string,
  *   type: string,
  *   core: string,
- *   upstream: ProxyNode|null,
- *   members: ProxyNode[]
+ *   upstream: DecodedProxyNode|null,
+ *   members: DecodedProxyNode[]
  * }} ProxyIdentity
  */
 
@@ -184,18 +184,19 @@
  */
 
 /**
- * @typedef {CustomProxy|GeneratedProxyNode} ProxyNode
+ * 原始 ProxyNodeSection 经 decodeProxy() 转换后的节点；端口为整数，依赖为节点引用。
+ * @typedef {CustomProxy|GeneratedProxyNode} DecodedProxyNode
  */
 
 /**
  * @typedef {{
- *   [name: string]: ProxyNode
+ *   [name: string]: DecodedProxyNode
  * }} ProxyIndex
  */
 
 /**
  * @typedef {{
- *   nodes: ProxyNode[]
+ *   nodes: DecodedProxyNode[]
  * }} ProxyGraph
  */
 

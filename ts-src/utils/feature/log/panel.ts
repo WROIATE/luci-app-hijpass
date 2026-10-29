@@ -1,5 +1,24 @@
 import { Backend, Log } from "../../backend";
 
+/** Filter whole entries, keeping continuation lines and ignoring severity words in messages. */
+export function filterLogEntries(content: string, level: string): string {
+    if (!level) return content;
+    const wanted = level.toUpperCase().replace(/^WARNING$/, 'WARN');
+    let matches = false;
+    return content.split('\n').filter(line => {
+        const plain = line.replace(/\x1b\[[0-9;]*m/g, '');
+        // Application, sing-box and Xray headers; indented lines remain part of their entry.
+        const header = plain.match(/^\[\d{4}-\d{2}-\d{2} [^\]]+\]\s+(DEBUG|INFO|WARN(?:ING)?|ERROR)\b/i)
+            || plain.match(/^\+\d{4}\s+\d{4}-\d{2}-\d{2}\s+\S+\s+(DEBUG|INFO|WARN(?:ING)?|ERROR)\b/i)
+            || plain.match(/^\d{4}[-/]\d{2}[-/]\d{2}\s+\S+\s+\[(DEBUG|INFO|WARN(?:ING)?|ERROR)\]/i)
+            || plain.match(/^\[?(DEBUG|INFO|WARN(?:ING)?|ERROR)\]?\s*[:\[]/i);
+        if (header) matches = header[1].toUpperCase().replace(/^WARNING$/, 'WARN') === wanted;
+        // Other timestamped entries (e.g. TRACE/FATAL) must not inherit the preceding severity.
+        else if (/^(?:\[?\d{4}[-/]\d{2}[-/]\d{2}[ T]|\+\d{4}\s+\d{4}-\d{2}-\d{2})/.test(plain)) matches = false;
+        return matches;
+    }).join('\n');
+}
+
 function createLogFileOptions(logs: Log[]) {
     const labels = { main: _('Main Log'), shunt: _('Shunt Log'), proxy: _('Proxy Log'), server: _('Server Log') };
     return logs.map(log => E('option', { value: log.id },
@@ -22,18 +41,7 @@ function loadLogs(
     Backend.readLog(logFile, linesCount).then(function (content) {
         let logContent = content || '';
 
-        if (levelFilter) {
-            let upperFilter = levelFilter.toUpperCase();
-            let filteredLines = logContent.split('\n').filter(function (line) {
-                let upperLine = line.toUpperCase();
-                if (upperFilter === 'WARN') {
-                    return upperLine.includes('WARN') || upperLine.includes('WARNING');
-                }
-
-                return upperLine.includes(upperFilter);
-            });
-            logContent = filteredLines.join('\n');
-        }
+        logContent = filterLogEntries(logContent, levelFilter);
 
         logContent = highlightLogContent(logContent);
 

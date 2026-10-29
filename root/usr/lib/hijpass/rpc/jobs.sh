@@ -30,13 +30,28 @@ case "$action" in
     worker)
         directory=$3
         trap '' HUP
+        HIJPASS_TASK_ID=${directory##*/}
+        export HIJPASS_TASK_ID
+        started=$(date +%s)
+        hijpass_log INFO job "$id started"
         case "$id" in
             rules) "$HIJPASS_LIB/rules/update.sh" update ;;
             restart) /etc/init.d/hijpass restart ;;
             xray|sing-box) "$HIJPASS_LIB/core/update.sh" update "$id" ;;
             *) exit 1 ;;
         esac >"$directory/stdout" 2>"$directory/stderr"
-        printf '%s\n' "$?" >"$directory/exit.tmp"
+        code=$?
+        if [ "$code" -eq 0 ] && [ -s "$directory/stderr" ]; then
+            hijpass_log WARN job "$id diagnostic output (exit=$code):
+$(head -c 8192 "$directory/stderr")"
+        fi
+        if [ "$code" -eq 0 ]; then
+            hijpass_log INFO job "$id finished: exit=$code, elapsed=$(($(date +%s) - started))s"
+        else
+            hijpass_log ERROR job "$id finished: exit=$code, elapsed=$(($(date +%s) - started))s
+$(head -c 8192 "$directory/stderr")"
+        fi
+        printf '%s\n' "$code" >"$directory/exit.tmp"
         mv "$directory/exit.tmp" "$directory/exit" ;;
     status|release)
         case "$id" in ''|*[!A-Za-z0-9]*) hijpass_error 'invalid job ID'; exit 1 ;; esac
@@ -53,6 +68,7 @@ case "$action" in
         if [ ! -f "$directory/exit" ] && [ -f "$directory/pid" ]; then
             pid=$(cat "$directory/pid")
             if ! kill -0 "$pid" 2>/dev/null; then
+                hijpass_log ERROR job "$id: worker exited without a result"
                 printf 'job exited without a result\n' >>"$directory/stderr"
                 printf '1\n' >"$directory/exit"
             fi

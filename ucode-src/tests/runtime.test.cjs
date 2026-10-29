@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
 const { spawnSync } = require('node:child_process');
-const { root, run, runShell, withConfig } = require('./helpers.cjs');
+const { root, run, runShell, withConfig, shellRuntime } = require('./helpers.cjs');
 
 function invoke(request, env) {
     const extra = { paths: request.paths, ...(env ? { env: { ...process.env, ...env } } : {}) };
@@ -70,12 +70,17 @@ if (action === 'del') {
 }
 fs.writeFileSync(process.env.ROUTE_TEST_STATE, JSON.stringify(state));
 `, { mode: 0o755 });
-    const env = { ...process.env, PATH: directory + ':' + process.env.PATH, ROUTE_TEST_STATE: state, ROUTE_TEST_CALLS: calls };
+    const runtime = shellRuntime(), script = path.join(directory, 'route.sh');
+    // 新公共入口按安装布局运行；显式调用 mock，避免 BusyBox 内置 ip 绕过 PATH。
+    fs.writeFileSync(script, fs.readFileSync(path.join(runtime, 'firewall/route.sh'), 'utf8')
+        .replaceAll('ip "', `'${directory}/ip' "`));
+    const env = { ...process.env, PATH: directory + ':' + path.join(runtime, 'testbin') + ':' + process.env.PATH,
+        ROUTE_TEST_STATE: state, ROUTE_TEST_CALLS: calls };
     return {
         write: value => fs.writeFileSync(state, JSON.stringify(value)),
         read: () => JSON.parse(fs.readFileSync(state)),
         calls: () => fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').trim().split('\n').map(JSON.parse) : [],
-        run: (args, failure) => spawnSync(path.join(root, 'root/usr/lib/hijpass/firewall/route.sh'), args,
+        run: (args, failure) => spawnSync('/usr/bin/busybox', ['ash', script, ...args],
             { encoding: 'utf8', env: { ...env, ROUTE_TEST_FAIL: failure || '' } }),
     };
 }
@@ -804,8 +809,13 @@ test('schema 2 路径迁移保留规则、模板、Hook、自定义配置和日�
     assert.equal(fs.statSync(path.join(target, 'hook/nft-hook.sh')).mode & 0o777, 0o755);
     for (const [file, content] of [['client/manual-a.json', 'manual-a.json'], ['server/server-b.json', 'server-b.json'],
         ['logs/hijpass.log', 'main.log'], ['logs/manual-a.log', 'node.log'], ['logs/shunt.log', 'shunt.log'],
-        ['server-logs/server-b.log', 'server.log']])
-        assert.equal(fs.readFileSync(path.join(target, file), 'utf8'), content + ' content');
+        ['server-logs/server-b.log', 'server.log']]) {
+        const actual = fs.readFileSync(path.join(target, file), 'utf8');
+        if (file === 'logs/hijpass.log') {
+            assert.ok(actual.startsWith(content + ' content'));
+            assert.match(actual.slice((content + ' content').length), /\[migration\] Schema migration completed: version=4/);
+        } else assert.equal(actual, content + ' content');
+    }
     assert.equal(sections.find(s => s['.name'] === 'a').command, 'program --config {conf_path}');
     assert.equal(sections.find(s => s['.name'] === 'a').log_enabled, '1');
     assert.equal(sections.find(s => s['.name'] === 'off').log_enabled, '0');

@@ -31,20 +31,25 @@ if [ "$mode" = query ]; then
 fi
 json_select jobs
 json_get_keys jobs
+completed=0
+trap 'code=$?; if [ "$code" -ne 0 ]; then hijpass_log ERROR geo "$mode failed: job=${job:-none}, exit=$code"; fi' EXIT
 for job in $jobs; do
     json_select "$job"
     json_get_var output output
     mkdir -p "$(dirname -- "$output")" || exit 1
     if [ "$mode" = convert ]; then
         json_get_vars database tag input
-        geoview -type "$database" -action convert -format ruleset -input "$input" -regex -list "$tag" -output "$output" || exit 1
+        hijpass_step geo "Convert $database tag" geoview -type "$database" -action convert -format ruleset -input "$input" -regex -list "$tag" -output "$output" || exit 1
     else
         json_get_var value value
         if [ -n "$value" ]; then
-            geoview -type geosite -action extract -input /usr/share/v2ray/geosite.dat -list "$value" >"$output" || exit 1
+            hijpass_step geo 'Extract DNS domains' geoview -type geosite -action extract -input /usr/share/v2ray/geosite.dat -list "$value" >"$output" || exit 1
         else
             : >"$output"
         fi
     fi
+    completed=$((completed + 1))
+    hijpass_log DEBUG geo "$mode: output=$output, bytes=$(wc -c <"$output")"
     json_select ..
 done
+hijpass_log INFO geo "$mode completed: outputs=$completed"

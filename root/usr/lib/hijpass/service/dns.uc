@@ -10,6 +10,7 @@ import { findDnsSection, findDnsmasqSection } from 'hijpass.config.sections';
 import { port } from 'hijpass.config.values';
 import { domain } from '../rules/rules.uc';
 import { lines, atomic, renderTemplate } from 'hijpass.common';
+import { logger } from '../maintenance/logs.uc';
 
 // ChinadnsOptions：listenPort 为监听端口，direct/proxy 为解析后的上游地址，
 // useChn/useGfw 为列表开关，chnList/gfwList 为对应列表路径。
@@ -18,7 +19,7 @@ import { lines, atomic, renderTemplate } from 'hijpass.common';
  * 合并普通域名和已提取的 Geo 域名，去重后写入文件。
  * @param {string} path
  * @param {string} output
- * @returns {null} 无业务返回值，结果写入 output。
+ * @returns {integer} 去重后的域名数量；结果写入 output。
  */
 function domains(path, output) {
 	let result = [], tags = [];
@@ -37,7 +38,9 @@ function domains(path, output) {
 	if (length(tags)) {
 		push(result, ...map(lines(fs.readfile(replace(output, /[.]txt$/, '-geo.txt'))), lc));
 	}
-	atomic(output, join('\n', uniq(result)) + '\n', 0o644);
+	result = uniq(result);
+	atomic(output, join('\n', result) + '\n', 0o644);
+	return length(result);
 }
 /**
  * @param {DnsSection} dns
@@ -97,8 +100,9 @@ export function prepare(sections, configDirectory) {
 	if (!settings) {
 		return null;
 	}
-	domains(RULE_FILES.domain_proxy, '/tmp/hijpass/domain-proxy.txt');
-	domains(RULE_FILES.domain_direct, '/tmp/hijpass/domain-direct.txt');
+	let proxyCount = domains(RULE_FILES.domain_proxy, '/tmp/hijpass/domain-proxy.txt');
+	let directCount = domains(RULE_FILES.domain_direct, '/tmp/hijpass/domain-direct.txt');
 	atomic('/etc/hijpass/chinadns-ng.conf', renderTemplate('/usr/lib/hijpass/service/chinadns.ut', { options: settings }), 0o644);
+	logger(sections)('INFO', `[dns] chinadns-ng prepared: port=${settings.listenPort}, direct_domains=${directCount}, proxy_domains=${proxyCount}, chn_list=${settings.useChn}, gfw_list=${settings.useGfw}`);
 	return { id: dns['.name'], name: 'chinadns-ng', command: ['chinadns-ng', '-C', '/etc/hijpass/chinadns-ng.conf'], env: [], user: 'hijpass' };
 };

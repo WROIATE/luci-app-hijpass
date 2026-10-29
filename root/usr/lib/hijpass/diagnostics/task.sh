@@ -52,6 +52,7 @@ case "$action" in
         active=0
         if running; then active=1
         elif [ ! -f "$directory/exit" ]; then
+            hijpass_log ERROR trace "${directory##*/}: worker exited without a result"
             printf 'Trace worker exited without a result\n' >>"$directory/stderr"
             printf '1\n' >"$directory/exit"
         fi

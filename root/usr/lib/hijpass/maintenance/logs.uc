@@ -3,8 +3,20 @@ import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { logPath } from 'hijpass.config.paths';
 import { findHijpassSection } from 'hijpass.config.sections';
-import { mkdir } from 'hijpass.common';
+import { mkdir, command } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
+
+/**
+ * 外部命令输出只保留有限诊断文本；URL 和常见凭据字段不进入主日志。
+ * @param {string} message
+ * @returns {string}
+ */
+function safeMessage(message) {
+	message = replace(message, /https?:\/\/[^[:space:]<>"']+/gi, '[URL redacted]');
+	message = replace(message, /((password|passwd|token|secret|authorization|uuid)["']?[ \t]*[:=][ \t]*)[^\n]+/gi, '$1[redacted]');
+	message = replace(message, /[[:cntrl:]]/g, character => character == '\n' || character == '\t' ? character : '');
+	return length(message) > 8192 ? substr(message, 0, 8192) + '\n[truncated]' : message;
+}
 
 // Logger 返回一个 (level, message) 函数，保留应用日志级别与多行排版。
 // 主日志位置由后端确定，global.log_level 为 DEBUG/INFO/WARN/ERROR。
@@ -17,24 +29,49 @@ export function logger(sections) {
 	let global = findHijpassSection(sections), path = logPath({ '.type': 'hijpass' });
 	const levels = { DEBUG: 1, INFO: 2, WARN: 3, ERROR: 4 };
 	return (level, message) => {
-		level = uc(level);
+		level = uc(level) || 'INFO';
+		if (!exists(levels, level)) level = 'INFO';
 		if ((levels[level] || 2) < (levels[uc(global?.log_level || 'INFO')] || 2)) {
 			return;
 		}
-		mkdir(fs.dirname(path));
-		let file = fs.open(path, 'a');
-		if (!file) {
-			die(`cannot open log ${path}`);
-		}
-		let date = localtime(time());
-		if (!date) {
+		message = safeMessage(message);
+		let task = getenv('HIJPASS_TASK_ID');
+		if (task && match(task, /^[A-Za-z0-9]{8}$/)) message = `[task=${task}] ${message}`;
+		let file;
+		try {
+			mkdir(fs.dirname(path));
+			file = fs.open(path, 'a');
+			if (!file) die(`cannot open log ${path}`);
+			let date = localtime(time());
+			if (!date) die('cannot format log timestamp');
+			let stamp = sprintf('%04d-%02d-%02d %02d:%02d:%02d', date.year, date.mon, date.mday, date.hour, date.min, date.sec);
+			let entry = sprintf('[%s]   %-8s%s\n', stamp, level, replace(message, '\n', '\n                               '));
+			if (file.write(entry) != length(entry) || !file.flush()) die('cannot write log');
 			file.close();
-			die('cannot format log timestamp');
 		}
-		let stamp = sprintf('%04d-%02d-%02d %02d:%02d:%02d', date.year, date.mon, date.mday, date.hour, date.min, date.sec);
-		file.write(sprintf('[%s]   %-8s%s\n', stamp, level, replace(message, '\n', '\n                               ')));
-		file.close();
+		catch (e) {
+			if (file) file.close();
+			// 不新增 ucode 模块依赖；只有文件日志故障时才调用系统 logger。
+			try {
+				let priority = { DEBUG: 'debug', INFO: 'info', WARN: 'warning', ERROR: 'err' };
+				if (system(command(['logger', '-t', 'hijpass', '-p', `daemon.${priority[level]}`, '--', `${level} ${message}\nFile log unavailable: ${e.message}`]) + ' >/dev/null 2>&1', 1000) == 0) return;
+			}
+			catch (fallbackError) { }
+			warn(`hijpass log unavailable: ${level} ${message}\n`);
+		}
 	};
+};
+
+/**
+ * 读取日志级别；安装早期或配置损坏时仍使用默认级别记录错误。
+ * @param {string|null} [configDirectory]
+ * @returns {function}
+ */
+export function configuredLogger(configDirectory) {
+	let config = [];
+	try { config = read('hijpass', configDirectory); }
+	catch (e) { }
+	return logger(config);
 };
 /**
  * 裁剪过长日志，只保留最后 30000 行。
@@ -100,8 +137,7 @@ export function main() { run(ARGV,
     function(args, configDirectory) {
     let action = shift(args);
     if (action == 'append') {
-        let config = read('hijpass', configDirectory);
-        return logger(config)(args[0], join(' ', slice(args, 1)));
+        return configuredLogger(configDirectory)(args[0], join(' ', slice(args, 1)));
     }
     if (action == 'clean') {
         return cleanLogs([], 'clean', args[0] || '');

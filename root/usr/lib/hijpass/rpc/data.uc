@@ -3,7 +3,7 @@ import { defaultTemplate } from '../firewall/generate.uc';
 import { editor, logs, log } from './files.uc';
 import { generate, validate } from 'hijpass.config.generate';
 import { read } from 'hijpass.uci.read';
-import { prepareConfigFiles, writeConfigs } from '../service/prepare.uc';
+import { generateAndWriteConfigs } from '../service/prepare.uc';
 
 // RPC 参数是业务数据。没有文件路径或通用 command/argv 入口。
 const methods = {
@@ -82,7 +82,6 @@ try {
     }
     else if (method == 'config_write') {
         let sections = json(request.sections);
-        let generated = generate(sections);
         for (let section in sections) {
             if (!match(section['.name'], /^[A-Za-z0-9_-]+$/)) {
                 die('invalid section ID');
@@ -90,7 +89,7 @@ try {
         }
         // 快照只提供表单值；文件位置由后端常量决定。
         // 复用服务启动时的生成、上游解析和原子替换，前端不再写生成文件。
-        writeConfigs(prepareConfigFiles(sections, generated));
+        let generated = generateAndWriteConfigs(sections);
         result = generated.shunt ? { shunt: sprintf('%.2J', generated.shunt) } : {};
     }
     else {

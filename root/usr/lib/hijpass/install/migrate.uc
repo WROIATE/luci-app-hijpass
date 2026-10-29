@@ -3,6 +3,7 @@
 import { cursor } from 'uci';
 import * as fs from 'fs';
 import { RULE_FILES, FILES, CLIENT_DIR, SERVER_DIR, nodeConfig, logPath } from 'hijpass.config.paths';
+import { logger } from '../maintenance/logs.uc';
 
 // 安装专用：历史字段按 schema_version 分阶段转换；业务模块只读取当前格式。
 // 版本号在全部迁移成功后提交；同版本重复安装跳过，失败则保留入口供重试。
@@ -34,6 +35,7 @@ function markLegacyFirewallTemplate(ctx, global) {
         // 不把旧格式文件当作可用的新模板覆盖软件包提供的默认模板。
         ctx.delete('hijpass', global['.name'], 'firewall_template');
         warn(`Legacy firewall template ${source} requires manual migration; see the Firewall page.\n`);
+        logger([])('WARN', '[migration] Legacy firewall template requires manual migration; see the Firewall page');
     }
 }
 
@@ -361,6 +363,7 @@ function cleanLegacyCron(path) {
     catch (e) { file.close(); fs.unlink(temp); die(e.message); }
 }
 
+let log = logger([]), started = time();
 try {
     let directory;
     if (length(ARGV)) {
@@ -390,6 +393,7 @@ try {
     if (version == VERSION) {
         exit(0);
     }
+    log('INFO', `[migration] Schema migration started: ${version} -> ${VERSION}`);
     if (index(['0', '1', '2', '3'], version) < 0) {
         die(`unsupported schema_version "${version}"`);
     }
@@ -415,5 +419,6 @@ try {
     if (!ctx.commit('hijpass')) {
         die(`cannot commit hijpass migration: ${ctx.error()}`);
     }
+    log('INFO', `[migration] Schema migration completed: version=${VERSION}, elapsed=${time() - started}s`);
 }
-catch (e) { warn(e.message + '\n'); exit(1); }
+catch (e) { log('ERROR', `[migration] Migration failed: ${e.message}`); warn(e.message + '\n'); exit(1); }

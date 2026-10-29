@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import { read } from 'hijpass.uci.read';
 import { atomic } from 'hijpass.common';
 import { RULE_FILES, FILES, nodeConfig, logPath } from 'hijpass.config.paths';
+import { configuredLogger } from '../maintenance/logs.uc';
 
 // 编辑器只传资源名、section ID 和可选的新名称；目录和文件命名始终由后端决定。
 const resources = {
@@ -67,7 +68,15 @@ export function editor(request, write) {
         die('editor content must be a string');
     }
     let content = replace(trim(request.content), /\r\n/g, '\n');
-    atomic(path, content ? content + '\n' : '', fs.stat(path)?.mode || 0o600);
+    let writeLog = configuredLogger();
+    try {
+        atomic(path, content ? content + '\n' : '', fs.stat(path)?.mode || 0o600);
+        writeLog('INFO', `[editor] Resource saved: resource=${request.resource}, section=${request.section || '-'}, bytes=${length(content)}`);
+    }
+    catch (e) {
+        writeLog('ERROR', `[editor] Save failed: resource=${request.resource}, section=${request.section || '-'}: ${e.message}`);
+        die(e.message);
+    }
     return { ok: true };
 };
 

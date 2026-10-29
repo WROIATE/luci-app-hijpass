@@ -39,6 +39,99 @@ function fixture(t) {
     return { directory, runtime, patch, script, run, data };
 }
 
+test('主日志按配置级别筛选，保留多行上下文并脱敏 URL 和凭据', t => {
+    const f = fixture(t), log = path.join(f.directory, 'logs/hijpass.log');
+    withConfig([{ '.type': 'hijpass', log_level: 'WARN' }], config => {
+        const args = ['--configdir', config];
+        assert.equal(f.run('maintenance/logs.sh', ['append', 'INFO', 'hidden', ...args]).status, 0);
+        const result = f.run('maintenance/logs.sh', ['append', 'WARN',
+            '[test] failed https://user:private@example.org/file?token=private\npassword=another-private\ncontinuation', ...args]);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout, '');
+        assert.equal(result.stderr, '');
+    });
+    const content = fs.readFileSync(log, 'utf8');
+    assert.match(content, /WARN\s+\[test\] failed \[URL redacted\]\n +password=\[redacted\]\n +continuation/);
+    assert.doesNotMatch(content, /hidden|private|https:\/\//);
+});
+
+test('日志目录不可写或磁盘写入失败时回退系统日志，追加命令保持成功', t => {
+    const f = fixture(t), fallback = path.join(f.directory, 'fallback');
+    f.script('logger', 'printf "%s\\n" "$@" >>"$TEST_FALLBACK"');
+    fs.writeFileSync(path.join(f.directory, 'logs'), 'not a directory');
+    const args = ['append', 'ERROR', '[test] diagnostic https://user:private@example.org/?token=private'];
+    for (const full of [false, true]) {
+        if (full) f.patch('maintenance/logs.uc', "path = logPath({ '.type': 'hijpass' })", "path = '/dev/full'");
+        const result = f.run('maintenance/logs.sh', args, { TEST_FALLBACK: fallback });
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout, '');
+        assert.equal(result.stderr, '');
+    }
+    const content = fs.readFileSync(fallback, 'utf8');
+    assert.equal(content.split('ERROR [test] diagnostic').length - 1, 2);
+    assert.doesNotMatch(content, /private|https:\/\//);
+});
+
+test('规则更新主日志记录备用来源、合并数量和结果，stdout 仍为单个 JSON', t => {
+    const f = fixture(t);
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', f.directory + '/rules');
+    f.script('curl', `while [ "$1" != -o ]; do shift; done
+output=$2
+case "$*" in *unavailable*) echo 'curl: unavailable' >&2; exit 28 ;; esac
+i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); done >"$output"`);
+    withConfig([{ '.type': 'hijpass', enabled: '0' }, { '.type': 'rule', retry_count: '1',
+        chn_domain_list: ['https://example.org/unavailable', 'https://example.org/valid'] }], config => {
+        const result = f.run('rules/update.sh', ['chnlist', '--configdir', config]);
+        assert.equal(result.status, 0, result.stderr);
+        assert.deepEqual(JSON.parse(result.stdout), { success: true });
+    });
+    const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
+    assert.match(content, /WARN\s+\[rules\] chn_domain_list: source 1 unavailable/);
+    assert.match(content, /sources=1\/2, bytes=12, entries=1/);
+    assert.match(content, /Update finished: installed=1, failed=0, elapsed=\d+s/);
+});
+
+test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变激活结果', t => {
+    const f = fixture(t), hook = path.join(f.directory, 'dns-hook');
+    f.script('dns-hook', "echo 'Warning: optional DNS service unavailable' >&2\nexit 0");
+    for (const file of ['firewall/firewall.sh', 'firewall/route.sh'])
+        fs.writeFileSync(path.join(f.runtime, file), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    f.script('cron-init', 'exit 0');
+    f.patch('service/service.sh', '/etc/init.d/cron', path.join(f.directory, 'cron-init'));
+    f.patch('service/prepare.uc', '/etc/crontabs/root', path.join(f.directory, 'crontab'));
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', hook);
+    withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
+        const result = f.run('service/service.sh', ['activate', '--configdir', config]);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout, '');
+        assert.match(result.stderr, /optional DNS service unavailable/);
+    });
+    const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
+    assert.match(content, /WARN\s+\[service\] DNS Hook start: exit=0/);
+    assert.match(content, /optional DNS service unavailable/);
+    assert.match(content, /Activation completed/);
+});
+
+test('配置提交失败后继续恢复其余文件，同时保留原错误和回滚失败原因', t => {
+    const f = fixture(t), first = path.join(f.directory, 'first.json'), second = path.join(f.directory, 'second.json');
+    const blocked = path.join(f.directory, 'blocked');
+    fs.writeFileSync(first, 'first-original'); fs.writeFileSync(second, 'second-original'); fs.mkdirSync(blocked);
+    f.patch('service/prepare.uc', "import { atomic, command, temporary, renderTemplate } from 'hijpass.common';",
+        `import { atomic as writeAtomic, command, temporary, renderTemplate } from 'hijpass.common';
+function atomic(path, data, mode) {
+    if (path == '${second}' && data == 'second-original') die('restore second failed');
+    return writeAtomic(path, data, mode);
+}`);
+    fs.writeFileSync(path.join(f.runtime, 'write-test.uc'), `import { writeConfigs } from './service/prepare.uc';
+writeConfigs([{ path: '${first}', data: 'first-new' }, { path: '${second}', data: 'second-new' }, { path: '${blocked}', data: 'blocked' }]);`);
+    const result = f.data('write-test.uc', []);
+    assert.notEqual(result.status, 0, result.stderr);
+    assert.match(result.stderr, /cannot replace .*blocked; rollback incomplete: restore second failed/);
+    assert.equal(fs.readFileSync(first, 'utf8'), 'first-original');
+    assert.equal(fs.readFileSync(second, 'utf8'), 'second-new');
+    assert.equal(fs.readdirSync(f.directory).some(name => name.includes('.new-')), false);
+});
+
 test('Geo 更新验证下载内容，失败保留旧库，有效备用来源才替换', t => {
     const f = fixture(t), target = path.join(f.directory, 'v2ray');
     fs.mkdirSync(target);

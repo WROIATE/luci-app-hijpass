@@ -159,18 +159,41 @@ export function writeConfigs(files) {
 		}
 	}
 	catch (e) {
+		let rollbackErrors = [];
 		for (let file in reverse(committed)) {
-			if (file.original == null) {
-				fs.unlink(file.path);
+			try {
+				if (file.original == null) {
+					if (!fs.unlink(file.path)) die(`cannot remove ${file.path}`);
+				}
+				else atomic(file.path, file.original, file.mode);
 			}
-			else {
-				atomic(file.path, file.original, file.mode);
-			}
+			catch (rollbackError) { push(rollbackErrors, rollbackError.message); }
 		}
 		for (let file in staged) fs.unlink(file.temp);
-		die(e.message);
+		die(e.message + (length(rollbackErrors) ? '; rollback incomplete: ' + join('; ', rollbackErrors) : '; previous files restored'));
 	}
 	return files;
+};
+
+/**
+ * 服务启动与 RPC 保存共用的执行入口，记录生成、写入和回滚结果。
+ * @param {UciSection[]} sections
+ * @returns {GeneratedConfigs}
+ */
+export function generateAndWriteConfigs(sections) {
+	let log = logger(sections), started = time();
+	log('INFO', '[config] Generating proxy configurations');
+	try {
+		let generated = generate(sections), files = prepareConfigFiles(sections, generated);
+		writeConfigs(files);
+		for (let file in files) log('DEBUG', `[config] Written ${file.path}`);
+		log('INFO', `[config] Configurations written: files=${length(files)}, elapsed=${time() - started}s`);
+		return generated;
+	}
+	catch (e) {
+		log('ERROR', `[config] Generation or write failed: ${e.message}`);
+		die(e.message);
+	}
 };
 // 启停只替换当前服务注册的任务，保留其他命令及参数中的同名文本。
 /**
@@ -210,7 +233,7 @@ function cron(sections, enabled) {
 			if (!match(schedule, /^[A-Za-z0-9*\/,? -]+$/) || length(split(trim(schedule) || '', /[ \t]+/)) != 5) {
 				die('invalid update schedule');
 			}
-			push(entries, `${schedule} /usr/lib/hijpass/rules/update.sh update`);
+			push(entries, `${schedule} /usr/lib/hijpass/rules/update.sh update --scheduled`);
 		}
 		if (length(filter(sections, section => !!logPath(section)))) {
 			push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijpass');
@@ -334,8 +357,7 @@ export function main() { run(ARGV,
         if (findHijpassSection(config)?.enabled == '1') {
             // 先生成进程描述，确认自定义命令、环境变量和文件名有效，再替换配置。
             plan(config);
-            logger(config)('INFO', 'Preparing proxy configurations');
-            writeConfigs(prepareConfigFiles(config, generate(config)));
+            generateAndWriteConfigs(config);
         }
         return;
     }
@@ -344,7 +366,9 @@ export function main() { run(ARGV,
     }
     if (action == 'prepare') {
         if (server) {
-            return serverPlan(config);
+            let result = serverPlan(config);
+            logger([])('INFO', `[server] Prepared ${length(result.instances)} process instance(s)`);
+            return result;
         }
         let result = plan(config);
         if (findHijpassSection(config)?.enabled == '1') {
@@ -353,6 +377,7 @@ export function main() { run(ARGV,
                 push(result.instances, dns);
             }
         }
+        logger(config)('INFO', `[service] Prepared ${length(result.instances)} process instance(s)`);
         return result;
     }
     if (action == 'cron') {

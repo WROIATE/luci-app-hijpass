@@ -137,7 +137,7 @@ test('命令阶段保留 fw4 信息级别，同时记录真实告警和失败且
     const f = fixture(t), entry = path.join(f.runtime, 'step-test.sh');
     fs.writeFileSync(entry, `#!/bin/sh
 . '${f.runtime}/common.sh'
-hijpass_step test 'command phase' "$LINENO" '${f.directory}/diagnostic-command'
+hijpass_run_logged test 'command phase' "$LINENO" '${f.directory}/diagnostic-command'
 `);
     const env = { TEST_DIAGNOSTIC: '[I] firewall feature enabled', TEST_STATUS: '0' };
     f.script('diagnostic-command', 'printf "%s\\n" "$TEST_DIAGNOSTIC" >&2\nexit "$TEST_STATUS"');
@@ -916,9 +916,9 @@ for (const fault of ['download-write', 'normalize', 'save', 'permissions', 'repl
 count=$((count+1)); echo "$count" >'${f.directory}/normalize-count'
 if [ "$count" -eq 2 ]; then echo partial; echo 'local processing failed' >&2; exit 1; fi
 exec '${interpreter}' -S -L '${f.runtime}/ucode' -- '${f.runtime}/rules/rulescli.uc' normalize "$@"`);
-            f.patch('rules/update-files.sh', 'hijpass_data "$data" normalize', `'${f.directory}/normalize-failure'`);
+            f.patch('rules/update-files.sh', 'hijpass_run_ucode "$data" normalize', `'${f.directory}/normalize-failure'`);
         }
-        const command = { save: 'hijpass_data "$data" merge', permissions: 'chmod 644 "$staged"', replace: 'mv -f "$staged" "$path"' }[fault];
+        const command = { save: 'hijpass_run_ucode "$data" merge', permissions: 'chmod 644 "$staged"', replace: 'mv -f "$staged" "$path"' }[fault];
         if (command) {
             f.script('save-failure', (fault === 'save' ? 'echo partial; ' : '') + 'echo "local file update failed" >&2; exit 1');
             f.patch('rules/update-files.sh', command, `'${f.directory}/save-failure'`);

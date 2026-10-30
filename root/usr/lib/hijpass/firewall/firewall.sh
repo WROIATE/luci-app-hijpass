@@ -13,16 +13,16 @@ trap 'code=$?; if [ "$code" -ne 0 ]; then hijpass_log ERROR firewall "${LINENO:-
 case "$action" in
     show) exec nft list table inet hijpass ;;
     remove)
-        rm -f "$rules" && hijpass_step firewall 'Reload after removal' "${LINENO:-}" fw4 reload || exit 1
+        rm -f "$rules" && hijpass_run_logged firewall 'Reload after removal' "${LINENO:-}" fw4 reload || exit 1
         hijpass_log INFO firewall "${LINENO:-}" 'Application rules removed'
         exit 0 ;;
     apply)
         # fw4 include 在重载后调用；这里只应用本应用表及用户 Hook。
         if nft list table inet hijpass >/dev/null 2>&1; then nft delete table inet hijpass || exit 1; fi
         [ -f "$rules" ] || exit 0
-        hijpass_step firewall 'Apply nft rules' "${LINENO:-}" nft -f "$rules" || exit 1
-        hook=$(hijpass_data "$data" hook) || exit 1
-        [ -z "$hook" ] || [ ! -x "$hook" ] || hijpass_step firewall 'NFT Hook' "${LINENO:-}" "$hook" || exit 1
+        hijpass_run_logged firewall 'Apply nft rules' "${LINENO:-}" nft -f "$rules" || exit 1
+        hook=$(hijpass_run_ucode "$data" hook) || exit 1
+        [ -z "$hook" ] || [ ! -x "$hook" ] || hijpass_run_logged firewall 'NFT Hook' "${LINENO:-}" "$hook" || exit 1
         hijpass_log INFO firewall "${LINENO:-}" 'nft rules applied'
         exit 0 ;;
     reset|generate) ;;
@@ -37,21 +37,21 @@ ip -j address show >"$work/addresses" 2>/dev/null
 printf '%s\n' "$?" >"$work/addresses.code"
 ubus call network.interface dump >"$work/interfaces" 2>/dev/null
 printf '%s\n' "$?" >"$work/interfaces.code"
-if [ "$action" = generate ]; then hijpass_data "$data" "$work" "$@"; exit $?; fi
+if [ "$action" = generate ]; then hijpass_run_ucode "$data" "$work" "$@"; exit $?; fi
 umask 077
 stage=generation
 hijpass_log INFO firewall "${LINENO:-}" 'Generating rules from current network snapshot'
-hijpass_data "$data" "$work" "$@" >"$temp" || exit 1
+hijpass_run_ucode "$data" "$work" "$@" >"$temp" || exit 1
 if [ ! -s "$temp" ]; then
-    rm -f "$rules" && hijpass_step firewall 'Reload empty rules' "${LINENO:-}" fw4 reload || exit 1
+    rm -f "$rules" && hijpass_run_logged firewall 'Reload empty rules' "${LINENO:-}" fw4 reload || exit 1
     hijpass_log INFO firewall "${LINENO:-}" 'No active rules; application rules removed'
     exit 0
 fi
 # 规则必须完整校验后才替换旧文件，目标旁边的临时文件保证 rename 原子性。
 stage=validation
-hijpass_step firewall 'Validate nft rules' "${LINENO:-}" nft -c -f "$temp" || exit 1
+hijpass_run_logged firewall 'Validate nft rules' "${LINENO:-}" nft -c -f "$temp" || exit 1
 stage=installation
 mv -f "$temp" "$rules" || exit 1
 stage=reload
-hijpass_step firewall 'Reload rules' "${LINENO:-}" fw4 reload || exit 1
+hijpass_run_logged firewall 'Reload rules' "${LINENO:-}" fw4 reload || exit 1
 hijpass_log INFO firewall "${LINENO:-}" "Rules validated and reloaded: bytes=$(wc -c <"$rules")"

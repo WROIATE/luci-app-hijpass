@@ -56,7 +56,7 @@ case "$action" in
             printf 'Trace worker exited without a result\n' >>"$directory/stderr"
             printf '1\n' >"$directory/exit"
         fi
-        hijpass_data "$HIJPASS_LIB/diagnostics/capturecli.uc" task-status "$directory" "$active" ;;
+        hijpass_run_ucode "$HIJPASS_LIB/diagnostics/capturecli.uc" task-status "$directory" "$active" ;;
     release)
         task_path "${1:-}" || exit 1
         [ -f "$directory/exit" ] || { echo 'Trace task has not finished' >&2; exit 1; }

@@ -14,7 +14,7 @@ code=$?
 level=INFO
 [ "$code" -eq 0 ] || level=ERROR
 if [ -s "$directory/stderr" ]; then
-    hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" command trace "$0:${LINENO:-}" "$code" 'Capture' "$directory/stderr" >/dev/null 2>&1 || :
+    hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" command trace "$0:${LINENO:-}" "$code" 'Capture' "$directory/stderr" >/dev/null 2>&1 || :
 fi
 hijpass_log "$level" trace "${LINENO:-}" "Capture finished: exit=$code, elapsed=$(($(date +%s) - started))s"
 printf '%s\n' "$code" >"$directory/exit.tmp"

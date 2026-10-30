@@ -20,10 +20,10 @@ for file in group passwd shadow; do
     fi
 done
 stage=migration
-hijpass_data "$HIJPASS_LIB/install/migrate.uc" || exit 1
+hijpass_run_ucode "$HIJPASS_LIB/install/migrate.uc" || exit 1
 # 让 crond 立即丢弃已移除的旧任务；任务内容的转换只在安装迁移脚本中进行。
 stage=cron
-[ ! -x /etc/init.d/cron ] || hijpass_step install 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart || exit 1
+[ ! -x /etc/init.d/cron ] || hijpass_run_logged install 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart || exit 1
 # 防火墙 include 是安装配置，不属于旧字段迁移。
 stage=firewall-include
 uci -q set firewall.hijpass=include &&

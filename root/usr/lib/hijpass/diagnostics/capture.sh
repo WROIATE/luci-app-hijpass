@@ -15,7 +15,7 @@ finish_capture() {
     for chain in pre-filter out-route; do
         nft -a list chain inet hijpass "$chain" 2>/dev/null | sed "s/^/$chain /" >>"$raw"
     done
-    plan=$(hijpass_data "$data" cleanup "$directory" "$raw") || { rm -f "$raw"; return 1; }
+    plan=$(hijpass_run_ucode "$data" cleanup "$directory" "$raw") || { rm -f "$raw"; return 1; }
     rm -f "$raw"
     json_load "$plan" || return 1
     json_select rules
@@ -26,15 +26,15 @@ finish_capture() {
         nft delete rule inet hijpass "$chain" handle "$handle" 2>/dev/null || :
         json_select ..
     done
-    keep=$(hijpass_data "$data" keep "$directory" 2>/dev/null) || keep=0
-    hijpass_data "$data" report "$directory"
+    keep=$(hijpass_run_ucode "$data" keep "$directory" 2>/dev/null) || keep=0
+    hijpass_run_ucode "$data" report "$directory"
     code=$?
     [ "$keep" = 1 ] || rm -rf -- "$directory"
     return "$code"
 }
 if [ "${1:-}" = finish ]; then finish_capture "${2:-}"; exit $?; fi
 [ "$(id -u)" = 0 ] || { echo 'must run as root' >&2; exit 1; }
-capture=$(hijpass_data "$data" prepare "$$" "$@") || exit 1
+capture=$(hijpass_run_ucode "$data" prepare "$$" "$@") || exit 1
 json_load "$capture" || exit 1
 json_get_vars directory mode client seconds method url tcpdump iface filter
 for command in nft; do command -v "$command" >/dev/null 2>&1 || { echo "$command is required" >&2; exit 1; }; done
@@ -43,7 +43,7 @@ for command in nft; do command -v "$command" >/dev/null 2>&1 || { echo "$command
 nft list table inet hijpass >/dev/null 2>&1 || { echo 'nft table inet hijpass not found' >&2; exit 1; }
 mkdir -m 700 "$directory" || exit 1
 for name in nft.trace nft.setup system.log tcpdump.log tcpdump.err curl.out curl.err; do : >"$directory/$name"; done
-hijpass_data "$data" rules "$capture" >"$directory/add.nft" || { rm -rf "$directory"; exit 1; }
+hijpass_run_ucode "$data" rules "$capture" >"$directory/add.nft" || { rm -rf "$directory"; exit 1; }
 if ! nft -f "$directory/add.nft"; then
     echo 'cannot install trace rule' >"$directory/nft.setup"
     finish_capture "$directory"

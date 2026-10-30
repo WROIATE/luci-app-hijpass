@@ -273,7 +273,7 @@ download() {
     echo 'Warning: optional hook unavailable: https://user:private@example.org/path?token=private' >&2
     printf '{"success":true,"version":"test"}\\n'
 }
-hijpass_step core 'Download' "$LINENO" download
+hijpass_run_logged core 'Download' "$LINENO" download
 `, { mode: 0o755 });
     const start = f.invoke('core_update', { core: 'xray' });
     assert.match(start.id, /^[A-Za-z0-9]{8}$/);

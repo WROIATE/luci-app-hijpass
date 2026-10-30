@@ -7,12 +7,12 @@ data="$HIJPASS_LIB/network/networkcli.uc"
 action=${1:-}
 [ "$#" -eq 0 ] || shift
 case "$action" in
-    resolve|port|iptype) hijpass_data "$data" "$action" "$@"; exit $? ;;
+    resolve|port|iptype) hijpass_run_ucode "$data" "$action" "$@"; exit $? ;;
     connect) url=${1:-}; timeout=${2:-5}; socks=${3:-} ;;
     ping) socks=${1:-}; url="https://${2:-www.google.com}"; timeout=5 ;;
-    *) hijpass_error 'unknown network action'; exit 1 ;;
+    *) hijpass_print_error_json 'unknown network action'; exit 1 ;;
 esac
-plan=$(hijpass_data "$data" request "$url" "$timeout" "$socks") || { printf '%s\n' "$plan"; exit 1; }
+plan=$(hijpass_run_ucode "$data" request "$url" "$timeout" "$socks") || { printf '%s\n' "$plan"; exit 1; }
 json_load "$plan" || exit 1
 json_get_vars url timeout socks
 output=$(mktemp /tmp/hijpass-connect.XXXXXX) || exit 1
@@ -23,7 +23,7 @@ set -- curl -I -sS -o /dev/null --max-time "$timeout" -w '%{http_code}\n%{remote
 "$@" -- "$url" >"$output" 2>/dev/null
 code=$?
 if [ "$action" = ping ]; then
-    hijpass_data "$data" ping-report "$output" "$code" "$url"
+    hijpass_run_ucode "$data" ping-report "$output" "$code" "$url"
 else
-    hijpass_data "$data" report "$output" "$code" "$url"
+    hijpass_run_ucode "$data" report "$output" "$code" "$url"
 fi

@@ -7,9 +7,9 @@ data="$HIJPASS_LIB/rules/rulescli.uc"
 action=${1:-}
 [ "$#" -eq 0 ] || shift
 case "$action" in
-    -t|--convert) plan=$(hijpass_data "$data" geo-plan "$@") || exit 1; mode=convert ;;
-    dns) plan=$(hijpass_data "$data" dns-plan "$@") || exit 1; mode=dns ;;
-    -e|--extract|-l|--lookup) plan=$(hijpass_data "$data" geo-request "$action" "$@") || exit 1; mode=query ;;
+    -t|--convert) plan=$(hijpass_run_ucode "$data" geo-plan "$@") || exit 1; mode=convert ;;
+    dns) plan=$(hijpass_run_ucode "$data" dns-plan "$@") || exit 1; mode=dns ;;
+    -e|--extract|-l|--lookup) plan=$(hijpass_run_ucode "$data" geo-request "$action" "$@") || exit 1; mode=query ;;
     *) echo 'unknown Geo action' >&2; exit 1 ;;
 esac
 json_load "$plan" || exit 1
@@ -26,7 +26,7 @@ if [ "$mode" = query ]; then
     else
         geoview -type "$kind" -action lookup -input "$input" -value "$@" >"$output" || exit 1
     fi
-    hijpass_data "$data" lower "$output"
+    hijpass_run_ucode "$data" lower "$output"
     exit $?
 fi
 json_select jobs
@@ -41,11 +41,11 @@ for job in $jobs; do
     staged=$(mktemp "$output.new.XXXXXX") || exit 1
     if [ "$mode" = convert ]; then
         json_get_vars database tag input
-        hijpass_step geo "Convert $database tag" "${LINENO:-}" geoview -type "$database" -action convert -format ruleset -input "$input" -regex -list "$tag" -output "$staged" || exit 1
+        hijpass_run_logged geo "Convert $database tag" "${LINENO:-}" geoview -type "$database" -action convert -format ruleset -input "$input" -regex -list "$tag" -output "$staged" || exit 1
     else
         json_get_var value value
         if [ -n "$value" ]; then
-            hijpass_step geo 'Extract DNS domains' "${LINENO:-}" geoview -type geosite -action extract -input /usr/share/v2ray/geosite.dat -list "$value" >"$staged" || exit 1
+            hijpass_run_logged geo 'Extract DNS domains' "${LINENO:-}" geoview -type geosite -action extract -input /usr/share/v2ray/geosite.dat -list "$value" >"$staged" || exit 1
         else
             : >"$staged" || exit 1
         fi

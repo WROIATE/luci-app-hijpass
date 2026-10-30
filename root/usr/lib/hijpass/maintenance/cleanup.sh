@@ -4,7 +4,7 @@
 
 # 仅删除选定 section 的旧配置；固定目录与文件名由 ucode 校验、组装。
 id=${2:-}
-plan=$(hijpass_data "$HIJPASS_LIB/maintenance/cleanup.uc" "$@") || exit 1
+plan=$(hijpass_run_ucode "$HIJPASS_LIB/maintenance/cleanup.uc" "$@") || exit 1
 json_load "$plan" || exit 1
 json_get_vars directory keep
 removed=0

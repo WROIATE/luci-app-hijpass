@@ -6,7 +6,7 @@ if [ "${1:-}" = append ] && [ "$#" -ge 2 ]; then
     shift
     level=$1
     shift
-    hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" source "$level" "$0:${LINENO:-}" "$@"
+    hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" source "$level" "$0:${LINENO:-}" "$@"
     exit $?
 fi
-hijpass_data "$HIJPASS_LIB/maintenance/logscli.uc" "$@"
+hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" "$@"

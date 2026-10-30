@@ -19,7 +19,7 @@ hijpass_register_instances() {
     json_get_keys keys
     for key in $keys; do
         json_select "$key"
-        hijpass_open_instance
+        hijpass_register_instance
         json_select ..
     done
     json_cleanup
@@ -27,7 +27,7 @@ hijpass_register_instances() {
 }
 
 # 仅检查标准核心命令。用户自定义 Shell 命令仍按原样交给 procd。
-hijpass_check_instances() (
+hijpass_validate_core_configs() (
     local entries entry engine path keys key previous value
     json_set_namespace hijpass_check
     json_load "$1" && json_select instances || exit 1
@@ -64,7 +64,7 @@ hijpass_check_instances() (
 )
 
 # procd 提交后异步启动进程；只检查本次声明的实例，连续两次运行才继续。
-hijpass_wait_instances() (
+hijpass_wait_for_running_instances() (
     local service keys key attempt stable pending id name
     service=$1
     json_set_namespace hijpass_wait
@@ -92,7 +92,7 @@ hijpass_wait_instances() (
     exit 1
 )
 
-hijpass_open_instance() {
+hijpass_register_instance() {
     local id name user log shunt keys key value
     json_get_var id id
     json_get_var name name

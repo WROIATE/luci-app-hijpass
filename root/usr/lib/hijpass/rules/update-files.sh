@@ -6,12 +6,12 @@
 data="$HIJPASS_LIB/rules/rulescli.uc"
 action=${1:-update}
 [ "$#" -eq 0 ] || shift
-if [ "$action" = query ]; then hijpass_data "$data" query "$@"; exit $?; fi
+if [ "$action" = query ]; then hijpass_run_ucode "$data" query "$@"; exit $?; fi
 # 由实际更新进程持有锁。curl 等短期子进程继承锁，服务启动命令关闭 fd 9。
 mkdir -p "$HIJPASS_JOB_ROOT" && chmod 700 "$HIJPASS_JOB_ROOT" || exit 1
 exec 9>"$HIJPASS_JOB_ROOT/rules.lock"
 if ! flock -n 9; then
-    hijpass_data "$data" busy
+    hijpass_run_ucode "$data" busy
     exit 75
 fi
 if [ "${1:-}" = --scheduled ]; then HIJPASS_UPDATE_SOURCE=scheduled; shift; fi
@@ -23,14 +23,14 @@ for argument in "$@"; do
 done
 started=$(date +%s)
 hijpass_log INFO rules "${LINENO:-}" "Update started: action=$action, source=${HIJPASS_UPDATE_SOURCE:-manual}"
-plan=$(hijpass_data "$data" plan "$action" "$@") || { hijpass_log ERROR rules "${LINENO:-}" 'Cannot prepare update plan: invalid configuration'; hijpass_error 'invalid rules configuration'; exit 1; }
+plan=$(hijpass_run_ucode "$data" plan "$action" "$@") || { hijpass_log ERROR rules "${LINENO:-}" 'Cannot prepare update plan: invalid configuration'; hijpass_print_error_json 'invalid rules configuration'; exit 1; }
 json_load "$plan" || exit 1
 json_get_vars timeout retries enabled
 connect_timeout=$timeout
 [ "$connect_timeout" -le 10 ] || connect_timeout=10
 json_select jobs
 json_get_keys jobs
-work=$(mktemp -d /tmp/hijpass-rules.XXXXXX) || { hijpass_error 'cannot create rules workspace'; exit 1; }
+work=$(mktemp -d /tmp/hijpass-rules.XXXXXX) || { hijpass_print_error_json 'cannot create rules workspace'; exit 1; }
 temp=
 completed=0
 trap 'if [ -n "$temp" ]; then rm -f "$temp" "$temp.text"; fi; rm -rf "$work"' EXIT
@@ -41,7 +41,7 @@ fail_resource() {
     [ ! -s "$3" ] || detail=$(head -c 8192 "$3")
     hijpass_log ERROR rules "$line" "$key: $phase failed; previous file retained${detail:+
 $detail}"
-    hijpass_data "$data" result "$key"
+    hijpass_run_ucode "$data" result "$key"
     exit 1
 }
 
@@ -99,7 +99,7 @@ for job in $jobs; do
                 break
             fi
         else
-            hijpass_data "$data" normalize "$kind" "$temp" >"$work/normalized" 2>"$work/error" || fail_resource "${LINENO:-}" 'Normalize download' "$work/error"
+            hijpass_run_ucode "$data" normalize "$kind" "$temp" >"$work/normalized" 2>"$work/error" || fail_resource "${LINENO:-}" 'Normalize download' "$work/error"
             if grep -q '[^[:space:]]' "$work/normalized" 2>"$work/error"; then
                 cat "$work/normalized" >>"$work/merged" 2>"$work/error" || fail_resource "${LINENO:-}" 'Save merged data' "$work/error"
                 sources=$((sources + 1))
@@ -116,7 +116,7 @@ for job in $jobs; do
     staged=$temp
     if [ "$kind" != geo ]; then
         staged=$temp.text
-        hijpass_data "$data" merge "$work/merged" >"$staged" 2>"$work/error" || fail_resource "${LINENO:-}" 'Save processed data' "$work/error"
+        hijpass_run_ucode "$data" merge "$work/merged" >"$staged" 2>"$work/error" || fail_resource "${LINENO:-}" 'Save processed data' "$work/error"
     fi
     chmod 644 "$staged" 2>"$work/error" || fail_resource "${LINENO:-}" 'Set staged permissions' "$work/error"
     bytes=$(wc -c <"$staged" 2>"$work/error") || fail_resource "${LINENO:-}" 'Read staged file' "$work/error"
@@ -135,10 +135,10 @@ for job in $jobs; do
 done
 if [ "$action" = update ] && [ "$enabled" = 1 ] && [ "$completed" -gt 0 ]; then
     hijpass_log INFO rules "${LINENO:-}" 'Applying updated resources: restarting service'
-    if ! hijpass_step rules 'Service restart' "${LINENO:-}" /etc/init.d/hijpass restart; then
-        hijpass_data "$data" result restart
+    if ! hijpass_run_logged rules 'Service restart' "${LINENO:-}" /etc/init.d/hijpass restart; then
+        hijpass_run_ucode "$data" result restart
         exit 1
     fi
 fi
 hijpass_log INFO rules "${LINENO:-}" "Update finished: installed=$completed, failed=0, elapsed=$(($(date +%s) - started))s"
-hijpass_data "$data" result
+hijpass_run_ucode "$data" result

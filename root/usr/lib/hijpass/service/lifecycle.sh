@@ -33,7 +33,8 @@ runtime() {
 }
 phase() {
     apply_phase=$1
-    hijpass_data "$transaction" status "$state_directory" applying "$apply_phase"
+    hijpass_data "$transaction" status "$state_directory" applying "$apply_phase" || return 1
+    hijpass_log DEBUG service "${LINENO:-}" "Apply phase: $apply_phase"
 }
 submit() {
     local plan
@@ -48,7 +49,10 @@ wait_ready() {
         ubus call service list "{\"name\":\"$service_name\"}" >"$work/instances.json" || return 1
         if hijpass_data "$HIJPASS_LIB/service/readinesscli.uc" "$work/plan.json" "$work/instances.json" "$service_name" 2>"$work/readiness.error"; then
             stable=$((stable + 1))
-            [ "$stable" -lt 2 ] || return 0
+            if [ "$stable" -ge 2 ]; then
+                hijpass_log INFO service "${LINENO:-}" 'Process readiness confirmed'
+                return 0
+            fi
         else stable=0; fi
         attempt=$((attempt + 1))
         sleep 1
@@ -178,13 +182,13 @@ apply_service() (
     hijpass_data "$transaction" backup "$work" || exit 1
     phase stopping || exit 1
     switched=1
-    stop_runtime || exit 1
+    hijpass_step service 'Stop previous runtime' "${LINENO:-}" stop_runtime || exit 1
     phase installing || exit 1
-    hijpass_data "$transaction" install "$work" || exit 1
+    hijpass_step service 'Install prepared files' "${LINENO:-}" hijpass_data "$transaction" install "$work" || exit 1
     phase starting || exit 1
-    submit "$work" || exit 1
+    hijpass_step service 'Submit process instances' "${LINENO:-}" submit "$work" || exit 1
     phase waiting || exit 1
-    wait_ready "$work" || exit 1
+    hijpass_step service 'Wait for process readiness' "${LINENO:-}" wait_ready "$work" || exit 1
     phase activating || exit 1
     runtime activate --configdir "$work/config" || exit 1
     # 指针原子切换；失败前 active 始终指向上一份成功配置。

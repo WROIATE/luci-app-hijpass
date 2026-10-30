@@ -116,7 +116,10 @@ for (const fail of ['prepare', 'submit', 'activate', 'readiness']) test(`生命�
         assert.equal(fs.readFileSync(f.destination, 'utf8'), 'new');
         if (fail !== 'submit') assert.equal(status.rollback, 'restored');
         else assert.equal(status.rollback, 'failed');
-        if (fail === 'readiness') assert.equal(events.filter(event => event === 'activate').length, 1);
+        if (fail === 'readiness') {
+            assert.equal(events.filter(event => event === 'activate').length, 1);
+            assert.match(fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8'), /Service readiness timed out/);
+        }
     }
 });
 

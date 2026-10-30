@@ -156,7 +156,7 @@ export function main() { run(ARGV, function(args) {
     else if (action == 'backup') backup(work);
     else if (action == 'install' || action == 'restore') install(work, action == 'restore');
     else if (action == 'status') atomic(work + '/status.json', sprintf('%J\n', {
-        state: args[2], phase: args[3], rollback: args[4] || '', updated: time(),
+        state: args[2], phase: args[3], rollback: args[4] || 'none', updated: time(),
     }));
     else die('unknown transaction action');
 }); };

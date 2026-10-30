@@ -12,13 +12,13 @@ if [ "${1:-}" = --configdir ]; then
     [ -n "$config_directory" ] || { echo 'missing --configdir' >&2; exit 1; }
     shift 2
 fi
-run_with_config_dir() {
+run_with_config() {
     local executable="$1"
     shift
     if [ -n "$config_directory" ]; then "$executable" "$@" --configdir "$config_directory"; else "$executable" "$@"; fi
 }
 run_service_ucode() {
-    run_with_config_dir hijpass_run_ucode "$data" "$@"
+    run_with_config hijpass_run_ucode "$data" "$@"
 }
 case "$action" in plan|delay) run_service_ucode "$action" "$@"; exit $? ;; esac
 settings=$(run_service_ucode settings "$@") || exit 1
@@ -33,7 +33,7 @@ update_cron() {
     hijpass_run_logged "$module" 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
 }
 run_dns_hook() { [ -z "$dns_hook" ] || hijpass_run_logged "$module" "DNS Hook $1" "${LINENO:-}" "$dns_hook" "$1"; }
-remove_client_resources() {
+clear_resources() {
     # 防火墙撤流失败时保留路由；其他清理错误最后统一返回。
     failed=0
     run_dns_hook stop || failed=1
@@ -50,8 +50,8 @@ case "$action" in
         if [ "$enabled" = 1 ]; then
             # 数据准备全部完成才交给 procd；外部转换工具由本层调用。
             run_service_ucode configs "$@" || exit 1
-            [ "$geo_convert" != 1 ] || run_with_config_dir "$HIJPASS_LIB/rules/geoview.sh" --convert "$@" || exit 1
-            run_with_config_dir "$HIJPASS_LIB/rules/geoview.sh" dns "$@" || exit 1
+            [ "$geo_convert" != 1 ] || run_with_config "$HIJPASS_LIB/rules/geoview.sh" --convert "$@" || exit 1
+            run_with_config "$HIJPASS_LIB/rules/geoview.sh" dns "$@" || exit 1
             json_select log_paths
             json_get_keys entries
             for entry in $entries; do json_get_var path "$entry"; mkdir -p "$(dirname -- "$path")" || exit 1; done
@@ -61,7 +61,7 @@ case "$action" in
     activate)
         [ "$enabled" = 1 ] || exit 0
         # 进程确认启动后才调用本入口；先准备策略路由，再启用流量接管。
-        if "$HIJPASS_LIB/firewall/route.sh" reset && run_with_config_dir "$HIJPASS_LIB/firewall/firewall.sh" reset "$@" && run_dns_hook start && update_cron enable; then
+        if "$HIJPASS_LIB/firewall/route.sh" reset && run_with_config "$HIJPASS_LIB/firewall/firewall.sh" reset "$@" && run_dns_hook start && update_cron enable; then
             hijpass_log INFO "$module" "${LINENO:-}" "Activation completed: elapsed=$(($(date +%s) - started))s"
         else
             hijpass_log ERROR "$module" "${LINENO:-}" 'Activation failed'
@@ -69,7 +69,7 @@ case "$action" in
         fi ;;
     deactivate)
         hijpass_log INFO "$module" "${LINENO:-}" 'Stopping service resources'
-        remove_client_resources ;;
+        clear_resources ;;
     auto-update)
         last=/tmp/hijpass_last_update
         [ "$update_interval" -gt 0 ] || exit 0
@@ -81,7 +81,7 @@ case "$action" in
         HIJPASS_UPDATE_SOURCE=scheduled
         export HIJPASS_UPDATE_SOURCE
         # 下载和应用都由更新执行器完成，锁覆盖完整过程，外层不再重复重启。
-        run_with_config_dir "$HIJPASS_LIB/rules/update.sh" update "$@" >/dev/null
+        run_with_config "$HIJPASS_LIB/rules/update.sh" update "$@" >/dev/null
         code=$?
         [ "$code" -ne 75 ] || exit 0
         [ "$code" -eq 0 ] || exit "$code"

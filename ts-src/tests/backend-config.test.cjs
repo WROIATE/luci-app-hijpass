@@ -134,7 +134,7 @@ test('init delegates lifecycle to Shell while preserving argv passed to procd', 
     assert.match(source, /USE_PROCD=1/);
     assert.match(source, /service_started\(\)/);
     assert.doesNotMatch(source, /service\/lifecycle[.]sh/);
-    assert.match(bridge, /hijpass_register_instances/);
+    assert.match(bridge, /hijpass_add_instances/);
     assert.match(bridge, /set -- "\$@" "\$value"/);
     assert.doesNotMatch(source + bridge, /uci -q|config_foreach|geoview[.]sh/);
 });

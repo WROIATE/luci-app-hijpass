@@ -64,9 +64,9 @@ execute_job() {
 
 case "$action" in
     start|run)
-        case "$id" in rules|restart|xray|sing-box) ;; *) hijpass_print_error_json 'unknown job'; exit 1 ;; esac
+        case "$id" in rules|restart|xray|sing-box) ;; *) hijpass_json_error 'unknown job'; exit 1 ;; esac
         if [ "$action" = start ]; then exec "$0" claim "$id" async 0; fi
-        [ "$id" = rules ] || { hijpass_print_error_json 'unsupported inline job'; exit 1; }
+        [ "$id" = rules ] || { hijpass_json_error 'unsupported inline job'; exit 1; }
         shift 2
         if registration=$("$0" claim rules inline "$$" "${1:-update}"); then
             json_load "$registration" || exit 1
@@ -83,7 +83,7 @@ case "$action" in
     claim)
         mode=${3:-} owner=${4:-} scope=${5:-update}
         case "$id:$mode" in rules:inline|rules:async|restart:async|xray:async|sing-box:async) ;;
-            *) hijpass_print_error_json 'invalid job registration'; exit 1 ;;
+            *) hijpass_json_error 'invalid job registration'; exit 1 ;;
         esac
         # 检查活动任务与发布新 ID 在同一短临界区内，避免检查后再创建的竞态。
         exec 8>"$root/registry.lock"
@@ -127,7 +127,7 @@ case "$action" in
         ); then
             rm -rf -- "$directory"
             [ "$id" != rules ] || rm -f "$root/rules.active"
-            hijpass_print_error_json 'cannot start job'
+            hijpass_json_error 'cannot start job'
             exit 1
         fi
         json_init; json_add_string id "${directory##*/}"; json_dump ;;
@@ -138,27 +138,27 @@ case "$action" in
         else execute_job "$id" "$directory"; fi
         exit $? ;;
     current)
-        [ "$id" = rules ] || { hijpass_print_error_json 'unknown job'; exit 1; }
+        [ "$id" = rules ] || { hijpass_json_error 'unknown job'; exit 1; }
         exec 8>"$root/registry.lock"
         flock -x 8 || exit 1
         json_init
         if active=$(active_rules); then json_add_string id "$active"; else json_add_null id; fi
         json_dump ;;
     status|release)
-        valid_id "$id" || { hijpass_print_error_json 'invalid job ID'; exit 1; }
+        valid_id "$id" || { hijpass_json_error 'invalid job ID'; exit 1; }
         directory="$root/$id"
-        [ -d "$directory" ] && [ ! -L "$directory" ] || { hijpass_print_error_json 'job not found'; exit 1; }
+        [ -d "$directory" ] && [ ! -L "$directory" ] || { hijpass_json_error 'job not found'; exit 1; }
         exec 8>"$root/registry.lock"
         flock -x 8 || exit 1
         recover_job "$directory"
         flock -u 8
         exec 8>&-
         if [ "$action" = release ]; then
-            [ -f "$directory/exit" ] || { hijpass_print_error_json 'job still running'; exit 1; }
+            [ -f "$directory/exit" ] || { hijpass_json_error 'job still running'; exit 1; }
             # 多个页面可能观察同一任务；释放是确认读取，结果统一按保留期回收。
             printf '{"ok":true}\n'
         else
             hijpass_run_ucode "$HIJPASS_LIB/result.uc" job "$directory"
         fi ;;
-    *) hijpass_print_error_json 'unknown job action'; exit 1 ;;
+    *) hijpass_json_error 'unknown job action'; exit 1 ;;
 esac

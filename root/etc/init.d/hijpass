@@ -12,8 +12,8 @@ RUNTIME=/usr/lib/hijpass/service/service.sh
 start_service() {
     # rc.common 不传播此回调的 return；失败必须退出，避免提交部分实例。
     service_plan="$(hijpass_run_logged service 'Prepare service' "${LINENO:-}" "$RUNTIME" prepare)" || exit 1
-    hijpass_run_logged service 'Check core configurations' "${LINENO:-}" hijpass_validate_core_configs "$service_plan" || exit 1
-    hijpass_register_instances "$service_plan" || exit 1
+    hijpass_run_logged service 'Check core configurations' "${LINENO:-}" hijpass_check_configs "$service_plan" || exit 1
+    hijpass_add_instances "$service_plan" || exit 1
     # 禁用服务时，在 procd 提交空实例列表前撤销网络配置。
     if ! hijpass_has_instances "$service_plan"; then
         "$RUNTIME" deactivate || exit 1
@@ -22,7 +22,7 @@ start_service() {
 
 service_started() {
     hijpass_has_instances "$service_plan" || return 0
-    if hijpass_run_logged service 'Wait for service instances' "${LINENO:-}" hijpass_wait_for_running_instances hijpass "$service_plan" &&
+    if hijpass_run_logged service 'Wait for service instances' "${LINENO:-}" hijpass_wait_running hijpass "$service_plan" &&
         "$RUNTIME" activate; then
         return 0
     fi

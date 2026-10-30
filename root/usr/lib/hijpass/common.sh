@@ -10,7 +10,7 @@ hijpass_run_ucode() {
     # -- 分隔解释器选项和业务参数，兼容旧版本以及 glibc 宿主机的 getopt。
     ucode -S -- "$@"
 }
-hijpass_print_error_json() { hijpass_run_ucode "$HIJPASS_LIB/result.uc" error "$1"; }
+hijpass_json_error() { hijpass_run_ucode "$HIJPASS_LIB/result.uc" error "$1"; }
 
 # 调用点显式传入 $LINENO；子进程中的日志 CLI 无法恢复 Shell 调用位置。
 hijpass_log() (

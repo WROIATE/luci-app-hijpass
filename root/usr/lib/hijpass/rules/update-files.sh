@@ -23,14 +23,14 @@ for argument in "$@"; do
 done
 started=$(date +%s)
 hijpass_log INFO rules "${LINENO:-}" "Update started: action=$action, source=${HIJPASS_UPDATE_SOURCE:-manual}"
-plan=$(hijpass_run_ucode "$data" plan "$action" "$@") || { hijpass_log ERROR rules "${LINENO:-}" 'Cannot prepare update plan: invalid configuration'; hijpass_print_error_json 'invalid rules configuration'; exit 1; }
+plan=$(hijpass_run_ucode "$data" plan "$action" "$@") || { hijpass_log ERROR rules "${LINENO:-}" 'Cannot prepare update plan: invalid configuration'; hijpass_json_error 'invalid rules configuration'; exit 1; }
 json_load "$plan" || exit 1
 json_get_vars timeout retries enabled
 connect_timeout=$timeout
 [ "$connect_timeout" -le 10 ] || connect_timeout=10
 json_select jobs
 json_get_keys jobs
-work=$(mktemp -d /tmp/hijpass-rules.XXXXXX) || { hijpass_print_error_json 'cannot create rules workspace'; exit 1; }
+work=$(mktemp -d /tmp/hijpass-rules.XXXXXX) || { hijpass_json_error 'cannot create rules workspace'; exit 1; }
 temp=
 completed=0
 trap 'if [ -n "$temp" ]; then rm -f "$temp" "$temp.text"; fi; rm -rf "$work"' EXIT

@@ -78,15 +78,16 @@ test('RPC reads the full editable template and serves an immutable default witho
     assert.equal(f.invoke('not_a_method').error, 'unknown RPC method');
 });
 
-test('one RPC object exposes configuration preview, validation and writes with matching ACLs', t => {
+test('one RPC object exposes configuration preview, validation and apply status with matching ACLs', t => {
     const f = fixture(t), schema = f.invoke('list');
     assert.deepEqual(schema.config_render, { sections: '', target: '' });
     assert.deepEqual(schema.config_validate, { sections: '' });
-    assert.deepEqual(schema.config_write, { sections: '' });
+    assert.equal(schema.config_write, undefined);
+    assert.deepEqual(schema.service_apply_status, {});
     assert.throws(() => fs.lstatSync(path.join(root, 'root/usr/libexec/rpcd/hijpass-config')), { code: 'ENOENT' });
     const acl = JSON.parse(fs.readFileSync(path.join(root, 'root/usr/share/rpcd/acl.d/luci-app-hijpass.json'), 'utf8'))['luci-app-hijpass'];
     assert.equal(acl.write.ubus['hijpass-config'], undefined);
-    for (const method of ['config_render', 'config_validate', 'config_write']) assert.ok(acl.write.ubus.hijpass.includes(method));
+    for (const method of ['config_render', 'config_validate']) assert.ok(acl.write.ubus.hijpass.includes(method));
 
     const sections = require('./testdata/compatibility.json').find(f => f.name === 'sing-box-chain').sections;
     const snapshot = JSON.stringify(sections);
@@ -238,8 +239,15 @@ test('backend writes preserve TLS while resolving chains and reject snapshot sto
         for (const node of sections.slice(1)) node.core = core;
         const downstream = sections[2];
         downstream.tls_server_name = 'tls.example.org';
-        const result = f.invoke('config_write', { sections: JSON.stringify(sections) });
-        assert.equal(result.error, undefined, result.error);
+        const input = path.join(f.directory, 'sections.json');
+        const entry = path.join(f.runtime, 'write-test.uc');
+        fs.writeFileSync(entry, "import { generateAndWriteConfigs } from './service/prepare.uc'; import * as fs from 'fs'; generateAndWriteConfigs(json(fs.readfile(ARGV[0])));");
+        function write() {
+            fs.writeFileSync(input, JSON.stringify(sections));
+            return spawnSync(path.join(f.runtime, 'testbin/ucode'), ['-S', '--', entry, input], { encoding: 'utf8' });
+        }
+        const result = write();
+        assert.equal(result.status, 0, result.stderr);
         assert.equal(fs.existsSync(sections[0].client_dir), false);
         const target = path.join(f.directory, 'downstream-downstream.json');
         const content = fs.readFileSync(target, 'utf8'), outbound = JSON.parse(content).outbounds[0];
@@ -251,7 +259,7 @@ test('backend writes preserve TLS while resolving chains and reject snapshot sto
             assert.equal(outbound.streamSettings.tlsSettings.serverName, 'tls.example.org');
         }
         downstream.server = 'fail.example.org';
-        assert.match(f.invoke('config_write', { sections: JSON.stringify(sections) }).error, /DNS failed/);
+        assert.match(write().stderr, /DNS failed/);
         assert.equal(fs.readFileSync(target, 'utf8'), content);
     }
 });

@@ -108,8 +108,8 @@ test('CLI renders supplied input without runtime commands and rejects generate',
     assert.match(rejected.stderr, /unknown command/);
 });
 
-test('Save & Apply stops before applying UCI when generation, saving or replacement fails', async () => {
-    for (const fail of [null, 'invalid configuration', 'cannot write configuration', 'cannot replace configuration']) {
+test('Save & Apply validates without writing files and stops before applying invalid UCI', async () => {
+    for (const fail of [null, 'invalid configuration']) {
         const events = [];
         const generated = { nodes: {} };
         const handler = loadTS('utils/actions/save-apply/index.ts', {
@@ -119,24 +119,23 @@ test('Save & Apply stops before applying UCI when generation, saving or replacem
             './node-file-cleanup': { NodeFileCleanupUtils: { cleanupChangedNodeFiles: async () => events.push('cleanup') } },
             '../../base/luci/notification': { NotificationUtils: { error: () => events.push('error') } },
             '../../base/luci/form': { FormUtils: { simpleHash: () => 0 } },
-            '../../backend': { Backend: { writeConfigs: async () => {
-                events.push('write');
+            '../../backend': { Backend: { validateConfigs: async () => {
+                events.push('validate');
                 if (fail) throw new Error(fail);
                 return {};
             } } },
             './precheck': { PrecheckUtils: { runSaveApplyPrechecks: async () => true } },
         }).SaveApplyUtils.genHandleSaveApply();
         await handler.call({ handleSave: async () => events.push('form') }, {}, 1);
-        assert.deepEqual(events, fail ? ['form', 'write', 'error'] : ['form', 'write', 'save', 'cleanup', 'apply']);
+        assert.deepEqual(events, fail ? ['form', 'validate', 'error'] : ['form', 'validate', 'save', 'apply']);
     }
 });
 
 test('init delegates lifecycle to Shell while preserving argv passed to procd', () => {
     const source = fs.readFileSync(path.join(root, 'root/etc/init.d/hijpass'), 'utf8');
     const bridge = fs.readFileSync(path.join(root, 'root/usr/lib/hijpass/service/procd.sh'), 'utf8');
-    assert.match(source, /service[.]sh/);
-    assert.ok(source.indexOf('$RUNTIME prepare') < source.indexOf('hijpass_start_instances "$plan"'));
-    assert.ok(source.indexOf('hijpass_start_instances "$plan"') < source.indexOf('$RUNTIME activate'));
+    assert.match(source, /service\/lifecycle[.]sh/);
+    assert.match(bridge, /hijpass_register_instances/);
     assert.match(bridge, /set -- "\$@" "\$value"/);
     assert.doesNotMatch(source + bridge, /uci -q|config_foreach|geoview[.]sh/);
 });
@@ -187,4 +186,27 @@ test('share-link imports declare generated configuration and do not normalize le
     const xhttp = ProxyShareLinkUtils.parse(uri + '&type=xhttp&method=PUT', 'xray');
     assert.equal(xhttp.values.transport_xhttp_method, 'PUT');
     assert.equal(new URLSearchParams(ProxyShareLinkUtils.generate(xhttp.values).split('?')[1]).get('method'), 'PUT');
+});
+
+test('刷新页面后继续查询应用结果，只报告一次失败，并区分已恢复的旧运行版本', async () => {
+    const timers = [], messages = [];
+    let calls = 0;
+    const { SaveApplyUtils } = loadTS('utils/actions/save-apply/index.ts', {
+        '../../../enum/hijpass': { LuciFlied: {} }, uci: {}, ui: {}, './precheck': {},
+        '../../base/luci/notification': { NotificationUtils: { error: (...args) => messages.push(args) } },
+        '../../backend': { Backend: { serviceApplyStatus: async () => {
+            calls++;
+            return { hijpass: calls < 3 ? { state: 'applying' } : { state: 'failed', rollback: 'restored', updated: 2 },
+                hijserver: { state: 'failed', rollback: 'failed', updated: 1 } };
+        } } },
+    }, { window: { setTimeout: fn => timers.push(fn) } });
+    SaveApplyUtils.watchApplyStatus();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(messages.length, 1);
+    await timers.shift()();
+    assert.equal(messages.length, 1);
+    await timers.shift()();
+    assert.equal(messages.length, 2);
+    assert.match(messages[1][1], /Previous runtime restored/);
+    assert.equal(timers.length, 0);
 });

@@ -1,27 +1,9 @@
 #!/bin/sh /etc/rc.common
 
-USE_PROCD=1
 START=99
 STOP=15
-RUNTIME=/usr/lib/hijpass/service/service.sh
-
-# Shell 组织完整服务生命周期；ucode 只生成配置、进程描述和定时任务内容。
-. /usr/lib/hijpass/service/procd.sh
-
-start_service() {
-    local plan
-    plan="$($RUNTIME prepare)" || return 1
-    hijpass_start_instances "$plan" || return 1
-    $RUNTIME activate
-}
-
-stop_service() {
-    $RUNTIME deactivate
-}
-
-reload_service() {
-    /etc/init.d/hijpass restart
-}
+# 保留 rc.common 命令入口，生命周期显式检查每个阶段与 procd 的返回值。
+. /usr/lib/hijpass/service/lifecycle.sh
 
 service_triggers() {
     procd_add_reload_trigger hijpass
@@ -30,7 +12,7 @@ service_triggers() {
 
 boot() {
     local delay
-    delay="$($RUNTIME delay)" || return 1
+    delay="$(runtime delay)" || return 1
     [ "$delay" -le 0 ] || sleep "$delay"
     start
 }

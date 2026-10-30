@@ -176,15 +176,17 @@ export function writeConfigs(files) {
 };
 
 /**
- * 服务启动与 RPC 保存共用的执行入口，记录生成、写入和回滚结果。
+ * 根据服务快照生成配置，支持写入候选目录供生命周期校验后安装。
  * @param {UciSection[]} sections
+ * @param {string} [outputDirectory] 候选输出根目录；省略时写入正式位置。
  * @returns {GeneratedConfigs}
  */
-export function generateAndWriteConfigs(sections) {
+export function generateAndWriteConfigs(sections, outputDirectory) {
 	let log = logger(sections), started = time();
 	log('INFO', '[config] Generating proxy configurations');
 	try {
 		let generated = generate(sections), files = prepareConfigFiles(sections, generated);
+		if (outputDirectory) files = map(files, file => ({ ...file, path: outputDirectory + file.path }));
 		writeConfigs(files);
 		for (let file in files) log('DEBUG', `[config] Written ${file.path}`);
 		log('INFO', `[config] Configurations written: files=${length(files)}, elapsed=${time() - started}s`);
@@ -297,16 +299,17 @@ function serverCron(instances) {
  * @param {UciSection[]} sections
  * @returns {null} 无业务返回值，只更新 nft include 文件。
  */
-function writeServerRules(sections) {
+function writeServerRules(sections, outputDirectory) {
 	let output = serverPlan(sections);
+	let table = (outputDirectory || '') + SERVER_TABLE, chain = (outputDirectory || '') + SERVER_CHAIN;
 	// 只开放明确选中的端口；没有端口时删除旧 include，避免旧服务端仍对 WAN 开放。
 	if (length(output.ports)) {
-		atomic(SERVER_TABLE, renderTemplate('/usr/lib/hijpass/service/server.ut', { ports: output.ports }), 0o644);
-		atomic(SERVER_CHAIN, 'jump hijserver comment "hijserver rule"\n', 0o644);
+		atomic(table, renderTemplate('/usr/lib/hijpass/service/server.ut', { ports: output.ports }), 0o644);
+		atomic(chain, 'jump hijserver comment "hijserver rule"\n', 0o644);
 	}
 	else {
-		fs.unlink(SERVER_TABLE);
-		fs.unlink(SERVER_CHAIN);
+		if (outputDirectory) { atomic(table, '', 0o644); atomic(chain, '', 0o644); }
+		else { fs.unlink(table); fs.unlink(chain); }
 	}
 };
 
@@ -357,7 +360,7 @@ export function main() { run(ARGV,
         if (findHijpassSection(config)?.enabled == '1') {
             // 先生成进程描述，确认自定义命令、环境变量和文件名有效，再替换配置。
             plan(config);
-            generateAndWriteConfigs(config);
+            generateAndWriteConfigs(config, args[0]);
         }
         return;
     }
@@ -372,7 +375,7 @@ export function main() { run(ARGV,
         }
         let result = plan(config);
         if (findHijpassSection(config)?.enabled == '1') {
-            let dns = prepareDNS(config, configDirectory);
+            let dns = prepareDNS(config, configDirectory, args[0]);
             if (dns) {
                 push(result.instances, dns);
             }
@@ -387,7 +390,7 @@ export function main() { run(ARGV,
         return cron(config, args[0] == 'enable');
     }
     if (action == 'server-files') {
-        return writeServerRules(config);
+        return writeServerRules(config, args[0]);
     }
     die('unknown service data action');
 });

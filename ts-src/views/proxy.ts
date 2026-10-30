@@ -34,6 +34,7 @@ function getFirewallReferrers(listenPort: string): string[] {
 
 const v = view.extend({
     load: function () {
+        SaveApplyUtils.watchApplyStatus();
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME),
             ServiceUtils.getServiceInstances(LuciFlied.CONF_NAME)

@@ -3,7 +3,7 @@ import { defaultTemplate } from '../firewall/generate.uc';
 import { editor, logs, log } from './files.uc';
 import { generate, validate } from 'hijpass.config.generate';
 import { read } from 'hijpass.uci.read';
-import { generateAndWriteConfigs } from '../service/prepare.uc';
+import { status as applyStatus } from '../service/transaction.uc';
 import { writeOutput } from 'hijpass.command.runtime';
 
 // RPC 参数是业务数据。没有文件路径或通用 command/argv 入口。
@@ -11,7 +11,7 @@ const methods = {
     firewall_template_default: {}, editor_read: { resource: '', section: '', name: '' },
     editor_write: { resource: '', section: '', name: '', content: '' },
     config_render: { sections: '', target: '' }, config_validate: { sections: '' },
-    config_write: { sections: '' }, log_list: {}, log_read: { id: '', action: '', lines: '' },
+    service_apply_status: {}, log_list: {}, log_read: { id: '', action: '', lines: '' },
     log_clear: { id: '' },
     defaults: {}, cleanup_node: { kind: '', section: '', name: '' },
     service_restart: {}, firewall_reset: {}, firewall_show: {},
@@ -81,17 +81,8 @@ try {
             result = request.target ? { config: generated } : generated;
         }
     }
-    else if (method == 'config_write') {
-        let sections = json(request.sections);
-        for (let section in sections) {
-            if (!match(section['.name'], /^[A-Za-z0-9_-]+$/)) {
-                die('invalid section ID');
-            }
-        }
-        // 快照只提供表单值；文件位置由后端常量决定。
-        // 复用服务启动时的生成、上游解析和原子替换，前端不再写生成文件。
-        let generated = generateAndWriteConfigs(sections);
-        result = generated.shunt ? { shunt: sprintf('%.2J', generated.shunt) } : {};
+    else if (method == 'service_apply_status') {
+        result = { hijpass: applyStatus('hijpass'), hijserver: applyStatus('hijserver') };
     }
     else {
         die('unknown data method');

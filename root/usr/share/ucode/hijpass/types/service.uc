@@ -26,7 +26,8 @@
  *   env: string[],
  *   user: string,
  *   log: string|null,
- *   shunt: boolean|null
+ *   shunt: boolean|null,
+ *   ports: integer[]|null
  * }} ServiceInstance
  */
 
@@ -54,4 +55,16 @@
  *   update_interval: integer,
  *   log_paths: string[]
  * }} ServiceSettings
+ */
+
+/**
+ * procd 返回的实例状态；运行状态与 PID 用于就绪检查。
+ * @typedef {object} ProcdInstanceStatus
+ * @property {boolean} running
+ * @property {integer} pid
+ */
+
+/**
+ * @typedef {object} ProcdServiceStatus
+ * @property {Object<string, ProcdInstanceStatus>} instances
  */

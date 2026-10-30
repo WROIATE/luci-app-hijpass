@@ -3284,3 +3284,9 @@ msgstr ""
 
 msgid "Details"
 msgstr ""
+
+msgid "Configuration saved, but service apply failed. Previous runtime restored; see main log."
+msgstr ""
+
+msgid "Configuration saved, but service apply failed. Check service status and main log."
+msgstr ""

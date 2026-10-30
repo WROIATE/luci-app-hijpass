@@ -9,9 +9,14 @@ if [ "${1:-}" = server ]; then server=1; shift; fi
 action=${1:-}
 [ "$#" -eq 0 ] || shift
 config_directory=
+output_directory=
 if [ "${1:-}" = --configdir ]; then
     config_directory=${2:-}
     [ -n "$config_directory" ] || { echo 'missing --configdir' >&2; exit 1; }
+    shift 2
+fi
+if [ "${1:-}" = --outputdir ]; then
+    output_directory=${2:?missing output directory}
     shift 2
 fi
 with_config() {
@@ -40,8 +45,8 @@ stop_client() {
     # 即使一个步骤失败，其余资源仍继续清理；最后统一返回失败。
     failed=0
     hook stop || failed=1
-    "$HIJPASS_LIB/firewall/route.sh" remove || failed=1
     "$HIJPASS_LIB/firewall/firewall.sh" remove || failed=1
+    "$HIJPASS_LIB/firewall/route.sh" remove || failed=1
     cron_update disable || failed=1
     rm -f /etc/hijpass/chinadns-ng.conf /tmp/hijpass/domain-proxy-geo.txt /tmp/hijpass/domain-direct-geo.txt || failed=1
     [ "$failed" -eq 0 ] || return 1
@@ -53,24 +58,26 @@ case "$action" in
         if [ "$enabled" = 1 ]; then
             # 数据准备全部完成才交给 procd；外部转换工具由本层调用。
             if [ "$server" = 0 ]; then
-                data_call configs "$@" || exit 1
-                [ "$geo_convert" != 1 ] || with_config "$HIJPASS_LIB/rules/geoview.sh" --convert "$@" || exit 1
-                with_config "$HIJPASS_LIB/rules/geoview.sh" dns "$@" || exit 1
+                data_call configs "$output_directory" "$@" || exit 1
+                [ "$geo_convert" != 1 ] || with_config "$HIJPASS_LIB/rules/geoview.sh" --convert --outputdir "$output_directory" "$@" || exit 1
+                with_config "$HIJPASS_LIB/rules/geoview.sh" dns --outputdir "$output_directory" "$@" || exit 1
+            elif [ -n "$output_directory" ]; then
+                data_call server-files "$output_directory" || exit 1
             fi
             json_select log_paths
             json_get_keys entries
             for entry in $entries; do json_get_var path "$entry"; mkdir -p "$(dirname -- "$path")" || exit 1; done
             json_select ..
         fi
-        hijpass_step "$module" 'Prepare process instances and DNS' "${LINENO:-}" data_call prepare "$@" ;;
+        hijpass_step "$module" 'Prepare process instances and DNS' "${LINENO:-}" data_call prepare "$output_directory" "$@" ;;
     activate)
         [ "$enabled" = 1 ] || exit 0
         if [ "$server" = 1 ]; then
-            data_call server-files "$@" && hijpass_step "$module" 'Firewall reload' "${LINENO:-}" fw4 reload && cron_update enable || exit 1
+            hijpass_step "$module" 'Firewall reload' "${LINENO:-}" fw4 reload && cron_update enable || exit 1
             hijpass_log INFO "$module" "${LINENO:-}" 'Activation completed'
         else
             # 启动错误回滚与命令执行集中在 Shell，ucode 不再驱动服务启停。
-            if with_config "$HIJPASS_LIB/firewall/firewall.sh" reset "$@" && "$HIJPASS_LIB/firewall/route.sh" reset && hook start && cron_update enable; then
+            if "$HIJPASS_LIB/firewall/route.sh" reset && "$HIJPASS_LIB/firewall/firewall.sh" reload && hook start && cron_update enable; then
                 hijpass_log INFO "$module" "${LINENO:-}" "Activation completed: elapsed=$(($(date +%s) - started))s"
             else
                 hijpass_log WARN "$module" "${LINENO:-}" 'Activation failed; rolling back service resources'

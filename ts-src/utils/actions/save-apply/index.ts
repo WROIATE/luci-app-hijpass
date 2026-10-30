@@ -1,10 +1,8 @@
 import { LuciFlied } from "../../../enum/hijpass";
 import uci from "uci";
 import ui from "ui";
-import { NodeFileCleanupUtils } from "./node-file-cleanup";
 import { NotificationUtils } from "../../base/luci/notification";
 import { Backend } from "../../backend";
-import { FormUtils } from "../../base/luci/form";
 import { PrecheckUtils } from "./precheck";
 
 function isGlobalServiceDisabled() {
@@ -12,6 +10,28 @@ function isGlobalServiceDisabled() {
 }
 
 const SaveApplyUtils = {
+    watchApplyStatus: function () {
+        let attempts = 0;
+        const reported = new Set<string>();
+        const refresh = async () => {
+            try {
+                const result = await Backend.serviceApplyStatus();
+                for (const name of ['hijpass', 'hijserver']) {
+                    const status = result[name];
+                    if (status?.state === 'failed' && !reported.has(name + status.updated)) {
+                        reported.add(name + status.updated);
+                        const message = status.rollback === 'restored'
+                            ? _('Configuration saved, but service apply failed. Previous runtime restored; see main log.')
+                            : _('Configuration saved, but service apply failed. Check service status and main log.');
+                        NotificationUtils.error(_('Configuration Apply Failed'), name + ': ' + message, 0);
+                    }
+                }
+                if (Object.values(result).some(status => status?.state === 'applying') && ++attempts < 120)
+                    window.setTimeout(refresh, 1000);
+            } catch (e) { console.error(e); }
+        };
+        void refresh();
+    },
     genHandleSaveApply: function () {
         return async function (ev: Event, mode?: string | number) {
             try {
@@ -19,7 +39,7 @@ const SaveApplyUtils = {
 
                 if (isGlobalServiceDisabled()) {
                     await uci.save();
-                    await ui.changes.apply(mode == '0');
+                    ui.changes.apply(mode == '0');
                     return;
                 }
 
@@ -27,15 +47,10 @@ const SaveApplyUtils = {
                     return;
                 }
 
-                const written = await Backend.writeConfigs(JSON.stringify(uci.sections(LuciFlied.CONF_NAME, undefined)));
-                if (written.shunt !== undefined) uci.set_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE,
-                    'shunt_hash', String(FormUtils.simpleHash(written.shunt)));
-
+                await Backend.validateConfigs(JSON.stringify(uci.sections(LuciFlied.CONF_NAME, undefined)));
                 await uci.save();
-                let changes = await uci.changes()
-                await NodeFileCleanupUtils.cleanupChangedNodeFiles(changes)
 
-                await ui.changes.apply(mode == '0');
+                ui.changes.apply(mode == '0');
             } catch (e) {
                 console.log(e)
                 NotificationUtils.error(_('Configuration Apply Failed'), _(e.message), 5000);

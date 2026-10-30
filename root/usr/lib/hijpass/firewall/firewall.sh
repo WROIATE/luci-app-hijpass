@@ -11,6 +11,7 @@ action=${1:-}
 stage=$action
 trap 'code=$?; if [ "$code" -ne 0 ]; then hijpass_log ERROR firewall "${LINENO:-}" "$stage failed: exit=$code"; fi' EXIT
 case "$action" in
+    reload) hijpass_step firewall 'Reload prepared rules' "${LINENO:-}" fw4 reload; exit $? ;;
     show) exec nft list table inet hijpass ;;
     remove)
         rm -f "$rules" && hijpass_step firewall 'Reload after removal' "${LINENO:-}" fw4 reload || exit 1

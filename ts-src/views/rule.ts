@@ -8,6 +8,7 @@ import { RuntimePanelUtils } from "../utils/feature/rule/runtime";
 
 const v = view.extend({
     load: function () {
+        SaveApplyUtils.watchApplyStatus();
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME)
         ]);

@@ -1,26 +1,9 @@
 #!/bin/sh /etc/rc.common
 
-USE_PROCD=1
 START=99
 STOP=15
-RUNTIME=/usr/lib/hijpass/service/service.sh
-. /usr/lib/hijpass/service/procd.sh
-
-# 服务端的数据准备使用 ucode，进程、防火墙应用和服务启停由 Shell 组织。
-start_service() {
-    local plan
-    plan="$($RUNTIME server prepare)" || return 1
-    hijpass_start_instances "$plan" || return 1
-    $RUNTIME server activate
-}
-
-stop_service() {
-    $RUNTIME server deactivate
-}
-
-reload_service() {
-    /etc/init.d/hijserver restart
-}
+# 保留 rc.common 命令入口，生命周期显式检查每个阶段与 procd 的返回值。
+. /usr/lib/hijpass/service/lifecycle.sh
 
 service_triggers() {
     procd_add_reload_trigger hijserver

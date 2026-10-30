@@ -1,6 +1,6 @@
 #!/bin/sh
 # 共享的 procd 桥接，只消费 ucode 的 Instance 对象；此处不读取业务配置。
-hijpass_start_instances() {
+hijpass_register_instances() {
     local plan keys key old_namespace
     plan=$1
     json_set_namespace hijpass_plan old_namespace

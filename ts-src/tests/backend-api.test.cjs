@@ -35,13 +35,13 @@ test('editors send resource identities and propagate backend failures', async ()
     assert.deepEqual(Array.from(f.calls[1][1]), ['proxy_config', 'node', 'renamed', '{}']);
 });
 
-test('configuration preview, validation and writes share the hijpass RPC object', async () => {
+test('configuration preview and validation share the hijpass RPC object without a file-writing API', async () => {
     const f = backend(method => method === 'config_render' ? { config: { outbounds: [] } } : { ok: true });
     const snapshot = '[{".name":"global",".type":"hijpass"}]';
     assert.deepEqual((await f.api.renderConfigs(snapshot, 'node')).config, { outbounds: [] });
     await f.api.validateConfigs(snapshot);
-    await f.api.writeConfigs(snapshot);
-    assert.deepEqual(f.calls.map(([method]) => method), ['config_render', 'config_validate', 'config_write']);
+    assert.equal(f.api.writeConfigs, undefined);
+    assert.deepEqual(f.calls.map(([method]) => method), ['config_render', 'config_validate']);
     assert.deepEqual(Array.from(f.calls[0][1]), [snapshot, 'node']);
 });
 

@@ -443,6 +443,7 @@ function getShuntDnsDependencyError(section: LuCI.form.AbstractSection, sectionI
 
 const v = view.extend({
     load: function () {
+        SaveApplyUtils.watchApplyStatus();
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME)
         ]);
@@ -453,7 +454,7 @@ const v = view.extend({
             await view.prototype.handleSave(ev)
         } catch (e) {
             console.log(e);
-            NotificationUtils.error(_('Configuration Save Failed'), _(e.message), 5000);
+            throw e;
         }
     },
 

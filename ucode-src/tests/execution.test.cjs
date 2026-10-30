@@ -467,6 +467,10 @@ test('服务端模板仅开放选中的端口，错误保留旧规则，没有�
         assert.equal(f.data('service/preparecli.uc', ['server', 'server-files', '--configdir', config]).status, 0);
         assert.equal(fs.existsSync(table), false);
         assert.equal(fs.existsSync(chain), false);
+        fs.mkdirSync(table);
+        const failedRemoval = f.data('service/preparecli.uc', ['server', 'server-files', '--configdir', config]);
+        assert.equal(failedRemoval.status, 1);
+        assert.match(failedRemoval.stderr, /cannot remove/);
     });
 });
 
@@ -994,4 +998,66 @@ recover_job() {`);
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(JSON.parse(result.stdout), { running: false, code: 0, stdout: '{"success":true}', stderr: '' });
     assert.equal(fs.readFileSync(path.join(job, 'exit'), 'utf8'), '0\n');
+});
+
+for (const fail of ['', 'route', 'firewall', 'hook']) test(`客户端按路由、防火墙、DNS 顺序激活，${fail || '正常'}分支不跨越失败阶段`, t => {
+    const f = fixture(t), events = f.directory + '/events';
+    for (const [file, stage] of [['route.sh', 'route'], ['firewall.sh', 'firewall']])
+        fs.writeFileSync(f.runtime + '/firewall/' + file,
+            `#!/bin/sh\necho '${stage}' >>"$EVENTS"\n[ "$FAIL_STAGE" != '${stage}' ]\n`, { mode: 0o755 });
+    f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ]');
+    f.script('cron-init', 'echo cron >>"$EVENTS"');
+    f.patch('service/service.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
+    withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
+        const result = f.run('service/service.sh', ['activate', '--configdir', config], { EVENTS: events, FAIL_STAGE: fail });
+        assert.equal(result.status, fail ? 1 : 0, result.stderr);
+    });
+    const expected = ['route', 'firewall', 'hook', 'cron'];
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail ? expected.slice(0, expected.indexOf(fail) + 1) : expected);
+});
+
+test('客户端防火墙撤流失败时保留策略路由，不继续清理', t => {
+    const f = fixture(t), events = f.directory + '/events';
+    fs.writeFileSync(f.runtime + '/firewall/firewall.sh', '#!/bin/sh\necho firewall >>"$EVENTS"\nexit 1\n', { mode: 0o755 });
+    fs.writeFileSync(f.runtime + '/firewall/route.sh', '#!/bin/sh\necho route >>"$EVENTS"\n', { mode: 0o755 });
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
+    f.script('dns-hook', 'echo hook >>"$EVENTS"');
+    withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
+        const result = f.run('service/service.sh', ['deactivate', '--configdir', config], { EVENTS: events });
+        assert.equal(result.status, 1);
+    });
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall']);
+});
+
+test('服务端独立准备自定义命令，激活只写端口规则和日志任务，不生成客户端数据', t => {
+    const f = fixture(t), events = f.directory + '/events', table = f.directory + '/server.nft', chain = f.directory + '/chain.nft';
+    for (const file of ['service/prepare.uc', 'service/server.sh']) {
+        f.patch(file, '/usr/share/nftables.d/table-post/hijserver.nft', table);
+        f.patch(file, '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', chain);
+    }
+    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('service/server.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.script('fw4', 'echo firewall >>"$EVENTS"');
+    f.script('cron-init', 'echo cron >>"$EVENTS"');
+    for (const file of ['firewall/firewall.sh', 'firewall/route.sh', 'rules/geoview.sh', 'service/service.sh'])
+        fs.writeFileSync(f.runtime + '/' + file, '#!/bin/sh\necho unexpected >>"$EVENTS"\nexit 1\n', { mode: 0o755 });
+    withConfig([], config => {
+        fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '1'\nconfig server_node 'server'\n option enabled '1'\n option name 'server'\n option command 'program -c {conf_path}'\n option allow_firewall '1'\n option listen_port '8443'\n");
+        f.patch('service/server.sh', 'server "$@";', `server "$@" --configdir '${config}';`);
+        const prepared = f.run('service/server.sh', ['prepare'], { EVENTS: events });
+        assert.equal(prepared.status, 0, prepared.stderr);
+        assert.deepEqual(JSON.parse(prepared.stdout).instances[0].command,
+            ['/bin/sh', '-c', "program -c '/etc/hijpass/server/server-server.json'"]);
+        assert.equal(fs.existsSync(table), false);
+        assert.equal(fs.existsSync(events), false);
+        const activated = f.run('service/server.sh', ['activate'], { EVENTS: events });
+        assert.equal(activated.status, 0, activated.stderr);
+        assert.match(fs.readFileSync(table, 'utf8'), /8443/);
+        assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['firewall', 'cron']);
+        assert.equal(f.run('service/server.sh', ['deactivate'], { EVENTS: events }).status, 0);
+        assert.equal(fs.existsSync(table), false);
+        assert.equal(fs.existsSync(chain), false);
+    });
 });

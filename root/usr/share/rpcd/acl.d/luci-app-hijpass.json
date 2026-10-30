@@ -18,7 +18,6 @@
           "log_read",
           "defaults",
           "firewall_show",
-          "service_apply_status",
           "network_connect",
           "network_ping",
           "rule_query",

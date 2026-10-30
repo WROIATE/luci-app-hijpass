@@ -5,8 +5,9 @@ hijpass_register_instances() {
     plan=$1
     json_set_namespace hijpass_plan old_namespace
     json_load "$plan" || { json_set_namespace "$old_namespace"; return 1; }
-    json_select instances
+    json_select instances || { json_set_namespace "$old_namespace"; return 1; }
     json_get_keys keys
+    service_instance_keys=$keys
     for key in $keys; do
         json_select "$key"
         hijpass_open_instance
@@ -15,6 +16,70 @@ hijpass_register_instances() {
     json_cleanup
     json_set_namespace "$old_namespace"
 }
+
+# 仅检查标准核心命令。用户自定义 Shell 命令仍按原样交给 procd。
+hijpass_check_instances() (
+    json_set_namespace hijpass_check
+    json_load "$1" && json_select instances || exit 1
+    json_get_keys entries
+    for entry in $entries; do
+        json_select "$entry"
+        json_select command
+        json_get_var engine 1
+        path=
+        json_get_keys keys
+        previous=
+        for key in $keys; do
+            json_get_var value "$key"
+            [ "$previous" != -c ] || path=$value
+            previous=$value
+        done
+        json_select ..
+        case "$engine" in
+            xray|sing-box)
+                [ -n "$path" ] || exit 1
+                json_select env
+                json_get_keys keys
+                set --
+                for key in $keys; do json_get_var value "$key"; set -- "$@" "$value"; done
+                json_select ..
+                if [ "$engine" = xray ]; then
+                    env "$@" xray run -test -c "$path" || exit 1
+                else
+                    env "$@" sing-box check -c "$path" || exit 1
+                fi ;;
+        esac
+        json_select ..
+    done
+)
+
+# procd 提交后异步启动进程；只检查本次声明的实例，连续两次运行才继续。
+hijpass_wait_instances() (
+    service=$1
+    json_set_namespace hijpass_wait
+    json_load "$2" && json_select instances || exit 1
+    json_get_keys keys
+    attempt=0 stable=0
+    while [ "$attempt" -lt 20 ]; do
+        pending=
+        for key in $keys; do
+            json_select "$key"
+            json_get_var id id
+            json_get_var name name
+            # procd_running 会重置 jshn；隔离查询，保留正在遍历的实例描述。
+            ( procd_running "$service" "$id-$name" ) || pending="$pending $id-$name"
+            json_select ..
+        done
+        if [ -z "$pending" ]; then
+            stable=$((stable + 1))
+            [ "$stable" -lt 2 ] || exit 0
+        else stable=0; fi
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+    echo "Service instances did not stay running:$pending" >&2
+    exit 1
+)
 
 hijpass_open_instance() {
     local id name user log shunt keys key value

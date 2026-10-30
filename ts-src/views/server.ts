@@ -11,7 +11,6 @@ import {UciUtils} from "../utils/base/luci/uci";
 
 const v = view.extend({
     load: function () {
-        SaveApplyUtils.watchApplyStatus();
         return Promise.all([
             uci.load(LuciFlied.SERVER_CONF_NAME),
             uci.load(LuciFlied.CONF_NAME),

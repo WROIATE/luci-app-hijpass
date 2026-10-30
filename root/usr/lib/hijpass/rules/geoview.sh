@@ -6,12 +6,6 @@
 data="$HIJPASS_LIB/rules/rulescli.uc"
 action=${1:-}
 [ "$#" -eq 0 ] || shift
-output_directory=
-if [ "${1:-}" = --outputdir ]; then
-    [ "$#" -ge 2 ] || exit 1
-    output_directory=$2
-    shift 2
-fi
 case "$action" in
     -t|--convert) plan=$(hijpass_data "$data" geo-plan "$@") || exit 1; mode=convert ;;
     dns) plan=$(hijpass_data "$data" dns-plan "$@") || exit 1; mode=dns ;;
@@ -43,7 +37,6 @@ trap 'code=$?; if [ -n "$staged" ]; then rm -f "$staged"; fi; if [ "$code" -ne 0
 for job in $jobs; do
     json_select "$job"
     json_get_var output output
-    output="$output_directory$output"
     mkdir -p "$(dirname -- "$output")" || exit 1
     staged=$(mktemp "$output.new.XXXXXX") || exit 1
     if [ "$mode" = convert ]; then

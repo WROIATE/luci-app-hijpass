@@ -1,9 +1,42 @@
 #!/bin/sh /etc/rc.common
 
+USE_PROCD=1
 START=99
 STOP=15
-# 保留 rc.common 命令入口，生命周期显式检查每个阶段与 procd 的返回值。
-. /usr/lib/hijpass/service/lifecycle.sh
+RUNTIME=/usr/lib/hijpass/service/server.sh
+. /usr/lib/hijpass/common.sh
+. /usr/lib/hijpass/service/procd.sh
+
+# 服务端的数据准备使用 ucode，进程、防火墙应用和服务启停由 Shell 组织。
+start_service() {
+    # rc.common 不传播此回调的 return；失败必须退出，避免提交部分实例。
+    service_plan="$(hijpass_step server 'Prepare service' "${LINENO:-}" "$RUNTIME" prepare)" || exit 1
+    hijpass_step server 'Check core configurations' "${LINENO:-}" hijpass_check_instances "$service_plan" || exit 1
+    hijpass_register_instances "$service_plan" || exit 1
+    # 禁用服务时，在 procd 提交空实例列表前撤销网络配置。
+    [ -n "$service_instance_keys" ] || "$RUNTIME" deactivate || exit 1
+}
+
+service_started() {
+    [ -n "$service_instance_keys" ] || return 0
+    if hijpass_step server 'Wait for service instances' "${LINENO:-}" hijpass_wait_instances hijserver "$service_plan" &&
+        "$RUNTIME" activate; then
+        return 0
+    fi
+    # 启动或接管流量失败：撤销本服务网络配置后停止本服务实例。
+    stop_service
+    procd_kill hijserver
+    return 1
+}
+
+stop_service() {
+    # 撤流失败时退出，阻止 rc.common 继续停止核心，避免流量落到空端口。
+    "$RUNTIME" deactivate || exit 1
+}
+
+reload_service() {
+    /etc/init.d/hijserver restart
+}
 
 service_triggers() {
     procd_add_reload_trigger hijserver

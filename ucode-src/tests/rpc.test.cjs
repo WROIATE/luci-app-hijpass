@@ -78,12 +78,12 @@ test('RPC reads the full editable template and serves an immutable default witho
     assert.equal(f.invoke('not_a_method').error, 'unknown RPC method');
 });
 
-test('one RPC object exposes configuration preview, validation and apply status with matching ACLs', t => {
+test('one RPC object exposes configuration preview and validation with matching ACLs', t => {
     const f = fixture(t), schema = f.invoke('list');
     assert.deepEqual(schema.config_render, { sections: '', target: '' });
     assert.deepEqual(schema.config_validate, { sections: '' });
     assert.equal(schema.config_write, undefined);
-    assert.deepEqual(schema.service_apply_status, {});
+    assert.equal(schema.service_apply_status, undefined);
     assert.throws(() => fs.lstatSync(path.join(root, 'root/usr/libexec/rpcd/hijpass-config')), { code: 'ENOENT' });
     const acl = JSON.parse(fs.readFileSync(path.join(root, 'root/usr/share/rpcd/acl.d/luci-app-hijpass.json'), 'utf8'))['luci-app-hijpass'];
     assert.equal(acl.write.ubus['hijpass-config'], undefined);

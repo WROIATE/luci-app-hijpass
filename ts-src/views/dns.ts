@@ -39,7 +39,6 @@ function appendDnsServerOptions(option: LuCI.form.ListValue, routingDns: Routing
 
 const v = view.extend({
     load: function () {
-        SaveApplyUtils.watchApplyStatus();
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME)
         ]);

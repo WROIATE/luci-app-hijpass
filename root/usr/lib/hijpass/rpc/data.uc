@@ -3,7 +3,6 @@ import { defaultTemplate } from '../firewall/generate.uc';
 import { editor, logs, log } from './files.uc';
 import { generate, validate } from 'hijpass.config.generate';
 import { read } from 'hijpass.uci.read';
-import { status as applyStatus } from '../service/transaction.uc';
 import { writeOutput } from 'hijpass.command.runtime';
 
 // RPC 参数是业务数据。没有文件路径或通用 command/argv 入口。
@@ -11,7 +10,7 @@ const methods = {
     firewall_template_default: {}, editor_read: { resource: '', section: '', name: '' },
     editor_write: { resource: '', section: '', name: '', content: '' },
     config_render: { sections: '', target: '' }, config_validate: { sections: '' },
-    service_apply_status: {}, log_list: {}, log_read: { id: '', action: '', lines: '' },
+    log_list: {}, log_read: { id: '', action: '', lines: '' },
     log_clear: { id: '' },
     defaults: {}, cleanup_node: { kind: '', section: '', name: '' },
     service_restart: {}, firewall_reset: {}, firewall_show: {},
@@ -80,9 +79,6 @@ try {
             let generated = generate(sections, request.target);
             result = request.target ? { config: generated } : generated;
         }
-    }
-    else if (method == 'service_apply_status') {
-        result = { hijpass: applyStatus('hijpass'), hijserver: applyStatus('hijserver') };
     }
     else {
         die('unknown data method');

@@ -2527,9 +2527,3 @@ msgstr "规则文件已更新，但服务重启失败，请查看主日志"
 
 msgid "Backend operation failed; see main log"
 msgstr "后台操作失败，请查看主日志"
-
-msgid "Configuration saved, but service apply failed. Previous runtime restored; see main log."
-msgstr "配置已保存，但服务应用失败。已恢复之前的运行配置，请查看主日志。"
-
-msgid "Configuration saved, but service apply failed. Check service status and main log."
-msgstr "配置已保存，但服务应用失败。请检查服务状态和主日志。"

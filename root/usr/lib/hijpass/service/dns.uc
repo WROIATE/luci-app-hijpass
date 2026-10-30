@@ -21,7 +21,7 @@ import { logger } from '../maintenance/logs.uc';
  * @param {string} output
  * @returns {integer} 去重后的域名数量；结果写入 output。
  */
-function domains(path, output, outputDirectory) {
+function domains(path, output) {
 	let result = [], tags = [];
 	for (let line in lines(fs.readfile(path))) {
 		if (substr(line, 0, 8) == 'geosite:') {
@@ -36,10 +36,10 @@ function domains(path, output, outputDirectory) {
 	}
 	// Geo 提取由 Shell 完成；此处只合并提取结果与用户域名。
 	if (length(tags)) {
-		push(result, ...map(lines(fs.readfile((outputDirectory || '') + replace(output, /[.]txt$/, '-geo.txt'))), lc));
+		push(result, ...map(lines(fs.readfile(replace(output, /[.]txt$/, '-geo.txt'))), lc));
 	}
 	result = uniq(result);
-	atomic((outputDirectory || '') + output, join('\n', result) + '\n', 0o644);
+	atomic(output, join('\n', result) + '\n', 0o644);
 	return length(result);
 }
 /**
@@ -85,10 +85,9 @@ export function options(sections, dnsmasq) {
  * 生成 chinadns-ng 配置和域名文件，并准备启动参数。
  * @param {UciSection[]} sections
  * @param {string} [configDirectory] 需要 dnsmasq 时从此目录加载 dhcp 配置。
- * @param {string} [outputDirectory] 候选输出根目录。
  * @returns {ServiceInstance|null} procd 实例 {id, name, command, env, user}；其他 DNS 模式返回 null。
  */
-export function prepare(sections, configDirectory, outputDirectory) {
+export function prepare(sections, configDirectory) {
 	let dns = findDnsSection(sections), dnsmasq = null;
 	if (!dns) {
 		return null;
@@ -101,9 +100,9 @@ export function prepare(sections, configDirectory, outputDirectory) {
 	if (!settings) {
 		return null;
 	}
-	let proxyCount = domains(RULE_FILES.domain_proxy, '/tmp/hijpass/domain-proxy.txt', outputDirectory);
-	let directCount = domains(RULE_FILES.domain_direct, '/tmp/hijpass/domain-direct.txt', outputDirectory);
-	atomic((outputDirectory || '') + '/etc/hijpass/chinadns-ng.conf', renderTemplate('/usr/lib/hijpass/service/chinadns.ut', { options: settings }), 0o644);
+	let proxyCount = domains(RULE_FILES.domain_proxy, '/tmp/hijpass/domain-proxy.txt');
+	let directCount = domains(RULE_FILES.domain_direct, '/tmp/hijpass/domain-direct.txt');
+	atomic('/etc/hijpass/chinadns-ng.conf', renderTemplate('/usr/lib/hijpass/service/chinadns.ut', { options: settings }), 0o644);
 	logger(sections)('INFO', `[dns] chinadns-ng prepared: port=${settings.listenPort}, direct_domains=${directCount}, proxy_domains=${proxyCount}, chn_list=${settings.useChn}, gfw_list=${settings.useGfw}`);
 	return { id: dns['.name'], name: 'chinadns-ng', command: ['chinadns-ng', '-C', '/etc/hijpass/chinadns-ng.conf'], env: [], user: 'hijpass' };
 };

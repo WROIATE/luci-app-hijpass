@@ -443,7 +443,6 @@ function getShuntDnsDependencyError(section: LuCI.form.AbstractSection, sectionI
 
 const v = view.extend({
     load: function () {
-        SaveApplyUtils.watchApplyStatus();
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME)
         ]);

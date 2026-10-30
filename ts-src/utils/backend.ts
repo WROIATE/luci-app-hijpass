@@ -4,8 +4,6 @@ export type EditorResource = 'ip_direct' | 'ip_proxy' | 'domain_direct' | 'domai
     | 'nft_hook' | 'dns_hook' | 'shunt_conf' | 'firewall_template' | 'proxy_config' | 'server_config';
 export type Editor = { resource: EditorResource; section?: string; name?: string };
 export type Log = { id: string; kind: 'main' | 'shunt' | 'proxy' | 'server'; name: string };
-export type ServiceApplyStatus = { state: 'idle' | 'applying' | 'applied' | 'failed' | 'stopped';
-    phase?: string; rollback?: 'none' | 'restored' | 'failed'; updated?: number };
 export type RuleUpdateResult = { success: boolean; failed?: string[]; code?: string };
 
 // 页面只使用业务方法。文件布局、命令位置以及参数组装由后端负责。
@@ -27,7 +25,6 @@ const firewallDefault = method('firewall_template_default');
 const logs = method('log_list');
 const jobStatus = method('job_status', ['id']);
 const jobRelease = method('job_release', ['id']);
-const applyStatus = method('service_apply_status', [], true);
 
 // 每次轮询都是短 RPC；页面等待不会占住一次持续下载的 RPC 请求。
 async function runJob(start: (...args: any[]) => Promise<any>, jsonOutput: boolean, ...args: any[]) {
@@ -73,7 +70,6 @@ export const Backend = {
         editorWrite(editor.resource, editor.section || '', editor.name || '', content),
     renderConfigs: method('config_render', ['sections', 'target']),
     validateConfigs: method('config_validate', ['sections']),
-    serviceApplyStatus: (): Promise<{ hijpass: ServiceApplyStatus; hijserver: ServiceApplyStatus }> => applyStatus(),
     logList: async (): Promise<Log[]> => (await logs()).logs,
     readLog: async (id: string, lines: string = '200'): Promise<string> => (await logRead(id, 'read', lines)).content,
     downloadLog: (id: string) => logRead(id, 'download', ''),

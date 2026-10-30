@@ -10,7 +10,6 @@ import { FirewallMigrationUtils } from "../utils/feature/firewall/migration";
 
 const v = view.extend({
     load: function () {
-        SaveApplyUtils.watchApplyStatus();
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME),
             uci.load(LuciFlied.SERVER_CONF_NAME),

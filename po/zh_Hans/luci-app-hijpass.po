@@ -129,6 +129,9 @@ msgstr "不能将自身作为前置代理"
 msgid "chacha20-ietf-poly1305"
 msgstr "chacha20-ietf-poly1305"
 
+msgid "Checking..."
+msgstr "检查中…"
+
 msgid "ChinaDNS-NG Listen Port"
 msgstr "指定ChinaDNS-NG的监听端口"
 
@@ -359,6 +362,9 @@ msgstr "不使用"
 
 msgid "Display Lines"
 msgstr "显示行数"
+
+msgid "Failed to check update status: %s"
+msgstr "检查更新状态失败：%s"
 
 msgid "Independent DNS"
 msgstr "独立 DNS"

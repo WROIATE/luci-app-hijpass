@@ -7,8 +7,8 @@ export type Log = { id: string; kind: 'main' | 'shunt' | 'proxy' | 'server'; nam
 export type RuleUpdateResult = { success: boolean; failed?: string[]; code?: string };
 
 // 页面只使用业务方法。文件布局、命令位置以及参数组装由后端负责。
-function method(name: string, params: string[] = []) {
-    const call = rpc.declare({ object: 'hijpass', method: name, params, reject: true,
+function method(name: string, params: string[] = [], nobatch = false) {
+    const call = rpc.declare({ object: 'hijpass', method: name, params, reject: true, nobatch,
         expect: { '': { error: 'Invalid backend response' } } });
     return async (...args: any[]) => {
         const result = await call(...args);
@@ -58,7 +58,7 @@ async function waitForJob(id: string, jsonOutput: boolean) {
 
 const coreCalls = {
     version: method('core_version', ['core']),
-    latest: method('core_latest', ['core']),
+    latest: method('core_latest', ['core'], true),
     update: (core: string) => runJob(method('core_update', ['core']), true, core),
 };
 
@@ -87,7 +87,7 @@ export const Backend = {
     connect: method('network_connect', ['url', 'timeout']),
     ping: method('network_ping', ['port']),
     updateRules: (): Promise<RuleUpdateResult> => runJob(method('rule_update'), true),
-    ruleUpdateStatus: (): Promise<{ id: string | null }> => method('rule_update_status')(),
+    ruleUpdateStatus: (): Promise<{ id: string | null }> => method('rule_update_status', [], true)(),
     resumeRuleUpdate: (id: string): Promise<RuleUpdateResult> => waitForJob(id, true),
     queryRules: method('rule_query', ['keyword']),
     matchRule: method('rule_match', ['keyword']),

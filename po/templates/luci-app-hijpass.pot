@@ -171,6 +171,9 @@ msgstr ""
 msgid "chacha20-ietf-poly1305"
 msgstr ""
 
+msgid "Checking..."
+msgstr ""
+
 #: ts-src/views/dns.ts:46
 msgid "ChinaDNS-NG Listen Port"
 msgstr ""
@@ -478,6 +481,9 @@ msgstr ""
 
 #: ts-src/utils/feature/log/panel.ts:326
 msgid "Display Lines"
+msgstr ""
+
+msgid "Failed to check update status: %s"
 msgstr ""
 
 #: root/usr/share/luci/menu.d/luci-app-hijpass.json

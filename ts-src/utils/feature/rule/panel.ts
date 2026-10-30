@@ -158,15 +158,17 @@ const RulePanelUtils = {
                 if (updateButton.disabled) return;
                 updateRuleFile(statusElement, updateButton);
             }
-        }, _('Update Rule Files')) as HTMLButtonElement;
+        }, _('Checking...')) as HTMLButtonElement;
 
         updateButton.disabled = true;
         Backend.ruleUpdateStatus().then(({ id }) => {
             if (id) updateRuleFile(statusElement, updateButton, id);
             else updateButton.disabled = false;
         }).catch(error => {
-            updateUpdateStatus(statusElement, _('Error occurred while updating: %s').format(error.message), 'error');
+            updateUpdateStatus(statusElement, _('Failed to check update status: %s').format(error.message), 'error');
             updateButton.disabled = false;
+        }).finally(() => {
+            updateButton.textContent = _('Update Rule Files');
         });
 
         return E('div', {'class': 'cbi-section'}, [

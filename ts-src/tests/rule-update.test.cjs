@@ -34,7 +34,9 @@ test('rule update shows a concise failure without raw command output, then clear
     const responses = [{ success: false, failed: ['geoip'], details: 'curl failure\ncustom hook warning' }, { success: true }];
     const f = panel(async () => responses.shift());
     assert.equal(f.button.disabled, true);
+    assert.equal(f.button.textContent, 'Checking...');
     await new Promise(setImmediate);
+    assert.equal(f.button.textContent, 'Update Rule Files');
     f.button.attributes.click({ preventDefault() {} });
     assert.equal(f.button.disabled, true);
     await new Promise(setImmediate);
@@ -56,12 +58,33 @@ test('page refresh resumes the existing update and disables repeated clicks', as
     await new Promise(setImmediate);
     assert.equal(f.button.disabled, true);
     assert.equal(f.status.textContent, 'Updating Rule Files');
+    assert.equal(f.button.textContent, 'Update Rule Files');
     f.button.attributes.click({ preventDefault() {} });
     assert.equal(starts, 0);
     assert.equal(resumes, 1);
     finish({ success: true });
     await new Promise(setImmediate);
     assert.equal(f.button.disabled, false);
+    assert.equal(f.status.textContent, 'Rule Files Updated');
+});
+
+test('checking status prevents premature clicks and a failed check restores the update button', async () => {
+    let failCheck, starts = 0;
+    const f = panel(async () => { starts++; return { success: true }; },
+        () => new Promise((resolve, reject) => { failCheck = reject; }));
+    await new Promise(setImmediate);
+    assert.equal(f.button.textContent, 'Checking...');
+    assert.equal(f.button.disabled, true);
+    f.button.attributes.click({ preventDefault() {} });
+    assert.equal(starts, 0);
+    failCheck(new Error('status unavailable'));
+    await new Promise(setImmediate);
+    assert.equal(f.button.disabled, false);
+    assert.equal(f.button.textContent, 'Update Rule Files');
+    assert.equal(f.status.textContent, 'Failed to check update status: status unavailable');
+    f.button.attributes.click({ preventDefault() {} });
+    await new Promise(setImmediate);
+    assert.equal(starts, 1);
     assert.equal(f.status.textContent, 'Rule Files Updated');
 });
 

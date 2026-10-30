@@ -77,10 +77,7 @@ function createCoreRow(core: string, label: string) {
         }
     }, _('Update')) as HTMLButtonElement;
 
-    loadCoreVersion(currentVersionElement, core);
-    loadLatestCoreVersion(latestVersionElement, core);
-
-    return E('div', { 'class': 'cbi-value' }, [
+    const element = E('div', { 'class': 'cbi-value' }, [
         E('label', { 'class': 'cbi-value-title' }, label),
         E('div', {
             'class': 'cbi-value-field',
@@ -97,18 +94,30 @@ function createCoreRow(core: string, label: string) {
             updateButton
         ])
     ]);
+    return { element, loadVersions: () => {
+        loadCoreVersion(currentVersionElement, core);
+        loadLatestCoreVersion(latestVersionElement, core);
+    } };
 }
 
 const RuntimePanelUtils = {
     createCoreVersionPanel: function () {
-        return E('div', { 'class': 'cbi-section' }, [
+        const rows = [createCoreRow(CORE_TYPE.SING_BOX, 'sing-box'), createCoreRow(CORE_TYPE.XRAY, 'Xray')];
+        const panel = E('div', { 'class': 'cbi-section' }, [
             E('div', { 'class': 'cbi-section-descr' },
                 _('View installed core versions and update runtime components.')),
-            E('div', { 'class': 'cbi-section-node' }, [
-                createCoreRow(CORE_TYPE.SING_BOX, 'sing-box'),
-                createCoreRow(CORE_TYPE.XRAY, 'Xray')
-            ])
-        ]);
+            E('div', { 'class': 'cbi-section-node' }, rows.map(row => row.element))
+        ]) as HTMLElement;
+        // 等 LuCI 挂载并初始化页签，兼容恢复上次选中的“运行时”页签。
+        window.requestAnimationFrame(() => {
+            if (!panel.isConnected) return;
+            const pane = panel.closest('[data-tab="runtime"]');
+            if (!pane) return;
+            const load = () => rows.forEach(row => row.loadVersions());
+            if (pane.getAttribute('data-tab-active') === 'true') load();
+            else pane.addEventListener('cbi-tab-active', load, { once: true });
+        });
+        return panel;
     }
 };
 

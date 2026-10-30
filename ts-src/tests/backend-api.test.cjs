@@ -17,7 +17,7 @@ function backend(handler, clock = { now: 0 }) {
                 assert.equal(options.object, 'hijpass');
                 assert.equal(options.reject, true);
                 calls.push([options.method, args]);
-                return handler(options.method, args);
+                return handler(options.method, args, options);
             } };
         },
     });
@@ -95,6 +95,30 @@ test('resuming an existing update polls and acknowledges it without starting ano
     assert.equal((await f.api.ruleUpdateStatus()).id, 'Abcd1234');
     assert.equal((await f.api.resumeRuleUpdate('Abcd1234')).success, true);
     assert.deepEqual(f.calls.map(([method]) => method), ['rule_update_status', 'job_status', 'job_release']);
+});
+
+test('a pending core version lookup does not hold the rule update status response in its RPC batch', async () => {
+    let finishLatest;
+    const latest = new Promise(resolve => { finishLatest = resolve; });
+    const f = backend((method, args, options) => {
+        if (method === 'core_latest') {
+            assert.equal(options.nobatch, true);
+            return latest;
+        }
+        assert.equal(method, 'rule_update_status');
+        return options.nobatch ? { id: null } : latest.then(() => ({ id: null }));
+    });
+    const core = f.api.coreAction('latest', 'xray');
+    let received = false;
+    const status = f.api.ruleUpdateStatus().then(result => { received = true; return result; });
+    try {
+        await new Promise(setImmediate);
+        assert.equal(received, true, 'idle status should arrive while the core lookup is still pending');
+    } finally {
+        finishLatest({ version: 'test' });
+        await core;
+    }
+    assert.equal((await status).id, null);
 });
 
 test('an active partial update is reported as busy instead of claiming a full update succeeded', async () => {

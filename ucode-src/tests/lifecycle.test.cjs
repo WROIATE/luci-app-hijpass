@@ -107,38 +107,38 @@ for (const service of ['hijpass', 'hijserver']) {
         const f = fixture(t, service), result = f.run('start');
         assert.equal(result.status, 0, result.stderr);
         assert.deepEqual(f.events(), [service + ':prepare', `check:sing-box:value with spaces:check -c ${f.directory}/config space.json`,
-            service + ':submit', service + ':running:node-test space', service + ':running:node-test space', service + ':activate']);
+            service + ':submit', service + ':running:node-test space', service + ':running:node-test space', service + ':setup_aux']);
         assert.equal(f.run('start').status, 0);
-        assert.ok(!f.events().some(event => /:kill$|:deactivate$/.test(event)), 'start must not become restart');
+        assert.ok(!f.events().some(event => /:kill$|:clear_aux$/.test(event)), 'start must not become restart');
     });
-    for (const failure of ['prepare', 'check', 'submit', 'ready', 'activate', 'deactivate']) {
+    for (const failure of ['prepare', 'check', 'submit', 'ready', 'setup_aux', 'clear_aux']) {
         test(`${service}: ${failure} 失败返回错误并阻止后续不安全步骤`, t => {
-            const f = fixture(t, service), result = f.run(failure === 'deactivate' ? 'stop' : 'start', failure);
+            const f = fixture(t, service), result = f.run(failure === 'clear_aux' ? 'stop' : 'start', failure);
             assert.notEqual(result.status, 0, result.stderr);
             const events = f.events();
             if (failure === 'prepare' || failure === 'check') {
                 assert.ok(!events.includes(service + ':submit'));
-                assert.ok(!events.includes(service + ':activate'));
-            } else if (failure === 'deactivate') {
-                assert.deepEqual(events, [service + ':deactivate']);
+                assert.ok(!events.includes(service + ':setup_aux'));
+            } else if (failure === 'clear_aux') {
+                assert.deepEqual(events, [service + ':clear_aux']);
             } else {
-                if (failure !== 'activate') assert.ok(!events.includes(service + ':activate'));
-                assert.deepEqual(events.slice(-2), [service + ':deactivate', service + ':kill']);
+                if (failure !== 'setup_aux') assert.ok(!events.includes(service + ':setup_aux'));
+                assert.deepEqual(events.slice(-2), [service + ':clear_aux', service + ':kill']);
             }
         });
     }
     test(`${service}: stop 先撤流再停实例；reload 沿用原项目 restart 语义`, t => {
         const f = fixture(t, service);
         assert.equal(f.run('stop').status, 0);
-        assert.deepEqual(f.events(), [service + ':deactivate', service + ':kill']);
+        assert.deepEqual(f.events(), [service + ':clear_aux', service + ':kill']);
         assert.equal(f.run('reload').status, 0);
-        assert.deepEqual(f.events().slice(0, 3), [service + ':deactivate', service + ':kill', service + ':prepare']);
-        assert.equal(f.events().at(-1), service + ':activate');
+        assert.deepEqual(f.events().slice(0, 3), [service + ':clear_aux', service + ':kill', service + ':prepare']);
+        assert.equal(f.events().at(-1), service + ':setup_aux');
     });
     test(`${service}: 禁用时撤流后提交空实例，不重新激活网络`, t => {
         const f = fixture(t, service), result = f.run('start', '', { DISABLED: '1' });
         assert.equal(result.status, 0, result.stderr);
-        assert.deepEqual(f.events(), [service + ':prepare', service + ':deactivate', service + ':submit']);
+        assert.deepEqual(f.events(), [service + ':prepare', service + ':clear_aux', service + ':submit']);
         assert.deepEqual(JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances, {});
     });
 }
@@ -163,5 +163,5 @@ test('多个实例必须全部运行，已有其他实例不能掩盖本次实�
     assert.equal(f.events().filter(event => event === 'hijpass:running:second-node').length, 2);
     const failed = f.run('start', '', { FAIL_INSTANCE: 'second-node' });
     assert.notEqual(failed.status, 0);
-    assert.ok(!f.events().includes('hijpass:activate'));
+    assert.ok(!f.events().includes('hijpass:setup_aux'));
 });

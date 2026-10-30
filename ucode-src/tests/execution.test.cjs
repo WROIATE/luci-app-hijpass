@@ -122,7 +122,7 @@ test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变
     f.patch('service/prepare.uc', '/etc/crontabs/root', path.join(f.directory, 'crontab'));
     f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', hook);
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
-        const result = f.run('service/service.sh', ['activate', '--configdir', config]);
+        const result = f.run('service/service.sh', ['setup_aux', '--configdir', config]);
         assert.equal(result.status, 0, result.stderr);
         assert.equal(result.stdout, '');
         assert.equal(result.stderr, '');
@@ -1011,7 +1011,7 @@ for (const fail of ['', 'route', 'firewall', 'hook']) test(`客户端按路由�
     f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
     f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
-        const result = f.run('service/service.sh', ['activate', '--configdir', config], { EVENTS: events, FAIL_STAGE: fail });
+        const result = f.run('service/service.sh', ['setup_aux', '--configdir', config], { EVENTS: events, FAIL_STAGE: fail });
         assert.equal(result.status, fail ? 1 : 0, result.stderr);
     });
     const expected = ['route', 'firewall', 'hook', 'cron'];
@@ -1025,7 +1025,7 @@ test('客户端防火墙撤流失败时保留策略路由，不继续清理', t 
     f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     f.script('dns-hook', 'echo hook >>"$EVENTS"');
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
-        const result = f.run('service/service.sh', ['deactivate', '--configdir', config], { EVENTS: events });
+        const result = f.run('service/service.sh', ['clear_aux', '--configdir', config], { EVENTS: events });
         assert.equal(result.status, 1);
     });
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall']);
@@ -1052,11 +1052,11 @@ test('服务端独立准备自定义命令，激活只写端口规则和日志�
             ['/bin/sh', '-c', "program -c '/etc/hijpass/server/server-server.json'"]);
         assert.equal(fs.existsSync(table), false);
         assert.equal(fs.existsSync(events), false);
-        const activated = f.run('service/server.sh', ['activate'], { EVENTS: events });
+        const activated = f.run('service/server.sh', ['setup_aux'], { EVENTS: events });
         assert.equal(activated.status, 0, activated.stderr);
         assert.match(fs.readFileSync(table, 'utf8'), /8443/);
         assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['firewall', 'cron']);
-        assert.equal(f.run('service/server.sh', ['deactivate'], { EVENTS: events }).status, 0);
+        assert.equal(f.run('service/server.sh', ['clear_aux'], { EVENTS: events }).status, 0);
         assert.equal(fs.existsSync(table), false);
         assert.equal(fs.existsSync(chain), false);
     });

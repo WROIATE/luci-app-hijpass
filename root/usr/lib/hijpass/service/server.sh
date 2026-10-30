@@ -25,12 +25,12 @@ case "$action" in
             done
         fi
         run_service_ucode prepare ;;
-    activate)
+    setup_aux)
         run_service_ucode server-files || exit 1
         hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload || exit 1
         update_cron enable || exit 1
         hijpass_log INFO server "${LINENO:-}" 'Activation completed' ;;
-    deactivate)
+    clear_aux)
         rm -f /usr/share/nftables.d/table-post/hijserver.nft /usr/share/nftables.d/chain-pre/input_wan/hijserver.nft || exit 1
         hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload || exit 1
         update_cron disable || exit 1

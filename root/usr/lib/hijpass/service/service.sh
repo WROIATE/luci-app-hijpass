@@ -33,7 +33,7 @@ update_cron() {
     hijpass_run_logged "$module" 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
 }
 run_dns_hook() { [ -z "$dns_hook" ] || hijpass_run_logged "$module" "DNS Hook $1" "${LINENO:-}" "$dns_hook" "$1"; }
-clear_resources() {
+clear_aux() {
     # 防火墙撤流失败时保留路由；其他清理错误最后统一返回。
     failed=0
     run_dns_hook stop || failed=1
@@ -58,7 +58,7 @@ case "$action" in
             json_select ..
         fi
         hijpass_run_logged "$module" 'Prepare process instances and DNS' "${LINENO:-}" run_service_ucode prepare "$@" ;;
-    activate)
+    setup_aux)
         [ "$enabled" = 1 ] || exit 0
         # 进程确认启动后才调用本入口；先准备策略路由，再启用流量接管。
         if "$HIJPASS_LIB/firewall/route.sh" reset && run_with_config "$HIJPASS_LIB/firewall/firewall.sh" reset "$@" && run_dns_hook start && update_cron enable; then
@@ -67,9 +67,9 @@ case "$action" in
             hijpass_log ERROR "$module" "${LINENO:-}" 'Activation failed'
             exit 1
         fi ;;
-    deactivate)
+    clear_aux)
         hijpass_log INFO "$module" "${LINENO:-}" 'Stopping service resources'
-        clear_resources ;;
+        clear_aux ;;
     auto-update)
         last=/tmp/hijpass_last_update
         [ "$update_interval" -gt 0 ] || exit 0

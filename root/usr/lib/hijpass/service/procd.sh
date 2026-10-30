@@ -1,5 +1,15 @@
 #!/bin/sh
 # 共享的 procd 桥接，只消费 ucode 的 Instance 对象；此处不读取业务配置。
+
+# 检查已校验的进程描述；在子 Shell 中解析，不修改调用方的 JSON 状态。
+hijpass_has_instances() (
+    local keys
+    json_set_namespace hijpass_plan
+    json_load "$1" && json_select instances || exit 1
+    json_get_keys keys
+    [ -n "$keys" ]
+)
+
 hijpass_register_instances() {
     local plan keys key old_namespace
     plan=$1
@@ -7,7 +17,6 @@ hijpass_register_instances() {
     json_load "$plan" || { json_set_namespace "$old_namespace"; return 1; }
     json_select instances || { json_set_namespace "$old_namespace"; return 1; }
     json_get_keys keys
-    service_instance_keys=$keys
     for key in $keys; do
         json_select "$key"
         hijpass_open_instance
@@ -19,6 +28,7 @@ hijpass_register_instances() {
 
 # 仅检查标准核心命令。用户自定义 Shell 命令仍按原样交给 procd。
 hijpass_check_instances() (
+    local entries entry engine path keys key previous value
     json_set_namespace hijpass_check
     json_load "$1" && json_select instances || exit 1
     json_get_keys entries
@@ -55,6 +65,7 @@ hijpass_check_instances() (
 
 # procd 提交后异步启动进程；只检查本次声明的实例，连续两次运行才继续。
 hijpass_wait_instances() (
+    local service keys key attempt stable pending id name
     service=$1
     json_set_namespace hijpass_wait
     json_load "$2" && json_select instances || exit 1

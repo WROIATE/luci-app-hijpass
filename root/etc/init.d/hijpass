@@ -15,11 +15,13 @@ start_service() {
     hijpass_step service 'Check core configurations' "${LINENO:-}" hijpass_check_instances "$service_plan" || exit 1
     hijpass_register_instances "$service_plan" || exit 1
     # 禁用服务时，在 procd 提交空实例列表前撤销网络配置。
-    [ -n "$service_instance_keys" ] || "$RUNTIME" deactivate || exit 1
+    if ! hijpass_has_instances "$service_plan"; then
+        "$RUNTIME" deactivate || exit 1
+    fi
 }
 
 service_started() {
-    [ -n "$service_instance_keys" ] || return 0
+    hijpass_has_instances "$service_plan" || return 0
     if hijpass_step service 'Wait for service instances' "${LINENO:-}" hijpass_wait_instances hijpass "$service_plan" &&
         "$RUNTIME" activate; then
         return 0

@@ -14,7 +14,7 @@ start_service() {
     hijpass_run_logged server 'Check core configurations' "${LINENO:-}" hijpass_check_configs "$service_plan" || exit 1
     # 无实例时先撤销旧网络配置，再组装并提交空实例列表。
     if ! hijpass_has_instances "$service_plan"; then
-        "$RUNTIME" clear_aux || exit 1
+        stop_service
     fi
     hijpass_add_instances "$service_plan" || exit 1
 }
@@ -27,8 +27,7 @@ service_started() {
         return 0
     fi
     # 启动或接管流量失败：撤销本服务网络配置后停止本服务实例。
-    stop_service
-    procd_kill hijserver
+    stop
     return 1
 }
 

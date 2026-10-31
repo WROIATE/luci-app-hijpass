@@ -48,7 +48,7 @@ procd_running() {
     json_init
     json_add_string name "$1"
     json_cleanup
-    [ "$FAIL_PHASE" != ready ] && [ "$FAIL_INSTANCE" != "$2" ] && [ -f "$IPKG_INSTROOT/registered-$1" ]
+    return 1
 }
 `);
     // 只替换 procd/ubus 边界；JSON namespace 与原生 procd API 保持一致。
@@ -79,7 +79,7 @@ close_service() {
     json_get_var service name
     echo "$service:submit" >>"$EVENTS"
     json_dump >"$IPKG_INSTROOT/submitted.json"
-    if [ "$FAIL_PHASE" != submit ]; then touch "$IPKG_INSTROOT/registered-$service"; fi
+    touch "$IPKG_INSTROOT/registered-$service"
     json_cleanup
 }
 procd_lock() { :; }
@@ -103,15 +103,16 @@ procd_kill() { echo "$1:kill" >>"$EVENTS"; rm -f "$IPKG_INSTROOT/registered-$1";
 }
 
 for (const service of ['hijpass', 'hijserver']) {
-    test(`${service}: 原生 procd 提交后确认实例运行，才应用自己的网络配置`, t => {
+    test(`${service}: 提交前撤流，提交后直接设置辅助配置，不查询进程状态`, t => {
         const f = fixture(t, service), result = f.run('start');
         assert.equal(result.status, 0, result.stderr);
         assert.deepEqual(f.events(), [service + ':prepare', `check:sing-box:value with spaces:check -c ${f.directory}/config space.json`,
-            service + ':submit', service + ':running:node-test space', service + ':running:node-test space', service + ':setup_aux']);
+            service + ':clear_aux', service + ':submit', service + ':setup_aux']);
         assert.equal(f.run('start').status, 0);
-        assert.ok(!f.events().some(event => /:kill$|:clear_aux$/.test(event)), 'start must not become restart');
+        assert.ok(!f.events().some(event => /:kill$|:running:/.test(event)), 'start must not kill the service or poll processes');
+        assert.ok(f.events().indexOf(service + ':clear_aux') < f.events().indexOf(service + ':submit'));
     });
-    for (const failure of ['prepare', 'check', 'submit', 'ready', 'setup_aux', 'clear_aux']) {
+    for (const failure of ['prepare', 'check', 'setup_aux', 'clear_aux']) {
         test(`${service}: ${failure} 失败返回错误并阻止后续不安全步骤`, t => {
             const f = fixture(t, service), result = f.run(failure === 'clear_aux' ? 'stop' : 'start', failure);
             assert.notEqual(result.status, 0, result.stderr);
@@ -135,6 +136,20 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.deepEqual(f.events().slice(0, 3), [service + ':clear_aux', service + ':kill', service + ':prepare']);
         assert.equal(f.events().at(-1), service + ':setup_aux');
     });
+    for (const action of ['start', 'restart']) test(`${service}: ${action} 撤流失败不提交实例、不停核心`, t => {
+        const f = fixture(t, service), result = f.run(action, 'clear_aux');
+        assert.notEqual(result.status, 0);
+        assert.ok(!f.events().some(event => /:(kill|submit|setup_aux)$/.test(event)));
+    });
+    for (const plan of ['', '{', '{}', '{"instances":{}}', '{"instances":null}', '{"instances":[null]}', '{"instances":[{"command":[]}]}']) {
+        test(`${service}: 拒绝无效计划 ${plan || '(empty)'}，不当作禁用服务`, t => {
+            const f = fixture(t, service);
+            fs.writeFileSync(f.planPath, plan);
+            const result = f.run('start');
+            assert.notEqual(result.status, 0);
+            assert.ok(!f.events().some(event => /:(clear_aux|kill|submit|setup_aux)$/.test(event)));
+        });
+    }
     test(`${service}: 禁用时撤流后提交空实例，不重新激活网络`, t => {
         const f = fixture(t, service), result = f.run('start', '', { DISABLED: '1' });
         assert.equal(result.status, 0, result.stderr);
@@ -155,13 +170,13 @@ test('自定义命令配置路径保持原样，不替换成运行快照，也�
     assert.equal(fs.existsSync(f.directory + '/runtime/service/transaction.uc'), false);
 });
 
-test('多个实例必须全部运行，已有其他实例不能掩盖本次实例启动失败', t => {
+test('多个实例全部声明后直接应用辅助配置', t => {
     const f = fixture(t);
     f.plan.instances.push({ ...f.plan.instances[0], id: 'second', name: 'node' });
     fs.writeFileSync(f.planPath, JSON.stringify(f.plan));
     assert.equal(f.run('start').status, 0);
-    assert.equal(f.events().filter(event => event === 'hijpass:running:second-node').length, 2);
-    const failed = f.run('start', '', { FAIL_INSTANCE: 'second-node' });
-    assert.notEqual(failed.status, 0);
-    assert.ok(!f.events().includes('hijpass:setup_aux'));
+    assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances),
+        ['node-test space', 'second-node']);
+    assert.ok(!f.events().some(event => event.includes(':running:')));
+    assert.equal(f.events().at(-1), 'hijpass:setup_aux');
 });

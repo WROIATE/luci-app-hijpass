@@ -13,21 +13,18 @@ start_service() {
     # rc.common 不传播此回调的 return；失败必须退出，避免提交部分实例。
     service_plan="$(hijpass_run_logged service 'Prepare service' "${LINENO:-}" "$RUNTIME" prepare)" || exit 1
     hijpass_run_logged service 'Check core configurations' "${LINENO:-}" hijpass_check_configs "$service_plan" || exit 1
-    # 无实例时先撤销旧网络配置，再组装并提交空实例列表。
-    if ! hijpass_has_instances "$service_plan"; then
-        stop_service
-    fi
+    # 提交前撤销旧流量接管，直接 start 更新已有实例时也遵守这个顺序。
+    stop_service
+    # 合法空列表由框架直接提交，保留配置变更触发器。
+    hijpass_has_instances "$service_plan" || return 0
     hijpass_add_instances "$service_plan" || exit 1
 }
 
 service_started() {
-    # 空实例列表已完成撤流；无需等待进程，也不能重新激活网络。
+    # 此回调在实例提交后执行，不代表核心已经就绪。
     hijpass_has_instances "$service_plan" || return 0
-    if hijpass_run_logged service 'Wait for service instances' "${LINENO:-}" hijpass_wait_running hijpass "$service_plan" &&
-        "$RUNTIME" setup_aux; then
-        return 0
-    fi
-    # 启动或接管流量失败：撤销本服务网络配置后停止本服务实例。
+    "$RUNTIME" setup_aux && return 0
+    # 辅助配置失败：先撤流，再由原生 stop 停止本服务。
     stop
     return 1
 }

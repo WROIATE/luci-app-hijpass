@@ -34,13 +34,13 @@ update_cron() {
 }
 run_dns_hook() { [ -z "$dns_hook" ] || hijpass_run_logged "$module" "DNS Hook $1" "${LINENO:-}" "$dns_hook" "$1"; }
 clear_aux() {
-    # 防火墙撤流失败时保留路由；其他清理错误最后统一返回。
+    # 关键撤流失败时阻止停核心；维护清理失败只记录告警。
     failed=0
     run_dns_hook stop || failed=1
     "$HIJPASS_LIB/firewall/firewall.sh" remove || return 1
     "$HIJPASS_LIB/firewall/route.sh" remove || failed=1
-    update_cron disable || failed=1
-    rm -f /etc/hijpass/chinadns-ng.conf /tmp/hijpass/domain-proxy-geo.txt /tmp/hijpass/domain-direct-geo.txt || failed=1
+    update_cron disable || hijpass_log WARN "$module" "${LINENO:-}" 'Cron cleanup failed; continuing service stop'
+    # 生成的 DNS 配置保留：start 在准备新配置后也会调用此清理入口。
     [ "$failed" -eq 0 ] || return 1
     hijpass_log INFO "$module" "${LINENO:-}" 'Service resources removed'
 }
@@ -60,7 +60,7 @@ case "$action" in
         hijpass_run_logged "$module" 'Prepare process instances and DNS' "${LINENO:-}" run_service_ucode prepare "$@" ;;
     setup_aux)
         [ "$enabled" = 1 ] || exit 0
-        # 进程确认启动后才调用本入口；先准备策略路由，再启用流量接管。
+        # procd 提交实例后调用本入口；先准备策略路由，再启用流量接管。
         if "$HIJPASS_LIB/firewall/route.sh" reset && run_with_config "$HIJPASS_LIB/firewall/firewall.sh" reset "$@" && run_dns_hook start && update_cron enable; then
             hijpass_log INFO "$module" "${LINENO:-}" "Activation completed: elapsed=$(($(date +%s) - started))s"
         else

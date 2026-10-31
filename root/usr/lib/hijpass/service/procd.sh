@@ -28,14 +28,22 @@ hijpass_add_instances() {
 
 # 仅检查标准核心命令。用户自定义 Shell 命令仍按原样交给 procd。
 hijpass_check_configs() (
-    local entries entry engine path keys key previous value
+    local entries entry engine path keys key previous value kind
     json_set_namespace hijpass_check
-    json_load "$1" && json_select instances || exit 1
+    json_load "$1" || exit 1
+    json_get_type kind instances
+    [ "$kind" = array ] || { echo 'Invalid service plan: instances must be an array' >&2; exit 1; }
+    json_select instances || exit 1
     json_get_keys entries
     for entry in $entries; do
+        json_get_type kind "$entry"
+        [ "$kind" = object ] || { echo 'Invalid service plan: instance must be an object' >&2; exit 1; }
         json_select "$entry"
+        json_get_type kind command
+        [ "$kind" = array ] || { echo 'Invalid service plan: command must be an array' >&2; exit 1; }
         json_select command
         json_get_var engine 1
+        [ -n "$engine" ] || { echo 'Invalid service plan: command is empty' >&2; exit 1; }
         path=
         json_get_keys keys
         previous=
@@ -61,35 +69,6 @@ hijpass_check_configs() (
         esac
         json_select ..
     done
-)
-
-# procd 提交后异步启动进程；只检查本次声明的实例，连续两次运行才继续。
-hijpass_wait_running() (
-    local service keys key attempt stable pending id name
-    service=$1
-    json_set_namespace hijpass_wait
-    json_load "$2" && json_select instances || exit 1
-    json_get_keys keys
-    attempt=0 stable=0
-    while [ "$attempt" -lt 20 ]; do
-        pending=
-        for key in $keys; do
-            json_select "$key"
-            json_get_var id id
-            json_get_var name name
-            # procd_running 会重置 jshn；隔离查询，保留正在遍历的实例描述。
-            ( procd_running "$service" "$id-$name" ) || pending="$pending $id-$name"
-            json_select ..
-        done
-        if [ -z "$pending" ]; then
-            stable=$((stable + 1))
-            [ "$stable" -lt 2 ] || exit 0
-        else stable=0; fi
-        attempt=$((attempt + 1))
-        sleep 1
-    done
-    echo "Service instances did not stay running:$pending" >&2
-    exit 1
 )
 
 hijpass_add_instance() {

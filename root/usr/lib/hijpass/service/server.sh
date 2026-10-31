@@ -33,7 +33,7 @@ case "$action" in
     clear_aux)
         rm -f /usr/share/nftables.d/table-post/hijserver.nft /usr/share/nftables.d/chain-pre/input_wan/hijserver.nft || exit 1
         hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload || exit 1
-        update_cron disable || exit 1
+        update_cron disable || hijpass_log WARN server "${LINENO:-}" 'Cron cleanup failed; continuing service stop'
         hijpass_log INFO server "${LINENO:-}" 'Service resources removed' ;;
     *) echo 'unknown server action' >&2; exit 1 ;;
 esac

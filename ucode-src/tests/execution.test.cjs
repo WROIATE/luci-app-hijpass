@@ -1061,3 +1061,45 @@ test('服务端独立准备自定义命令，激活只写端口规则和日志�
         assert.equal(fs.existsSync(chain), false);
     });
 });
+
+for (const fail of ['hook', 'route', 'cron']) test(`客户端停止时区分关键撤流与维护失败：${fail}`, t => {
+    const f = fixture(t), events = f.directory + '/events';
+    for (const [file, stage] of [['route.sh', 'route'], ['firewall.sh', 'firewall']])
+        fs.writeFileSync(f.runtime + '/firewall/' + file,
+            `#!/bin/sh\necho '${stage}' >>"$EVENTS"\n[ "$FAIL_STAGE" != '${stage}' ]\n`, { mode: 0o755 });
+    f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ]');
+    f.script('cron-init', 'echo cron >>"$EVENTS"\n[ "$FAIL_STAGE" != cron ]');
+    f.patch('service/service.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
+    const generated = ['/etc/hijpass/chinadns-ng.conf', '/tmp/hijpass/domain-proxy-geo.txt', '/tmp/hijpass/domain-direct-geo.txt'];
+    for (const file of generated) {
+        const target = f.directory + '/' + path.basename(file);
+        fs.writeFileSync(target, 'prepared DNS configuration');
+        f.patch('service/service.sh', file, target);
+    }
+    withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
+        const result = f.run('service/service.sh', ['clear_aux', '--configdir', config], { EVENTS: events, FAIL_STAGE: fail });
+        assert.equal(result.status, fail === 'cron' ? 0 : 1, result.stderr);
+    });
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall', 'route', 'cron']);
+    for (const file of generated) assert.equal(fs.readFileSync(f.directory + '/' + path.basename(file), 'utf8'), 'prepared DNS configuration');
+    if (fail === 'cron') assert.match(fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8'), /WARN.*Cron cleanup failed/);
+});
+
+for (const fail of ['firewall', 'cron']) test(`服务端停止时区分防火墙与定时任务失败：${fail}`, t => {
+    const f = fixture(t), events = f.directory + '/events';
+    f.patch('service/server.sh', '/usr/share/nftables.d/table-post/hijserver.nft', f.directory + '/server.nft');
+    f.patch('service/server.sh', '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', f.directory + '/chain.nft');
+    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('service/server.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.script('fw4', 'echo firewall >>"$EVENTS"\n[ "$FAIL_STAGE" != firewall ]');
+    f.script('cron-init', 'echo cron >>"$EVENTS"\n[ "$FAIL_STAGE" != cron ]');
+    withConfig([], config => {
+        fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '1'\n");
+        f.patch('service/server.sh', 'server "$@";', `server "$@" --configdir '${config}';`);
+        const result = f.run('service/server.sh', ['clear_aux'], { EVENTS: events, FAIL_STAGE: fail });
+        assert.equal(result.status, fail === 'cron' ? 0 : 1, result.stderr);
+    });
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail === 'cron' ? ['firewall', 'cron'] : ['firewall']);
+});

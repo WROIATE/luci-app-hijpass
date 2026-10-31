@@ -34,11 +34,12 @@ function fixture(t) {
                 PATH: `${directory}:${runtime}/testbin:${process.env.PATH}` },
         });
     }
-    function data(file, args) {
+    function data(file, args, extra = {}) {
         return spawnSync(interpreter, ['-S', '-L', path.join(runtime, 'ucode'), '--', path.join(runtime, file), ...args],
-            { encoding: 'utf8', env: process.env });
+            { encoding: 'utf8', env: { ...process.env, ...extra, PATH: `${directory}:${runtime}/testbin:${process.env.PATH}` } });
     }
     patch('ucode/hijpass/config/paths.uc', '/tmp/hijpass/log', directory + '/logs');
+    patch('init-hijpass.sh', '/etc/hijpass/fw4-rules.nft', directory + '/rules.nft');
     function launch(file, args, extra = {}) {
         const child = spawn('/usr/bin/busybox', ['ash', path.join(runtime, file), ...args], {
             env: { ...process.env, ...extra, PATH: `${directory}:${runtime}/testbin:${process.env.PATH}` },
@@ -132,8 +133,9 @@ i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); don
 test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变激活结果', t => {
     const f = fixture(t), hook = path.join(f.directory, 'dns-hook');
     f.script('dns-hook', "echo 'Warning: optional DNS service unavailable' >&2\nexit 0");
-    for (const file of ['firewall/firewall.sh', 'firewall/route.sh'])
+    for (const file of ['firewall/route.sh'])
         fs.writeFileSync(path.join(f.runtime, file), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    f.script('fw4', 'exit 0');
     f.script('cron-init', 'exit 0');
     f.patch('init-hijpass.sh', '/etc/init.d/cron', path.join(f.directory, 'cron-init'));
     f.patch('service/prepare.uc', '/etc/crontabs/root', path.join(f.directory, 'crontab'));
@@ -333,16 +335,29 @@ test('规则全部下载失败时保留运行服务，不执行重启或 DNS Hoo
     });
 });
 
-test('防火墙解析网络快照，生成或 nft 校验失败时保留旧规则并停止重载', t => {
+test('防火墙只绕过 WAN 区域，查询、生成、写入或校验失败保留旧规则并停止重载', t => {
     const f = fixture(t), rules = path.join(f.directory, 'rules.nft'), calls = path.join(f.directory, 'calls');
-    f.patch('firewall/firewall.sh', '/etc/hijpass/fw4-rules.nft', rules);
-    // 宿主 BusyBox ash 优先调用自己的 ip applet，显式替换测试副本中的采集命令。
-    f.patch('firewall/firewall.sh', '\nip -j ', `\n'${f.directory}/ip' -j `);
-    f.script('ip', `if [ "$BAD_NETWORK_JSON" = 1 ]; then echo invalid; else
-printf '%s\\n' '[{"addr_info":[{"family":"inet","local":"192.168.1.1","prefixlen":24}]}]'
-fi`);
-    f.script('ubus', `printf '%s\\n' '{"interface":[{"device":"wan0","route":[{"mask":0}]}]}'`);
-    f.script('fw4', `if [ "$1" = zone ]; then echo wan0; else echo reload >>"$TEST_CALLS"; fi`);
+    f.patch('firewall/generate.uc', '/etc/hijpass/fw4-rules.nft', rules);
+    fs.writeFileSync(f.runtime + '/firewall/route.sh', '#!/bin/sh\nexit 0\n');
+    f.script('dns-hook', 'exit 0');
+    f.script('cron-init', 'exit 0');
+    f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
+    f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    // 大于单参数长度上限的查询结果，直接从管道读取；VPN 设备不进入 WAN 绕过列表。
+    fs.writeFileSync(f.directory + '/addresses', JSON.stringify([
+        { ifname: 'wg0', addr_info: [{ family: 'inet', local: '192.168.1.1', prefixlen: 24 }] },
+        { ifname: 'tun0', addr_info: [], padding: 'x'.repeat(150000) },
+    ]));
+    f.script('ip', `if [ "$BAD_NETWORK_JSON" = 1 ]; then echo invalid; else cat '${f.directory}/addresses'; fi
+[ "$IP_FAIL" != 1 ]`);
+    f.script('ubus', 'echo unexpected-query >>"$TEST_CALLS"; exit 1');
+    f.script('fw4', `if [ "$1" = zone ]; then
+[ "$2" = wan ] || exit 1
+[ "$ZONE_FAIL" != 1 ] || exit 1
+[ "$EMPTY_WAN" = 1 ] || echo wan0
+exit 0
+else echo reload >>"$TEST_CALLS"; fi`);
     f.script('nft', '[ "$NFT_FAIL" != 1 ]');
     const template = path.join(f.directory, 'firewall.ut');
     fs.copyFileSync(path.join(root, 'root/etc/hijpass/firewall.ut'), template);
@@ -353,37 +368,66 @@ fi`);
     withConfig(sections, config => {
         fs.writeFileSync(path.join(config, 'dhcp'), "config dnsmasq\n");
         fs.writeFileSync(rules, 'old rules');
-        for (const failure of [{ BAD_NETWORK_JSON: '1' }, { NFT_FAIL: '1' }]) {
-            const result = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls, ...failure });
-            assert.equal(result.status, 1, JSON.stringify(failure) + ': ' + result.stderr);
+        const apply = (extra = {}) => f.init('hijpass', 'service_started', config, { TEST_CALLS: calls, ...extra });
+        const unchanged = result => {
+            assert.equal(result.status, 1, result.stderr);
             assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
             assert.equal(fs.existsSync(calls), false);
-        }
-        // 规则文件缺失、模板语法错误均不能替换旧规则或触发重载。
-        const file = template, original = fs.readFileSync(file, 'utf8');
+            assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('rules.nft.new-')), false);
+        };
+        for (const failure of [{ BAD_NETWORK_JSON: '1' }, { NFT_FAIL: '1' }, { IP_FAIL: '1' }, { ZONE_FAIL: '1' }])
+            unchanged(apply(failure));
+        const original = fs.readFileSync(template, 'utf8');
         for (const invalid of [null, '', '{# empty rules #}', '{% if (: %}']) {
-            if (invalid === null) fs.unlinkSync(file); else fs.writeFileSync(file, invalid);
-            const broken = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
-            assert.equal(broken.status, 1);
-            assert.match(broken.stderr, /template/);
-            assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
-            assert.equal(fs.existsSync(calls), false);
-            fs.writeFileSync(file, original);
+            if (invalid === null) fs.unlinkSync(template); else fs.writeFileSync(template, invalid);
+            unchanged(apply());
+            fs.writeFileSync(template, original);
         }
-        // 实际向 /dev/full 输出规则，写入失败不能被误认为“没有启用规则”并重载。
-        f.patch('firewall/firewall.sh', '>"$temp"', '>/dev/full');
-        const full = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
-        assert.equal(full.status, 1, full.stderr);
-        assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
-        assert.equal(fs.existsSync(calls), false);
-        f.patch('firewall/firewall.sh', '>/dev/full', '>"$temp"');
-        const applied = f.run('firewall/firewall.sh', ['reset', '--configdir', config], { TEST_CALLS: calls });
+        // 故障只注入安装副本，生产代码不添加测试路径。
+        f.patch('firewall/generate.uc', "fs.open(temp, 'wx', 0o600)", "fs.open('/dev/full', 'w')");
+        unchanged(apply());
+        f.patch('firewall/generate.uc', "fs.open('/dev/full', 'w')", "fs.open(temp, 'wx', 0o600)");
+        f.patch('firewall/generate.uc', 'fs.rename(temp, path)', 'false');
+        unchanged(apply());
+        f.patch('firewall/generate.uc', 'if (!false)', 'if (!fs.rename(temp, path))');
+        const applied = apply();
         assert.equal(applied.status, 0, applied.stderr);
-        assert.match(fs.readFileSync(rules, 'utf8'), /192\.168\.1\.1\/24/);
-        assert.match(fs.readFileSync(rules, 'utf8'), /iifname \{ "wan0" \} counter return/);
+        let content = fs.readFileSync(rules, 'utf8');
+        assert.match(content, /192\.168\.1\.1\/24/);
+        assert.match(content, /iifname \{ "wan0" \} counter return/);
+        assert.doesNotMatch(content, /wg0|tun0/);
         assert.equal(fs.readFileSync(calls, 'utf8'), 'reload\n');
-        assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('rules.nft.new.')), false);
+        assert.equal(apply({ EMPTY_WAN: '1' }).status, 0);
+        content = fs.readFileSync(rules, 'utf8');
+        assert.doesNotMatch(content, /wan0|wg0|tun0|iifname \{\s*\}/);
     });
+    withConfig([{ '.type': 'hijpass' }], config => {
+        const disabled = f.data('firewall/generatecli.uc', ['--configdir', config], { ZONE_FAIL: '1', IP_FAIL: '1' });
+        assert.equal(disabled.status, 0, disabled.stderr);
+        assert.equal(fs.existsSync(rules), false);
+    });
+});
+
+for (const fail of ['', 'delete', 'apply', 'hook']) test(`fw4 include 只加载规则和 Hook，${fail || '正常'}分支保持顺序`, t => {
+    const f = fixture(t), rules = f.directory + '/rules.nft', events = f.directory + '/events';
+    f.patch('firewall/fw4.sh', '/etc/hijpass/fw4-rules.nft', rules);
+    f.patch('firewall/fw4.sh', '/etc/hijpass/hook/nft-hook.sh', f.directory + '/nft-hook');
+    fs.writeFileSync(rules, 'rules');
+    f.script('nft', `case "$1" in list) exit 0 ;; delete) stage=delete ;; -f) stage=apply ;; *) exit 2 ;; esac
+echo "$stage" >>"$EVENTS"
+[ "$FAIL_STAGE" != "$stage" ]`);
+    f.script('nft-hook', 'echo hook >>"$EVENTS"; [ "$FAIL_STAGE" != hook ]');
+    f.script('fw4', 'echo unexpected-reload >>"$EVENTS"; exit 1');
+    const result = f.run('firewall/fw4.sh', [], { EVENTS: events, FAIL_STAGE: fail });
+    assert.equal(result.status, fail ? 1 : 0, result.stderr);
+    const expected = ['delete', 'apply', 'hook'];
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail ? expected.slice(0, expected.indexOf(fail) + 1) : expected);
+    if (!fail) {
+        fs.unlinkSync(rules);
+        fs.writeFileSync(events, '');
+        assert.equal(f.run('firewall/fw4.sh', [], { EVENTS: events }).status, 0);
+        assert.equal(fs.readFileSync(events, 'utf8'), 'delete\n');
+    }
 });
 
 test('Chinadns 模板保留列表开关、默认 tag、上游和自定义域名的组合行为', t => {
@@ -1019,11 +1063,15 @@ recover_job() {`);
     assert.equal(fs.readFileSync(path.join(job, 'exit'), 'utf8'), '0\n');
 });
 
-for (const fail of ['', 'route', 'firewall', 'hook']) test(`客户端按路由、防火墙、DNS 顺序激活，${fail || '正常'}分支不跨越失败阶段`, t => {
+for (const fail of ['', 'route', 'generate', 'firewall', 'hook']) test(`客户端按路由、防火墙、DNS 顺序激活，${fail || '正常'}分支不跨越失败阶段`, t => {
     const f = fixture(t), events = f.directory + '/events';
-    for (const [file, stage] of [['route.sh', 'route'], ['firewall.sh', 'firewall']])
+    for (const [file, stage] of [['route.sh', 'route']])
         fs.writeFileSync(f.runtime + '/firewall/' + file,
             `#!/bin/sh\necho '${stage}' >>"$EVENTS"\n[ "$FAIL_STAGE" != '${stage}' ]\n`, { mode: 0o755 });
+    fs.writeFileSync(f.runtime + '/firewall/generatecli.uc', `import * as fs from 'fs';
+let file = fs.open(getenv('EVENTS'), 'a'); file.write('generate\\n'); file.close();
+exit(getenv('FAIL_STAGE') == 'generate' ? 1 : 0);`);
+    f.script('fw4', 'echo firewall >>"$EVENTS"\n[ "$FAIL_STAGE" != firewall ]');
     f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ]');
     f.script('cron-init', 'echo cron >>"$EVENTS"');
     f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
@@ -1033,13 +1081,13 @@ for (const fail of ['', 'route', 'firewall', 'hook']) test(`客户端按路由�
         const result = f.init('hijpass', 'service_started', config, { EVENTS: events, FAIL_STAGE: fail });
         assert.equal(result.status, fail ? 1 : 0, result.stderr);
     });
-    const expected = ['route', 'firewall', 'hook', 'cron'];
+    const expected = ['route', 'generate', 'firewall', 'hook', 'cron'];
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail ? expected.slice(0, expected.indexOf(fail) + 1) : expected);
 });
 
 test('客户端防火墙撤流失败时保留策略路由，不继续清理', t => {
     const f = fixture(t), events = f.directory + '/events';
-    fs.writeFileSync(f.runtime + '/firewall/firewall.sh', '#!/bin/sh\necho firewall >>"$EVENTS"\nexit 1\n', { mode: 0o755 });
+    f.script('fw4', 'echo firewall >>"$EVENTS"\nexit 1');
     fs.writeFileSync(f.runtime + '/firewall/route.sh', '#!/bin/sh\necho route >>"$EVENTS"\n', { mode: 0o755 });
     f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     f.script('dns-hook', 'echo hook >>"$EVENTS"');
@@ -1060,7 +1108,7 @@ test('服务端独立准备自定义命令，激活只写端口规则和日志�
     f.patch('init-hijserver.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.script('fw4', 'echo firewall >>"$EVENTS"');
     f.script('cron-init', 'echo cron >>"$EVENTS"');
-    for (const file of ['firewall/firewall.sh', 'firewall/route.sh', 'rules/geoview.sh'])
+    for (const file of ['firewall/route.sh', 'rules/geoview.sh'])
         fs.writeFileSync(f.runtime + '/' + file, '#!/bin/sh\necho unexpected >>"$EVENTS"\nexit 1\n', { mode: 0o755 });
     withConfig([], config => {
         fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '1'\nconfig server_node 'server'\n option enabled '1'\n option name 'server'\n option command 'program -c {conf_path}'\n option allow_firewall '1'\n option listen_port '8443'\n");
@@ -1082,9 +1130,10 @@ test('服务端独立准备自定义命令，激活只写端口规则和日志�
 
 for (const fail of ['hook', 'route', 'cron']) test(`客户端停止时区分关键撤流与维护失败：${fail}`, t => {
     const f = fixture(t), events = f.directory + '/events';
-    for (const [file, stage] of [['route.sh', 'route'], ['firewall.sh', 'firewall']])
+    for (const [file, stage] of [['route.sh', 'route']])
         fs.writeFileSync(f.runtime + '/firewall/' + file,
             `#!/bin/sh\necho '${stage}' >>"$EVENTS"\n[ "$FAIL_STAGE" != '${stage}' ]\n`, { mode: 0o755 });
+    f.script('fw4', 'echo firewall >>"$EVENTS"\n[ "$FAIL_STAGE" != firewall ]');
     f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ]');
     f.script('cron-init', 'echo cron >>"$EVENTS"\n[ "$FAIL_STAGE" != cron ]');
     f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');

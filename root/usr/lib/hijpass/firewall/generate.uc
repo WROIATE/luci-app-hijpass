@@ -6,7 +6,7 @@ import { RULE_FILES, FILES } from 'hijpass.config.paths';
 import { read } from 'hijpass.uci.read';
 import { findShuntSection, findDnsSection, findFirewallSection, findDnsmasqSection } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
-import { lines, text, renderTemplate } from 'hijpass.common';
+import { lines, text, renderTemplate, command, temporary } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
 import { parseCIDR } from 'hijpass.ip';
 
@@ -14,47 +14,45 @@ import { parseCIDR } from 'hijpass.ip';
 // tproxy_proto 为 tcp/udp 列表，dns_forward 为 none/pre-routing/routing；
 // proxy_local 控制路由器本机，acl_default_allow 与 MAC/接口列表控制客户端。
 // NetworkState：wan 为 WAN 设备名；local4/local6/dns4/dns6 为本地绕过地址数组。
-/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').NetworkSnapshot} NetworkSnapshot */
 /**
- * 把 Shell 采集的网络快照整理成防火墙所需的数据。
- * @param {NetworkSnapshot} raw Shell 采集的网络快照。
- * @param {string|null} resolvText dnsmasq resolvfile 的内容。
- * @returns {NetworkState} {wan, local4, local6, dns4, dns6}，分别为绕过设备、本机网段和上游 DNS。
+ * 读取固定查询命令的输出，检查退出状态；不通过参数或文件中转查询结果。
+ * @param {string[]} args
+ * @returns {string}
  */
-function networkState(raw, resolvText) {
-	let state = { wan: lines(raw.wan), local4: [], local6: [], dns4: [], dns6: [] };
-	let addresses = raw.addresses, interfaces = raw.interfaces;
-	// 命令的 JSON 解析失败时报告来源；不能用残缺网络状态继续生成绕过规则。
-	try {
-		if (!addresses.code) {
-			for (let iface in json(addresses.stdout)) {
-				for (let addr in iface.addr_info || []) push(addr.family == 'inet6' ? state.local6 : state.local4, `${addr.local}/${addr.prefixlen}`);
-			}
-		}
-		if (!interfaces.code) {
-			for (let iface in json(interfaces.stdout).interface || []) {
-				if (!length(filter(iface.route || [], route => route.mask == 0))) {
-					continue;
-				}
-				for (let name in [iface.device, iface.l3_device]) {
-					if (name && name != 'br-lan') {
-						push(state.wan, name);
-					}
-				}
-			}
-		}
-	}
-	catch (e) { die(`invalid network state JSON: ${e.message}`); }
-	for (let line in lines(resolvText)) {
-		let fields = split(line, /[ \t]+/), address = split(fields[1] || '', '%')[0] || '', bytes = iptoarr(address);
-		if (fields[0] != 'nameserver' || !bytes || index(['0.0.0.0', '127.0.0.1', '::', '::1'], address) >= 0) {
-			continue;
-		}
-		push(length(bytes) == 4 ? state.dns4 : state.dns6, address);
-	}
-	state.wan = uniq(state.wan);
-	return state;
-};
+function query(args) {
+    let process = fs.popen(command(args), 'r');
+    if (!process) die(`cannot execute ${join(' ', args)}: ${fs.error()}`);
+    let output = process.read('all'), code = process.close();
+    if (output == null || code != 0) die(`${join(' ', args)} failed: exit=${code}`);
+    return output;
+}
+/**
+ * WAN 绕过设备仅来自 wan 防火墙区域；本机地址用于目标地址绕过。
+ * @param {string|null} configDirectory
+ * @returns {NetworkState}
+ */
+function networkState(configDirectory) {
+    let state = { wan: uniq(lines(query(['fw4', 'zone', 'wan']))), local4: [], local6: [], dns4: [], dns6: [] };
+    let addresses;
+    try { addresses = json(query(['ip', '-j', 'address', 'show'])); }
+    catch (e) { die(`cannot read local addresses: ${e.message}`); }
+    if (type(addresses) != 'array') die('invalid local address list');
+    for (let iface in addresses) {
+        for (let addr in iface.addr_info || []) {
+            if (addr.family == 'inet' || addr.family == 'inet6')
+                push(addr.family == 'inet6' ? state.local6 : state.local4, `${addr.local}/${addr.prefixlen}`);
+        }
+    }
+    let dhcp = findDnsmasqSection(read('dhcp', configDirectory));
+    let resolvText = dhcp?.resolvfile ? fs.readfile(dhcp.resolvfile) : null;
+    for (let line in lines(resolvText)) {
+        let fields = split(line, /[ \t]+/), address = split(fields[1] || '', '%')[0] || '', bytes = iptoarr(address);
+        if (fields[0] != 'nameserver' || !bytes || index(['0.0.0.0', '127.0.0.1', '::', '::1'], address) >= 0)
+            continue;
+        push(length(bytes) == 4 ? state.dns4 : state.dns6, address);
+    }
+    return state;
+}
 /**
  * 读取规则文件，只保留指定地址族的有效 IP 和 CIDR。
  * @param {string} path
@@ -190,24 +188,35 @@ export function generate(config, state) {
     return output;
 };
 
-// NetworkSnapshot：Shell 采集的 wan 文本以及 address/interface 命令的输出与退出码。
 /**
- * 处理防火墙脚本的 Hook 路径查询或规则生成请求。
- * @returns {null} Hook 路径或生成的 nft 文本写入 stdout。
+ * 校验完整规则后才替换正式文件；生成、写入、校验和替换任一步失败都保留旧文件。
+ * @param {string} output
+ * @returns {null}
  */
+function writeRules(output) {
+    let path = '/etc/hijpass/fw4-rules.nft';
+    if (!length(output)) {
+        if (fs.lstat(path) && !fs.unlink(path)) die(`cannot remove ${path}: ${fs.error()}`);
+        return;
+    }
+    let temp = temporary(path), file = fs.open(temp, 'wx', 0o600);
+    if (!file) die(`cannot create ${temp}: ${fs.error()}`);
+    try {
+        if (file.write(output) != length(output) || !file.flush()) die(`cannot write ${temp}`);
+        if (!file.close()) die(`cannot close ${temp}`);
+        if (system(command(['nft', '-c', '-f', temp])) != 0) die('nft rule validation failed');
+        if (!fs.rename(temp, path)) die(`cannot replace ${path}: ${fs.error()}`);
+    }
+    catch (e) { file.close(); fs.unlink(temp); die(e.message); }
+}
+/** 生成并写入经过校验的规则。重载由 init.d 或 RPC 调用方执行。 */
 export function main() { run(ARGV, (args, configDirectory) => {
-    if (args[0] == 'hook') {
-        return FILES.nft_hook + '\n';
+    if (length(args)) die('unexpected firewall generation argument');
+    let config = read('hijpass', configDirectory), firewall = findFirewallSection(config);
+    if (!firewall || !firewall.proxy_port && !firewall.shunt_port) {
+        writeRules('');
+        return;
     }
-    let config = read('hijpass', configDirectory), directory = args[0];
-    let raw = { wan: text(directory + '/wan'),
-        addresses: { stdout: text(directory + '/addresses'), code: int(text(directory + '/addresses.code')) },
-        interfaces: { stdout: text(directory + '/interfaces'), code: int(text(directory + '/interfaces.code')) } };
-    let dhcp = findDnsmasqSection(read('dhcp', configDirectory));
-    let resolvText = null;
-    if (dhcp && dhcp.resolvfile) {
-        resolvText = fs.readfile(dhcp.resolvfile);
-    }
-    return generate(config, networkState(raw, resolvText));
+    writeRules(generate(config, networkState(configDirectory)));
 });
 };

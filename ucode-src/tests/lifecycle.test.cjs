@@ -38,7 +38,7 @@ if [ "$DISABLED" = 1 ]; then echo '{"instances":[]}'; else cat "$PLAN"; fi
     fs.writeFileSync(directory + '/lib/functions/service.sh', `
 procd_running() { echo unexpected-poll >>"$EVENTS"; return 1; }
 `);
-    for (const [file, stage] of [['firewall/route.sh', 'route'], ['firewall/firewall.sh', 'firewall']])
+    for (const [file, stage] of [['firewall/route.sh', 'route']])
         script(runtime + '/' + file, `echo "${stage}:$1" >>"$EVENTS"\n[ "$FAIL_PHASE" != "${stage}:$1" ]`);
     script(directory + '/dns-hook', 'echo "hook:$1" >>"$EVENTS"\n[ "$FAIL_PHASE" != "hook:$1" ]');
     script(directory + '/bin/fw4', 'echo "fw4:$1" >>"$EVENTS"\n[ "$FAIL_PHASE" != fw4 ]');
@@ -90,11 +90,13 @@ procd_kill() { echo "$1:kill" >>"$EVENTS"; rm -f "$IPKG_INSTROOT/registered-$1";
         `/usr/bin/busybox ash '${root}/ucode-src/tests/testdata/rc.common' '${init}' restart`);
     source = source.replace('/etc/hijpass/hook/dns-hook.sh', directory + '/dns-hook')
         .replace('/etc/init.d/cron', directory + '/cron-init')
+        .replace('/etc/hijpass/fw4-rules.nft', directory + '/rules.nft')
         .replace('/usr/share/nftables.d/table-post/hijserver.nft', directory + '/server.nft')
         .replace('/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', directory + '/chain.nft');
     source += `
 hijpass_run_ucode() {
     case "$1" in
+        */firewall/generatecli.uc) echo 'firewall:generate' >>"$EVENTS"; [ "$FAIL_PHASE" != firewall:generate ] ;;
         */service/preparecli.uc) shift; '${directory}/data-mock' "$@" ;;
         *) ucode -S -- "$@" ;;
     esac
@@ -114,10 +116,10 @@ hijpass_run_ucode() {
 
 for (const service of ['hijpass', 'hijserver']) {
     const setup = service === 'hijpass'
-        ? ['route:reset', 'firewall:reset', 'hook:start', 'data:cron enable', 'cron:restart']
+        ? ['route:reset', 'firewall:generate', 'fw4:reload', 'hook:start', 'data:cron enable', 'cron:restart']
         : ['data:server-files', 'fw4:reload', 'data:cron enable', 'cron:restart'];
     const cleanup = service === 'hijpass'
-        ? ['hook:stop', 'firewall:remove', 'route:remove', 'data:cron disable', 'cron:restart']
+        ? ['hook:stop', 'fw4:reload', 'route:remove', 'data:cron disable', 'cron:restart']
         : ['fw4:reload', 'data:cron disable', 'cron:restart'];
 
     test(`${service}: init.d 在提交后直接按顺序设置辅助功能，不查询进程、不重复清理`, t => {
@@ -149,7 +151,7 @@ for (const service of ['hijpass', 'hijserver']) {
     });
     for (const action of ['stop', 'restart']) test(`${service}: ${action} 撤流失败不继续停核心或启动`, t => {
         const f = fixture(t, service);
-        const failure = service === 'hijpass' ? 'firewall:remove' : 'fw4';
+        const failure = 'fw4';
         assert.notEqual(f.run(action, failure).status, 0);
         assert.ok(!f.events().some(event => /:(kill|submit|prepare)$/.test(event)));
     });

@@ -160,11 +160,11 @@ test('RPC encodes large command output from files and removes its capture direct
         .replace('/tmp/hijpass-rpc.XXXXXX', path.join(f.directory, 'capture.XXXXXX')));
     const stdout = 'rule "quoted" \\ 规则\tvalue\n'.repeat(8000) + 'tail \n\n';
     const stderr = 'failure "quoted" \\ 失败\n'.repeat(8000) + '\n';
-    fs.writeFileSync(path.join(f.runtime, 'firewall/firewall.sh'), `#!/bin/sh
+    fs.writeFileSync(path.join(f.runtime, 'testbin/nft'), `#!/bin/sh
 cat '${f.directory}/stdout'
 cat '${f.directory}/stderr' >&2
 exit "$(cat '${f.directory}/code')"
-`);
+`, { mode: 0o755 });
     for (const [out, err, code] of [[stdout, '', 0], ['', stderr, 7], [stdout, stderr, 9]]) {
         fs.writeFileSync(path.join(f.directory, 'stdout'), out);
         fs.writeFileSync(path.join(f.directory, 'stderr'), err);
@@ -295,4 +295,22 @@ hijpass_run_logged core 'Download' "$LINENO" download
     assert.match(log, /optional hook unavailable/);
     assert.doesNotMatch(log, /\[job\]|task=|diagnostic output/);
     assert.doesNotMatch(log, /private|https:\/\//);
+});
+
+for (const fail of ['', 'generate', 'reload']) test(`firewall_reset RPC 在生成成功后重载并返回真实状态：${fail || '正常'}`, t => {
+    const f = fixture(t), events = f.directory + '/events';
+    fs.writeFileSync(f.runtime + '/firewall/generatecli.uc', `import * as fs from 'fs';
+let file = fs.open('${events}', 'a'); file.write('generate\\n'); file.close();
+${fail === 'generate' ? "warn('generation failed'); exit(1);" : ''}
+`);
+    fs.writeFileSync(f.runtime + '/testbin/fw4', `#!/bin/sh
+echo "$1" >>'${events}'
+exit ${fail === 'reload' ? 7 : 0}
+`, { mode: 0o755 });
+    const response = f.invoke('firewall_reset');
+    assert.equal(response.code, fail === 'generate' ? 1 : fail === 'reload' ? 7 : 0);
+    assert.equal(response.stdout, '');
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail === 'generate' ? ['generate'] : ['generate', 'reload']);
+    if (fail) assert.match(response.stderr, /failed; see main log/);
+    else assert.equal(response.stderr, '');
 });

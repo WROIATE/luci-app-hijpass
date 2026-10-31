@@ -17,6 +17,9 @@ function fixture(t) {
         const target = path.join(runtime, file);
         fs.writeFileSync(target, fs.readFileSync(target, 'utf8').replaceAll(sourceRuntime, runtime));
     }
+    for (const service of ['hijpass', 'hijserver'])
+        fs.writeFileSync(path.join(runtime, 'init-' + service + '.sh'),
+            fs.readFileSync(path.join(root, 'root/etc/init.d', service), 'utf8').replaceAll('/usr/lib/hijpass', runtime));
     t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
     function patch(file, before, after) {
         const target = path.join(runtime, file);
@@ -49,7 +52,21 @@ function fixture(t) {
         });
         return { child, result };
     }
-    return { directory, runtime, patch, script, run, data, launch };
+    function init(service, action, config, extra = {}) {
+        const driver = 'init-callback.sh';
+        const quoted = value => "'" + value.replaceAll("'", "'\\''") + "'";
+        fs.writeFileSync(path.join(runtime, driver), `#!/bin/sh
+. ${quoted(path.join(runtime, 'init-' + service + '.sh'))}
+config_directory=${quoted(config)}
+hijpass_run_ucode() { ucode -S -- "$@" --configdir "$config_directory"; }
+instances=1
+# 此处仅测回调内的真实功能脚本；原生 stop/kill 链路由 lifecycle.test.cjs 覆盖。
+stop() { :; }
+"$1"
+`);
+        return run(driver, [action], extra);
+    }
+    return { directory, runtime, patch, script, run, data, launch, init };
 }
 
 async function until(condition) {
@@ -118,11 +135,11 @@ test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变
     for (const file of ['firewall/firewall.sh', 'firewall/route.sh'])
         fs.writeFileSync(path.join(f.runtime, file), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     f.script('cron-init', 'exit 0');
-    f.patch('service/service.sh', '/etc/init.d/cron', path.join(f.directory, 'cron-init'));
+    f.patch('init-hijpass.sh', '/etc/init.d/cron', path.join(f.directory, 'cron-init'));
     f.patch('service/prepare.uc', '/etc/crontabs/root', path.join(f.directory, 'crontab'));
-    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', hook);
+    f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', hook);
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
-        const result = f.run('service/service.sh', ['setup_aux', '--configdir', config]);
+        const result = f.init('hijpass', 'service_started', config);
         assert.equal(result.status, 0, result.stderr);
         assert.equal(result.stdout, '');
         assert.equal(result.stderr, '');
@@ -130,7 +147,7 @@ test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变
     const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
     assert.match(content, /WARN\s+\[service\]\s+DNS Hook start: Warning:/);
     assert.match(content, /optional DNS service unavailable/);
-    assert.match(content, /Activation completed/);
+    assert.match(content, /Service started/);
 });
 
 test('命令阶段保留 fw4 信息级别，同时记录真实告警和失败且不改变退出状态', t => {
@@ -385,7 +402,7 @@ test('Chinadns 模板保留列表开关、默认 tag、上游和自定义域名�
     for (const [china, proxy, tag] of [['0', '0', null], ['1', '0', 'gfw'], ['0', '1', 'chn'], ['1', '1', null]]) {
         const sections = [base[0], { ...base[1], use_chn: china, use_gfw: proxy }];
         withConfig(sections, config => {
-            const prepared = f.run('service/service.sh', ['prepare', '--configdir', config]);
+            const prepared = f.run('service/prepare.sh', ['--configdir', config]);
             assert.equal(prepared.status, 0, prepared.stderr);
             assert.equal(JSON.parse(prepared.stdout).instances[0].name, 'chinadns-ng');
             const text = fs.readFileSync(configFile, 'utf8');
@@ -404,7 +421,7 @@ test('Chinadns 模板保留列表开关、默认 tag、上游和自定义域名�
     }
     withConfig([base[0], { ...base[1], direct_dns: 'dnsmasq' }], config => {
         fs.writeFileSync(path.join(config, 'dhcp'), "config dnsmasq\n option port '1053'\n");
-        const prepared = f.run('service/service.sh', ['prepare', '--configdir', config]);
+        const prepared = f.run('service/prepare.sh', ['--configdir', config]);
         assert.equal(prepared.status, 0, prepared.stderr);
         assert.match(fs.readFileSync(configFile, 'utf8'), /^china-dns 127\.0\.0\.1#1053$/m);
     });
@@ -550,12 +567,13 @@ esac`);
 test('服务准备通过原生 UCI 读取并生成配置，禁用时不调用 Geo 工具', t => {
     const f = fixture(t), client = path.join(f.directory, 'client'), calls = path.join(f.directory, 'calls');
     f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/client', client);
+    f.script('sing-box', 'exit 0');
     f.script('geoview', 'echo unexpected >>"$TEST_CALLS"; exit 1');
     const sections = [{ '.type': 'hijpass', '.name': 'global', enabled: '1' },
         { '.type': 'proxy_node', '.name': 'ss', enabled: '1', name: 'test', type: 'shadowsocks', core: 'sing-box',
             server: '192.0.2.10', server_port: '443', listen_port: '10001', socks_port: '10002', method: 'aes-128-gcm', password: 'test' }];
     withConfig(sections, config => {
-        const prepared = f.run('service/service.sh', ['prepare', '--configdir', config], { TEST_CALLS: calls });
+        const prepared = f.run('service/prepare.sh', ['--configdir', config], { TEST_CALLS: calls });
         assert.equal(prepared.status, 0, prepared.stderr);
         assert.deepEqual(JSON.parse(prepared.stdout).instances[0].command, ['sing-box', '-c', client + '/test-ss.json', 'run']);
         assert.equal(JSON.parse(fs.readFileSync(client + '/test-ss.json', 'utf8')).outbounds[0].type, 'shadowsocks');
@@ -564,14 +582,14 @@ test('服务准备通过原生 UCI 读取并生成配置，禁用时不调用 Ge
     sections[1].password = 'changed';
     sections.push({ '.type': 'proxy_node', '.name': 'custom', enabled: '1', name: 'custom', config_type: 'custom', type: 'custom' });
     withConfig(sections, config => {
-        const failed = f.run('service/service.sh', ['prepare', '--configdir', config], { TEST_CALLS: calls });
+        const failed = f.run('service/prepare.sh', ['--configdir', config], { TEST_CALLS: calls });
         assert.equal(failed.status, 1);
         assert.match(failed.stderr, /has no command/);
         assert.equal(fs.readFileSync(client + '/test-ss.json', 'utf8'), original);
     });
     sections[0].enabled = '0';
     withConfig(sections, config => {
-        const disabled = f.run('service/service.sh', ['prepare', '--configdir', config], { TEST_CALLS: calls });
+        const disabled = f.run('service/prepare.sh', ['--configdir', config], { TEST_CALLS: calls });
         assert.equal(disabled.status, 0, disabled.stderr);
         assert.deepEqual(JSON.parse(disabled.stdout), { instances: [] });
         assert.equal(fs.existsSync(calls), false);
@@ -580,6 +598,7 @@ test('服务准备通过原生 UCI 读取并生成配置，禁用时不调用 Ge
 
 test('原生 UCI 中缺省核心的 VLESS 生成并启动 sing-box，自定义命令不生成或覆盖配置', t => {
     const f = fixture(t), client = path.join(f.directory, 'client');
+    f.script('sing-box', 'exit 0');
     f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/client', client);
     fs.mkdirSync(client);
     const customFile = path.join(client, 'manual-custom.json');
@@ -592,7 +611,7 @@ test('原生 UCI 中缺省核心的 VLESS 生成并启动 sing-box，自定义�
         { '.type': 'proxy_node', '.name': 'custom', enabled: '1', name: 'manual', config_type: 'custom',
             command, listen_port: '10003', socks_port: '10004' }];
     withConfig(sections, directory => {
-        const result = f.run('service/service.sh', ['prepare', '--configdir', directory]);
+        const result = f.run('service/prepare.sh', ['--configdir', directory]);
         assert.equal(result.status, 0, result.stderr);
         const plan = JSON.parse(result.stdout);
         assert.deepEqual(plan.instances[0].command, ['sing-box', '-c', client + '/vless-vless.json', 'run']);
@@ -820,8 +839,8 @@ i=0; while [ "$i" -lt 12 ]; do echo "$line"; i=$((i+1)); done >"$output"`);
 
 test('自动更新将下载与应用交给同一执行器，忙或失败不写完成时间，也不重复重启', t => {
     const f = fixture(t), last = path.join(f.directory, 'last-update'), calls = path.join(f.directory, 'calls');
-    f.patch('service/service.sh', '/tmp/hijpass_last_update', last);
-    f.patch('service/service.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
+    f.patch('rules/auto-update.sh', '/tmp/hijpass_last_update', last);
+    f.patch('rules/auto-update.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
     f.script('hijpass-init', `echo unexpected-restart >>'${calls}'`);
     fs.writeFileSync(path.join(f.runtime, 'rules/update.sh'), `#!/bin/sh
 printf '%s\\n' "$1" >>'${calls}'
@@ -830,7 +849,7 @@ exit "$AUTO_RESULT"
 `, { mode: 0o755 });
     withConfig([{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', update_interval: '1' }], config => {
         for (const code of ['75', '1', '0']) {
-            const result = f.run('service/service.sh', ['auto-update', '--configdir', config], { AUTO_RESULT: code });
+            const result = f.run('rules/auto-update.sh', ['--configdir', config], { AUTO_RESULT: code });
             assert.equal(result.status, code === '1' ? 1 : 0, result.stderr);
             assert.equal(fs.existsSync(last), code === '0');
         }
@@ -1007,11 +1026,11 @@ for (const fail of ['', 'route', 'firewall', 'hook']) test(`客户端按路由�
             `#!/bin/sh\necho '${stage}' >>"$EVENTS"\n[ "$FAIL_STAGE" != '${stage}' ]\n`, { mode: 0o755 });
     f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ]');
     f.script('cron-init', 'echo cron >>"$EVENTS"');
-    f.patch('service/service.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
-    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
+    f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
-        const result = f.run('service/service.sh', ['setup_aux', '--configdir', config], { EVENTS: events, FAIL_STAGE: fail });
+        const result = f.init('hijpass', 'service_started', config, { EVENTS: events, FAIL_STAGE: fail });
         assert.equal(result.status, fail ? 1 : 0, result.stderr);
     });
     const expected = ['route', 'firewall', 'hook', 'cron'];
@@ -1022,10 +1041,10 @@ test('客户端防火墙撤流失败时保留策略路由，不继续清理', t 
     const f = fixture(t), events = f.directory + '/events';
     fs.writeFileSync(f.runtime + '/firewall/firewall.sh', '#!/bin/sh\necho firewall >>"$EVENTS"\nexit 1\n', { mode: 0o755 });
     fs.writeFileSync(f.runtime + '/firewall/route.sh', '#!/bin/sh\necho route >>"$EVENTS"\n', { mode: 0o755 });
-    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
+    f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     f.script('dns-hook', 'echo hook >>"$EVENTS"');
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
-        const result = f.run('service/service.sh', ['clear_aux', '--configdir', config], { EVENTS: events });
+        const result = f.init('hijpass', 'stop_service', config, { EVENTS: events });
         assert.equal(result.status, 1);
     });
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall']);
@@ -1033,30 +1052,29 @@ test('客户端防火墙撤流失败时保留策略路由，不继续清理', t 
 
 test('服务端独立准备自定义命令，激活只写端口规则和日志任务，不生成客户端数据', t => {
     const f = fixture(t), events = f.directory + '/events', table = f.directory + '/server.nft', chain = f.directory + '/chain.nft';
-    for (const file of ['service/prepare.uc', 'service/server.sh']) {
+    for (const file of ['service/prepare.uc', 'init-hijserver.sh']) {
         f.patch(file, '/usr/share/nftables.d/table-post/hijserver.nft', table);
         f.patch(file, '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', chain);
     }
     f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
-    f.patch('service/server.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.patch('init-hijserver.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.script('fw4', 'echo firewall >>"$EVENTS"');
     f.script('cron-init', 'echo cron >>"$EVENTS"');
-    for (const file of ['firewall/firewall.sh', 'firewall/route.sh', 'rules/geoview.sh', 'service/service.sh'])
+    for (const file of ['firewall/firewall.sh', 'firewall/route.sh', 'rules/geoview.sh'])
         fs.writeFileSync(f.runtime + '/' + file, '#!/bin/sh\necho unexpected >>"$EVENTS"\nexit 1\n', { mode: 0o755 });
     withConfig([], config => {
         fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '1'\nconfig server_node 'server'\n option enabled '1'\n option name 'server'\n option command 'program -c {conf_path}'\n option allow_firewall '1'\n option listen_port '8443'\n");
-        f.patch('service/server.sh', 'server "$@";', `server "$@" --configdir '${config}';`);
-        const prepared = f.run('service/server.sh', ['prepare'], { EVENTS: events });
+        const prepared = f.run('service/prepare.sh', ['server', '--configdir', config], { EVENTS: events });
         assert.equal(prepared.status, 0, prepared.stderr);
         assert.deepEqual(JSON.parse(prepared.stdout).instances[0].command,
             ['/bin/sh', '-c', "program -c '/etc/hijpass/server/server-server.json'"]);
         assert.equal(fs.existsSync(table), false);
         assert.equal(fs.existsSync(events), false);
-        const activated = f.run('service/server.sh', ['setup_aux'], { EVENTS: events });
+        const activated = f.init('hijserver', 'service_started', config, { EVENTS: events });
         assert.equal(activated.status, 0, activated.stderr);
         assert.match(fs.readFileSync(table, 'utf8'), /8443/);
         assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['firewall', 'cron']);
-        assert.equal(f.run('service/server.sh', ['clear_aux'], { EVENTS: events }).status, 0);
+        assert.equal(f.init('hijserver', 'stop_service', config, { EVENTS: events }).status, 0);
         assert.equal(fs.existsSync(table), false);
         assert.equal(fs.existsSync(chain), false);
     });
@@ -1069,37 +1087,58 @@ for (const fail of ['hook', 'route', 'cron']) test(`客户端停止时区分关�
             `#!/bin/sh\necho '${stage}' >>"$EVENTS"\n[ "$FAIL_STAGE" != '${stage}' ]\n`, { mode: 0o755 });
     f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ]');
     f.script('cron-init', 'echo cron >>"$EVENTS"\n[ "$FAIL_STAGE" != cron ]');
-    f.patch('service/service.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
-    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
+    f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     const generated = ['/etc/hijpass/chinadns-ng.conf', '/tmp/hijpass/domain-proxy-geo.txt', '/tmp/hijpass/domain-direct-geo.txt'];
     for (const file of generated) {
         const target = f.directory + '/' + path.basename(file);
         fs.writeFileSync(target, 'prepared DNS configuration');
-        f.patch('service/service.sh', file, target);
+        f.patch('init-hijpass.sh', file, target);
     }
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
-        const result = f.run('service/service.sh', ['clear_aux', '--configdir', config], { EVENTS: events, FAIL_STAGE: fail });
+        const result = f.init('hijpass', 'stop_service', config, { EVENTS: events, FAIL_STAGE: fail });
         assert.equal(result.status, fail === 'cron' ? 0 : 1, result.stderr);
     });
-    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall', 'route', 'cron']);
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail === 'cron' ? ['hook', 'firewall', 'route', 'cron'] : ['hook', 'firewall', 'route']);
     for (const file of generated) assert.equal(fs.readFileSync(f.directory + '/' + path.basename(file), 'utf8'), 'prepared DNS configuration');
     if (fail === 'cron') assert.match(fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8'), /WARN.*Cron cleanup failed/);
 });
 
 for (const fail of ['firewall', 'cron']) test(`服务端停止时区分防火墙与定时任务失败：${fail}`, t => {
     const f = fixture(t), events = f.directory + '/events';
-    f.patch('service/server.sh', '/usr/share/nftables.d/table-post/hijserver.nft', f.directory + '/server.nft');
-    f.patch('service/server.sh', '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', f.directory + '/chain.nft');
+    f.patch('init-hijserver.sh', '/usr/share/nftables.d/table-post/hijserver.nft', f.directory + '/server.nft');
+    f.patch('init-hijserver.sh', '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', f.directory + '/chain.nft');
     f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
-    f.patch('service/server.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.patch('init-hijserver.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.script('fw4', 'echo firewall >>"$EVENTS"\n[ "$FAIL_STAGE" != firewall ]');
     f.script('cron-init', 'echo cron >>"$EVENTS"\n[ "$FAIL_STAGE" != cron ]');
     withConfig([], config => {
         fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '1'\n");
-        f.patch('service/server.sh', 'server "$@";', `server "$@" --configdir '${config}';`);
-        const result = f.run('service/server.sh', ['clear_aux'], { EVENTS: events, FAIL_STAGE: fail });
+        const result = f.init('hijserver', 'stop_service', config, { EVENTS: events, FAIL_STAGE: fail });
         assert.equal(result.status, fail === 'cron' ? 0 : 1, result.stderr);
     });
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail === 'cron' ? ['firewall', 'cron'] : ['firewall']);
+});
+
+for (const core of ['xray', 'sing-box']) test(`配置准备执行明确的 ${core} 检查命令，保留环境变量和带空格路径，失败不输出启动计划`, t => {
+    const f = fixture(t), client = f.directory + '/client files', args = f.directory + '/check-args';
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/client', client);
+    f.script(core, `printf '%s\\n' "$CHECK_ENV" "$@" >"$CHECK_ARGS"
+[ "$FAIL_CHECK" != 1 ]`);
+    const sections = [{ '.type': 'hijpass', enabled: '1' },
+        { '.type': 'proxy_node', '.name': 'ss', enabled: '1', name: 'test node', type: 'shadowsocks', core,
+            server: '192.0.2.10', server_port: '443', listen_port: '10001', socks_port: '10002',
+            method: 'aes-128-gcm', password: 'test', procd_env: ['CHECK_ENV=value with spaces'] }];
+    withConfig(sections, config => {
+        const check = core === 'xray' ? ['run', '-test', '-c'] : ['check', '-c'];
+        const result = f.run('service/prepare.sh', ['--configdir', config], { CHECK_ARGS: args });
+        assert.equal(result.status, 0, result.stderr);
+        const plan = JSON.parse(result.stdout), filename = client + '/test node-ss.json';
+        assert.deepEqual(plan.instances[0].check, [core, ...check, filename]);
+        assert.deepEqual(fs.readFileSync(args, 'utf8').trim().split('\n'), ['value with spaces', ...check, filename]);
+        const failed = f.run('service/prepare.sh', ['--configdir', config], { CHECK_ARGS: args, FAIL_CHECK: '1' });
+        assert.equal(failed.status, 1);
+        assert.equal(failed.stdout, '');
+    });
 });

@@ -23,6 +23,7 @@
  *   id: string,
  *   name: string,
  *   command: string[],
+ *   check?: string[],
  *   env: string[],
  *   user: string,
  *   log: string|null,
@@ -49,7 +50,6 @@
  * 服务执行层的开关、更新间隔（天）和日志路径。
  * @typedef {{
  *   enabled: boolean,
- *   dns_hook: string,
  *   geo_convert: boolean,
  *   update_interval: integer,
  *   log_paths: string[]

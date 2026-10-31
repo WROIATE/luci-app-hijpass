@@ -45,9 +45,10 @@ export function plan(sections) {
 	 * @param {string} name
 	 * @param {string[]} args
 	 * @param {boolean|null} shunt
+	 * @param {string[]|null} check 标准核心的配置检查命令；自定义命令不检查。
 	 * @returns {ServiceInstance} procd 实例对象，含 command、env、user、log 等字段。
 	 */
-	function instance(section, name, args, shunt) {
+	function instance(section, name, args, shunt, check) {
 		let env = list(section.procd_env);
 		for (let entry in env) {
 			if (!match(entry, /^[A-Za-z_][A-Za-z0-9_]*=/)) {
@@ -58,7 +59,7 @@ export function plan(sections) {
 			push(env, 'XRAY_LOCATION_ASSET=/usr/share/v2ray');
 		}
 		return {
-			id: section['.name'], name, command: args, env, shunt: !!shunt,
+			id: section['.name'], name, command: args, check: check || [], env, shunt: !!shunt,
 			user: section.nest_proxy == '1' ? 'root' : 'hijpass', log: logPath(section),
 		};
 	}
@@ -68,7 +69,7 @@ export function plan(sections) {
 		}
 		let name = section.name || section['.name'];
 		let path = nodeConfig(section);
-		let args;
+		let args, check = [];
 		if (configType(section.config_type) == CONFIG_TYPE.custom) {
 			if (!trim(section.command || '')) {
 				die(`custom node "${name}" has no command`);
@@ -80,15 +81,17 @@ export function plan(sections) {
 			let engine = core(section.core);
 			if (engine == CORE.xray) {
 				args = ['xray', '-c', path];
+				check = ['xray', 'run', '-test', '-c', path];
 			}
 			else if (engine == CORE.singbox) {
 				args = ['sing-box', '-c', path, 'run'];
+				check = ['sing-box', 'check', '-c', path];
 			}
 			else {
 				die(`unsupported core "${engine}"`);
 			}
 		}
-		push(instances, instance(section, name, args));
+		push(instances, instance(section, name, args, false, check));
 	}
 	let shunt = findShuntSection(sections);
 	if (shunt && shunt.enabled != '0' && shunt.type) {
@@ -96,7 +99,8 @@ export function plan(sections) {
 		if (engine != CORE.xray && engine != CORE.singbox) {
 			die('unsupported shunt core');
 		}
-		push(instances, instance(shunt, 'shunt', engine == CORE.xray ? ['xray', '-c', path] : ['sing-box', 'run', '-c', path], true));
+		push(instances, instance(shunt, 'shunt', engine == CORE.xray ? ['xray', '-c', path] : ['sing-box', 'run', '-c', path], true,
+            engine == CORE.xray ? ['xray', 'run', '-test', '-c', path] : ['sing-box', 'check', '-c', path]));
 	}
 	return { instances };
 };
@@ -312,13 +316,13 @@ function writeServerRules(sections) {
 };
 
 // ServiceSettings 是执行层需要的业务值；不包含可执行的通用动作列表。
-// enabled 控制启停，geo_convert 控制 Geo 准备，dns_hook 是后端固定的 Hook 位置，
+// enabled 控制配置准备，geo_convert 控制 Geo 准备，
 // update_interval 为自动更新间隔天数，log_paths 为需要准备目录的日志位置。
 /**
  * 为 Shell 执行脚本整理服务开关和维护参数。
  * @param {UciSection[]} config
  * @param {boolean} server
- * @returns {ServiceSettings} 含 enabled、dns_hook、geo_convert、update_interval（天）及 log_paths 的对象。
+ * @returns {ServiceSettings} 含 enabled、geo_convert、update_interval（天）及 log_paths 的对象。
  */
 function settings(config, server) {
     /** @type {HijpassSection|HijserverSection|null} */
@@ -328,7 +332,7 @@ function settings(config, server) {
     if (!server && shunt) {
         convert = shunt.enabled != '0' && core(shunt.type) == CORE.singbox && shunt.ruleset_convert == '1';
     }
-    return { enabled: global?.enabled == '1', dns_hook: server ? '' : FILES.dns_hook,
+    return { enabled: global?.enabled == '1',
         geo_convert: convert,
         update_interval: int(findRuleSection(config)?.update_interval || '0'),
         log_paths: filter(map(config, item => logPath(item, server)), path => !!path) };

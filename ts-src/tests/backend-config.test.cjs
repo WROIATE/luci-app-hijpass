@@ -128,13 +128,14 @@ test('Save & Apply validates without writing files and stops before applying inv
     }
 });
 
-test('init delegates lifecycle to Shell while preserving argv passed to procd', () => {
+test('init owns lifecycle and shares only procd instance mapping', () => {
     const source = fs.readFileSync(path.join(root, 'root/etc/init.d/hijpass'), 'utf8');
     const bridge = fs.readFileSync(path.join(root, 'root/usr/lib/hijpass/service/procd.sh'), 'utf8');
     assert.match(source, /USE_PROCD=1/);
     assert.match(source, /service_started\(\)/);
-    assert.doesNotMatch(source, /service\/lifecycle[.]sh/);
-    assert.match(bridge, /hijpass_add_instances/);
+    assert.doesNotMatch(source, /service\/lifecycle[.]sh|setup_aux|clear_aux/);
+    assert.match(bridge, /procd_open_instance/);
+    assert.doesNotMatch(bridge, /preparecli|firewall|cron|hijpass_check_configs/);
     assert.match(bridge, /set -- "\$@" "\$value"/);
     assert.doesNotMatch(source + bridge, /uci -q|config_foreach|geoview[.]sh/);
 });

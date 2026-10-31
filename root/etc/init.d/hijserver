@@ -3,34 +3,58 @@
 USE_PROCD=1
 START=99
 STOP=15
-RUNTIME=/usr/lib/hijpass/service/server.sh
 . /usr/lib/hijpass/common.sh
 . /usr/lib/hijpass/service/procd.sh
 
-# 服务端的数据准备使用 ucode，进程、防火墙应用和服务启停由 Shell 组织。
+NFT_TABLE=/usr/share/nftables.d/table-post/hijserver.nft
+NFT_CHAIN=/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft
+
 start_service() {
-    # rc.common 不传播此回调的 return；失败必须退出，避免提交部分实例。
-    service_plan="$(hijpass_run_logged server 'Prepare service' "${LINENO:-}" "$RUNTIME" prepare)" || exit 1
-    hijpass_run_logged server 'Check core configurations' "${LINENO:-}" hijpass_check_configs "$service_plan" || exit 1
-    # 提交前清理旧辅助配置，直接 start 更新已有实例时也遵守这个顺序。
-    stop_service
-    # 合法空列表由框架直接提交，保留配置变更触发器。
-    hijpass_has_instances "$service_plan" || return 0
-    hijpass_add_instances "$service_plan" || exit 1
+    local plan kind instance
+    plan="$(hijpass_run_logged server 'Prepare configurations' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server)" || exit 1
+    # 使用独立 JSON 命名空间，避免覆盖 rc.common 正在组装的 procd 消息。
+    json_set_namespace hijserver_plan
+    json_load "$plan" || exit 1
+    json_get_type kind instances
+    [ "$kind" = array ] || { echo 'Invalid service plan: instances must be an array' >&2; exit 1; }
+    json_select instances
+    json_get_keys instances
+    # 空实例也是正常配置；撤销旧辅助功能后由框架提交空列表。
+    if [ -z "$instances" ]; then
+        stop_service
+        return 0
+    fi
+    for instance in $instances; do
+        json_select "$instance" || exit 1
+        hijpass_add_instance || exit 1
+        json_select ..
+    done
 }
 
 service_started() {
-    # 此回调在实例提交后执行，不代表核心已经就绪。
-    hijpass_has_instances "$service_plan" || return 0
-    "$RUNTIME" setup_aux && return 0
-    # 辅助配置失败：先撤流，再由原生 stop 停止本服务。
+    # procd 已收到实例描述；按约定直接设置辅助功能，不轮询进程状态。
+    [ -n "$instances" ] || return 0
+    if hijpass_run_ucode "$HIJPASS_LIB/service/preparecli.uc" server server-files &&
+        hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload &&
+        update_cron enable; then
+        hijpass_log INFO server "${LINENO:-}" 'Service started'
+        return 0
+    fi
+    hijpass_log ERROR server "${LINENO:-}" 'Service setup failed'
     stop
     return 1
 }
 
 stop_service() {
-    # 撤流失败时退出，阻止 rc.common 继续停止核心，避免流量落到空端口。
-    "$RUNTIME" clear_aux || exit 1
+    rm -f "$NFT_TABLE" "$NFT_CHAIN" || exit 1
+    hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload || exit 1
+    update_cron disable || hijpass_log WARN server "${LINENO:-}" 'Cron cleanup failed; continuing service stop'
+    hijpass_log INFO server "${LINENO:-}" 'Service resources removed'
+}
+
+update_cron() {
+    hijpass_run_ucode "$HIJPASS_LIB/service/preparecli.uc" server cron "$1" || return 1
+    hijpass_run_logged server 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
 }
 
 reload_service() {

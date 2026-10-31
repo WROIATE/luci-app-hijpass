@@ -77,8 +77,7 @@ service_triggers() {
 
 boot() {
     local delay
-    if delay="$(hijpass_run_logged service 'Read startup delay' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" delay)"; then
-        [ "$delay" -le 0 ] || hijpass_run_logged service 'Startup delay' "${LINENO:-}" sleep "$delay"
-    fi
+    delay="$(hijpass_run_logged service 'Read startup delay' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" delay)" || return $?
+    [ "$delay" -le 0 ] || hijpass_run_logged service 'Startup delay' "${LINENO:-}" sleep "$delay" || return $?
     start
 }

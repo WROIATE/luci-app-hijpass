@@ -82,6 +82,6 @@ service_triggers() {
 }
 
 boot() {
-    hijpass_run_logged server 'Startup delay' "${LINENO:-}" sleep 10
+    hijpass_run_logged server 'Startup delay' "${LINENO:-}" sleep 10 || return $?
     start
 }

@@ -173,17 +173,16 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.match(log, /Remove (firewall )?rules failed: exit=1/);
         assert.match(log, /Service cleanup completed with errors/);
     });
-    test(`${service}: 启动延时失败记日志后仍启动服务`, t => {
+    test(`${service}: 启动延时失败记日志并终止本次启动`, t => {
         const f = fixture(t, service);
-        assert.equal(f.run('boot', 'sleep', { DELAY_SECS: '1' }).status, 0);
-        assert.deepEqual(f.events(), [...(service === 'hijpass' ? ['data:delay', 'delay:1'] : ['delay:10']),
-            service + ':prepare', service + ':submit', ...setup]);
+        assert.equal(f.run('boot', 'sleep', { DELAY_SECS: '1' }).status, 1);
+        assert.deepEqual(f.events(), service === 'hijpass' ? ['data:delay', 'delay:1'] : ['delay:10']);
         assert.match(fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8'), /Startup delay failed: exit=1/);
     });
-    if (service === 'hijpass') test('启动延时读取失败不阻止实例准备', t => {
+    if (service === 'hijpass') test('启动延时读取失败不再准备实例', t => {
         const f = fixture(t);
-        assert.equal(f.run('boot', 'data:delay').status, 0);
-        assert.deepEqual(f.events(), ['data:delay', service + ':prepare', service + ':submit', ...setup]);
+        assert.equal(f.run('boot', 'data:delay').status, 1);
+        assert.deepEqual(f.events(), ['data:delay']);
     });
     for (const plan of ['', '{', '{}', '{"instances":{}}', '{"instances":null}']) {
         test(`${service}: 拒绝无效计划 ${plan || '(empty)'}，不当作禁用服务`, t => {

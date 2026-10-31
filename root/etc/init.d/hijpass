@@ -9,7 +9,7 @@ STOP=15
 DNS_HOOK=/etc/hijpass/hook/dns-hook.sh
 
 start_service() {
-    local plan kind instance
+    local plan kind instance keys id name
     plan="$(hijpass_run_logged service 'Prepare configurations' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh")" || exit 1
     # 使用独立 JSON 命名空间，避免覆盖 rc.common 正在组装的 procd 消息。
     json_set_namespace hijpass_plan
@@ -17,17 +17,21 @@ start_service() {
     json_get_type kind instances
     [ "$kind" = array ] || { echo 'Invalid service plan: instances must be an array' >&2; exit 1; }
     json_select instances
-    json_get_keys instances
-    # 空实例也是正常配置；撤销旧辅助功能后由框架提交空列表。
-    if [ -z "$instances" ]; then
-        stop_service
-        return 0
-    fi
-    for instance in $instances; do
-        json_select "$instance" || exit 1
-        hijpass_add_instance || exit 1
+    json_get_keys keys
+    instances=
+    for instance in $keys; do
+        json_select "$instance" || {
+            hijpass_log ERROR service "${LINENO:-}" "Invalid instance entry: index=$instance"
+            continue
+        }
+        json_get_vars id name
+        if hijpass_run_logged service "Prepare instance $id ($name)" "${LINENO:-}" hijpass_add_instance; then
+            instances="$instances $instance"
+        fi
         json_select ..
     done
+    # 没有成功注册的实例时撤销辅助功能，由框架提交空列表。
+    [ -n "$instances" ] || stop_service
 }
 
 service_started() {

@@ -151,7 +151,7 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.notEqual(f.run(action, failure).status, 0);
         assert.ok(!f.events().some(event => /:(kill|submit|prepare)$/.test(event)));
     });
-    for (const plan of ['', '{', '{}', '{"instances":{}}', '{"instances":null}', '{"instances":[null]}', '{"instances":[{"command":[]}]}']) {
+    for (const plan of ['', '{', '{}', '{"instances":{}}', '{"instances":null}']) {
         test(`${service}: 拒绝无效计划 ${plan || '(empty)'}，不当作禁用服务`, t => {
             const f = fixture(t, service);
             fs.writeFileSync(f.planPath, plan);
@@ -187,11 +187,48 @@ test('多个实例全部声明后直接应用辅助配置', t => {
     assert.ok(!f.events().includes('unexpected-poll'));
 });
 
-test('后续实例无效时不提交前面已组装的部分实例', t => {
-    const f = fixture(t);
-    f.plan.instances.push({ id: 'broken', name: 'broken', command: [] });
-    fs.writeFileSync(f.planPath, JSON.stringify(f.plan));
-    assert.notEqual(f.run('start').status, 0);
-    assert.deepEqual(f.events(), ['hijpass:prepare']);
-    assert.equal(fs.existsSync(f.directory + '/submitted.json'), false);
-});
+for (const service of ['hijpass', 'hijserver']) {
+    test(`${service}: 单个实例无效时记录原因，继续提交前后有效实例`, t => {
+        const f = fixture(t, service);
+        f.plan.instances.push(null, { id: 'broken', name: 'broken', command: [] }, { ...f.plan.instances[0], id: 'last' });
+        fs.writeFileSync(f.planPath, JSON.stringify(f.plan));
+        assert.equal(f.run('start').status, 0);
+        const instances = JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances;
+        assert.deepEqual(Object.keys(instances), ['node-test space', 'last-test space']);
+        const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
+        assert.match(log, /Invalid instance entry: index=2/);
+        assert.match(log, /Prepare instance broken \(broken\): Invalid service instance: empty command/);
+        assert.match(log, /Prepare instance broken \(broken\) failed: exit=1/);
+        assert.ok(!f.events().some(event => /:kill$/.test(event)));
+    });
+    test(`${service}: 全部实例无效仍提交空列表，清理辅助功能且不重新激活`, t => {
+        const f = fixture(t, service);
+        f.plan.instances = [null, { id: 'broken', name: 'broken', command: [] }];
+        fs.writeFileSync(f.planPath, JSON.stringify(f.plan));
+        assert.equal(f.run('start').status, 0);
+        assert.deepEqual(JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances, {});
+        const events = f.events();
+        assert.ok(events.includes(service + ':submit'));
+        assert.ok(events.includes('data:cron disable'));
+        assert.ok(!events.includes('data:cron enable'));
+    });
+    for (const core of ['xray', 'sing-box']) test(`${service}: ${core} 检查失败只跳过当前实例，记录详情并保留 argv 和环境变量`, t => {
+        const f = fixture(t, service), check = f.directory + '/bin/' + core, args = f.directory + '/check-args';
+        f.script(check, `printf '%s\\n' "$CHECK_ENV" "$@" >>'${args}'
+if [ "$CHECK_FAIL" = 1 ]; then echo 'invalid core configuration' >&2; exit 7; fi`);
+        const options = core === 'xray' ? ['run', '-test', '-c'] : ['check', '-c'];
+        const valid = { ...f.plan.instances[0], check: [check, ...options, 'config with spaces.json'], env: ['CHECK_ENV=value with spaces'] };
+        f.plan.instances = [{ ...valid, id: 'broken', env: [...valid.env, 'CHECK_FAIL=1'] }, valid];
+        fs.writeFileSync(f.planPath, JSON.stringify(f.plan));
+        assert.equal(f.run('start').status, 0);
+        assert.deepEqual(fs.readFileSync(args, 'utf8').trim().split('\n'),
+            Array(2).fill(['value with spaces', ...options, 'config with spaces.json']).flat());
+        const instances = JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances;
+        assert.deepEqual(Object.keys(instances), ['node-test space']);
+        assert.deepEqual(instances['node-test space'].command, [f.runtime + '/service/process.sh', '', ...valid.command]);
+        assert.deepEqual(instances['node-test space'].env, valid.env);
+        const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
+        assert.match(log, /Prepare instance broken \(test space\): invalid core configuration/);
+        assert.match(log, /Prepare instance broken \(test space\) failed: exit=7/);
+    });
+}

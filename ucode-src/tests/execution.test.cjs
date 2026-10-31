@@ -1179,7 +1179,7 @@ for (const fail of ['firewall', 'cron']) test(`服务端停止时区分防火墙
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail === 'cron' ? ['firewall', 'cron'] : ['firewall']);
 });
 
-for (const core of ['xray', 'sing-box']) test(`配置准备执行明确的 ${core} 检查命令，保留环境变量和带空格路径，失败不输出启动计划`, t => {
+for (const core of ['xray', 'sing-box']) test(`配置准备仅生成 ${core} 检查命令，检查留给逐实例注册`, t => {
     const f = fixture(t), client = f.directory + '/client files', args = f.directory + '/check-args';
     f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/client', client);
     f.script(core, `printf '%s\\n' "$CHECK_ENV" "$@" >"$CHECK_ARGS"
@@ -1194,10 +1194,8 @@ for (const core of ['xray', 'sing-box']) test(`配置准备执行明确的 ${cor
         assert.equal(result.status, 0, result.stderr);
         const plan = JSON.parse(result.stdout), filename = client + '/test node-ss.json';
         assert.deepEqual(plan.instances[0].check, [core, ...check, filename]);
-        assert.deepEqual(fs.readFileSync(args, 'utf8').trim().split('\n'), ['value with spaces', ...check, filename]);
-        const failed = f.run('service/prepare.sh', ['--configdir', config], { CHECK_ARGS: args, FAIL_CHECK: '1' });
-        assert.equal(failed.status, 1);
-        assert.equal(failed.stdout, '');
+        assert.deepEqual(plan.instances[0].env, ['CHECK_ENV=value with spaces']);
+        assert.equal(fs.existsSync(args), false);
     });
 });
 

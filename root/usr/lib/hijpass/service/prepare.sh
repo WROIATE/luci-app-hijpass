@@ -31,25 +31,4 @@ if [ "$enabled" = 1 ]; then
     done
 fi
 plan=$(run_data prepare "$@") || exit 1
-json_load "$plan" && json_select instances || exit 1
-json_get_keys entries
-keys='' value=''
-for entry in $entries; do
-    json_select "$entry"
-    json_get_values check check
-    if [ -n "$check" ]; then
-        set --
-        for field in env check; do
-            json_select "$field"
-            json_get_keys keys
-            for key in $keys; do
-                json_get_var value "$key"
-                set -- "$@" "$value"
-            done
-            json_select ..
-        done
-        env "$@" >&2 || exit 1
-    fi
-    json_select ..
-done
 printf '%s\n' "$plan"

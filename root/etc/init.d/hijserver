@@ -34,7 +34,7 @@ start_service() {
 service_started() {
     # procd 已收到实例描述；按约定直接设置辅助功能，不轮询进程状态。
     [ -n "$instances" ] || return 0
-    if hijpass_run_ucode "$HIJPASS_LIB/service/preparecli.uc" server server-files &&
+    if hijpass_run_logged server 'Write firewall rules' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server server-files &&
         hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload &&
         update_cron enable; then
         hijpass_log INFO server "${LINENO:-}" 'Service started'
@@ -53,7 +53,7 @@ stop_service() {
 }
 
 update_cron() {
-    hijpass_run_ucode "$HIJPASS_LIB/service/preparecli.uc" server cron "$1" || return 1
+    hijpass_run_logged server 'Write cron entries' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server cron "$1" || return 1
     hijpass_run_logged server 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
 }
 

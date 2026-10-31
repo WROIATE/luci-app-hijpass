@@ -39,7 +39,8 @@ function fixture(t) {
             { encoding: 'utf8', env: { ...process.env, ...extra, PATH: `${directory}:${runtime}/testbin:${process.env.PATH}` } });
     }
     patch('ucode/hijpass/config/paths.uc', '/tmp/hijpass/log', directory + '/logs');
-    patch('init-hijpass.sh', '/etc/hijpass/fw4-rules.nft', directory + '/rules.nft');
+    patch('firewall/firewall.sh', '/etc/hijpass/fw4-rules.nft', directory + '/rules.nft');
+    patch('testbin/ucode', 'exec ', 'if [ -n "$HIJPASS_TEST_CONFIG" ]; then set -- "$@" --configdir "$HIJPASS_TEST_CONFIG"; fi\nexec ');
     function launch(file, args, extra = {}) {
         const child = spawn('/usr/bin/busybox', ['ash', path.join(runtime, file), ...args], {
             env: { ...process.env, ...extra, PATH: `${directory}:${runtime}/testbin:${process.env.PATH}` },
@@ -65,7 +66,7 @@ instances=1
 stop() { :; }
 "$1"
 `);
-        return run(driver, [action], extra);
+        return run(driver, [action], { ...extra, HIJPASS_TEST_CONFIG: config });
     }
     return { directory, runtime, patch, script, run, data, launch, init };
 }
@@ -170,7 +171,9 @@ hijpass_run_logged test 'command phase' "$LINENO" '${f.directory}/diagnostic-com
         assert.equal(result.stderr, code === '0' ? '' : 'command phase failed; see main log\n');
         const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
         assert.match(content, new RegExp(`${level}\\s+\\[test\\]`));
-        assert.doesNotMatch(content, /\[I\]|\[E\]|diagnostic output|exit=/);
+        assert.doesNotMatch(content, /\[I\]|\[E\]|diagnostic output/);
+        if (code === '0') assert.doesNotMatch(content, /exit=/);
+        else assert.match(content, new RegExp(`ERROR.*command phase failed: exit=${code}`));
         assert.equal(content.split('firewall feature enabled').length - 1, message.includes('firewall feature enabled') ? 1 : 0);
         fs.unlinkSync(path.join(f.directory, 'logs/hijpass.log'));
     }
@@ -1067,12 +1070,12 @@ for (const fail of ['', 'route', 'generate', 'firewall', 'hook']) test(`客户�
     const f = fixture(t), events = f.directory + '/events';
     for (const [file, stage] of [['route.sh', 'route']])
         fs.writeFileSync(f.runtime + '/firewall/' + file,
-            `#!/bin/sh\necho '${stage}' >>"$EVENTS"\n[ "$FAIL_STAGE" != '${stage}' ]\n`, { mode: 0o755 });
+            `#!/bin/sh\necho '${stage}' >>"$EVENTS"\n[ "$FAIL_STAGE" != '${stage}' ] || { echo '${stage} detail' >&2; exit 1; }\n`, { mode: 0o755 });
     fs.writeFileSync(f.runtime + '/firewall/generatecli.uc', `import * as fs from 'fs';
 let file = fs.open(getenv('EVENTS'), 'a'); file.write('generate\\n'); file.close();
-exit(getenv('FAIL_STAGE') == 'generate' ? 1 : 0);`);
-    f.script('fw4', 'echo firewall >>"$EVENTS"\n[ "$FAIL_STAGE" != firewall ]');
-    f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ]');
+if (getenv('FAIL_STAGE') == 'generate') { warn('generate detail'); exit(1); }`);
+    f.script('fw4', 'echo firewall >>"$EVENTS"\n[ "$FAIL_STAGE" != firewall ] || { echo "firewall detail" >&2; exit 1; }');
+    f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ] || { echo "hook detail" >&2; exit 1; }');
     f.script('cron-init', 'echo cron >>"$EVENTS"');
     f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
@@ -1081,6 +1084,12 @@ exit(getenv('FAIL_STAGE') == 'generate' ? 1 : 0);`);
         const result = f.init('hijpass', 'service_started', config, { EVENTS: events, FAIL_STAGE: fail });
         assert.equal(result.status, fail ? 1 : 0, result.stderr);
     });
+    if (fail) {
+        const phase = { route: 'Reset policy routes', generate: 'Generate rules', firewall: 'Reload rules', hook: 'DNS Hook start' }[fail];
+        const log = fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8');
+        assert.match(log, new RegExp(`${phase}: ${fail} detail`));
+        assert.match(log, new RegExp(`ERROR.*${phase} failed: exit=1`));
+    }
     const expected = ['route', 'generate', 'firewall', 'hook', 'cron'];
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail ? expected.slice(0, expected.indexOf(fail) + 1) : expected);
 });
@@ -1189,5 +1198,55 @@ for (const core of ['xray', 'sing-box']) test(`配置准备执行明确的 ${cor
         const failed = f.run('service/prepare.sh', ['--configdir', config], { CHECK_ARGS: args, FAIL_CHECK: '1' });
         assert.equal(failed.status, 1);
         assert.equal(failed.stdout, '');
+    });
+});
+
+test('防火墙脚本统一删除和重载，删除失败记录原因并停止重载', t => {
+    const f = fixture(t), rules = f.directory + '/rules.nft', calls = f.directory + '/calls';
+    f.script('fw4', `echo "$1" >>'${calls}'`);
+    fs.mkdirSync(rules);
+    let result = f.run('firewall/firewall.sh', ['remove']);
+    assert.equal(result.status, 1);
+    assert.equal(fs.existsSync(calls), false);
+    const log = fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8');
+    assert.match(log, /ERROR.*Remove rules: .*rules\.nft/);
+    assert.match(log, /ERROR.*Remove rules failed: exit=1/);
+    fs.rmdirSync(rules);
+    fs.writeFileSync(rules, 'old rules');
+    result = f.run('firewall/firewall.sh', ['remove']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(rules), false);
+    assert.equal(fs.readFileSync(calls, 'utf8'), 'reload\n');
+    assert.equal(f.run('firewall/firewall.sh', ['invalid']).status, 1);
+    assert.equal(fs.readFileSync(calls, 'utf8'), 'reload\n');
+});
+
+for (const failure of ['write', 'reload']) test(`cron ${failure} 失败时普通日志包含阶段、原因和退出码`, t => {
+    const f = fixture(t), crontab = f.directory + '/crontab', calls = f.directory + '/calls';
+    f.patch('service/prepare.uc', '/etc/crontabs/root', crontab);
+    f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.script('cron-init', `echo reload >>'${calls}'; echo 'cron reload detail' >&2; exit 7`);
+    if (failure === 'write') fs.mkdirSync(crontab);
+    withConfig([{ '.type': 'hijpass', enabled: '1', log_level: 'INFO' }], config => {
+        const result = f.init('hijpass', 'update_cron', config);
+        assert.equal(result.status, failure === 'write' ? 1 : 7, result.stderr);
+    });
+    const log = fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8');
+    if (failure === 'write') {
+        assert.match(log, /ERROR.*Write cron entries: .*crontab/);
+        assert.match(log, /ERROR.*Write cron entries failed: exit=1/);
+        assert.equal(fs.existsSync(calls), false);
+    } else {
+        assert.match(log, /ERROR.*Cron reload: cron reload detail/);
+        assert.match(log, /ERROR.*Cron reload failed: exit=7/);
+    }
+});
+
+test('prepare 脚本提供启动延时数据，不额外执行配置准备', t => {
+    const f = fixture(t);
+    withConfig([{ '.type': 'hijpass', delay_time: '12' }], config => {
+        const result = f.run('service/prepare.sh', ['delay', '--configdir', config]);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout, '12\n');
     });
 });

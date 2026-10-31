@@ -6,7 +6,6 @@ STOP=15
 . /usr/lib/hijpass/common.sh
 . /usr/lib/hijpass/service/procd.sh
 
-NFT_RULES=/etc/hijpass/fw4-rules.nft
 DNS_HOOK=/etc/hijpass/hook/dns-hook.sh
 
 start_service() {
@@ -34,9 +33,8 @@ start_service() {
 service_started() {
     # procd 已收到实例描述；按约定直接设置辅助功能，不轮询进程状态。
     [ -n "$instances" ] || return 0
-    if "$HIJPASS_LIB/firewall/route.sh" reset &&
-        hijpass_run_logged firewall 'Generate rules' "${LINENO:-}" hijpass_run_ucode "$HIJPASS_LIB/firewall/generatecli.uc" &&
-        hijpass_run_logged firewall 'Reload rules' "${LINENO:-}" fw4 reload &&
+    if hijpass_run_logged route 'Reset policy routes' "${LINENO:-}" "$HIJPASS_LIB/firewall/route.sh" reset &&
+        "$HIJPASS_LIB/firewall/firewall.sh" reset &&
         hijpass_run_logged service 'DNS Hook start' "${LINENO:-}" "$DNS_HOOK" start &&
         update_cron enable; then
         hijpass_log INFO service "${LINENO:-}" 'Service started'
@@ -51,16 +49,15 @@ stop_service() {
     local failed=0
     hijpass_run_logged service 'DNS Hook stop' "${LINENO:-}" "$DNS_HOOK" stop || failed=1
     # 先撤销流量接管，再移除路由；撤流失败时阻止框架继续停核心。
-    rm -f "$NFT_RULES" || exit 1
-    hijpass_run_logged firewall 'Reload after removal' "${LINENO:-}" fw4 reload || exit 1
-    "$HIJPASS_LIB/firewall/route.sh" remove || failed=1
+    "$HIJPASS_LIB/firewall/firewall.sh" remove || exit 1
+    hijpass_run_logged route 'Remove policy routes' "${LINENO:-}" "$HIJPASS_LIB/firewall/route.sh" remove || failed=1
     [ "$failed" -eq 0 ] || exit 1
     update_cron disable || hijpass_log WARN service "${LINENO:-}" 'Cron cleanup failed; continuing service stop'
     hijpass_log INFO service "${LINENO:-}" 'Service resources removed'
 }
 
 update_cron() {
-    hijpass_run_ucode "$HIJPASS_LIB/service/preparecli.uc" cron "$1" || return 1
+    hijpass_run_logged service 'Write cron entries' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" cron "$1" || return 1
     hijpass_run_logged service 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
 }
 
@@ -75,7 +72,7 @@ service_triggers() {
 
 boot() {
     local delay
-    delay="$(hijpass_run_ucode "$HIJPASS_LIB/service/preparecli.uc" delay)" || return 1
+    delay="$(hijpass_run_logged service 'Read startup delay' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" delay)" || return 1
     [ "$delay" -le 0 ] || sleep "$delay"
     start
 }

@@ -36,15 +36,9 @@ structured() {
     if [ -s "$directory/stdout" ]; then cat "$directory/stdout"
     else hijpass_run_ucode "$HIJPASS_LIB/result.uc" error-file "$directory/stderr"; fi
 }
-# capture 通过 "$@" 调用此函数，以统一返回 stdout、stderr 和退出状态。
-# shellcheck disable=SC2329
-reset_firewall() {
-    hijpass_run_logged firewall 'Generate rules' "${LINENO:-}" hijpass_run_ucode "$HIJPASS_LIB/firewall/generatecli.uc" || return 1
-    hijpass_run_logged firewall 'Reload rules' "${LINENO:-}" fw4 reload
-}
 case "$method" in
     service_restart) structured "$HIJPASS_LIB/rpc/jobs.sh" start restart ;;
-    firewall_reset) capture reset_firewall ;;
+    firewall_reset) capture "$HIJPASS_LIB/firewall/firewall.sh" reset ;;
     firewall_show) capture nft list table inet hijpass ;;
     cleanup_node)
         argument kind; argument section; argument name

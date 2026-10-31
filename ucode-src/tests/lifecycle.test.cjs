@@ -20,10 +20,12 @@ function fixture(t, service = 'hijpass') {
     const patch = (file, before, after) => fs.writeFileSync(runtime + '/' + file,
         fs.readFileSync(runtime + '/' + file, 'utf8').replaceAll(before, after));
     patch('ucode/hijpass/config/paths.uc', '/tmp/hijpass/log', directory + '/log');
+    patch('firewall/firewall.sh', '/etc/hijpass/fw4-rules.nft', directory + '/rules.nft');
     const script = (file, text) => fs.writeFileSync(file, '#!/usr/bin/busybox ash\n' + text, { mode: 0o755 });
     script(runtime + '/service/prepare.sh', `
 service=hijpass
-[ "$1" != server ] || service=hijserver
+[ "$1" != server ] || { service=hijserver; shift; }
+case "$1" in cron|delay|server-files) exec '${directory}/data-mock' "$@" ;; esac
 echo "$service:prepare" >>"$EVENTS"
 [ "$FAIL_PHASE" != prepare ] || exit 1
 if [ "$DISABLED" = 1 ]; then echo '{"instances":[]}'; else cat "$PLAN"; fi
@@ -90,18 +92,12 @@ procd_kill() { echo "$1:kill" >>"$EVENTS"; rm -f "$IPKG_INSTROOT/registered-$1";
         `/usr/bin/busybox ash '${root}/ucode-src/tests/testdata/rc.common' '${init}' restart`);
     source = source.replace('/etc/hijpass/hook/dns-hook.sh', directory + '/dns-hook')
         .replace('/etc/init.d/cron', directory + '/cron-init')
-        .replace('/etc/hijpass/fw4-rules.nft', directory + '/rules.nft')
         .replace('/usr/share/nftables.d/table-post/hijserver.nft', directory + '/server.nft')
         .replace('/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', directory + '/chain.nft');
-    source += `
-hijpass_run_ucode() {
-    case "$1" in
-        */firewall/generatecli.uc) echo 'firewall:generate' >>"$EVENTS"; [ "$FAIL_PHASE" != firewall:generate ] ;;
-        */service/preparecli.uc) shift; '${directory}/data-mock' "$@" ;;
-        *) ucode -S -- "$@" ;;
-    esac
-}
-`;
+    fs.writeFileSync(runtime + '/firewall/generatecli.uc', `import * as fs from 'fs';
+let file = fs.open(getenv('EVENTS'), 'a'); file.write('firewall:generate\\n'); file.close();
+exit(getenv('FAIL_PHASE') == 'firewall:generate' ? 1 : 0);
+`);
     fs.writeFileSync(init, source);
     function run(action, fail = '', extra = {}) {
         fs.writeFileSync(events, '');

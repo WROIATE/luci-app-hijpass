@@ -1,5 +1,5 @@
 #!/bin/sh
-# 生成配置、执行外部转换和配置检查；stdout 仅输出 procd 所需数据。
+# 生成服务数据；默认准备配置和 procd 实例，也可单独更新 cron、端口规则或读取延时。
 . /usr/lib/hijpass/common.sh
 server=
 [ "${1:-}" != server ] || { server=server; shift; }
@@ -11,6 +11,9 @@ run_data() {
         hijpass_run_ucode "$data" "$@"
     fi
 }
+case "${1:-}" in
+    cron|delay|server-files) run_data "$@"; exit $? ;;
+esac
 settings=$(run_data settings "$@") || exit 1
 json_load "$settings" || exit 1
 json_get_vars enabled geo_convert

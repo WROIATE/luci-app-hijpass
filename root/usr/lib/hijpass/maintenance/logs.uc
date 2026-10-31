@@ -121,7 +121,6 @@ export function configuredLogger(configDirectory) {
  * @returns {null}
  */
 function logCommandOutput(log, module, source, phase, output, code) {
-	let reportedError = false;
 	for (let line in split(output, '\n')) {
 		if (!trim(line)) continue;
 		let prefix = match(line, /^[ \t]*\[([IWE])\][ \t]*(.*)$/);
@@ -131,11 +130,10 @@ function logCommandOutput(log, module, source, phase, output, code) {
 			line = prefix[2];
 		}
 		else if (match(line, /^[ \t]*(warn|warning)[ :]/i)) level = 'WARN';
-		if (level == 'ERROR') reportedError = true;
 		log(level, `[${module}] ${!prefix || level == 'ERROR' ? phase + ': ' : ''}${line}`, source);
 	}
-	if (code && !reportedError) log('ERROR', `[${module}] ${phase} failed`, source);
-	log('DEBUG', `[${module}] ${phase}: exit=${code}`, source);
+	if (code) log('ERROR', `[${module}] ${phase} failed: exit=${code}`, source);
+	else log('DEBUG', `[${module}] ${phase}: exit=0`, source);
 }
 /**
  * 裁剪过长日志，只保留最后 30000 行。

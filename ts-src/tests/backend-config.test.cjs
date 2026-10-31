@@ -187,3 +187,51 @@ test('share-link imports declare generated configuration and do not normalize le
     assert.equal(xhttp.values.transport_xhttp_method, 'PUT');
     assert.equal(new URLSearchParams(ProxyShareLinkUtils.generate(xhttp.values).split('?')[1]).get('method'), 'PUT');
 });
+
+for (const [name, dnsService, proxies, shunt, allowed] of [
+    ['no proxy or shunt', 'chinadns-ng', [], null, false],
+    ['only disabled services', 'chinadns-ng', [{ enabled: '0' }], { enabled: '0', type: 'sing-box' }, false],
+    ['enabled proxy', 'chinadns-ng', [{ enabled: '1' }], { enabled: '0', type: 'sing-box' }, true],
+    ['enabled shunt', 'chinadns-ng', [], { enabled: '1', type: 'sing-box' }, true],
+    ['default-enabled shunt', 'chinadns-ng', [], { type: 'sing-box' }, true],
+    ['unconfigured shunt', 'chinadns-ng', [], { enabled: '1' }, false],
+    ['custom DNS', 'custom', [], null, true],
+]) test(`Save & Apply checks independent DNS dependency: ${name}`, async () => {
+    const enums = loadTS('enum/hijpass.ts', {}), events = [], warnings = [];
+    const sections = [
+        { '.type': 'hijpass', enabled: '1' },
+        { '.type': 'firewall', dns_forward: 'none' },
+        { '.type': 'dns', dns_service: dnsService, direct_dns: 'dnsmasq', proxy_dns: 'custom' },
+        ...proxies.map((node, index) => ({ '.type': 'proxy_node', name: 'node' + index, config_type: 'custom', ...node })),
+        ...(shunt ? [{ '.type': 'shunt', config_type: 'custom', ...shunt }] : []),
+    ];
+    const uci = {
+        get_first(_config, type, option) {
+            const section = sections.find(s => s['.type'] === type);
+            return option ? section?.[option] : section;
+        },
+        sections(_config, type, callback) {
+            const result = sections.filter(s => !type || s['.type'] === type);
+            if (callback) result.forEach(callback);
+            return result;
+        },
+        save: async () => events.push('save'),
+    };
+    const chain = loadTS('utils/feature/proxy/chain.ts', { uci, '../../../enum/hijpass': enums });
+    const dns = loadTS('utils/feature/firewall/dns-forward.ts', { uci, '../../../enum/hijpass': enums });
+    const { PrecheckUtils } = loadTS('utils/actions/save-apply/precheck.ts', {
+        uci, ui: {}, '../../../enum/hijpass': enums,
+        '../../base/luci/notification': { NotificationUtils: { warning: (...args) => warnings.push(args) } },
+        '../../feature/shunt/section': {}, '../../feature/proxy/chain': chain, '../../feature/firewall/dns-forward': dns,
+    });
+    const { SaveApplyUtils } = loadTS('utils/actions/save-apply/index.ts', {
+        '../../../enum/hijpass': enums, uci, './precheck': { PrecheckUtils },
+        ui: { changes: { apply: () => events.push('apply') } },
+        '../../backend': { Backend: { validateConfigs: async () => events.push('validate') } },
+        '../../base/luci/notification': { NotificationUtils: { error: (...args) => assert.fail(JSON.stringify(args)) } },
+    });
+    await SaveApplyUtils.genHandleSaveApply().call({ handleSave: async () => events.push('form-save') }, {});
+    assert.deepEqual(events, allowed ? ['form-save', 'validate', 'save', 'apply'] : ['form-save']);
+    if (allowed) assert.deepEqual(warnings, []);
+    else assert.match(warnings[0][1], /Independent DNS requires an enabled proxy node or shunt service/);
+});

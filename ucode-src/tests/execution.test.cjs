@@ -1066,7 +1066,7 @@ recover_job() {`);
     assert.equal(fs.readFileSync(path.join(job, 'exit'), 'utf8'), '0\n');
 });
 
-for (const fail of ['', 'route', 'generate', 'firewall', 'hook']) test(`客户端按路由、防火墙、DNS 顺序激活，${fail || '正常'}分支不跨越失败阶段`, t => {
+for (const fail of ['', 'route', 'generate', 'firewall', 'hook']) test(`客户端按路由、防火墙、DNS 顺序激活，${fail || '正常'}分支继续后续独立阶段`, t => {
     const f = fixture(t), events = f.directory + '/events';
     for (const [file, stage] of [['route.sh', 'route']])
         fs.writeFileSync(f.runtime + '/firewall/' + file,
@@ -1091,7 +1091,7 @@ if (getenv('FAIL_STAGE') == 'generate') { warn('generate detail'); exit(1); }`);
         assert.match(log, new RegExp(`ERROR.*${phase} failed: exit=1`));
     }
     const expected = ['route', 'generate', 'firewall', 'hook', 'cron'];
-    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail ? expected.slice(0, expected.indexOf(fail) + 1) : expected);
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail === 'generate' ? expected.filter(stage => stage !== 'firewall') : expected);
 });
 
 test('客户端防火墙撤流失败时保留策略路由，不继续清理', t => {

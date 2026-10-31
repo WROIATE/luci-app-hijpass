@@ -2527,3 +2527,6 @@ msgstr "规则文件已更新，但服务重启失败，请查看主日志"
 
 msgid "Backend operation failed; see main log"
 msgstr "后台操作失败，请查看主日志"
+
+msgid "Independent DNS requires an enabled proxy node or shunt service"
+msgstr "独立 DNS 需要至少启用一个代理节点或分流服务"

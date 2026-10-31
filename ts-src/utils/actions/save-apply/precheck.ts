@@ -370,6 +370,12 @@ function checkDnsRoutingTargets() {
     const routingTarget = FirewallDnsForwardUtils.getRoutingTarget();
     const routingServer = routingTarget.port ? '127.0.0.1#' + routingTarget.port : '';
     const warnings: string[] = [];
+    const shunt = uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE);
+    const hasProxy = uci.sections(LuciFlied.CONF_NAME, LuciFlied.PROXY_NODE_TYPE)
+        .some((section: any) => section.enabled === '1');
+    if (!hasProxy && !(shunt && shunt.enabled !== '0' && shunt.type)) {
+        warnings.push(_('Independent DNS requires an enabled proxy node or shunt service'));
+    }
     [
         ['direct_dns', _('Direct Domain DNS')],
         ['proxy_dns', _('Proxy Domain DNS')],

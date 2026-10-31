@@ -30,23 +30,21 @@ start_service() {
         fi
         json_select ..
     done
-    # 没有成功注册的实例时撤销辅助功能，由框架提交空列表。
-    [ -n "$instances" ] || stop_service
 }
 
 service_started() {
-    # procd 已收到实例描述；按约定直接设置辅助功能，不轮询进程状态。
+    local failed=0
+    # procd 已收到实例描述；按顺序设置辅助功能，不轮询进程状态。
     [ -n "$instances" ] || return 0
-    if hijpass_run_logged route 'Reset policy routes' "${LINENO:-}" "$HIJPASS_LIB/firewall/route.sh" reset &&
-        "$HIJPASS_LIB/firewall/firewall.sh" reset &&
-        hijpass_run_logged service 'DNS Hook start' "${LINENO:-}" "$DNS_HOOK" start &&
-        update_cron enable; then
-        hijpass_log INFO service "${LINENO:-}" 'Service started'
-        return 0
+    hijpass_run_logged route 'Reset policy routes' "${LINENO:-}" "$HIJPASS_LIB/firewall/route.sh" reset || failed=1
+    "$HIJPASS_LIB/firewall/firewall.sh" reset || failed=1
+    hijpass_run_logged service 'DNS Hook start' "${LINENO:-}" "$DNS_HOOK" start || failed=1
+    update_cron enable || failed=1
+    if [ "$failed" -ne 0 ]; then
+        hijpass_log ERROR service "${LINENO:-}" 'Service setup completed with errors'
+        return 1
     fi
-    hijpass_log ERROR service "${LINENO:-}" 'Service setup failed'
-    stop
-    return 1
+    hijpass_log INFO service "${LINENO:-}" 'Service started'
 }
 
 stop_service() {

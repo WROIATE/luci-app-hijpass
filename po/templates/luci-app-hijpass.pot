@@ -3284,3 +3284,6 @@ msgstr ""
 
 msgid "Details"
 msgstr ""
+
+msgid "Independent DNS requires an enabled proxy node or shunt service"
+msgstr ""

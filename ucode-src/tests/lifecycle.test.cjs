@@ -49,7 +49,7 @@ procd_running() { echo unexpected-poll >>"$EVENTS"; return 1; }
 [ "$1" != server ] || shift
 echo "data:$*" >>"$EVENTS"
 [ "$FAIL_PHASE" != "data:$*" ] || exit 1
-[ "$1" != delay ] || echo 0
+[ "$1" != delay ] || echo "\${DELAY_SECS:-0}"
 `);
     // 只替换 procd/ubus 边界；JSON namespace 与原生 procd API 保持一致。
     fs.writeFileSync(directory + '/lib/functions/procd.sh', `
@@ -98,6 +98,7 @@ procd_kill() { echo "$1:kill" >>"$EVENTS"; rm -f "$IPKG_INSTROOT/registered-$1";
 let file = fs.open(getenv('EVENTS'), 'a'); file.write('firewall:generate\\n'); file.close();
 exit(getenv('FAIL_PHASE') == 'firewall:generate' ? 1 : 0);
 `);
+    source += `\nsleep() { echo "delay:$1" >>"$EVENTS"; [ "$FAIL_PHASE" != sleep ]; }\n`;
     fs.writeFileSync(init, source);
     function run(action, fail = '', extra = {}) {
         fs.writeFileSync(events, '');
@@ -150,11 +151,39 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.equal(f.run('reload').status, 0);
         assert.deepEqual(f.events(), [...cleanup, service + ':kill', service + ':prepare', service + ':submit', ...setup]);
     });
-    for (const action of ['stop', 'restart']) test(`${service}: ${action} 撤流失败不继续停核心或启动`, t => {
+    for (const action of ['stop', 'restart', 'reload']) {
+        for (const failure of cleanup) test(`${service}: ${action} 的 ${failure} 失败仍完成清理并交回框架`, t => {
+            const f = fixture(t, service);
+            const result = f.run(action, failure === 'fw4:reload' ? 'fw4' : failure);
+            const expectedCleanup = cleanup.filter(event => failure !== 'data:cron disable' || event !== 'cron:restart');
+            assert.deepEqual(f.events(), [...expectedCleanup, service + ':kill',
+                ...(action === 'stop' ? [] : [service + ':prepare', service + ':submit', ...setup])]);
+            assert.equal(result.status, action !== 'stop' && ['fw4:reload', 'cron:restart'].includes(failure) ? 1 : 0, result.stderr);
+            const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
+            assert.match(log, /Service cleanup completed with errors/);
+        });
+    }
+    test(`${service}: 规则文件删除失败跳过 reload，仍完成其他清理并停止实例`, t => {
         const f = fixture(t, service);
-        const failure = 'fw4';
-        assert.notEqual(f.run(action, failure).status, 0);
-        assert.ok(!f.events().some(event => /:(kill|submit|prepare)$/.test(event)));
+        fs.mkdirSync(f.directory + (service === 'hijpass' ? '/rules.nft' : '/server.nft'));
+        const result = f.run('stop');
+        assert.equal(result.status, 0, result.stderr);
+        assert.deepEqual(f.events(), [...cleanup.filter(event => event !== 'fw4:reload'), service + ':kill']);
+        const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
+        assert.match(log, /Remove (firewall )?rules failed: exit=1/);
+        assert.match(log, /Service cleanup completed with errors/);
+    });
+    test(`${service}: 启动延时失败记日志后仍启动服务`, t => {
+        const f = fixture(t, service);
+        assert.equal(f.run('boot', 'sleep', { DELAY_SECS: '1' }).status, 0);
+        assert.deepEqual(f.events(), [...(service === 'hijpass' ? ['data:delay', 'delay:1'] : ['delay:10']),
+            service + ':prepare', service + ':submit', ...setup]);
+        assert.match(fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8'), /Startup delay failed: exit=1/);
+    });
+    if (service === 'hijpass') test('启动延时读取失败不阻止实例准备', t => {
+        const f = fixture(t);
+        assert.equal(f.run('boot', 'data:delay').status, 0);
+        assert.deepEqual(f.events(), ['data:delay', service + ':prepare', service + ':submit', ...setup]);
     });
     for (const plan of ['', '{', '{}', '{"instances":{}}', '{"instances":null}']) {
         test(`${service}: 拒绝无效计划 ${plan || '(empty)'}，不当作禁用服务`, t => {
@@ -167,7 +196,7 @@ for (const service of ['hijpass', 'hijserver']) {
     test(`${service}: 空实例提交，不重新设置网络`, t => {
         const f = fixture(t, service);
         assert.equal(f.run('start', '', { DISABLED: '1' }).status, 0);
-        assert.deepEqual(f.events(), [service + ':prepare', ...(service === 'hijserver' ? cleanup : []), service + ':submit']);
+        assert.deepEqual(f.events(), [service + ':prepare', service + ':submit']);
         assert.deepEqual(JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances, {});
     });
 }
@@ -214,7 +243,7 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.deepEqual(JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances, {});
         const events = f.events();
         assert.ok(events.includes(service + ':submit'));
-        assert.equal(events.includes('data:cron disable'), service === 'hijserver');
+        assert.equal(events.includes('data:cron disable'), false);
         assert.ok(!events.includes('data:cron enable'));
     });
     for (const core of ['xray', 'sing-box']) test(`${service}: ${core} 检查失败只跳过当前实例，记录详情并保留 argv 和环境变量`, t => {

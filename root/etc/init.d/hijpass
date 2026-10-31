@@ -13,9 +13,9 @@ start_service() {
     plan="$(hijpass_run_logged service 'Prepare configurations' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh")" || exit 1
     # 使用独立 JSON 命名空间，避免覆盖 rc.common 正在组装的 procd 消息。
     json_set_namespace hijpass_plan
-    json_load "$plan" || exit 1
+    json_load "$plan" || { hijpass_log ERROR service "${LINENO:-}" 'Invalid service plan: malformed JSON'; exit 1; }
     json_get_type kind instances
-    [ "$kind" = array ] || { echo 'Invalid service plan: instances must be an array' >&2; exit 1; }
+    [ "$kind" = array ] || { hijpass_log ERROR service "${LINENO:-}" 'Invalid service plan: instances must be an array'; exit 1; }
     json_select instances
     json_get_keys keys
     instances=
@@ -50,11 +50,14 @@ service_started() {
 stop_service() {
     local failed=0
     hijpass_run_logged service 'DNS Hook stop' "${LINENO:-}" "$DNS_HOOK" stop || failed=1
-    # 先撤销流量接管，再移除路由；撤流失败时阻止框架继续停核心。
-    "$HIJPASS_LIB/firewall/firewall.sh" remove || exit 1
+    # 按撤流、路由、cron 的顺序尝试清理；失败不阻断其他步骤或框架停实例。
+    "$HIJPASS_LIB/firewall/firewall.sh" remove || failed=1
     hijpass_run_logged route 'Remove policy routes' "${LINENO:-}" "$HIJPASS_LIB/firewall/route.sh" remove || failed=1
-    [ "$failed" -eq 0 ] || exit 1
-    update_cron disable || hijpass_log WARN service "${LINENO:-}" 'Cron cleanup failed; continuing service stop'
+    update_cron disable || failed=1
+    if [ "$failed" -ne 0 ]; then
+        hijpass_log ERROR service "${LINENO:-}" 'Service cleanup completed with errors'
+        return 1
+    fi
     hijpass_log INFO service "${LINENO:-}" 'Service resources removed'
 }
 
@@ -74,7 +77,8 @@ service_triggers() {
 
 boot() {
     local delay
-    delay="$(hijpass_run_logged service 'Read startup delay' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" delay)" || return 1
-    [ "$delay" -le 0 ] || sleep "$delay"
+    if delay="$(hijpass_run_logged service 'Read startup delay' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" delay)"; then
+        [ "$delay" -le 0 ] || hijpass_run_logged service 'Startup delay' "${LINENO:-}" sleep "$delay"
+    fi
     start
 }

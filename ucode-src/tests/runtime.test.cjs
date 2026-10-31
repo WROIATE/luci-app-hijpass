@@ -100,7 +100,7 @@ test('路由脚本重复重置或移除时仅修改 Hijpass 的 IPv4/IPv6 路由
     }
 });
 
-test('路由脚本拒绝无效动作，添加失败时停止并返回命令错误', t => {
+test('路由脚本拒绝无效动作，IPv4 失败后仍设置 IPv6 并返回错误', t => {
     const route = routeFixture(t);
     route.write({ '-4': { rule: [], route: [] }, '-6': { rule: [], route: [] } });
     for (const args of [[], ['flush'], ['reset', '233']]) {
@@ -109,8 +109,10 @@ test('路由脚本拒绝无效动作，添加失败时停止并返回命令错�
     }
     const result = route.run(['reset'], '-4 route add');
     assert.equal(result.status, 5);
-    assert.deepEqual(route.read(), { '-4': { rule: [], route: [] }, '-6': { rule: [], route: [] } });
-    assert.equal(route.calls().some(args => args[0] === '-6' || args[1] === 'rule' && args[2] === 'add'), false);
+    assert.deepEqual(route.read(), { '-4': { rule: [], route: [] },
+        '-6': { rule: ['fwmark 0x1 table 233'], route: ['local default dev lo table 233'] } });
+    assert.equal(route.calls().some(args => args[0] === '-4' && args[1] === 'rule' && args[2] === 'add'), false);
+    assert.equal(route.calls().some(args => args[0] === '-6' && args[1] === 'rule' && args[2] === 'add'), true);
 });
 
 test('firewall handles shipped comma protocols, DNS/local toggles and removes dangling references', t => {

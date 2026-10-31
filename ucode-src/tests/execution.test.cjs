@@ -1094,17 +1094,20 @@ if (getenv('FAIL_STAGE') == 'generate') { warn('generate detail'); exit(1); }`);
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail === 'generate' ? expected.filter(stage => stage !== 'firewall') : expected);
 });
 
-test('客户端防火墙撤流失败时保留策略路由，不继续清理', t => {
+test('客户端防火墙撤流失败仍继续清理路由和 cron', t => {
     const f = fixture(t), events = f.directory + '/events';
     f.script('fw4', 'echo firewall >>"$EVENTS"\nexit 1');
     fs.writeFileSync(f.runtime + '/firewall/route.sh', '#!/bin/sh\necho route >>"$EVENTS"\n', { mode: 0o755 });
     f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     f.script('dns-hook', 'echo hook >>"$EVENTS"');
+    f.script('cron-init', 'echo cron >>"$EVENTS"');
+    f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
         const result = f.init('hijpass', 'stop_service', config, { EVENTS: events });
         assert.equal(result.status, 1);
     });
-    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall']);
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall', 'route', 'cron']);
 });
 
 test('服务端独立准备自定义命令，激活只写端口规则和日志任务，不生成客户端数据', t => {
@@ -1137,7 +1140,7 @@ test('服务端独立准备自定义命令，激活只写端口规则和日志�
     });
 });
 
-for (const fail of ['hook', 'route', 'cron']) test(`客户端停止时区分关键撤流与维护失败：${fail}`, t => {
+for (const fail of ['hook', 'route', 'cron']) test(`客户端停止时各阶段失败仍继续后续清理：${fail}`, t => {
     const f = fixture(t), events = f.directory + '/events';
     for (const [file, stage] of [['route.sh', 'route']])
         fs.writeFileSync(f.runtime + '/firewall/' + file,
@@ -1156,14 +1159,14 @@ for (const fail of ['hook', 'route', 'cron']) test(`客户端停止时区分关�
     }
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
         const result = f.init('hijpass', 'stop_service', config, { EVENTS: events, FAIL_STAGE: fail });
-        assert.equal(result.status, fail === 'cron' ? 0 : 1, result.stderr);
+        assert.equal(result.status, 1, result.stderr);
     });
-    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail === 'cron' ? ['hook', 'firewall', 'route', 'cron'] : ['hook', 'firewall', 'route']);
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall', 'route', 'cron']);
     for (const file of generated) assert.equal(fs.readFileSync(f.directory + '/' + path.basename(file), 'utf8'), 'prepared DNS configuration');
-    if (fail === 'cron') assert.match(fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8'), /WARN.*Cron cleanup failed/);
+    assert.match(fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8'), /ERROR.*Service cleanup completed with errors/);
 });
 
-for (const fail of ['firewall', 'cron']) test(`服务端停止时区分防火墙与定时任务失败：${fail}`, t => {
+for (const fail of ['firewall', 'cron']) test(`服务端停止时各阶段失败仍继续后续清理：${fail}`, t => {
     const f = fixture(t), events = f.directory + '/events';
     f.patch('init-hijserver.sh', '/usr/share/nftables.d/table-post/hijserver.nft', f.directory + '/server.nft');
     f.patch('init-hijserver.sh', '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', f.directory + '/chain.nft');
@@ -1174,9 +1177,9 @@ for (const fail of ['firewall', 'cron']) test(`服务端停止时区分防火墙
     withConfig([], config => {
         fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '1'\n");
         const result = f.init('hijserver', 'stop_service', config, { EVENTS: events, FAIL_STAGE: fail });
-        assert.equal(result.status, fail === 'cron' ? 0 : 1, result.stderr);
+        assert.equal(result.status, 1, result.stderr);
     });
-    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), fail === 'cron' ? ['firewall', 'cron'] : ['firewall']);
+    assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['firewall', 'cron']);
 });
 
 for (const core of ['xray', 'sing-box']) test(`配置准备仅生成 ${core} 检查命令，检查留给逐实例注册`, t => {

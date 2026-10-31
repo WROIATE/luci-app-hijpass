@@ -14,9 +14,9 @@ start_service() {
     plan="$(hijpass_run_logged server 'Prepare configurations' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server)" || exit 1
     # 使用独立 JSON 命名空间，避免覆盖 rc.common 正在组装的 procd 消息。
     json_set_namespace hijserver_plan
-    json_load "$plan" || exit 1
+    json_load "$plan" || { hijpass_log ERROR server "${LINENO:-}" 'Invalid service plan: malformed JSON'; exit 1; }
     json_get_type kind instances
-    [ "$kind" = array ] || { echo 'Invalid service plan: instances must be an array' >&2; exit 1; }
+    [ "$kind" = array ] || { hijpass_log ERROR server "${LINENO:-}" 'Invalid service plan: instances must be an array'; exit 1; }
     json_select instances
     json_get_keys keys
     instances=
@@ -31,8 +31,6 @@ start_service() {
         fi
         json_select ..
     done
-    # 没有成功注册的实例时撤销辅助功能，由框架提交空列表。
-    [ -n "$instances" ] || stop_service
 }
 
 service_started() {
@@ -54,9 +52,18 @@ service_started() {
 }
 
 stop_service() {
-    rm -f "$NFT_TABLE" "$NFT_CHAIN" || exit 1
-    hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload || exit 1
-    update_cron disable || hijpass_log WARN server "${LINENO:-}" 'Cron cleanup failed; continuing service stop'
+    local failed=0
+    # 文件删除失败不 reload，但仍清理 cron 并交回框架停实例。
+    if hijpass_run_logged server 'Remove firewall rules' "${LINENO:-}" rm -f "$NFT_TABLE" "$NFT_CHAIN"; then
+        hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload || failed=1
+    else
+        failed=1
+    fi
+    update_cron disable || failed=1
+    if [ "$failed" -ne 0 ]; then
+        hijpass_log ERROR server "${LINENO:-}" 'Service cleanup completed with errors'
+        return 1
+    fi
     hijpass_log INFO server "${LINENO:-}" 'Service resources removed'
 }
 
@@ -75,6 +82,6 @@ service_triggers() {
 }
 
 boot() {
-    sleep 10
+    hijpass_run_logged server 'Startup delay' "${LINENO:-}" sleep 10
     start
 }

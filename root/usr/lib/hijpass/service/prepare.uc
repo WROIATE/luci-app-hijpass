@@ -235,22 +235,22 @@ export function serverPlan(sections) {
 	}
 	return { instances, ports: uniq(ports) };
 };
-const SERVER_TABLE = '/usr/share/nftables.d/table-post/hijserver.nft';
-const SERVER_CHAIN = '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft';
 /**
  * 生成服务端端口放行规则，没有端口时删除旧规则文件。
  * @param {UciSection[]} sections
+ * @param {string} tablePath nft 表规则文件路径。
+ * @param {string} chainPath WAN 输入链引用文件路径。
  * @returns {null} 无业务返回值，只更新 nft include 文件。
  */
-function writeServerRules(sections) {
+function writeServerRules(sections, tablePath, chainPath) {
 	let output = serverPlan(sections);
 	// 只开放明确选中的端口；没有端口时删除旧 include，避免旧服务端仍对 WAN 开放。
 	if (length(output.ports)) {
-		atomic(SERVER_TABLE, renderTemplate('/usr/lib/hijpass/service/server.ut', { ports: output.ports }), 0o644);
-		atomic(SERVER_CHAIN, 'jump hijserver comment "hijserver rule"\n', 0o644);
+		atomic(tablePath, renderTemplate('/usr/lib/hijpass/service/server.ut', { ports: output.ports }), 0o644);
+		atomic(chainPath, 'jump hijserver comment "hijserver rule"\n', 0o644);
 	}
 	else {
-		for (let path in [SERVER_TABLE, SERVER_CHAIN]) {
+		for (let path in [tablePath, chainPath]) {
 			if (fs.lstat(path) && !fs.unlink(path)) die(`cannot remove ${path}`);
 		}
 	}
@@ -322,7 +322,8 @@ export function main() { run(ARGV,
         return result;
     }
     if (action == 'server-files') {
-        return writeServerRules(config);
+        if (length(args) != 2 || !args[0] || !args[1]) die('server-files requires table and chain paths');
+        return writeServerRules(config, args[0], args[1]);
     }
     die('unknown service data action');
 });

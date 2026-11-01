@@ -525,27 +525,31 @@ printf('%J\\n', { files, generated });
 });
 
 test('服务端模板仅开放选中的端口，错误保留旧规则，没有允许端口时删除旧 include', t => {
-    const f = fixture(t), table = path.join(f.directory, 'server.nft'), chain = path.join(f.directory, 'chain.nft');
-    f.patch('service/prepare.uc', '/usr/share/nftables.d/table-post/hijserver.nft', table);
-    f.patch('service/prepare.uc', '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', chain);
+    const f = fixture(t), table = path.join(f.directory, 'server rules.nft'), chain = path.join(f.directory, 'chain rules.nft');
     withConfig([], config => {
         const configFile = path.join(config, 'hijserver');
         const source = "config hijserver\n option enabled '1'\nconfig server_node 'a'\n option enabled '1'\n option name 'a'\n option command 'xray run'\n option allow_firewall '1'\n option listen_port '443'\n";
         fs.writeFileSync(configFile, source);
-        const result = f.data('service/preparecli.uc', ['server', 'server-files', '--configdir', config]);
+        for (const paths of [[], [table], [table, '']]) {
+            const invalid = f.data('service/preparecli.uc', ['server', 'server-files', ...paths, '--configdir', config]);
+            assert.equal(invalid.status, 1);
+            assert.match(invalid.stderr, /requires table and chain paths/);
+            assert.equal(fs.existsSync(table), false);
+        }
+        const result = f.data('service/preparecli.uc', ['server', 'server-files', table, chain, '--configdir', config]);
         assert.equal(result.status, 0, result.stderr);
         const original = fs.readFileSync(table, 'utf8');
         assert.equal(original, 'chain hijserver {\n    tcp dport { 443 } counter accept\n    udp dport { 443 } counter accept\n    return\n}\n');
         assert.equal(fs.readFileSync(chain, 'utf8'), 'jump hijserver comment "hijserver rule"\n');
         fs.writeFileSync(configFile, source.replace("'443'", "'0'"));
-        assert.equal(f.data('service/preparecli.uc', ['server', 'server-files', '--configdir', config]).status, 1);
+        assert.equal(f.data('service/preparecli.uc', ['server', 'server-files', table, chain, '--configdir', config]).status, 1);
         assert.equal(fs.readFileSync(table, 'utf8'), original);
         fs.writeFileSync(configFile, source.replace("allow_firewall '1'", "allow_firewall '0'"));
-        assert.equal(f.data('service/preparecli.uc', ['server', 'server-files', '--configdir', config]).status, 0);
+        assert.equal(f.data('service/preparecli.uc', ['server', 'server-files', table, chain, '--configdir', config]).status, 0);
         assert.equal(fs.existsSync(table), false);
         assert.equal(fs.existsSync(chain), false);
         fs.mkdirSync(table);
-        const failedRemoval = f.data('service/preparecli.uc', ['server', 'server-files', '--configdir', config]);
+        const failedRemoval = f.data('service/preparecli.uc', ['server', 'server-files', table, chain, '--configdir', config]);
         assert.equal(failedRemoval.status, 1);
         assert.match(failedRemoval.stderr, /cannot remove/);
     });
@@ -1212,11 +1216,9 @@ test('客户端防火墙撤流失败仍继续清理路由和 cron', t => {
 });
 
 test('服务端独立准备自定义命令，激活只写端口规则和日志任务，不生成客户端数据', t => {
-    const f = fixture(t), events = f.directory + '/events', table = f.directory + '/server.nft', chain = f.directory + '/chain.nft';
-    for (const file of ['service/prepare.uc', 'init-hijserver.sh']) {
-        f.patch(file, '/usr/share/nftables.d/table-post/hijserver.nft', table);
-        f.patch(file, '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', chain);
-    }
+    const f = fixture(t), events = f.directory + '/events', table = f.directory + '/server rules.nft', chain = f.directory + '/chain rules.nft';
+    f.patch('init-hijserver.sh', '/usr/share/nftables.d/table-post/hijserver.nft', table);
+    f.patch('init-hijserver.sh', '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', chain);
     f.patch('service/cron.uc', '/etc/crontabs/root', f.directory + '/crontab');
     f.patch('init-hijserver.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.script('fw4', 'echo firewall >>"$EVENTS"');

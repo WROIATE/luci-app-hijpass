@@ -55,8 +55,8 @@ printf '%s\\n' "$@" >"$IPKG_INSTROOT/cron-args"
     script(directory + '/cron-init', 'echo "cron:$1" >>"$EVENTS"\n[ "$FAIL_PHASE" != "cron:$1" ]');
     script(directory + '/data-mock', `
 [ "$1" != server ] || shift
-echo "data:$*" >>"$EVENTS"
-[ "$FAIL_PHASE" != "data:$*" ] || exit 1
+echo "data:$1" >>"$EVENTS"
+[ "$FAIL_PHASE" != "data:$1" ] || exit 1
 `);
     // 只替换 procd/ubus 边界；JSON namespace 与原生 procd API 保持一致。
     fs.writeFileSync(directory + '/lib/functions/procd.sh', `

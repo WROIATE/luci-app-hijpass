@@ -111,7 +111,7 @@ export function configuredLogger(configDirectory) {
 };
 
 /**
- * 在执行边界逐条规范化命令诊断；成功时的未知输出只写 DEBUG。
+ * 在执行边界逐条规范化命令诊断；成功时的普通输出只写 DEBUG，保留警告和失败详情。
  * @param {function} log
  * @param {string} module
  * @param {string} source
@@ -126,7 +126,7 @@ function logCommandOutput(log, module, source, phase, output, code) {
 		let prefix = match(line, /^[ \t]*\[([IWE])\][ \t]*(.*)$/);
 		let level = code ? 'ERROR' : 'DEBUG';
 		if (prefix) {
-			level = { I: 'INFO', W: 'WARN', E: 'ERROR' }[prefix[1]];
+			level = { I: code ? 'ERROR' : 'DEBUG', W: 'WARN', E: 'ERROR' }[prefix[1]];
 			line = prefix[2];
 		}
 		else if (match(line, /^[ \t]*(warn|warning)[ :]/i)) level = 'WARN';

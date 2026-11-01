@@ -11,6 +11,7 @@ NFT_CHAIN=/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft
 
 start_service() {
     local plan kind instance keys id name log
+    hijpass_log INFO server "${LINENO:-}" 'Starting hijserver...'
     plan="$(hijpass_run_logged server 'Prepare configurations' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server)" || exit 1
     # 使用独立 JSON 命名空间，避免覆盖 rc.common 正在组装的 procd 消息。
     json_set_namespace hijserver_plan
@@ -46,15 +47,12 @@ service_started() {
         failed=1
     fi
     update_cron enable || failed=1
-    if [ "$failed" -ne 0 ]; then
-        hijpass_log ERROR server "${LINENO:-}" 'Service setup completed with errors'
-        return 1
-    fi
-    hijpass_log INFO server "${LINENO:-}" 'Service started'
+    [ "$failed" -eq 0 ]
 }
 
 stop_service() {
     local failed=0
+    hijpass_log INFO server "${LINENO:-}" 'Stopping hijserver...'
     # 文件删除失败不 reload，但仍清理 cron 并交回框架停实例。
     if hijpass_run_logged server 'Remove firewall rules' "${LINENO:-}" rm -f "$NFT_TABLE" "$NFT_CHAIN"; then
         hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload || failed=1
@@ -62,11 +60,7 @@ stop_service() {
         failed=1
     fi
     update_cron disable || failed=1
-    if [ "$failed" -ne 0 ]; then
-        hijpass_log ERROR server "${LINENO:-}" 'Service cleanup completed with errors'
-        return 1
-    fi
-    hijpass_log INFO server "${LINENO:-}" 'Service resources removed'
+    [ "$failed" -eq 0 ]
 }
 
 update_cron() {

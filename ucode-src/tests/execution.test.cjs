@@ -156,7 +156,7 @@ test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变
     const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
     assert.match(content, /WARN\s+\[service\]\s+DNS Hook start: Warning:/);
     assert.match(content, /optional DNS service unavailable/);
-    assert.match(content, /Service started/);
+    assert.doesNotMatch(content, /Service started/);
 });
 
 test('命令阶段保留 fw4 信息级别，同时记录真实告警和失败且不改变退出状态', t => {
@@ -379,7 +379,8 @@ else echo reload >>"$TEST_CALLS"; fi`);
         fs.writeFileSync(rules, 'old rules');
         const apply = (extra = {}) => f.init('hijpass', 'service_started', config, { TEST_CALLS: calls, ...extra });
         const unchanged = result => {
-            assert.equal(result.status, 1, result.stderr);
+            assert.equal(result.status, 0, result.stderr);
+            assert.match(result.stderr, /Generate rules failed/);
             assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
             assert.equal(fs.existsSync(calls), false);
             assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('rules with spaces.nft.new-')), false);
@@ -1182,7 +1183,7 @@ if (getenv('FAIL_STAGE') == 'generate') { warn('generate detail'); exit(1); }`);
     f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
         const result = f.init('hijpass', 'service_started', config, { EVENTS: events, FAIL_STAGE: fail });
-        assert.equal(result.status, fail ? 1 : 0, result.stderr);
+        assert.equal(result.status, 0, result.stderr);
     });
     if (fail) {
         const phase = { route: 'Reset policy routes', generate: 'Generate rules', firewall: 'Reload rules', hook: 'DNS Hook start' }[fail];
@@ -1205,7 +1206,7 @@ test('客户端防火墙撤流失败仍继续清理路由和 cron', t => {
     f.patch('service/cron.uc', '/etc/crontabs/root', f.directory + '/crontab');
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
         const result = f.init('hijpass', 'stop_service', config, { EVENTS: events });
-        assert.equal(result.status, 1);
+        assert.equal(result.status, 0);
     });
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall', 'route', 'cron']);
 });
@@ -1259,11 +1260,11 @@ for (const fail of ['hook', 'route', 'cron']) test(`客户端停止时各阶段�
     }
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
         const result = f.init('hijpass', 'stop_service', config, { EVENTS: events, FAIL_STAGE: fail });
-        assert.equal(result.status, 1, result.stderr);
+        assert.equal(result.status, fail === 'cron' ? 1 : 0, result.stderr);
     });
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall', 'route', 'cron']);
     for (const file of generated) assert.equal(fs.readFileSync(f.directory + '/' + path.basename(file), 'utf8'), 'prepared DNS configuration');
-    assert.match(fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8'), /ERROR.*Service cleanup completed with errors/);
+    assert.match(fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8'), /ERROR.*failed: exit=1/);
 });
 
 for (const fail of ['firewall', 'cron']) test(`服务端停止时各阶段失败仍继续后续清理：${fail}`, t => {

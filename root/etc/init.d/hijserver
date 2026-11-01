@@ -57,8 +57,10 @@ stop_service() {
 
 update_cron() {
     local logs=0
+    hijpass_log INFO server "${LINENO:-}" "Updating cron entries ($1)"
     [ "$1" != enable ] || logs=${cron_log:-0}
     hijpass_run_logged server 'Write cron entries' "${LINENO:-}" hijpass_run_ucode "$HIJPASS_LIB/service/cron.uc" hijserver '' "$logs" || return 1
+    hijpass_log INFO server "${LINENO:-}" 'Reloading cron'
     hijpass_run_logged server 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
 }
 

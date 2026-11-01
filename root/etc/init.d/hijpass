@@ -38,12 +38,14 @@ service_started() {
     [ -n "$instances" ] || return 0
     hijpass_run_logged route 'Reset policy routes' "${LINENO:-}" "$HIJPASS_LIB/firewall/route.sh" reset
     "$HIJPASS_LIB/firewall/firewall.sh" reset
+    hijpass_log INFO service "${LINENO:-}" 'Executing DNS Hook (start)'
     hijpass_run_logged service 'DNS Hook start' "${LINENO:-}" "$DNS_HOOK" start
     update_cron enable
 }
 
 stop_service() {
     hijpass_log INFO service "${LINENO:-}" '===================== Stopping service ======================='
+    hijpass_log INFO service "${LINENO:-}" 'Executing DNS Hook (stop)'
     hijpass_run_logged service 'DNS Hook stop' "${LINENO:-}" "$DNS_HOOK" stop
     # 按撤流、路由、cron 的顺序尝试清理；失败不阻断其他步骤或框架停实例。
     "$HIJPASS_LIB/firewall/firewall.sh" remove
@@ -53,6 +55,7 @@ stop_service() {
 
 update_cron() {
     local schedule='' logs=0
+    hijpass_log INFO service "${LINENO:-}" "Updating cron entries ($1)"
     if [ "$1" = enable ]; then
         schedule=$(uci -q get 'hijpass.@rule[0].update_schedule') || {
             hijpass_run_logged service 'Read cron configuration' "${LINENO:-}" uci export hijpass >/dev/null || return $?
@@ -62,6 +65,7 @@ update_cron() {
         logs=1
     fi
     hijpass_run_logged service 'Write cron entries' "${LINENO:-}" hijpass_run_ucode "$HIJPASS_LIB/service/cron.uc" hijpass "$schedule" "$logs" || return 1
+    hijpass_log INFO service "${LINENO:-}" 'Reloading cron'
     hijpass_run_logged service 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
 }
 

@@ -191,7 +191,7 @@ export function generateAndWriteConfigs(sections) {
 		let generated = generate(sections), files = prepareConfigFiles(sections, generated);
 		writeConfigs(files);
 		for (let file in files) log('DEBUG', `[config] Written ${file.path}`);
-		log('INFO', `[config] Configurations written: files=${length(files)}, elapsed=${time() - started}s`);
+		log('INFO', `[config] Wrote ${length(files)} proxy core JSON configuration files in ${time() - started}s`);
 		return generated;
 	}
 	catch (e) {

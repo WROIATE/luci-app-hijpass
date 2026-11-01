@@ -58,4 +58,8 @@ for job in $jobs; do
     hijpass_log DEBUG geo "${LINENO:-}" "$mode: output=$output, bytes=$(wc -c <"$output")"
     json_select ..
 done
-hijpass_log INFO geo "${LINENO:-}" "$mode completed: outputs=$completed"
+if [ "$mode" = convert ]; then
+    hijpass_log INFO geo "${LINENO:-}" "Wrote $completed sing-box SRS rule-set files"
+else
+    hijpass_log INFO geo "${LINENO:-}" "Wrote $completed DNS Geo domain list files (proxy/direct)"
+fi

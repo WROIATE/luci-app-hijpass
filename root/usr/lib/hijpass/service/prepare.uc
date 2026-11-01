@@ -10,7 +10,7 @@
 import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { FILES, nodeConfig, logPath } from 'hijpass.config.paths';
-import { findHijpassSection, findHijserverSection, findShuntSection, findRuleSection, filterProxyNodeSections, filterServerNodeSections } from 'hijpass.config.sections';
+import { findHijpassSection, findHijserverSection, findShuntSection, filterProxyNodeSections, filterServerNodeSections } from 'hijpass.config.sections';
 import { list, port } from 'hijpass.config.values';
 import { generate } from 'hijpass.config.generate';
 import { CORE, core, CONFIG_TYPE, configType } from 'hijpass.config.protocol.proxy';
@@ -199,52 +199,6 @@ export function generateAndWriteConfigs(sections) {
 		die(e.message);
 	}
 };
-// 启停只替换当前服务注册的任务，保留其他命令及参数中的同名文本。
-/**
- * 筛选 crontab 内容，排除当前服务的已有任务。
- * @returns {string[]} 保留下来的非空任务行数组。
- */
-function cronEntries(path, packageName) {
-    let entries = [];
-    for (let line in split(fs.readfile(path) || '', '\n')) {
-        if (!line) {
-            continue;
-        }
-        let fields = split(trim(line) || '', /[ \t]+/);
-        let position = substr(fields[0] || '', 0, 1) == '@' ? 1 : 5;
-        if (fields[position] == '/usr/lib/hijpass/maintenance/logs.sh' && fields[position + 1] == packageName) {
-            continue;
-        }
-        if (packageName == 'hijpass' && fields[position] == '/usr/lib/hijpass/rules/update.sh') {
-            continue;
-        }
-        push(entries, line);
-    }
-    return entries;
-}
-/**
- * 按服务状态注册或移除客户端更新和日志清理任务。
- * @param {UciSection[]} sections
- * @param {boolean} enabled
- * @returns {null} 无业务返回值，原子更新 crontab。
- */
-function cron(sections, enabled) {
-    let path = '/etc/crontabs/root';
-    let entries = cronEntries(path, 'hijpass');
-	if (enabled) {
-		let schedule = findRuleSection(sections)?.update_schedule;
-		if (schedule) {
-			if (!match(schedule, /^[A-Za-z0-9*\/,? -]+$/) || length(split(trim(schedule) || '', /[ \t]+/)) != 5) {
-				die('invalid update schedule');
-			}
-			push(entries, `${schedule} /usr/lib/hijpass/rules/update.sh update --scheduled`);
-		}
-		if (length(filter(sections, section => !!logPath(section)))) {
-			push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijpass');
-		}
-	}
-	atomic(path, join('\n', entries) + '\n');
-}
 // 服务端配置为用户编辑的原生 JSON，保留原文件；这里只声明进程与开放端口。
 // ServerPlan 使用相同的 Instance 字段；ports 为显式 allow_firewall 的监听端口数组。
 /**
@@ -283,19 +237,6 @@ export function serverPlan(sections) {
 };
 const SERVER_TABLE = '/usr/share/nftables.d/table-post/hijserver.nft';
 const SERVER_CHAIN = '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft';
-/**
- * 按服务端日志开关注册或移除日志清理任务。
- * @param {ServiceInstance[]} instances
- * @returns {null} 无业务返回值，更新 crontab 并保留其他服务任务。
- */
-function serverCron(instances) {
-	let path = '/etc/crontabs/root';
-    let entries = cronEntries(path, 'hijserver');
-	if (length(filter(instances, instance => instance.log))) {
-		push(entries, '*/10 * * * * /usr/lib/hijpass/maintenance/logs.sh hijserver');
-	}
-	atomic(path, join('\n', entries) + '\n');
-}
 /**
  * 生成服务端端口放行规则，没有端口时删除旧规则文件。
  * @param {UciSection[]} sections
@@ -336,7 +277,7 @@ function settings(config, server) {
         log_paths: filter(map(config, item => logPath(item, server)), path => !!path) };
 };
 /**
- * 为服务启停准备配置、进程参数和定时任务。
+ * 为服务准备配置、进程参数和端口规则。
  * @returns {null} 查询结果写入 stdout；写入类动作直接更新对应文件。
  */
 export function main() { run(ARGV,
@@ -379,12 +320,6 @@ export function main() { run(ARGV,
         }
         logger(config)('INFO', `[service] Prepared ${length(result.instances)} process instance(s)`);
         return result;
-    }
-    if (action == 'cron') {
-        if (server) {
-            return serverCron(args[0] == 'enable' ? serverPlan(config).instances : []);
-        }
-        return cron(config, args[0] == 'enable');
     }
     if (action == 'server-files') {
         return writeServerRules(config);

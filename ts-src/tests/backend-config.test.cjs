@@ -137,8 +137,8 @@ test('init owns lifecycle and shares only procd instance mapping', () => {
     assert.match(bridge, /procd_open_instance/);
     assert.doesNotMatch(bridge, /preparecli|firewall|cron|hijpass_check_configs/);
     assert.match(bridge, /set -- "\$@" "\$value"/);
-    // boot 可直接读取启动延时；实例准备仍消费 ucode 生成的数据。
-    assert.doesNotMatch(source.split('boot()')[0] + bridge, /uci -q/);
+    // boot 和 cron 可直接读取简单配置；实例准备仍消费 ucode 生成的数据。
+    assert.doesNotMatch(source.slice(source.indexOf('start_service()'), source.indexOf('service_started()')) + bridge, /uci -q/);
     assert.doesNotMatch(source + bridge, /config_foreach|geoview[.]sh/);
 });
 

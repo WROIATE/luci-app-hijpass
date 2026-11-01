@@ -25,7 +25,7 @@ function fixture(t, service = 'hijpass') {
     script(runtime + '/service/prepare.sh', `
 service=hijpass
 [ "$1" != server ] || { service=hijserver; shift; }
-case "$1" in cron|server-files) exec '${directory}/data-mock' "$@" ;; esac
+case "$1" in server-files) exec '${directory}/data-mock' "$@" ;; esac
 echo "$service:prepare" >>"$EVENTS"
 [ "$FAIL_PHASE" != prepare ] || exit 1
 if [ "$DISABLED" = 1 ]; then echo '{"instances":[]}'; else cat "$PLAN"; fi
@@ -49,6 +49,9 @@ procd_running() { echo unexpected-poll >>"$EVENTS"; return 1; }
         script(runtime + '/' + file, `echo "${stage}:$1" >>"$EVENTS"\n[ "$FAIL_PHASE" != "${stage}:$1" ]`);
     script(directory + '/dns-hook', 'echo "hook:$1" >>"$EVENTS"\n[ "$FAIL_PHASE" != "hook:$1" ]');
     script(directory + '/bin/fw4', 'echo "fw4:$1" >>"$EVENTS"\n[ "$FAIL_PHASE" != fw4 ]');
+    script(directory + '/cron-write', `echo "cron:write $1" >>"$EVENTS"
+printf '%s\\n' "$@" >"$IPKG_INSTROOT/cron-args"
+[ "$FAIL_PHASE" != "cron:write $1" ]`);
     script(directory + '/cron-init', 'echo "cron:$1" >>"$EVENTS"\n[ "$FAIL_PHASE" != "cron:$1" ]');
     script(directory + '/data-mock', `
 [ "$1" != server ] || shift
@@ -91,6 +94,7 @@ procd_kill() { echo "$1:kill" >>"$EVENTS"; rm -f "$IPKG_INSTROOT/registered-$1";
 `);
     const init = directory + '/' + service;
     let source = fs.readFileSync(root + '/root/etc/init.d/' + service, 'utf8').replaceAll('/usr/lib/hijpass', runtime);
+    source = source.replace('hijpass_run_ucode "$HIJPASS_LIB/service/cron.uc" ' + service, `'${directory}/cron-write' "$1" ${service}`);
     // reload_service 的自调用也经过同一份原生 rc.common。
     source = source.replace('/etc/init.d/' + service + ' restart',
         `/usr/bin/busybox ash '${root}/ucode-src/tests/testdata/rc.common' '${init}' restart`);
@@ -117,11 +121,11 @@ exit(getenv('FAIL_PHASE') == 'firewall:generate' ? 1 : 0);
 
 for (const service of ['hijpass', 'hijserver']) {
     const setup = service === 'hijpass'
-        ? ['route:reset', 'firewall:generate', 'fw4:reload', 'hook:start', 'data:cron enable', 'cron:restart']
-        : ['data:server-files', 'fw4:reload', 'data:cron enable', 'cron:restart'];
+        ? ['route:reset', 'firewall:generate', 'fw4:reload', 'hook:start', 'cron:write enable', 'cron:restart']
+        : ['data:server-files', 'fw4:reload', 'cron:write enable', 'cron:restart'];
     const cleanup = service === 'hijpass'
-        ? ['hook:stop', 'fw4:reload', 'route:remove', 'data:cron disable', 'cron:restart']
-        : ['fw4:reload', 'data:cron disable', 'cron:restart'];
+        ? ['hook:stop', 'fw4:reload', 'route:remove', 'cron:write disable', 'cron:restart']
+        : ['fw4:reload', 'cron:write disable', 'cron:restart'];
 
     test(`${service}: init.d 在提交后直接按顺序设置辅助功能，不查询进程、不重复清理`, t => {
         const f = fixture(t, service);
@@ -140,7 +144,7 @@ for (const service of ['hijpass', 'hijserver']) {
             const f = fixture(t, service);
             assert.notEqual(f.run('start', failure === 'fw4:reload' ? 'fw4' : failure).status, 0);
             const skipped = failure === 'firewall:generate' || failure === 'data:server-files' ? 'fw4:reload'
-                : failure === 'data:cron enable' ? 'cron:restart' : '';
+                : failure === 'cron:write enable' ? 'cron:restart' : '';
             assert.deepEqual(f.events(), [service + ':prepare', service + ':submit', ...setup.filter(event => event !== skipped)]);
             const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
             assert.match(log, /ERROR.*failed: exit=1/);
@@ -159,7 +163,7 @@ for (const service of ['hijpass', 'hijserver']) {
         for (const failure of cleanup) test(`${service}: ${action} 的 ${failure} 失败仍完成清理并交回框架`, t => {
             const f = fixture(t, service);
             const result = f.run(action, failure === 'fw4:reload' ? 'fw4' : failure);
-            const expectedCleanup = cleanup.filter(event => failure !== 'data:cron disable' || event !== 'cron:restart');
+            const expectedCleanup = cleanup.filter(event => failure !== 'cron:write disable' || event !== 'cron:restart');
             assert.deepEqual(f.events(), [...expectedCleanup, service + ':kill',
                 ...(action === 'stop' ? [] : [service + ':prepare', service + ':submit', ...setup])]);
             assert.equal(result.status, action !== 'stop' && ['fw4:reload', 'cron:restart'].includes(failure) ? 1 : 0, result.stderr);
@@ -264,8 +268,8 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.deepEqual(JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances, {});
         const events = f.events();
         assert.ok(events.includes(service + ':submit'));
-        assert.equal(events.includes('data:cron disable'), false);
-        assert.ok(!events.includes('data:cron enable'));
+        assert.equal(events.includes('cron:write disable'), false);
+        assert.ok(!events.includes('cron:write enable'));
     });
     for (const core of ['xray', 'sing-box']) test(`${service}: ${core} 检查失败只跳过当前实例，记录详情并保留 argv 和环境变量`, t => {
         const f = fixture(t, service), check = f.directory + '/bin/' + core, args = f.directory + '/check-args';
@@ -287,3 +291,13 @@ if [ "$CHECK_FAIL" = 1 ]; then echo 'invalid core configuration' >&2; exit 7; fi
         assert.match(log, /Prepare instance broken \(test space\) failed: exit=7/);
     });
 }
+
+for (const log of [null, '/tmp/server.log']) test(`服务端 cron 使用启动计划中的日志开关：${log}`, t => {
+    const f = fixture(t, 'hijserver');
+    f.plan.instances[0].log = log;
+    fs.writeFileSync(f.planPath, JSON.stringify(f.plan));
+    assert.equal(f.run('start').status, 0);
+    assert.deepEqual(fs.readFileSync(f.directory + '/cron-args', 'utf8').split('\n'),
+        ['enable', 'hijserver', '', log ? '1' : '0', '']);
+    assert.equal(f.events().filter(event => event === 'hijserver:prepare').length, 1);
+});

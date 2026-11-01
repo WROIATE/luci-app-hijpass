@@ -10,7 +10,7 @@ NFT_TABLE=/usr/share/nftables.d/table-post/hijserver.nft
 NFT_CHAIN=/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft
 
 start_service() {
-    local plan kind instance keys id name
+    local plan kind instance keys id name log
     plan="$(hijpass_run_logged server 'Prepare configurations' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server)" || exit 1
     # 使用独立 JSON 命名空间，避免覆盖 rc.common 正在组装的 procd 消息。
     json_set_namespace hijserver_plan
@@ -20,12 +20,14 @@ start_service() {
     json_select instances
     json_get_keys keys
     instances=
+    cron_log=0
     for instance in $keys; do
         json_select "$instance" || {
             hijpass_log ERROR server "${LINENO:-}" "Invalid instance entry: index=$instance"
             continue
         }
-        json_get_vars id name
+        json_get_vars id name log
+        [ -z "$log" ] || cron_log=1
         if hijpass_run_logged server "Prepare instance $id ($name)" "${LINENO:-}" hijpass_add_instance; then
             instances="$instances $instance"
         fi
@@ -68,7 +70,9 @@ stop_service() {
 }
 
 update_cron() {
-    hijpass_run_logged server 'Write cron entries' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server cron "$1" || return 1
+    local logs=0
+    [ "$1" != enable ] || logs=${cron_log:-0}
+    hijpass_run_logged server 'Write cron entries' "${LINENO:-}" hijpass_run_ucode "$HIJPASS_LIB/service/cron.uc" hijserver '' "$logs" || return 1
     hijpass_run_logged server 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
 }
 

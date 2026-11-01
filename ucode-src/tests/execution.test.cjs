@@ -39,8 +39,12 @@ function fixture(t) {
             { encoding: 'utf8', env: { ...process.env, ...extra, PATH: `${directory}:${runtime}/testbin:${process.env.PATH}` } });
     }
     patch('ucode/hijpass/config/paths.uc', '/tmp/hijpass/log', directory + '/logs');
+    patch('service/cron.uc', '/etc/crontabs/root', directory + '/crontab');
     patch('firewall/firewall.sh', '/etc/hijpass/fw4-rules.nft', directory + '/rules.nft');
-    patch('testbin/ucode', 'exec ', 'if [ -n "$HIJPASS_TEST_CONFIG" ]; then set -- "$@" --configdir "$HIJPASS_TEST_CONFIG"; fi\nexec ');
+    patch('testbin/ucode', 'exec ', `has_config=0
+for arg in "$@"; do [ "$arg" != --configdir ] || has_config=1; done
+if [ -n "$HIJPASS_TEST_CONFIG" ] && [ "$has_config" = 0 ]; then set -- "$@" --configdir "$HIJPASS_TEST_CONFIG"; fi
+exec `);
     function launch(file, args, extra = {}) {
         const child = spawn('/usr/bin/busybox', ['ash', path.join(runtime, file), ...args], {
             env: { ...process.env, ...extra, PATH: `${directory}:${runtime}/testbin:${process.env.PATH}` },
@@ -62,9 +66,11 @@ function fixture(t) {
 config_directory=${quoted(config)}
 hijpass_run_ucode() { ucode -S -- "$@" --configdir "$config_directory"; }
 instances=1
+cron_log=\${CRON_LOG:-0}
+uci() { command uci -c "$config_directory" "$@"; }
 # 此处仅测回调内的真实功能脚本；原生 stop/kill 链路由 lifecycle.test.cjs 覆盖。
 stop() { :; }
-"$1"
+"$1" "\${CRON_ACTION:-}"
 `);
         return run(driver, [action], { ...extra, HIJPASS_TEST_CONFIG: config });
     }
@@ -139,7 +145,7 @@ test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变
     f.script('fw4', 'exit 0');
     f.script('cron-init', 'exit 0');
     f.patch('init-hijpass.sh', '/etc/init.d/cron', path.join(f.directory, 'cron-init'));
-    f.patch('service/prepare.uc', '/etc/crontabs/root', path.join(f.directory, 'crontab'));
+    f.patch('service/cron.uc', '/etc/crontabs/root', path.join(f.directory, 'crontab'));
     f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', hook);
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
         const result = f.init('hijpass', 'service_started', config);
@@ -346,7 +352,7 @@ test('防火墙只绕过 WAN 区域，查询、生成、写入或校验失败保
     f.script('cron-init', 'exit 0');
     f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
-    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('service/cron.uc', '/etc/crontabs/root', f.directory + '/crontab');
     // 大于单参数长度上限的查询结果，直接从管道读取；VPN 设备不进入 WAN 绕过列表。
     fs.writeFileSync(f.directory + '/addresses', JSON.stringify([
         { ifname: 'wg0', addr_info: [{ family: 'inet', local: '192.168.1.1', prefixlen: 24 }] },
@@ -713,15 +719,17 @@ test('uci-defaults 首次安装自动迁移并注册防火墙，重复安装不�
 
 test('服务 cron 只管理当前脚本，客户端与服务端互不删除，不在启动时清理旧任务', t => {
     const f = fixture(t), cron = path.join(f.directory, 'crontab');
-    f.patch('service/prepare.uc', '/etc/crontabs/root', cron);
+    f.script('cron-init', 'exit 0');
+    for (const service of ['hijpass', 'hijserver']) f.patch('init-' + service + '.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.patch('service/cron.uc', '/etc/crontabs/root', cron);
     const legacy = `0 * * * * ${f.runtime}/rules.sh update\n`;
     const mentioned = `0 * * * * echo ${f.runtime}/rules/update.sh\n`;
     fs.writeFileSync(cron, legacy + mentioned + `0 * * * * ${f.runtime}/rules/update.sh update\n*/10 * * * * ${f.runtime}/maintenance/logs.sh hijpass\n`);
     withConfig([{ '.type': 'hijpass', '.name': 'global', enabled: '1' },
         { '.type': 'rule', '.name': 'rules', update_schedule: '0 5 * * 1' }], directory => {
         fs.writeFileSync(path.join(directory, 'hijserver'), `config hijserver 'global'\n option enabled '1'\nconfig server_node 'a'\n option enabled '1'\n option command 'program'\n option log_enabled '1'\n`);
-        for (const args of [['cron', 'enable'], ['cron', 'enable'], ['server', 'cron', 'enable'], ['server', 'cron', 'enable']]) {
-            const result = f.data('service/preparecli.uc', [...args, '--configdir', directory]);
+        for (const service of ['hijpass', 'hijpass', 'hijserver', 'hijserver']) {
+            const result = f.init(service, 'update_cron', directory, { CRON_ACTION: 'enable', CRON_LOG: '1' });
             assert.equal(result.status, 0, result.stderr);
         }
         let contents = fs.readFileSync(cron, 'utf8');
@@ -730,7 +738,7 @@ test('服务 cron 只管理当前脚本，客户端与服务端互不删除，�
         assert.equal(contents.split('\n').filter(line => line.includes(`0 5 * * 1 ${f.runtime}/rules/update.sh`)).length, 1);
         for (const kind of ['hijpass', 'hijserver'])
             assert.equal(contents.split('\n').filter(line => line.endsWith('/maintenance/logs.sh ' + kind)).length, 1);
-        const stopped = f.data('service/preparecli.uc', ['cron', 'disable', '--configdir', directory]);
+        const stopped = f.init('hijpass', 'update_cron', directory, { CRON_ACTION: 'disable' });
         assert.equal(stopped.status, 0, stopped.stderr);
         contents = fs.readFileSync(cron, 'utf8');
         assert.ok(contents.includes(legacy));
@@ -740,6 +748,54 @@ test('服务 cron 只管理当前脚本，客户端与服务端互不删除，�
         assert.equal(contents.includes(`0 5 * * 1 ${f.runtime}/rules/update.sh`), false);
     });
 });
+
+test('cron 拒绝无效调度和损坏配置，写入或替换失败不破坏旧任务、不重启 cron', t => {
+    const f = fixture(t), cron = f.directory + '/crontab', calls = f.directory + '/cron-calls';
+    const original = '0 * * * * /usr/bin/user-task\n';
+    f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.script('cron-init', `echo reload >>'${calls}'`);
+    for (const schedule of ['0 0 * *', '0 0 * * *\n0 0 * * *', '0 0 * * *; touch /tmp/unexpected']) {
+        fs.writeFileSync(cron, original);
+        withConfig([{ '.type': 'rule', update_schedule: schedule }], config => {
+            const result = f.init('hijpass', 'update_cron', config, { CRON_ACTION: 'enable' });
+            assert.notEqual(result.status, 0);
+        });
+        assert.equal(fs.readFileSync(cron, 'utf8'), original);
+        assert.equal(fs.existsSync(calls), false);
+    }
+    withConfig([], config => {
+        fs.writeFileSync(config + '/hijpass', "config rule\n option update_schedule 'broken\n");
+        assert.notEqual(f.init('hijpass', 'update_cron', config, { CRON_ACTION: 'enable' }).status, 0);
+        assert.equal(fs.readFileSync(cron, 'utf8'), original);
+        assert.equal(fs.existsSync(calls), false);
+    });
+    for (const failure of ['write', 'replace']) {
+        const script = f.runtime + '/ucode/hijpass/common.uc', saved = fs.readFileSync(script, 'utf8');
+        if (failure === 'write') f.patch('ucode/hijpass/common.uc', 'if (file.write(data)', "file.close(); file = fs.open('/dev/full', 'w');\n        if (file.write(data)");
+        else f.patch('ucode/hijpass/common.uc', 'fs.rename(temp, path)', 'false');
+        withConfig([{ '.type': 'rule', update_schedule: '0 5 * * 1' }], config => {
+            assert.notEqual(f.init('hijpass', 'update_cron', config, { CRON_ACTION: 'enable' }).status, 0);
+        });
+        assert.equal(fs.readFileSync(cron, 'utf8'), original);
+        assert.equal(fs.existsSync(calls), false);
+        assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('crontab.new-')), false);
+        fs.writeFileSync(script, saved);
+    }
+});
+
+test('服务端 cron 复用日志标记，停用时不依赖配置文件是否有效', t => {
+    const f = fixture(t), cron = f.directory + '/crontab';
+    f.patch('init-hijserver.sh', '/etc/init.d/cron', f.directory + '/cron-init');
+    f.script('cron-init', 'exit 0');
+    withConfig([], config => {
+        fs.writeFileSync(config + '/hijserver', 'invalid configuration');
+        for (const [action, logs] of [['enable', '1'], ['enable', '0'], ['disable', '1']]) {
+            assert.equal(f.init('hijserver', 'update_cron', config, { CRON_ACTION: action, CRON_LOG: logs }).status, 0);
+            assert.equal(fs.readFileSync(cron, 'utf8').includes('/maintenance/logs.sh hijserver'), action === 'enable' && logs === '1');
+        }
+    });
+});
+
 
 test('页面、定时和命令行更新共用任务状态与执行锁，完成结果可供多个观察者读取', async t => {
     const f = fixture(t), started = path.join(f.directory, 'started'), release = path.join(f.directory, 'release');
@@ -1122,7 +1178,7 @@ if (getenv('FAIL_STAGE') == 'generate') { warn('generate detail'); exit(1); }`);
     f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ] || { echo "hook detail" >&2; exit 1; }');
     f.script('cron-init', 'echo cron >>"$EVENTS"');
     f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
-    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('service/cron.uc', '/etc/crontabs/root', f.directory + '/crontab');
     f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
         const result = f.init('hijpass', 'service_started', config, { EVENTS: events, FAIL_STAGE: fail });
@@ -1146,7 +1202,7 @@ test('客户端防火墙撤流失败仍继续清理路由和 cron', t => {
     f.script('dns-hook', 'echo hook >>"$EVENTS"');
     f.script('cron-init', 'echo cron >>"$EVENTS"');
     f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
-    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('service/cron.uc', '/etc/crontabs/root', f.directory + '/crontab');
     withConfig([{ '.type': 'hijpass', enabled: '1' }], config => {
         const result = f.init('hijpass', 'stop_service', config, { EVENTS: events });
         assert.equal(result.status, 1);
@@ -1160,7 +1216,7 @@ test('服务端独立准备自定义命令，激活只写端口规则和日志�
         f.patch(file, '/usr/share/nftables.d/table-post/hijserver.nft', table);
         f.patch(file, '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', chain);
     }
-    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('service/cron.uc', '/etc/crontabs/root', f.directory + '/crontab');
     f.patch('init-hijserver.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.script('fw4', 'echo firewall >>"$EVENTS"');
     f.script('cron-init', 'echo cron >>"$EVENTS"');
@@ -1193,7 +1249,7 @@ for (const fail of ['hook', 'route', 'cron']) test(`客户端停止时各阶段�
     f.script('dns-hook', 'echo hook >>"$EVENTS"\n[ "$FAIL_STAGE" != hook ]');
     f.script('cron-init', 'echo cron >>"$EVENTS"\n[ "$FAIL_STAGE" != cron ]');
     f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
-    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('service/cron.uc', '/etc/crontabs/root', f.directory + '/crontab');
     f.patch('init-hijpass.sh', '/etc/hijpass/hook/dns-hook.sh', f.directory + '/dns-hook');
     const generated = ['/etc/hijpass/chinadns-ng.conf', '/tmp/hijpass/domain-proxy-geo.txt', '/tmp/hijpass/domain-direct-geo.txt'];
     for (const file of generated) {
@@ -1214,7 +1270,7 @@ for (const fail of ['firewall', 'cron']) test(`服务端停止时各阶段失败
     const f = fixture(t), events = f.directory + '/events';
     f.patch('init-hijserver.sh', '/usr/share/nftables.d/table-post/hijserver.nft', f.directory + '/server.nft');
     f.patch('init-hijserver.sh', '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', f.directory + '/chain.nft');
-    f.patch('service/prepare.uc', '/etc/crontabs/root', f.directory + '/crontab');
+    f.patch('service/cron.uc', '/etc/crontabs/root', f.directory + '/crontab');
     f.patch('init-hijserver.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.script('fw4', 'echo firewall >>"$EVENTS"\n[ "$FAIL_STAGE" != firewall ]');
     f.script('cron-init', 'echo cron >>"$EVENTS"\n[ "$FAIL_STAGE" != cron ]');
@@ -1268,7 +1324,7 @@ test('防火墙脚本统一删除和重载，删除失败记录原因并停止�
 
 for (const failure of ['write', 'reload']) test(`cron ${failure} 失败时普通日志包含阶段、原因和退出码`, t => {
     const f = fixture(t), crontab = f.directory + '/crontab', calls = f.directory + '/calls';
-    f.patch('service/prepare.uc', '/etc/crontabs/root', crontab);
+    f.patch('service/cron.uc', '/etc/crontabs/root', crontab);
     f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
     f.script('cron-init', `echo reload >>'${calls}'; echo 'cron reload detail' >&2; exit 7`);
     if (failure === 'write') fs.mkdirSync(crontab);

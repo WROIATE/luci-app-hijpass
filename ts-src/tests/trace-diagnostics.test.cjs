@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { readFileSync, writeFileSync, mkdtempSync, cpSync, readdirSync, chmodSync, rmSync, existsSync } = require('node:fs');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 const vm = require('node:vm');
 const path = require('node:path');
@@ -119,7 +119,7 @@ function fixture(t) {
     script('nslookup', 'echo unexpected-nslookup >>"$TRACE_TEST_LOG"; exit 1');
     script('curl', 'echo curl >>"$TRACE_TEST_LOG"');
     script('logread', 'exec /bin/sleep 180');
-    script('sleep', '[ "$TRACE_REAL_SLEEP" = 1 ] && exec /bin/sleep "$@"; exec /bin/sleep 0.01');
+    script('sleep', 'case "$1" in ""|*[!0-9]*) echo "sleep: invalid number" >&2; exit 1 ;; esac\n[ "$TRACE_REAL_SLEEP" = 1 ] && exec /bin/sleep "$@"; exec /bin/sleep 0.01');
     script('nft', `printf 'nft %s\\n' "$*" >>"$TRACE_TEST_LOG"
 if [ "$1" = -f ]; then
     sed 's/"//g; s/^/nft /' "$2" >>"$TRACE_TEST_LOG"
@@ -144,6 +144,16 @@ printf '1.0 br-lan In IP 192.168.1.100.12345 > 8.8.8.8.53: UDP, length 20\\n'
 exec /bin/sleep 180`);
     return { dir, env, trace: path.join(runtime, 'diagnostics/capture.sh'), task: path.join(runtime, 'diagnostics/task.sh') };
 }
+
+test('router and client capture support integer-only sleep without diagnostic warnings', t => {
+    const f = fixture(t);
+    for (const args of [['-c', '192.168.1.100', '-t', '1'], ['-t', '1', 'https://example.com/']]) {
+        const result = spawnSync(f.trace, args, { env: f.env, encoding: 'utf8' });
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stderr, '');
+        assert.match(result.stdout, /Trace is active/);
+    }
+});
 
 test('Shell capture with ucode parsing filters all/TCP/UDP and cleans its nft rule without DNS or curl', t => {
     const f = fixture(t);

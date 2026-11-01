@@ -67,8 +67,9 @@ nft monitor trace >"$directory/nft.trace" 2>&1 &
 nft_pid=$!
 if command -v logread >/dev/null 2>&1; then logread -f >"$directory/system.log" 2>&1 & log_pid=$!; fi
 if [ "$tcpdump" = 1 ]; then tcpdump -l -n -i "$iface" "$filter" >"$directory/tcpdump.log" 2>"$directory/tcpdump.err" & tcpdump_pid=$!; fi
+# 部分 OpenWrt BusyBox sleep 只支持整数秒；留出监听器启动时间。
+sleep 1 || exit 1
 printf 'Trace is active. Generate traffic on the selected client during capture.\n'
-sleep 0.25
 if [ "$mode" = client ]; then
     sleep "$seconds" & request_pid=$!
     wait "$request_pid"

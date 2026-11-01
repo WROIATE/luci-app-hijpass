@@ -339,8 +339,8 @@ test('规则全部下载失败时保留运行服务，不执行重启或 DNS Hoo
 });
 
 test('防火墙只绕过 WAN 区域，查询、生成、写入或校验失败保留旧规则并停止重载', t => {
-    const f = fixture(t), rules = path.join(f.directory, 'rules.nft'), calls = path.join(f.directory, 'calls');
-    f.patch('firewall/generate.uc', '/etc/hijpass/fw4-rules.nft', rules);
+    const f = fixture(t), rules = path.join(f.directory, 'rules with spaces.nft'), calls = path.join(f.directory, 'calls');
+    f.patch('firewall/firewall.sh', `rules=${f.directory}/rules.nft`, `rules='${rules}'`);
     fs.writeFileSync(f.runtime + '/firewall/route.sh', '#!/bin/sh\nexit 0\n');
     f.script('dns-hook', 'exit 0');
     f.script('cron-init', 'exit 0');
@@ -376,7 +376,7 @@ else echo reload >>"$TEST_CALLS"; fi`);
             assert.equal(result.status, 1, result.stderr);
             assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
             assert.equal(fs.existsSync(calls), false);
-            assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('rules.nft.new-')), false);
+            assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('rules with spaces.nft.new-')), false);
         };
         for (const failure of [{ BAD_NETWORK_JSON: '1' }, { NFT_FAIL: '1' }, { IP_FAIL: '1' }, { ZONE_FAIL: '1' }])
             unchanged(apply(failure));
@@ -405,7 +405,13 @@ else echo reload >>"$TEST_CALLS"; fi`);
         assert.doesNotMatch(content, /wan0|wg0|tun0|iifname \{\s*\}/);
     });
     withConfig([{ '.type': 'hijpass' }], config => {
-        const disabled = f.data('firewall/generatecli.uc', ['--configdir', config], { ZONE_FAIL: '1', IP_FAIL: '1' });
+        for (const args of [[], [''], [rules, 'extra']]) {
+            const invalid = f.data('firewall/generatecli.uc', [...args, '--configdir', config]);
+            assert.notEqual(invalid.status, 0);
+            assert.match(invalid.stderr, /usage: generatecli.uc/);
+            assert.equal(fs.existsSync(rules), true);
+        }
+        const disabled = f.data('firewall/generatecli.uc', [rules, '--configdir', config], { ZONE_FAIL: '1', IP_FAIL: '1' });
         assert.equal(disabled.status, 0, disabled.stderr);
         assert.equal(fs.existsSync(rules), false);
     });

@@ -190,11 +190,11 @@ export function generate(config, state) {
 
 /**
  * 校验完整规则后才替换正式文件；生成、写入、校验和替换任一步失败都保留旧文件。
+ * @param {string} path
  * @param {string} output
  * @returns {null}
  */
-function writeRules(output) {
-    let path = '/etc/hijpass/fw4-rules.nft';
+function writeRules(path, output) {
     if (!length(output)) {
         if (fs.lstat(path) && !fs.unlink(path)) die(`cannot remove ${path}: ${fs.error()}`);
         return;
@@ -211,12 +211,13 @@ function writeRules(output) {
 }
 /** 生成并写入经过校验的规则。重载由 init.d 或 RPC 调用方执行。 */
 export function main() { run(ARGV, (args, configDirectory) => {
-    if (length(args)) die('unexpected firewall generation argument');
+    if (length(args) != 1 || !length(args[0])) die('usage: generatecli.uc <rules-file>');
+    let path = args[0];
     let config = read('hijpass', configDirectory), firewall = findFirewallSection(config);
     if (!firewall || !firewall.proxy_port && !firewall.shunt_port) {
-        writeRules('');
+        writeRules(path, '');
         return;
     }
-    writeRules(generate(config, networkState(configDirectory)));
+    writeRules(path, generate(config, networkState(configDirectory)));
 });
 };

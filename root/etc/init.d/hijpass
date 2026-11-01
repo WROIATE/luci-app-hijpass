@@ -77,7 +77,13 @@ service_triggers() {
 
 boot() {
     local delay
-    delay="$(hijpass_run_logged service 'Read startup delay' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" delay)" || return $?
+    delay=$(uci -q get 'hijpass.@hijpass[0].delay_time') || {
+        # 字段未配置采用 0；配置文件本身不可读时终止启动。
+        hijpass_run_logged service 'Read startup configuration' "${LINENO:-}" uci export hijpass >/dev/null || return $?
+        delay=0
+    }
+    delay=${delay:-0}
+    [ "$delay" -ge 0 ] 2>/dev/null || { hijpass_log ERROR service "${LINENO:-}" 'Invalid startup delay'; return 1; }
     [ "$delay" -le 0 ] || hijpass_run_logged service 'Startup delay' "${LINENO:-}" sleep "$delay" || return $?
     start
 }

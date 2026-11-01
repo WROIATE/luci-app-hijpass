@@ -316,13 +316,12 @@ function writeServerRules(sections) {
 };
 
 // ServiceSettings 是执行层需要的业务值；不包含可执行的通用动作列表。
-// enabled 控制配置准备，geo_convert 控制 Geo 准备，
-// update_interval 为自动更新间隔天数，log_paths 为需要准备目录的日志位置。
+// enabled 控制配置准备，geo_convert 控制 Geo 准备，log_paths 为需要准备目录的日志位置。
 /**
  * 为 Shell 执行脚本整理服务开关和维护参数。
  * @param {UciSection[]} config
  * @param {boolean} server
- * @returns {ServiceSettings} 含 enabled、geo_convert、update_interval（天）及 log_paths 的对象。
+ * @returns {ServiceSettings} 含 enabled、geo_convert 及 log_paths 的对象。
  */
 function settings(config, server) {
     /** @type {HijpassSection|HijserverSection|null} */
@@ -334,7 +333,6 @@ function settings(config, server) {
     }
     return { enabled: global?.enabled == '1',
         geo_convert: convert,
-        update_interval: int(findRuleSection(config)?.update_interval || '0'),
         log_paths: filter(map(config, item => logPath(item, server)), path => !!path) };
 };
 /**
@@ -354,9 +352,6 @@ export function main() { run(ARGV,
     let config = read(server ? 'hijserver' : 'hijpass', configDirectory), action = shift(args);
     if (action == 'settings') {
         return settings(config, server);
-    }
-    if (action == 'delay') {
-        return `${int(findHijpassSection(config)?.delay_time || '0')}\n`;
     }
     if (action == 'configs') {
         if (findHijpassSection(config)?.enabled == '1') {

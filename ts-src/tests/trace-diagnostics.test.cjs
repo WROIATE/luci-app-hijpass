@@ -175,6 +175,23 @@ test('Shell capture with ucode parsing filters all/TCP/UDP and cleans its nft ru
     assert.throws(() => execFileSync(f.trace, ['-c', '::1;flush ruleset', '-t', '1'], { env: f.env, stdio: 'pipe' }));
 });
 
+test('capture preserves files only with -K while always removing temporary nft rules', t => {
+    const f = fixture(t);
+    for (const keep of [false, true]) {
+        writeFileSync(f.env.TRACE_TEST_LOG, '');
+        const output = execFileSync(f.trace, ['-c', '192.168.1.100', '-t', '1', ...(keep ? ['-K'] : [])],
+            { env: f.env, encoding: 'utf8' });
+        const calls = readFileSync(f.env.TRACE_TEST_LOG, 'utf8');
+        const pid = calls.match(/add chain inet hijpass trace-(\d+)/)[1];
+        const directory = '/tmp/hijpass-trace.' + pid;
+        t.after(() => rmSync(directory, { recursive: true, force: true }));
+        assert.match(calls, /delete chain inet hijpass trace-/);
+        assert.match(calls, /delete rule inet hijpass pre-filter handle 42/);
+        assert.equal(existsSync(directory), keep);
+        assert.equal(output.includes('Temporary files kept:'), keep);
+    }
+});
+
 test('detached worker returns immediately, reports a real 30s capture, and cleans up', { timeout: 45000 }, async t => {
     const f = fixture(t);
     f.env.TRACE_REAL_SLEEP = '1';

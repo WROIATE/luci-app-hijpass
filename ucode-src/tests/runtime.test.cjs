@@ -538,11 +538,6 @@ test('文本工具正常退出，参数错误保持 JSON 工具的错误契约',
         assert.equal(result.stdout, family);
         assert.equal(result.stderr, '');
     }
-    const directory = fixture(t);
-    fs.writeFileSync(path.join(directory, 'hijpass'), "config hijpass 'global'\n option delay_time '7'\n");
-    const delay = run('root/usr/lib/hijpass/service/preparecli.uc', ['delay', '--configdir', directory]);
-    assert.equal(delay.status, 0, delay.stderr);
-    assert.equal(delay.stdout, '7\n');
     const invalid = run('root/usr/lib/hijpass/network/network.sh', ['resolve', 'example.org', '--configdir']);
     assert.equal(invalid.status, 1);
     assert.match(JSON.parse(invalid.stdout).error, /missing --configdir/);

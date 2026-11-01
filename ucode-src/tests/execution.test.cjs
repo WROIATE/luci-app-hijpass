@@ -910,6 +910,44 @@ exit "$AUTO_RESULT"
     assert.equal(fs.readFileSync(calls, 'utf8'), 'update\nupdate\nupdate\n');
 });
 
+test('自动更新直接读取 UCI 间隔，缺省不更新，读取失败和非法值报错', t => {
+    const f = fixture(t), last = f.directory + '/last', calls = f.directory + '/calls';
+    f.patch('rules/auto-update.sh', '/tmp/hijpass_last_update', last);
+    fs.writeFileSync(f.runtime + '/rules/update.sh', `#!/bin/sh\necho update >>'${calls}'\n`, { mode: 0o755 });
+    const config = f.directory + '/config';
+    fs.mkdirSync(config);
+    for (const source of [null, "config rule\n option update_interval 'broken\n", "config rule\n option update_interval 'bad'\n"]) {
+        if (source != null) fs.writeFileSync(config + '/hijpass', source);
+        const result = f.run('rules/auto-update.sh', ['--configdir', config]);
+        assert.equal(result.status, 1, result.stderr);
+        assert.equal(fs.existsSync(calls), false);
+        assert.equal(fs.existsSync(last), false);
+    }
+    for (const source of ['config hijpass\n', 'config rule\n', "config rule\n option update_interval ''\n", "config rule\n option update_interval '0'\n"]) {
+        fs.writeFileSync(config + '/hijpass', source);
+        assert.equal(f.run('rules/auto-update.sh', ['--configdir', config]).status, 0);
+        assert.equal(fs.existsSync(calls), false);
+    }
+    fs.writeFileSync(config + '/hijpass', "config rule 'rules'\n option update_interval '08'\n");
+    assert.equal(f.run('rules/auto-update.sh', ['--configdir', config]).status, 0);
+    assert.equal(fs.readFileSync(calls, 'utf8'), 'update\n');
+    assert.equal(f.run('rules/auto-update.sh', ['--configdir', config]).status, 0);
+    assert.equal(fs.readFileSync(calls, 'utf8'), 'update\n');
+});
+
+test('Geo 查询使用 Shell 转小写，保留换行和命令失败状态', t => {
+    const f = fixture(t);
+    f.script('geoview', `printf 'EXAMPLE.COM\\nCN\\n'; exit "\${GEO_EXIT:-0}"`);
+    for (const action of ['-l', '-e']) {
+        const result = f.run('rules/geoview.sh', [action, 'geosite', 'CN']);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout, 'example.com\ncn\n');
+        const failed = f.run('rules/geoview.sh', [action, 'geosite', 'CN'], { GEO_EXIT: '7' });
+        assert.notEqual(failed.status, 0);
+        assert.equal(failed.stdout, '');
+    }
+});
+
 test('来源和模块使用固定列宽，正文与续行对齐，完整路径和行号保留', t => {
     const f = fixture(t);
     const log = path.join(f.directory, 'logs/hijpass.log');
@@ -1247,13 +1285,4 @@ for (const failure of ['write', 'reload']) test(`cron ${failure} 失败时普通
         assert.match(log, /ERROR.*Cron reload: cron reload detail/);
         assert.match(log, /ERROR.*Cron reload failed: exit=7/);
     }
-});
-
-test('prepare 脚本提供启动延时数据，不额外执行配置准备', t => {
-    const f = fixture(t);
-    withConfig([{ '.type': 'hijpass', delay_time: '12' }], config => {
-        const result = f.run('service/prepare.sh', ['delay', '--configdir', config]);
-        assert.equal(result.status, 0, result.stderr);
-        assert.equal(result.stdout, '12\n');
-    });
 });

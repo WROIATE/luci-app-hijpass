@@ -18,6 +18,8 @@ finish_capture() {
     plan=$(hijpass_run_ucode "$data" cleanup "$directory" "$raw") || { rm -f "$raw"; return 1; }
     rm -f "$raw"
     json_load "$plan" || return 1
+    keep=0
+    json_get_var keep keep
     json_select rules
     json_get_keys entries
     for entry in $entries; do
@@ -26,7 +28,6 @@ finish_capture() {
         nft delete rule inet hijpass "$chain" handle "$handle" 2>/dev/null || :
         json_select ..
     done
-    keep=$(hijpass_run_ucode "$data" keep "$directory" 2>/dev/null) || keep=0
     hijpass_run_ucode "$data" report "$directory"
     code=$?
     [ "$keep" = 1 ] || rm -rf -- "$directory"

@@ -1,5 +1,5 @@
 #!/bin/sh
-# 生成服务数据；默认准备配置和 procd 实例，也可单独更新 cron、端口规则或读取延时。
+# 生成服务数据；默认准备配置和 procd 实例，也可单独更新 cron、端口规则。
 . /usr/lib/hijpass/common.sh
 server=
 [ "${1:-}" != server ] || { server=server; shift; }
@@ -12,7 +12,7 @@ run_data() {
     fi
 }
 case "${1:-}" in
-    cron|delay|server-files) run_data "$@"; exit $? ;;
+    cron|server-files) run_data "$@"; exit $? ;;
 esac
 settings=$(run_data settings "$@") || exit 1
 json_load "$settings" || exit 1

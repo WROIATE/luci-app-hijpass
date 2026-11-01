@@ -47,11 +47,10 @@
  */
 
 /**
- * 服务执行层的开关、更新间隔（天）和日志路径。
+ * 服务执行层的开关和日志路径。
  * @typedef {{
  *   enabled: boolean,
  *   geo_convert: boolean,
- *   update_interval: integer,
  *   log_paths: string[]
  * }} ServiceSettings
  */

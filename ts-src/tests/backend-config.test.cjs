@@ -137,7 +137,9 @@ test('init owns lifecycle and shares only procd instance mapping', () => {
     assert.match(bridge, /procd_open_instance/);
     assert.doesNotMatch(bridge, /preparecli|firewall|cron|hijpass_check_configs/);
     assert.match(bridge, /set -- "\$@" "\$value"/);
-    assert.doesNotMatch(source + bridge, /uci -q|config_foreach|geoview[.]sh/);
+    // boot 可直接读取启动延时；实例准备仍消费 ucode 生成的数据。
+    assert.doesNotMatch(source.split('boot()')[0] + bridge, /uci -q/);
+    assert.doesNotMatch(source + bridge, /config_foreach|geoview[.]sh/);
 });
 
 test('LuCI uses the same default core and ignores protocol dependencies on custom commands', async () => {

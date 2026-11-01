@@ -240,7 +240,11 @@ export function main() { run(ARGV,
         return ruleText(capture);
     }
     if (action == 'cleanup') {
-        return cleanupPlan(args[0], text(args[1]));
+        let plan = cleanupPlan(args[0], text(args[1])), keep = false;
+        // 元数据损坏不能阻断规则清理；保留原来的不保留任务文件行为。
+        try { keep = metadata(args[0]).capture.keep === true; }
+        catch (e) { }
+        return { ...plan, keep };
     }
     if (action == 'report') {
         let directory = args[0];
@@ -249,9 +253,6 @@ export function main() { run(ARGV,
         }
         let data = metadata(directory), capture = data.capture;
         return report(capture, directory, data.positions) + (capture.keep === true ? `Temporary files kept: ${args[0]}\n` : '');
-    }
-    if (action == 'keep') {
-        return metadata(args[0]).capture.keep === true ? '1\n' : '0\n';
     }
     if (action == 'task-status') {
         let directory = args[0], active = args[1] == '1';

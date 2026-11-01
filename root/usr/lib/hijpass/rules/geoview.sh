@@ -26,7 +26,8 @@ if [ "$mode" = query ]; then
     else
         geoview -type "$kind" -action lookup -input "$input" -value "$@" >"$output" || exit 1
     fi
-    hijpass_run_ucode "$data" lower "$output"
+    # 显式 ASCII 映射兼容未启用字符类支持的 BusyBox tr。
+    LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz' <"$output"
     exit $?
 fi
 json_select jobs

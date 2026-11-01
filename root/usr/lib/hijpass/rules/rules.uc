@@ -312,9 +312,6 @@ export function main() { run(ARGV,
         let config = read('hijpass', configDirectory);
         return routeMatch(config, args[0] || '', args[1] ? text(args[1]) : '');
     }
-    if (action == 'lower') {
-        return lc(text(args[0]));
-    }
     if (action == 'result') {
         let failed = args;
         return { success: !length(failed), ...(length(failed) ? { failed } : {}) };

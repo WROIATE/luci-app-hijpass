@@ -25,7 +25,7 @@ function fixture(t, service = 'hijpass') {
     script(runtime + '/service/prepare.sh', `
 service=hijpass
 [ "$1" != server ] || { service=hijserver; shift; }
-case "$1" in cron|delay|server-files) exec '${directory}/data-mock' "$@" ;; esac
+case "$1" in cron|server-files) exec '${directory}/data-mock' "$@" ;; esac
 echo "$service:prepare" >>"$EVENTS"
 [ "$FAIL_PHASE" != prepare ] || exit 1
 if [ "$DISABLED" = 1 ]; then echo '{"instances":[]}'; else cat "$PLAN"; fi
@@ -36,6 +36,11 @@ if [ "$DISABLED" = 1 ]; then echo '{"instances":[]}'; else cat "$PLAN"; fi
     fs.writeFileSync(planPath, JSON.stringify(plan));
     fs.mkdirSync(directory + '/lib/functions', { recursive: true });
     fs.mkdirSync(directory + '/bin');
+    fs.mkdirSync(directory + '/config');
+    fs.writeFileSync(directory + '/config/hijpass', "config hijpass\n option delay_time '1'\n");
+    const uci = spawnSync('sh', ['-c', 'command -v uci'], { encoding: 'utf8' }).stdout.trim();
+    assert.ok(uci, 'native UCI CLI is required');
+    script(directory + '/bin/uci', `exec '${uci}' -c '${directory}/config' "$@"`);
     fs.writeFileSync(directory + '/lib/functions.sh', `list_contains() { return 0; }\n`);
     fs.writeFileSync(directory + '/lib/functions/service.sh', `
 procd_running() { echo unexpected-poll >>"$EVENTS"; return 1; }
@@ -49,7 +54,6 @@ procd_running() { echo unexpected-poll >>"$EVENTS"; return 1; }
 [ "$1" != server ] || shift
 echo "data:$*" >>"$EVENTS"
 [ "$FAIL_PHASE" != "data:$*" ] || exit 1
-[ "$1" != delay ] || echo "\${DELAY_SECS:-0}"
 `);
     // 只替换 procd/ubus 边界；JSON namespace 与原生 procd API 保持一致。
     fs.writeFileSync(directory + '/lib/functions/procd.sh', `
@@ -108,7 +112,7 @@ exit(getenv('FAIL_PHASE') == 'firewall:generate' ? 1 : 0);
         });
     }
     return { directory, runtime, plan, planPath, patch, script, run,
-        events: () => fs.readFileSync(events, 'utf8').trim().split('\n') };
+        events: () => fs.readFileSync(events, 'utf8').trim().split('\n').filter(Boolean) };
 }
 
 for (const service of ['hijpass', 'hijserver']) {
@@ -175,15 +179,33 @@ for (const service of ['hijpass', 'hijserver']) {
     });
     test(`${service}: 启动延时失败记日志并终止本次启动`, t => {
         const f = fixture(t, service);
-        assert.equal(f.run('boot', 'sleep', { DELAY_SECS: '1' }).status, 1);
-        assert.deepEqual(f.events(), service === 'hijpass' ? ['data:delay', 'delay:1'] : ['delay:10']);
+        assert.equal(f.run('boot', 'sleep').status, 1);
+        assert.deepEqual(f.events(), service === 'hijpass' ? ['delay:1'] : ['delay:10']);
         assert.match(fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8'), /Startup delay failed: exit=1/);
     });
-    if (service === 'hijpass') test('启动延时读取失败不再准备实例', t => {
-        const f = fixture(t);
-        assert.equal(f.run('boot', 'data:delay').status, 1);
-        assert.deepEqual(f.events(), ['data:delay']);
-    });
+    if (service === 'hijpass') {
+        for (const config of [null, "config hijpass\n option delay_time 'broken\n", "config hijpass\n option delay_time 'invalid'\n"])
+            test(`启动配置缺失、损坏或延时非法时不再准备实例：${config}`, t => {
+                const f = fixture(t);
+                if (config == null) fs.unlinkSync(f.directory + '/config/hijpass');
+                else fs.writeFileSync(f.directory + '/config/hijpass', config);
+                assert.equal(f.run('boot').status, 1);
+                assert.deepEqual(f.events(), []);
+            });
+        for (const [config, delay] of [
+            ["config hijpass\n option delay_time '12'\n", '12'],
+            ["config hijpass 'global'\n option delay_time '08'\n", '08'],
+            ["config hijpass\n", null],
+            ["config hijpass\n option delay_time ''\n", null],
+            ["config firewall\n", null],
+        ]) test(`boot 直接读取 UCI，字段缺省时跳过等待：${config}`, t => {
+            const f = fixture(t);
+            fs.writeFileSync(f.directory + '/config/hijpass', config);
+            const result = f.run('boot');
+            assert.equal(result.status, 0, result.stderr);
+            assert.deepEqual(f.events(), [...(delay ? ['delay:' + delay] : []), service + ':prepare', service + ':submit', ...setup]);
+        });
+    }
     for (const plan of ['', '{', '{}', '{"instances":{}}', '{"instances":null}']) {
         test(`${service}: 拒绝无效计划 ${plan || '(empty)'}，不当作禁用服务`, t => {
             const f = fixture(t, service);

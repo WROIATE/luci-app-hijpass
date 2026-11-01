@@ -146,7 +146,7 @@ for (const service of ['hijpass', 'hijserver']) {
         test(`${service}: ${failure} 失败记录日志后继续独立阶段，不停止实例`, t => {
             const f = fixture(t, service);
             assert.equal(f.run('start', failure === 'fw4:reload' ? 'fw4' : failure).status,
-                service === 'hijpass' && !failure.startsWith('cron:') ? 0 : 1);
+                failure.startsWith('cron:') ? 1 : 0);
             const skipped = failure === 'firewall:generate' || failure === 'data:server-files' ? 'fw4:reload'
                 : failure === 'cron:write enable' ? 'cron:restart' : '';
             assert.deepEqual(f.events(), [service + ':prepare', service + ':submit', ...setup.filter(event => event !== skipped)]);
@@ -173,7 +173,7 @@ for (const service of ['hijpass', 'hijserver']) {
             const expectedCleanup = cleanup.filter(event => failure !== 'cron:write disable' || event !== 'cron:restart');
             assert.deepEqual(f.events(), [...expectedCleanup, service + ':kill',
                 ...(action === 'stop' ? [] : [service + ':prepare', service + ':submit', ...setup])]);
-            assert.equal(result.status, action !== 'stop' && (failure === 'cron:restart' || service === 'hijserver' && failure === 'fw4:reload') ? 1 : 0, result.stderr);
+            assert.equal(result.status, action !== 'stop' && failure === 'cron:restart' ? 1 : 0, result.stderr);
             const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
             assert.match(log, /ERROR.*failed: exit=1/);
             assert.doesNotMatch(log, /Service cleanup completed with errors/);

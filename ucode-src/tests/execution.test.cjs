@@ -1278,7 +1278,7 @@ for (const fail of ['firewall', 'cron']) test(`服务端停止时各阶段失败
     withConfig([], config => {
         fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '1'\n");
         const result = f.init('hijserver', 'stop_service', config, { EVENTS: events, FAIL_STAGE: fail });
-        assert.equal(result.status, 1, result.stderr);
+        assert.equal(result.status, fail === 'cron' ? 1 : 0, result.stderr);
     });
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['firewall', 'cron']);
 });

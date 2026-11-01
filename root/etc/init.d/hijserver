@@ -37,30 +37,22 @@ start_service() {
 }
 
 service_started() {
-    local failed=0
     # procd 已收到实例描述；按顺序设置辅助功能，不轮询进程状态。
     [ -n "$instances" ] || return 0
     # 规则写入失败不 reload；其他独立阶段仍继续执行。
     if hijpass_run_logged server 'Write firewall rules' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server server-files; then
-        hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload || failed=1
-    else
-        failed=1
+        hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload
     fi
-    update_cron enable || failed=1
-    [ "$failed" -eq 0 ]
+    update_cron enable
 }
 
 stop_service() {
-    local failed=0
     hijpass_log INFO server "${LINENO:-}" 'Stopping hijserver...'
     # 文件删除失败不 reload，但仍清理 cron 并交回框架停实例。
     if hijpass_run_logged server 'Remove firewall rules' "${LINENO:-}" rm -f "$NFT_TABLE" "$NFT_CHAIN"; then
-        hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload || failed=1
-    else
-        failed=1
+        hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload
     fi
-    update_cron disable || failed=1
-    [ "$failed" -eq 0 ]
+    update_cron disable
 }
 
 update_cron() {

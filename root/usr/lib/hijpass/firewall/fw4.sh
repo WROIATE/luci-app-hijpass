@@ -10,4 +10,4 @@ fi
 [ -f "$rules" ] || exit 0
 hijpass_run_logged firewall 'Apply nft rules' "${LINENO:-}" nft -f "$rules" || exit 1
 [ ! -x "$hook" ] || hijpass_run_logged firewall 'NFT Hook' "${LINENO:-}" "$hook" || exit 1
-hijpass_log INFO firewall "${LINENO:-}" 'nft rules applied'
+hijpass_log INFO firewall "${LINENO:-}" 'Applied hijpass client nft rules'

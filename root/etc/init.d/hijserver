@@ -41,6 +41,7 @@ service_started() {
     [ -n "$instances" ] || return 0
     # 规则写入失败不 reload；其他独立阶段仍继续执行。
     if hijpass_run_logged server 'Write firewall rules' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server server-files "$NFT_TABLE" "$NFT_CHAIN"; then
+        hijpass_log INFO server "${LINENO:-}" 'Reloading firewall after updating hijserver rules'
         hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload
     fi
     update_cron enable
@@ -50,6 +51,7 @@ stop_service() {
     hijpass_log INFO server "${LINENO:-}" 'Stopping hijserver...'
     # 文件删除失败不 reload，但仍清理 cron 并交回框架停实例。
     if hijpass_run_logged server 'Remove firewall rules' "${LINENO:-}" rm -f "$NFT_TABLE" "$NFT_CHAIN"; then
+        hijpass_log INFO server "${LINENO:-}" 'Reloading firewall after removing hijserver rules'
         hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload
     fi
     update_cron disable

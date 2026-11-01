@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
-const { readFileSync, writeFileSync, mkdtempSync, cpSync, readdirSync, chmodSync, rmSync, existsSync } = require('node:fs');
-const { execFileSync, spawnSync } = require('node:child_process');
+const { readFileSync, writeFileSync, mkdtempSync, cpSync, readdirSync, chmodSync, rmSync, existsSync, mkdirSync, statSync } = require('node:fs');
+const { execFileSync, spawnSync, spawn } = require('node:child_process');
 const { test } = require('node:test');
 const vm = require('node:vm');
 const path = require('node:path');
@@ -107,13 +107,16 @@ function fixture(t) {
         for (const file of files) if (file.endsWith('.sh') || file.endsWith('.uc'))
             writeFileSync(file, readFileSync(file, 'utf8')
                 .replace('#!/bin/sh', '#!/usr/bin/busybox ash')
-                .replaceAll('/usr/lib/hijpass', runtime));
+                .replaceAll('/usr/lib/hijpass', runtime)
+                .replaceAll('/tmp/hijpass-trace-tasks', path.join(dir, 'tasks'))
+                .replaceAll('/tmp/hijpass-jobs', path.join(dir, 'jobs')));
     }
     const capture = path.join(runtime, 'diagnostics/capture.sh');
     writeFileSync(capture, readFileSync(capture, 'utf8').replaceAll('sleep ', shellQuote(path.join(dir, 'sleep')) + ' ').replace('$(id -u)', '$(' + shellQuote(path.join(dir, 'id')) + ' -u)'));
     const common = path.join(runtime, 'common.sh');
     writeFileSync(common, readFileSync(common, 'utf8').replace('/usr/share/libubox/jshn.sh', process.env.JSHN_SH || '/usr/share/libubox/jshn.sh'));
     script('ucode', `exec ${shellQuote(interpreter)} -L ${shellQuote(path.join(root, 'root/usr/share/ucode'))} "$@"`);
+    script('start-stop-daemon', 'exec /usr/bin/busybox start-stop-daemon \"$@\"');
     script('id', 'echo 0');
     script('uci', 'exit 0');
     script('nslookup', 'echo unexpected-nslookup >>"$TRACE_TEST_LOG"; exit 1');
@@ -210,7 +213,7 @@ test('detached worker returns immediately, reports a real 30s capture, and clean
     const id = execFileSync('/bin/sh', ['-c', 'exec 3>&1; exec "$@"', 'test', f.task,
         'start', '-c', '192.168.1.100', '-t', '30'], { env: f.env, encoding: 'utf8', timeout: 3000 }).trim();
     assert.match(id, /^[A-Za-z0-9]{8}$/);
-    const taskDir = `/tmp/hijpass-trace-tasks/${id}`;
+    const taskDir = `${f.dir}/tasks/${id}`;
     t.after(() => rmSync(taskDir, { recursive: true, force: true }));
     assert.ok(Date.now() - startTime < 3000);
     let result;
@@ -241,4 +244,73 @@ test('failed background capture exposes its exit status and task IDs reject trav
     assert.match(result.stderr, /timeout must be <= 120/);
     execFileSync(f.task, ['release', id], { env: f.env });
     assert.throws(() => execFileSync(f.task, ['status', '../../etc'], { env: f.env, stdio: 'pipe' }));
+});
+
+test('startup cleanup stops active diagnostics, removes retained captures and preserves update locks', { timeout: 15000 }, async t => {
+    const f = fixture(t);
+    // Limit cleanup to captures created by this test, never other host captures.
+    const captures = path.join(f.dir, 'captures');
+    writeFileSync(captures, '');
+    writeFileSync(f.task, readFileSync(f.task, 'utf8').replace('/tmp/hijpass-trace.[0-9]*', `$(cat '${captures}')`));
+    const run = (...args) => execFileSync(f.task, args, { env: f.env, encoding: 'utf8', timeout: 8000 });
+    execFileSync(f.trace, ['-c', '192.168.1.100', '-t', '1', '-K'], { env: f.env });
+    const keptPid = readFileSync(f.env.TRACE_TEST_LOG, 'utf8').match(/add chain inet hijpass trace-(\d+)/)[1];
+    const kept = '/tmp/hijpass-trace.' + keptPid;
+    writeFileSync(captures, kept + '\n');
+    t.after(() => rmSync(kept, { recursive: true, force: true }));
+    f.env.TRACE_REAL_SLEEP = '1';
+
+    const jobs = path.join(f.dir, 'jobs');
+    mkdirSync(jobs);
+    const updater = spawn('/bin/sh', ['-c', 'exec 9>"$1/rules.lock"; flock -x 9; echo running >"$1/state"; exec sleep 120', 'test', jobs]);
+    t.after(() => updater.kill());
+    const deadline = Date.now() + 3000;
+    while (!existsSync(jobs + '/state') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(readFileSync(jobs + '/state', 'utf8'), 'running\n');
+    const lockInode = statSync(jobs + '/rules.lock').ino;
+
+    try {
+        const id = run('start', '-c', '192.168.1.100', '-t', '120', '-p').trim();
+        let status;
+        const readyDeadline = Date.now() + 4000;
+        do {
+            status = JSON.parse(run('status', id));
+            if (status.stdout.includes('Trace is active')) break;
+            await new Promise(resolve => setTimeout(resolve, 50));
+        } while (Date.now() < readyDeadline);
+        assert.match(status.stdout, /Trace is active/);
+        const workerPid = readFileSync(`${f.dir}/tasks/${id}/pid`, 'utf8').trim();
+        const activePid = [...readFileSync(f.env.TRACE_TEST_LOG, 'utf8').matchAll(/add chain inet hijpass trace-(\d+)/g)].at(-1)[1];
+        const active = '/tmp/hijpass-trace.' + activePid;
+        writeFileSync(captures, kept + '\n' + active + '\n');
+        const children = readFileSync(`/proc/${activePid}/task/${activePid}/children`, 'utf8').trim().split(/\s+/);
+        const stale = `${f.dir}/tasks/Stale123`;
+        mkdirSync(stale);
+        // Reused PID points to an unrelated live process: it must not be killed.
+        writeFileSync(stale + '/pid', String(updater.pid));
+        writeFileSync(stale + '/stdout', 'old result');
+        const registryInode = statSync(f.dir + '/tasks/registry.lock').ino;
+
+        run('clear');
+        assert.deepEqual(readdirSync(f.dir + '/tasks'), ['registry.lock']);
+        assert.equal(statSync(f.dir + '/tasks/registry.lock').ino, registryInode);
+        for (const directory of [kept, active]) assert.equal(existsSync(directory), false, directory);
+        for (const pid of [workerPid, activePid, ...children]) {
+            const cmdline = `/proc/${pid}/cmdline`;
+            assert.ok(!existsSync(cmdline) || readFileSync(cmdline).length === 0, `diagnostic process ${pid} is still alive`);
+        }
+        assert.match(readFileSync(f.env.TRACE_TEST_LOG, 'utf8'), /delete rule inet hijpass pre-filter handle 42/);
+        assert.equal(readFileSync(jobs + '/state', 'utf8'), 'running\n');
+        assert.equal(statSync(jobs + '/rules.lock').ino, lockInode);
+        assert.equal(spawnSync('flock', ['-n', jobs + '/rules.lock', 'true']).status, 1);
+        assert.doesNotThrow(() => process.kill(updater.pid, 0));
+        // Clearing again is safe; a subsequent diagnostic can still be registered.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            assert.match(run('start', '-c', '192.168.1.100', '-t', '121').trim(), /^[A-Za-z0-9]{8}$/);
+            run('clear');
+            assert.deepEqual(readdirSync(f.dir + '/tasks'), ['registry.lock']);
+        }
+    } finally {
+        run('clear');
+    }
 });

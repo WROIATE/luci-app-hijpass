@@ -11,6 +11,7 @@ DNS_HOOK=/etc/hijpass/hook/dns-hook.sh
 start_service() {
     local plan kind instance keys id name
     hijpass_log INFO service "${LINENO:-}" '===================== Starting service ======================='
+    hijpass_run_logged trace 'Clear previous diagnostics' "${LINENO:-}" "$HIJPASS_LIB/diagnostics/task.sh" clear
     plan="$(hijpass_run_logged service 'Prepare configurations' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh")" || exit 1
     # 使用独立 JSON 命名空间，避免覆盖 rc.common 正在组装的 procd 消息。
     json_set_namespace hijpass_plan

@@ -22,6 +22,7 @@ function fixture(t, service = 'hijpass') {
     patch('ucode/hijpass/config/paths.uc', '/tmp/hijpass/log', directory + '/log');
     patch('firewall/firewall.sh', '/etc/hijpass/fw4-rules.nft', directory + '/rules.nft');
     const script = (file, text) => fs.writeFileSync(file, '#!/usr/bin/busybox ash\n' + text, { mode: 0o755 });
+    script(runtime + '/diagnostics/task.sh', 'echo \"trace:$1\" >>\"$EVENTS\"\n[ \"$FAIL_PHASE\" != trace:clear ]');
     script(runtime + '/service/prepare.sh', `
 service=hijpass
 [ "$1" != server ] || { service=hijserver; shift; }
@@ -120,6 +121,7 @@ exit(getenv('FAIL_PHASE') == 'firewall:generate' ? 1 : 0);
 }
 
 for (const service of ['hijpass', 'hijserver']) {
+    const preparation = [...(service === 'hijpass' ? ['trace:clear'] : []), service + ':prepare'];
     const setup = service === 'hijpass'
         ? ['route:reset', 'firewall:generate', 'fw4:reload', 'hook:start', 'cron:write enable', 'cron:restart']
         : ['data:server-files', 'fw4:reload', 'cron:write enable', 'cron:restart'];
@@ -130,9 +132,9 @@ for (const service of ['hijpass', 'hijserver']) {
     test(`${service}: init.d 在提交后直接按顺序设置辅助功能，不查询进程、不重复清理`, t => {
         const f = fixture(t, service);
         assert.equal(f.run('start').status, 0);
-        assert.deepEqual(f.events(), [service + ':prepare', service + ':submit', ...setup]);
+        assert.deepEqual(f.events(), [...preparation, service + ':submit', ...setup]);
         assert.equal(f.run('start').status, 0);
-        assert.deepEqual(f.events(), [service + ':prepare', service + ':submit', ...setup]);
+        assert.deepEqual(f.events(), [...preparation, service + ':submit', ...setup]);
         const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
         assert.equal((log.match(service === 'hijpass' ? /Starting service/g : /Starting hijserver/g) || []).length, 2);
         assert.doesNotMatch(log, /Service started|Service setup completed/);
@@ -140,7 +142,7 @@ for (const service of ['hijpass', 'hijserver']) {
     test(`${service}: 准备失败不提交实例、不设置网络`, t => {
         const f = fixture(t, service);
         assert.notEqual(f.run('start', 'prepare').status, 0);
-        assert.deepEqual(f.events(), [service + ':prepare']);
+        assert.deepEqual(f.events(), [...preparation]);
     });
     for (const failure of setup) {
         test(`${service}: ${failure} 失败记录日志后继续独立阶段，不停止实例`, t => {
@@ -149,7 +151,7 @@ for (const service of ['hijpass', 'hijserver']) {
                 failure.startsWith('cron:') ? 1 : 0);
             const skipped = failure === 'firewall:generate' || failure === 'data:server-files' ? 'fw4:reload'
                 : failure === 'cron:write enable' ? 'cron:restart' : '';
-            assert.deepEqual(f.events(), [service + ':prepare', service + ':submit', ...setup.filter(event => event !== skipped)]);
+            assert.deepEqual(f.events(), [...preparation, service + ':submit', ...setup.filter(event => event !== skipped)]);
             const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
             assert.match(log, /ERROR.*failed: exit=1/);
             assert.doesNotMatch(log, /Service setup completed with errors/);
@@ -164,7 +166,7 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.match(log, service === 'hijpass' ? /Stopping service/ : /Stopping hijserver/);
         assert.doesNotMatch(log, /Service resources removed|Service cleanup completed/);
         assert.equal(f.run('reload').status, 0);
-        assert.deepEqual(f.events(), [...cleanup, service + ':kill', service + ':prepare', service + ':submit', ...setup]);
+        assert.deepEqual(f.events(), [...cleanup, service + ':kill', ...preparation, service + ':submit', ...setup]);
     });
     for (const action of ['stop', 'restart', 'reload']) {
         for (const failure of cleanup) test(`${service}: ${action} 的 ${failure} 失败仍完成清理并交回框架`, t => {
@@ -172,7 +174,7 @@ for (const service of ['hijpass', 'hijserver']) {
             const result = f.run(action, failure === 'fw4:reload' ? 'fw4' : failure);
             const expectedCleanup = cleanup.filter(event => failure !== 'cron:write disable' || event !== 'cron:restart');
             assert.deepEqual(f.events(), [...expectedCleanup, service + ':kill',
-                ...(action === 'stop' ? [] : [service + ':prepare', service + ':submit', ...setup])]);
+                ...(action === 'stop' ? [] : [...preparation, service + ':submit', ...setup])]);
             assert.equal(result.status, action !== 'stop' && failure === 'cron:restart' ? 1 : 0, result.stderr);
             const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
             assert.match(log, /ERROR.*failed: exit=1/);
@@ -215,7 +217,7 @@ for (const service of ['hijpass', 'hijserver']) {
             fs.writeFileSync(f.directory + '/config/hijpass', config);
             const result = f.run('boot');
             assert.equal(result.status, 0, result.stderr);
-            assert.deepEqual(f.events(), [...(delay ? ['delay:' + delay] : []), service + ':prepare', service + ':submit', ...setup]);
+            assert.deepEqual(f.events(), [...(delay ? ['delay:' + delay] : []), ...preparation, service + ':submit', ...setup]);
         });
     }
     for (const plan of ['', '{', '{}', '{"instances":{}}', '{"instances":null}']) {
@@ -223,13 +225,13 @@ for (const service of ['hijpass', 'hijserver']) {
             const f = fixture(t, service);
             fs.writeFileSync(f.planPath, plan);
             assert.notEqual(f.run('start').status, 0);
-            assert.deepEqual(f.events(), [service + ':prepare']);
+            assert.deepEqual(f.events(), [...preparation]);
         });
     }
     test(`${service}: 空实例提交，不重新设置网络`, t => {
         const f = fixture(t, service);
         assert.equal(f.run('start', '', { DISABLED: '1' }).status, 0);
-        assert.deepEqual(f.events(), [service + ':prepare', service + ':submit']);
+        assert.deepEqual(f.events(), [...preparation, service + ':submit']);
         assert.deepEqual(JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances, {});
     });
 }

@@ -61,8 +61,6 @@ export function logger(sections) {
 			source = source || callerLocation();
 			// 原脚本为来源预留 40 列；加入行号后预留 64 列，并保留分隔空格。
 			location = sprintf('%-64s  ', source || '');
-			let task = getenv('HIJPASS_TASK_ID');
-			if (task && match(task, /^[A-Za-z0-9]{8}$/)) message += ` [task=${task}]`;
 		}
 		let file;
 		try {

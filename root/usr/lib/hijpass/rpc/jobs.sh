@@ -21,7 +21,7 @@ recover_job() {
     if [ "$pid" -eq 0 ] || ! kill -0 "$pid" 2>/dev/null; then
         # 存活检查期间 worker 可能刚写入结果并退出，不能覆盖它的真实结果。
         [ ! -f "$directory/exit" ] || return 0
-        hijpass_log ERROR job "${LINENO:-}" "${directory##*/}: worker exited without a result"
+        hijpass_log ERROR job "${LINENO:-}" "$(cat "$directory/kind" 2>/dev/null): worker exited without a result"
         printf 'job exited without a result\n' >>"$directory/stderr"
         printf '1\n' >"$directory/exit.tmp"
         mv "$directory/exit.tmp" "$directory/exit"
@@ -42,8 +42,6 @@ active_rules() {
 execute_job() {
     local kind="$1" directory="$2" code started
     shift 2
-    HIJPASS_TASK_ID=${directory##*/}
-    export HIJPASS_TASK_ID
     started=$(date +%s)
     hijpass_log DEBUG job "${LINENO:-}" "$kind started"
     case "$kind" in

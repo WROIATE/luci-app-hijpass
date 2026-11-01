@@ -199,7 +199,7 @@ test('DEBUG 为所有级别附加真实 Shell 和 ucode 调用位置，普通模
     const f = fixture(t), entry = path.join(f.runtime, 'debug-call.sh');
     fs.writeFileSync(entry, `. '${f.runtime}/common.sh'\nconfig_directory=$1\nhijpass_log INFO test "$LINENO" 'shell location'\n`);
     withConfig([{ '.type': 'hijpass', log_level: 'DEBUG' }], config => {
-        assert.equal(f.run('debug-call.sh', [config]).status, 0);
+        assert.equal(f.run('debug-call.sh', [config], { HIJPASS_TASK_ID: 'Test1234' }).status, 0);
     });
     const native = path.join(f.runtime, 'debug-call.uc');
     fs.writeFileSync(native, `import { logger } from './maintenance/logs.uc';
@@ -211,6 +211,7 @@ business();\n`);
     assert.equal(f.data('debug-call.uc', []).status, 0);
     const log = path.join(f.directory, 'logs/hijpass.log');
     let content = fs.readFileSync(log, 'utf8');
+    assert.doesNotMatch(content, /task=|Test1234/);
     assert.ok(content.includes(`${entry}:3`) && /:3\s+\[test\]\s+shell location/.test(content), content);
     assert.ok(content.includes(`${native}:4`) && /:4\s+\[test\]\s+ucode location/.test(content), content);
     fs.writeFileSync(log, '');

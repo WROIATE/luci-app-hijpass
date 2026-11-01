@@ -28,12 +28,13 @@ finish_capture() {
         nft delete rule inet hijpass "$chain" handle "$handle" 2>/dev/null || :
         json_select ..
     done
+    [ "${2:-}" != discard ] || { rm -rf -- "$directory"; return $?; }
     hijpass_run_ucode "$data" report "$directory"
     code=$?
     [ "$keep" = 1 ] || rm -rf -- "$directory"
     return "$code"
 }
-if [ "${1:-}" = finish ]; then finish_capture "${2:-}"; exit $?; fi
+case "${1:-}" in finish|discard) finish_capture "${2:-}" "$1"; exit $? ;; esac
 [ "$(id -u)" = 0 ] || { echo 'must run as root' >&2; exit 1; }
 capture=$(hijpass_run_ucode "$data" prepare "$$" "$@") || exit 1
 json_load "$capture" || exit 1

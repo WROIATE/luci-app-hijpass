@@ -1,6 +1,7 @@
 #!/bin/sh
 # fw4 的 script include：只加载已生成的规则，不生成配置或再次 reload。
 . /usr/lib/hijpass/common.sh
+HIJPASS_LOG_SOURCE=/usr/lib/hijpass/firewall/fw4.sh
 rules=/etc/hijpass/fw4-rules.nft
 hook=/etc/hijpass/hook/nft-hook.sh
 

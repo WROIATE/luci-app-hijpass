@@ -199,7 +199,9 @@ test('DEBUG 为所有级别附加真实 Shell 和 ucode 调用位置，普通模
     const f = fixture(t), entry = path.join(f.runtime, 'debug-call.sh');
     fs.writeFileSync(entry, `. '${f.runtime}/common.sh'\nconfig_directory=$1\nhijpass_log INFO test "$LINENO" 'shell location'\n`);
     withConfig([{ '.type': 'hijpass', log_level: 'DEBUG' }], config => {
-        assert.equal(f.run('debug-call.sh', [config], { HIJPASS_TASK_ID: 'Test1234' }).status, 0);
+        assert.equal(f.run('debug-call.sh', [config], {
+            HIJPASS_TASK_ID: 'Test1234', HIJPASS_LOG_SOURCE: '/etc/init.d/parent',
+        }).status, 0);
     });
     const native = path.join(f.runtime, 'debug-call.uc');
     fs.writeFileSync(native, `import { logger } from './maintenance/logs.uc';
@@ -455,6 +457,29 @@ echo "$stage" >>"$EVENTS"
         assert.equal(f.run('firewall/fw4.sh', [], { EVENTS: events }).status, 0);
         assert.equal(fs.readFileSync(events, 'utf8'), 'delete\n');
     }
+});
+
+test('fw4 通过 sh -c source 加载时，日志保留 include 文件和调用行', t => {
+    const f = fixture(t), entry = f.runtime + '/firewall/fw4.sh';
+    f.patch('firewall/fw4.sh', '/etc/hijpass/fw4-rules.nft', f.directory + '/rules.nft');
+    f.patch('firewall/fw4.sh', '/etc/hijpass/hook/nft-hook.sh', f.directory + '/nft-hook');
+    fs.writeFileSync(f.directory + '/rules.nft', 'rules');
+    f.script('nft', 'exit 0');
+    f.script('nft-hook', 'exit 0');
+    withConfig([{ '.type': 'hijpass', log_level: 'DEBUG' }], config => {
+        const result = spawnSync('/usr/bin/busybox', ['ash', '-c', `. '${entry}'`], {
+            encoding: 'utf8', env: { ...process.env, HIJPASS_TEST_CONFIG: config,
+                PATH: `${f.directory}:${f.runtime}/testbin:${process.env.PATH}` },
+        });
+        assert.equal(result.status, 0, result.stderr);
+    });
+    const log = fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8');
+    const lines = fs.readFileSync(entry, 'utf8').split('\n');
+    for (const message of ['Remove nft table', 'Apply nft rules', 'NFT Hook', 'Applied hijpass client nft rules']) {
+        const number = lines.findIndex(line => line.includes(message)) + 1;
+        assert.ok(log.split('\n').some(line => line.includes(`${entry}:${number} `) && line.includes(message)), log);
+    }
+    assert.doesNotMatch(log, /\s(?:sh|ash):\d+/);
 });
 
 test('Chinadns 模板保留列表开关、默认 tag、上游和自定义域名的组合行为', t => {

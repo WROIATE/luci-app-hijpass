@@ -4,6 +4,7 @@ USE_PROCD=1
 START=99
 STOP=15
 . /usr/lib/hijpass/common.sh
+HIJPASS_LOG_SOURCE=${initscript:-/etc/init.d/hijserver}
 . /usr/lib/hijpass/service/procd.sh
 
 NFT_TABLE='/usr/share/nftables.d/table-post/hijserver.nft'

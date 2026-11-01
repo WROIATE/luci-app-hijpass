@@ -4,6 +4,7 @@ USE_PROCD=1
 START=99
 STOP=15
 . /usr/lib/hijpass/common.sh
+HIJPASS_LOG_SOURCE=${initscript:-/etc/init.d/hijpass}
 . /usr/lib/hijpass/service/procd.sh
 
 DNS_HOOK=/etc/hijpass/hook/dns-hook.sh

@@ -144,6 +144,18 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.notEqual(f.run('start', 'prepare').status, 0);
         assert.deepEqual(f.events(), [...preparation]);
     });
+    test(`${service}: rc.common 加载的日志使用 init 脚本路径并保留 Shell 行号`, t => {
+        const f = fixture(t, service), init = f.directory + '/' + service;
+        fs.appendFileSync(f.directory + '/config/hijpass', " option log_level 'DEBUG'\n");
+        f.patch('testbin/ucode', 'exec ', `set -- "$@" --configdir '${f.directory}/config'\nexec `);
+        assert.equal(f.run('start').status, 0);
+        const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
+        for (const message of ['Starting ', 'Prepare configurations']) {
+            // 宿主 BusyBox 1.30 的函数 LINENO 是相对值；设备的 1.37 为文件行号。
+            assert.ok(log.split('\n').some(line => line.includes(`${init}:`) && /:\d+\s/.test(line) && line.includes(message)), log);
+        }
+        assert.doesNotMatch(log, /rc\.common:\d+/);
+    });
     for (const failure of setup) {
         test(`${service}: ${failure} 失败记录日志后继续独立阶段，不停止实例`, t => {
             const f = fixture(t, service);

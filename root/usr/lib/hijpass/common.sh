@@ -3,6 +3,8 @@
 # LuCI 包的安装路径固定，各功能入口共用这个只读目录常量。
 readonly HIJPASS_LIB=/usr/lib/hijpass
 readonly HIJPASS_JOB_ROOT=/tmp/hijpass-jobs
+# 普通入口使用 $0；被框架 source 的入口在加载本文件后指定实际脚本路径。
+HIJPASS_LOG_SOURCE=$0
 
 # Shell 只用 jshn 消费业务对象，不把 JSON 当成命令执行，也不使用 eval。
 . /usr/share/libubox/jshn.sh
@@ -14,7 +16,7 @@ hijpass_json_error() { hijpass_run_ucode "$HIJPASS_LIB/result.uc" error "$1"; }
 
 # 调用点显式传入 $LINENO；子进程中的日志 CLI 无法恢复 Shell 调用位置。
 hijpass_log() (
-    level=$1 module=$2 source="$0${3:+:$3}"
+    level=$1 module=$2 source="$HIJPASS_LOG_SOURCE${3:+:$3}"
     shift 3
     if [ -n "${config_directory:-}" ]; then
         hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" source "$level" "$source" "[$module] $*" --configdir "$config_directory"
@@ -26,10 +28,10 @@ hijpass_log() (
 
 # 只在实际命令边界处理 stderr，保持业务 stdout 和原始退出状态。
 hijpass_run_logged() {
-    local module="$1" phase="$2" source="$0${3:+:$3}" output code
+    local module="$1" phase="$2" line="$3" source="$HIJPASS_LOG_SOURCE${3:+:$3}" output code
     shift 3
     output=$(mktemp /tmp/hijpass-step.XXXXXX) || {
-        hijpass_log WARN "$module" "${LINENO:-}" "$phase: cannot capture diagnostic output"
+        hijpass_log WARN "$module" "$line" "$phase: cannot capture diagnostic output"
         "$@" 9>&-
         return $?
     }

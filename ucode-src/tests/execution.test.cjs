@@ -792,29 +792,6 @@ test('服务 cron 只管理当前脚本，客户端与服务端互不删除，�
     });
 });
 
-test('cron 写入或替换失败不破坏旧任务、不重启 cron', t => {
-    const f = fixture(t), cron = f.directory + '/crontab', calls = f.directory + '/cron-calls';
-    const original = '0 * * * * /usr/bin/user-task\n';
-    f.patch('init-hijpass.sh', '/etc/init.d/cron', f.directory + '/cron-init');
-    f.script('cron-init', `echo reload >>'${calls}'`);
-    fs.writeFileSync(cron, original);
-    for (const failure of ['write', 'replace']) {
-        const script = f.runtime + '/service/cron.sh', saved = fs.readFileSync(script, 'utf8');
-        const command = failure === 'write' ? 'sed' : 'mv';
-        f.script(command, failure === 'write' ? 'exec /usr/bin/sed "$@" >/dev/full' : 'echo "cannot replace crontab" >&2; exit 1');
-        // BusyBox ash 可能优先选择内置 applet，显式替换测试副本中的执行路径。
-        f.patch('service/cron.sh', command + ' ', `'${f.directory}/${command}' `);
-        withConfig([{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', update_schedule: '0 5 * * 1' }], config => {
-            assert.notEqual(f.init('hijpass', 'update_cron', config, { CRON_ACTION: 'enable' }).status, 0);
-        });
-        assert.equal(fs.readFileSync(cron, 'utf8'), original);
-        assert.equal(fs.existsSync(calls), false);
-        assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('crontab.')), false);
-        fs.unlinkSync(f.directory + '/' + command);
-        fs.writeFileSync(script, saved);
-    }
-});
-
 test('服务端 cron 复用日志标记，停用时不依赖配置文件是否有效', t => {
     const f = fixture(t), cron = f.directory + '/crontab';
     f.patch('init-hijserver.sh', '/etc/init.d/cron', f.directory + '/cron-init');

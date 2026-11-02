@@ -25,6 +25,10 @@ export function build(node) {
             inbound.settings = { clients: [{ id: node.uuid, flow: node.flow }], decryption: 'none' };
             if (node.transport == 'ws') stream.wsSettings = { path: node.ws_path };
             if (node.transport == 'grpc') stream.grpcSettings = { serviceName: node.grpc_service_name };
+            if (node.transport == 'xhttp') {
+                stream.xhttpSettings = { host: node.xhttp_host, path: node.xhttp_path, mode: node.xhttp_mode };
+                if (node.xhttp_method) stream.xhttpSettings.uplinkHTTPMethod = node.xhttp_method;
+            }
         }
         if (node.security == 'tls') {
             stream.tlsSettings = { serverName: node.server_name,

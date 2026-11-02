@@ -2587,3 +2587,12 @@ msgstr "旧自定义服务端节点已停用。请编辑节点，选择协议并
 
 msgid "Configuration Preview"
 msgstr "配置预览"
+
+msgid "sing-box REALITY requires TCP"
+msgstr "sing-box 的 REALITY 仅支持 TCP"
+
+msgid "XHTTP path must start with /"
+msgstr "XHTTP 路径必须以 / 开头"
+
+msgid "Invalid HTTP method"
+msgstr "HTTP 方法无效"

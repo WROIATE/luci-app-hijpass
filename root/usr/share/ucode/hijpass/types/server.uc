@@ -45,7 +45,11 @@
  *   uuid: string,
  *   flow: string,
  *   ws_path?: string,
- *   grpc_service_name?: string
+ *   grpc_service_name?: string,
+ *   xhttp_host?: string,
+ *   xhttp_path?: string,
+ *   xhttp_mode?: string,
+ *   xhttp_method?: string
  * }} VlessServerOptions
  */
 

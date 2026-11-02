@@ -3344,3 +3344,12 @@ msgstr ""
 
 msgid "Configuration Preview"
 msgstr ""
+
+msgid "sing-box REALITY requires TCP"
+msgstr ""
+
+msgid "XHTTP path must start with /"
+msgstr ""
+
+msgid "Invalid HTTP method"
+msgstr ""

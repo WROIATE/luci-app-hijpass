@@ -56,12 +56,25 @@ export function options(section) {
             transport: ['text', 'tcp'], security: ['text', 'tls'] }) };
         if (!match(node.uuid, /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
             die('invalid VLESS UUID');
-        if (index(['tcp', 'ws', 'grpc'], node.transport) < 0) die('unsupported VLESS transport');
+        if (index(['tcp', 'ws', 'grpc', 'xhttp'], node.transport) < 0) die('unsupported VLESS transport');
+        if (node.transport == 'xhttp' && node.core != 'xray') die('XHTTP transport is only supported by Xray core');
         if (index(['none', 'tls', 'reality'], node.security) < 0) die('unsupported VLESS security');
         if (node.flow != '' && node.flow != 'xtls-rprx-vision') die('unsupported VLESS flow');
         if (node.flow && (node.transport != 'tcp' || node.security == 'none'))
             die('Vision requires TCP with TLS or REALITY');
-        if (node.security == 'reality' && node.transport != 'tcp') die('REALITY requires TCP');
+        if (node.security == 'reality') {
+            if (node.core == 'sing-box' && node.transport != 'tcp') die('sing-box REALITY requires TCP');
+            if (node.core == 'xray' && index(['tcp', 'xhttp', 'grpc'], node.transport) < 0)
+                die('Xray REALITY only supports RAW, XHTTP and gRPC transports');
+        }
+        if (node.transport == 'xhttp') {
+            node = { ...node, ...decode(section, { xhttp_host: ['text', ''], xhttp_path: ['text', '/'],
+                xhttp_mode: ['text', 'auto'], xhttp_method: ['text', ''] }) };
+            if (substr(node.xhttp_path, 0, 1) != '/') die('XHTTP path must start with /');
+            if (index(['auto', 'packet-up', 'stream-up', 'stream-one'], node.xhttp_mode) < 0) die('invalid XHTTP mode');
+            if (match(node.xhttp_host, /[\r\n]/)) die('invalid XHTTP Host');
+            if (node.xhttp_method && !match(node.xhttp_method, /^[A-Z]+$/)) die('invalid HTTP method');
+        }
         if (node.transport == 'ws') {
             node.ws_path = decode(section, { ws_path: ['text', '/'] }).ws_path;
             if (substr(node.ws_path, 0, 1) != '/') die('WebSocket path must start with /');

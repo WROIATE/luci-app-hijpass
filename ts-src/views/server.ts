@@ -137,28 +137,53 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
     uuidOption.rmempty = false;
     uuidOption.datatype = 'uuid';
 
-    const transportOption = field(form.ListValue, 'transport', _('Transport'), [{ type: 'vless' }]);
-    for (const transport of ['tcp', 'ws', 'grpc']) transportOption.value(transport);
+    const transportOption = field(form.ListValue, 'transport', _('Transport Protocol'), [{ type: 'vless' }]);
+    for (const [value, label] of [['tcp', 'TCP'], ['ws', 'WebSocket'], ['grpc', 'gRPC'], ['xhttp', 'XHTTP']]) transportOption.value(value, label);
     transportOption.default = 'tcp';
     transportOption.rmempty = false;
+    transportOption.validate = function (id: string, value: string) {
+        const core = this.section.formvalue(id, 'core');
+        const security = this.section.formvalue(id, 'security');
+        if (value === 'xhttp' && core !== 'xray') return _('XHTTP transport is only supported by Xray core');
+        if (security === 'reality') {
+            if (core === 'sing-box' && value !== 'tcp') return _('sing-box REALITY requires TCP');
+            if (core === 'xray' && !['tcp', 'xhttp', 'grpc'].includes(value))
+                return _('Xray REALITY only supports RAW, XHTTP and gRPC transports');
+        }
+        return true;
+    };
     const wsPathOption = field(form.Value, 'ws_path', _('WebSocket Path'), [{ type: 'vless', transport: 'ws' }]);
     wsPathOption.default = '/';
     wsPathOption.rmempty = false;
     const grpcServiceNameOption = field(form.Value, 'grpc_service_name', _('gRPC Service Name'), [{ type: 'vless', transport: 'grpc' }]);
     grpcServiceNameOption.rmempty = false;
+    const xhttp = [{ type: 'vless', core: 'xray', transport: 'xhttp' }];
+    field(form.Value, 'xhttp_host', _('XHTTP Host'), xhttp);
+    const xhttpPath = field(form.Value, 'xhttp_path', _('XHTTP Path'), xhttp);
+    xhttpPath.default = '/';
+    xhttpPath.rmempty = false;
+    xhttpPath.validate = (_id: string, value: string) => value.startsWith('/') || _('XHTTP path must start with /');
+    const xhttpMode = field(form.ListValue, 'xhttp_mode', _('XHTTP Mode'), xhttp);
+    xhttpMode.default = 'auto';
+    xhttpMode.rmempty = false;
+    xhttpMode.value('auto', _('Auto'));
+    for (const mode of ['packet-up', 'stream-one', 'stream-up']) xhttpMode.value(mode);
+    const xhttpMethod = field(form.Value, 'xhttp_method', _('HTTP Method'), xhttp);
+    xhttpMethod.validate = (_id: string, value: string) => !value || /^[A-Z]+$/.test(value) || _('Invalid HTTP method');
+
     const securityOption = field(form.ListValue, 'security', _('Transport Security'), [{ type: 'vless' }]);
     securityOption.value('tls', 'TLS');
     securityOption.value('reality', 'REALITY');
     securityOption.value('none', _('None'));
     securityOption.default = 'tls';
     securityOption.rmempty = false;
-    const flowOption = field(form.ListValue, 'flow', _('Flow'), [{ type: 'vless', transport: 'tcp', security: 'tls' },
+    const flowOption = field(form.ListValue, 'flow', _('VLESS Flow Control'), [{ type: 'vless', transport: 'tcp', security: 'tls' },
         { type: 'vless', transport: 'tcp', security: 'reality' }]);
     flowOption.value('', _('None'));
     flowOption.value('xtls-rprx-vision', 'xtls-rprx-vision');
 
     const tls = [{ type: 'hysteria2' }, { type: 'vless', security: 'tls' }];
-    field(form.Value, 'server_name', _('Server Name (SNI)'), [...tls, { type: 'vless', security: 'reality' }]);
+    field(form.Value, 'server_name', _('TLS Server Name'), [...tls, { type: 'vless', security: 'reality' }]);
     const certificatePathOption = field(form.Value, 'certificate_path', _('Certificate File'), tls);
     certificatePathOption.rmempty = false;
     const keyPathOption = field(form.Value, 'key_path', _('Private Key File'), tls);

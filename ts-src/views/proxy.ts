@@ -88,15 +88,11 @@ const v = view.extend({
         createProxyOptions(s, instances);
 
         return E('div', {}, [
-            E('style', {}, `#modal_overlay .cbi-value[data-field^="cbid.hijpass."] > .cbi-value-title,
-                #modal_overlay .cbi-value[data-field^="cbid.hijpass."] > .cbi-value-field {
-                    display:block; float:none; width:100%; min-width:0; margin-left:0; text-align:left;
-                }
-                #modal_overlay .cbi-value[data-field^="cbid.hijpass."] > .cbi-value-field {
-                    box-sizing:border-box; max-width:56rem;
+            E('style', {}, `.cbi-value[data-name="custom_conf"] > .cbi-value-field {
+                    width:100%; min-width:0;
                 }
                 .cbi-value[data-name="custom_conf"] .cm-editor {
-                    height:26rem; min-height:min(16rem, 60vh); max-height:60vh;
+                    max-width:56rem; height:26rem; min-height:min(16rem, 60vh); max-height:60vh;
                 }`),
             await m.render(),
         ]);

@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import { defaultTemplate } from '../firewall/generate.uc';
 import { editor, logs, log } from './files.uc';
 import { generate, validate } from 'hijpass.config.generate';
+import { generate as generateServers, render as renderServer } from 'hijpass.server.generate';
+import { validateSections, filterServerNodeSections } from 'hijpass.config.sections';
 import { read } from 'hijpass.uci.read';
 import { writeOutput } from 'hijpass.command.runtime';
 
@@ -12,7 +14,8 @@ const methods = {
     config_render: { sections: '', target: '' }, config_validate: { sections: '' },
     log_list: {}, log_read: { id: '', action: '', lines: '' },
     log_clear: { id: '' },
-    defaults: {}, cleanup_node: { kind: '', section: '', name: '' },
+    server_render: { sections: '', target: '' }, server_validate: { sections: '' },
+    cleanup_node: { kind: '', section: '', name: '' },
     service_restart: {}, firewall_reset: {}, firewall_show: {},
     network_connect: { url: '', timeout: '' }, network_ping: { port: '' },
     rule_update: {}, rule_update_status: {}, rule_query: { keyword: '' }, rule_match: { keyword: '' },
@@ -66,8 +69,18 @@ try {
     else if (method == 'log_clear') {
         result = log({ id: request.id, action: 'clear' });
     }
-    else if (method == 'defaults') {
-        result = { command: '/usr/bin/xray -c {conf_path}' };
+    else if (method == 'server_render' || method == 'server_validate') {
+        let sections = hasSections ? json(request.sections) : read('hijserver');
+        validateSections(sections);
+        if (method == 'server_render') {
+            let section = filter(filterServerNodeSections(sections), s => s['.name'] == request.target)[0];
+            if (!section) die('server node not found');
+            result = { config: renderServer(section) };
+        }
+        else {
+            generateServers(sections);
+            result = { ok: true };
+        }
     }
     else if (method == 'config_render' || method == 'config_validate') {
         // 显式空快照仍须报错；只有省略 sections 才读取已提交 UCI。

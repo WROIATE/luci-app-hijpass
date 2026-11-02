@@ -29,7 +29,7 @@
  */
 
 /**
- * 使用自定义命令和原生 JSON 文件的节点选项；由自定义代理与服务端共用。
+ * 使用自定义命令和原生 JSON 文件的节点选项；仅供自定义代理使用。
  * @typedef {{
  *   command: string|null,
  *   custom_conf_hash: string|null
@@ -53,14 +53,6 @@
  * @typedef {EnabledSection & {
  *   '.type': 'hijserver'
  * }} HijserverSection
- */
-
-/**
- * 原生 JSON 服务端节点；command 与监听端口仅用于启动和防火墙放行。
- * @typedef {NamedNodeSection & RawCommandOptions & {
- *   '.type': 'server_node',
- *   allow_firewall: string|null
- * }} ServerNodeSection
  */
 
 /**

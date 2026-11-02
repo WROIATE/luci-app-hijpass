@@ -7,7 +7,7 @@ import { logger } from '../maintenance/logs.uc';
 
 // 安装专用：历史字段按 schema_version 分阶段转换；业务模块只读取当前格式。
 // 版本号在全部迁移成功后提交；同版本重复安装跳过，失败则保留入口供重试。
-const VERSION = '4';
+const VERSION = '5';
 
 // 旧 Shell 变量模板与 ucode 模板格式不同，只保留来源供用户手动迁移。
 /**
@@ -394,7 +394,7 @@ try {
         exit(0);
     }
     log('INFO', `Schema migration started: ${version} -> ${VERSION}`);
-    if (index(['0', '1', '2', '3'], version) < 0) {
+    if (index(['0', '1', '2', '3', '4'], version) < 0) {
         die(`unsupported schema_version "${version}"`);
     }
     if (version == '0') {
@@ -405,12 +405,20 @@ try {
         cleanLegacyCron(directory ? fs.dirname(directory) + '/crontabs/root' : '/etc/crontabs/root');
     }
     markLegacyFirewallTemplate(ctx, global);
-    if (version != '3') migratePaths(ctx, 'hijpass');
-    if (version != '3' && fs.stat((directory || '/etc/config') + '/hijserver')) {
+    if (int(version) < 3) migratePaths(ctx, 'hijpass');
+    if (fs.stat((directory || '/etc/config') + '/hijserver')) {
         if (!ctx.load('hijserver')) {
             die('cannot load hijserver for migration');
         }
-        migratePaths(ctx, 'hijserver');
+        if (int(version) < 3) migratePaths(ctx, 'hijserver');
+        ctx.foreach('hijserver', 'server_node', section => {
+            // 任意命令/JSON 无法可靠转换；保留文件和字段供人工迁移，不再执行。
+            let path = nodeConfig(section, true);
+            if (!fs.stat(path + '.legacy.json')) copyManagedFile(path, path + '.legacy.json');
+            ctx.set('hijserver', section['.name'], 'enabled', '0');
+            ctx.set('hijserver', section['.name'], 'legacy_custom', '1');
+            log('WARN', `Server "${section.name || section['.name']}" disabled: select a protocol and configure credentials on the Local Server page`);
+        });
         if (!ctx.commit('hijserver')) {
             die(`cannot commit hijserver migration: ${ctx.error()}`);
         }

@@ -7,7 +7,7 @@
 /** @typedef {import('../types/sections.uc').RuleSection} RuleSection */
 /** @typedef {import('../types/sections.uc').DnsmasqSection} DnsmasqSection */
 /** @typedef {import('../types/proxy-sections.uc').ProxyNodeSection} ProxyNodeSection */
-/** @typedef {import('../types/sections.uc').ServerNodeSection} ServerNodeSection */
+/** @typedef {import('../types/server-sections.uc').ServerNodeSection} ServerNodeSection */
 /** @typedef {import('../types/sections.uc').ShuntRouteRuleSection} ShuntRouteRuleSection */
 /** @typedef {import('../types/sections.uc').ShuntDnsNodeSection} ShuntDnsNodeSection */
 // Section：.name 是稳定 ID，.type 是配置段类型，.index 是可选排序位置。

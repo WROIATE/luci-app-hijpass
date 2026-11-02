@@ -11,8 +11,9 @@ import { read } from 'hijpass.uci.read';
 import * as fs from 'fs';
 import { FILES, nodeConfig, logPath } from 'hijpass.config.paths';
 import { findHijpassSection, findHijserverSection, findShuntSection, filterProxyNodeSections, filterServerNodeSections } from 'hijpass.config.sections';
-import { list, port } from 'hijpass.config.values';
+import { list } from 'hijpass.config.values';
 import { generate } from 'hijpass.config.generate';
+import { generate as generateServers, options as serverOptions } from 'hijpass.server.generate';
 import { CORE, core, CONFIG_TYPE, configType } from 'hijpass.config.protocol.proxy';
 import { resolve } from '../network/network.uc';
 import { atomic, command, temporary, renderTemplate } from 'hijpass.common';
@@ -199,41 +200,30 @@ export function generateAndWriteConfigs(sections) {
 		die(e.message);
 	}
 };
-// 服务端配置为用户编辑的原生 JSON，保留原文件；这里只声明进程与开放端口。
-// ServerPlan 使用相同的 Instance 字段；ports 为显式 allow_firewall 的监听端口数组。
+/** @typedef {import('../../../share/ucode/hijpass/types/service.uc').ServerPlan} ServerPlan */
 /**
- * 整理服务端节点的启动计划和需开放的端口。
+ * 整理标准核心启动参数及各协议需要开放的端口。
  * @param {UciSection[]} sections
- * @returns {ServicePlan} {instances, ports}；禁用时两个数组均为空。
+ * @returns {ServerPlan}
  */
 export function serverPlan(sections) {
-	let global = findHijserverSection(sections), instances = [], ports = [];
-	if (!global || global.enabled != '1') {
-		return { instances, ports };
-	}
-	for (let section in filterServerNodeSections(sections)) {
-		if (section.enabled != '1') {
-			continue;
-		}
-		let name = section.name || section['.name'];
-		if (!section.command) {
-			die(`server "${name}" has no command`);
-		}
-		let env = list(section.procd_env), path = nodeConfig(section, true);
-		for (let entry in env) {
-			if (!match(entry, /^[A-Za-z_][A-Za-z0-9_]*=/)) {
-				die('invalid procd_env');
-			}
-		}
-		push(instances, {
-			id: section['.name'], name, command: ['/bin/sh', '-c', configCommand(section.command, path)],
-			env, user: 'root', shunt: false, log: logPath(section, true),
-		});
-		if (section.allow_firewall == '1') {
-			push(ports, port(section.listen_port));
-		}
-	}
-	return { instances, ports: uniq(ports) };
+    let instances = [], ports = { tcp: [], udp: [] };
+    if (findHijserverSection(sections)?.enabled != '1') return { instances, ports };
+    for (let section in filterServerNodeSections(sections)) {
+        if (section.enabled != '1') continue;
+        let node = serverOptions(section), path = nodeConfig(section, true);
+        push(instances, {
+            id: section['.name'], name: node.name,
+            command: node.core == 'xray' ? ['xray', 'run', '-c', path] : ['sing-box', 'run', '-c', path],
+            check: node.core == 'xray' ? ['xray', 'run', '-test', '-c', path] : ['sing-box', 'check', '-c', path],
+            env: [], user: 'root', shunt: false, log: logPath(section, true),
+        });
+        if (section.allow_firewall == '1') {
+            if (node.type != 'hysteria2') push(ports.tcp, node.listen_port);
+            if (node.type != 'vless') push(ports.udp, node.listen_port);
+        }
+    }
+    return { instances, ports: { tcp: uniq(ports.tcp), udp: uniq(ports.udp) } };
 };
 /**
  * 生成服务端端口放行规则，没有端口时删除旧规则文件。
@@ -245,7 +235,7 @@ export function serverPlan(sections) {
 function writeServerRules(sections, tablePath, chainPath) {
 	let output = serverPlan(sections);
 	// 只开放明确选中的端口；没有端口时删除旧 include，避免旧服务端仍对 WAN 开放。
-	if (length(output.ports)) {
+	if (length(output.ports.tcp) || length(output.ports.udp)) {
 		atomic(tablePath, renderTemplate('/usr/lib/hijpass/service/server.ut', { ports: output.ports }), 0o644);
 		atomic(chainPath, 'jump hijserver comment "hijserver rule"\n', 0o644);
 	}
@@ -295,7 +285,12 @@ export function main() { run(ARGV,
         return settings(config, server);
     }
     if (action == 'configs') {
-        if (findHijpassSection(config)?.enabled == '1') {
+        if (server) {
+            let files = generateServers(config);
+            writeConfigs(files);
+            logger([])('INFO', `Wrote ${length(files)} hijserver core JSON configuration files`);
+        }
+        else if (findHijpassSection(config)?.enabled == '1') {
             // 先生成进程描述，确认自定义命令、环境变量和文件名有效，再替换配置。
             plan(config);
             generateAndWriteConfigs(config);

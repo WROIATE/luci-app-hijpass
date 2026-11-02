@@ -71,7 +71,7 @@ printf('%J', results);`);
 });
 
 test('absent optional services produce no instances, DNS settings or firewall rules', () => {
-    for (const [action, expected] of [['plan', { instances: [] }], ['server-plan', { instances: [], ports: [] }],
+    for (const [action, expected] of [['plan', { instances: [] }], ['server-plan', { instances: [], ports: { tcp: [], udp: [] } }],
         ['dns-options', null], ['firewall', '']]) {
         const result = run('ucode-src/tests/runtime.uc', [], { action, sections: [], dnsmasq: null });
         assert.equal(result.status, 0, result.stderr);

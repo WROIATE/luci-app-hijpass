@@ -3,7 +3,6 @@
 /**
  * @typedef {object} ServicePlan
  * @property {ServiceInstance[]} instances procd 的进程描述数组。
- * @property {integer[]} [ports] 服务端允许开放的端口数组。
  */
 
 /**
@@ -53,4 +52,11 @@
  *   geo_convert: boolean,
  *   log_paths: string[]
  * }} ServiceSettings
+ */
+
+/**
+ * 服务端启动计划及按传输协议分组的放行端口。
+ * @typedef {ServicePlan & {
+ *   ports: { tcp: integer[], udp: integer[] }
+ * }} ServerPlan
  */

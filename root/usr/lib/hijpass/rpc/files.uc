@@ -55,6 +55,7 @@ function editorPath(request) {
  * @returns {EditorResponse} 读取返回 {content}，保存返回 {ok: true}；尚未创建的节点或分流文件内容为空。
  */
 export function editor(request, write) {
+    if (write && request.resource == 'server_config') die('server configurations are generated from UCI');
     let path = editorPath(request);
     if (!write) {
         let content = fs.readfile(path);

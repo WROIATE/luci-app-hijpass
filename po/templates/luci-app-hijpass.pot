@@ -3287,3 +3287,60 @@ msgstr ""
 
 msgid "Independent DNS requires an enabled proxy node or shunt service"
 msgstr ""
+
+msgid "Core"
+msgstr ""
+
+msgid "Select protocol"
+msgstr ""
+
+msgid "Listen Address"
+msgstr ""
+
+msgid "For Shadowsocks 2022, enter a base64 key: 16 bytes for AES-128, 32 bytes for other methods."
+msgstr ""
+
+msgid "Transport"
+msgstr ""
+
+msgid "Transport Security"
+msgstr ""
+
+msgid "Server Name (SNI)"
+msgstr ""
+
+msgid "Certificate File"
+msgstr ""
+
+msgid "Private Key File"
+msgstr ""
+
+msgid "REALITY Handshake Server"
+msgstr ""
+
+msgid "REALITY Handshake Port"
+msgstr ""
+
+msgid "REALITY Private Key"
+msgstr ""
+
+msgid "REALITY Short ID"
+msgstr ""
+
+msgid "Salamander Password"
+msgstr ""
+
+msgid "Upload Bandwidth (Mbps)"
+msgstr ""
+
+msgid "Download Bandwidth (Mbps)"
+msgstr ""
+
+msgid "Flow"
+msgstr ""
+
+msgid "Custom server nodes have been disabled. Edit each node to select a protocol and configure credentials. Original JSON files are retained as .legacy.json."
+msgstr ""
+
+msgid "Configuration Preview"
+msgstr ""

@@ -561,7 +561,7 @@ test('服务端模板仅开放选中的端口，错误保留旧规则，没有�
     const f = fixture(t), table = path.join(f.directory, 'server rules.nft'), chain = path.join(f.directory, 'chain rules.nft');
     withConfig([], config => {
         const configFile = path.join(config, 'hijserver');
-        const source = "config hijserver\n option enabled '1'\nconfig server_node 'a'\n option enabled '1'\n option name 'a'\n option command 'xray run'\n option allow_firewall '1'\n option listen_port '443'\n";
+        const source = "config hijserver\n option enabled '1'\nconfig server_node 'a'\n option enabled '1'\n option name 'a'\n option type 'shadowsocks'\n option method 'aes-128-gcm'\n option password 'test'\n option allow_firewall '1'\n option listen_port '443'\n";
         fs.writeFileSync(configFile, source);
         for (const paths of [[], [table], [table, '']]) {
             const invalid = f.data('service/preparecli.uc', ['server', 'server-files', ...paths, '--configdir', config]);
@@ -741,7 +741,7 @@ test('uci-defaults 首次安装自动迁移并注册防火墙，重复安装不�
     const first = f.run('install/firstboot.sh', [], env);
     assert.equal(first.status, 0, first.stderr);
     const migrated = fs.readFileSync(path.join(directory, 'hijpass'), 'utf8');
-    assert.match(migrated, /schema_version '4'/);
+    assert.match(migrated, /schema_version '5'/);
     assert.match(migrated, /config_type 'custom'/);
     assert.doesNotMatch(migrated, /option (core|type) /);
     assert.match(fs.readFileSync(path.join(directory, 'firewall'), 'utf8'), /option type 'script'/);
@@ -1210,7 +1210,7 @@ test('客户端防火墙撤流失败仍继续清理路由和 cron', t => {
     assert.deepEqual(fs.readFileSync(events, 'utf8').trim().split('\n'), ['hook', 'firewall', 'route', 'cron']);
 });
 
-test('服务端独立准备自定义命令，激活只写端口规则和日志任务，不生成客户端数据', t => {
+test('服务端生成标准配置后，激活只写端口规则和日志任务，不生成客户端数据', t => {
     const f = fixture(t), events = f.directory + '/events', table = f.directory + '/server rules.nft', chain = f.directory + '/chain rules.nft';
     f.patch('init-hijserver.sh', '/usr/share/nftables.d/table-post/hijserver.nft', table);
     f.patch('init-hijserver.sh', '/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft', chain);
@@ -1220,12 +1220,14 @@ test('服务端独立准备自定义命令，激活只写端口规则和日志�
     f.script('cron-init', 'echo cron >>"$EVENTS"');
     for (const file of ['firewall/route.sh', 'rules/geoview.sh'])
         fs.writeFileSync(f.runtime + '/' + file, '#!/bin/sh\necho unexpected >>"$EVENTS"\nexit 1\n', { mode: 0o755 });
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/server', f.directory + '/server');
     withConfig([], config => {
-        fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '1'\nconfig server_node 'server'\n option enabled '1'\n option name 'server'\n option command 'program -c {conf_path}'\n option allow_firewall '1'\n option listen_port '8443'\n");
+        fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '1'\nconfig server_node 'server'\n option enabled '1'\n option name 'server'\n option type 'shadowsocks'\n option core 'xray'\n option method 'aes-128-gcm'\n option password 'test'\n option allow_firewall '1'\n option listen_port '8443'\n");
         const prepared = f.run('service/prepare.sh', ['server', '--configdir', config], { EVENTS: events });
         assert.equal(prepared.status, 0, prepared.stderr);
         assert.deepEqual(JSON.parse(prepared.stdout).instances[0].command,
-            ['/bin/sh', '-c', "program -c '/etc/hijpass/server/server-server.json'"]);
+            ['xray', 'run', '-c', f.directory + '/server/server-server.json']);
+        assert.equal(JSON.parse(fs.readFileSync(f.directory + '/server/server-server.json')).inbounds[0].protocol, 'shadowsocks');
         assert.equal(fs.existsSync(table), false);
         assert.equal(fs.existsSync(events), false);
         const activated = f.init('hijserver', 'service_started', config, { EVENTS: events });

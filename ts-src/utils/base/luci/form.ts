@@ -68,17 +68,17 @@ const FormUtils = {
         o.rows = 20;
 
         o.load = async function (section_id: string) {
-            return Backend.readEditor({ resource: confName === LuciFlied.SERVER_CONF_NAME ? 'server_config' : 'proxy_config', section: section_id });
+            return Backend.readEditor({ resource: 'proxy_config', section: section_id });
         };
         o.write = async function (section_id: string, value: string) {
             const text = (value || '').trim().replace(/\r\n/g, '\n');
             const content = text ? text + '\n' : '';
-            await Backend.writeEditor({ resource: confName === LuciFlied.SERVER_CONF_NAME ? 'server_config' : 'proxy_config',
+            await Backend.writeEditor({ resource: 'proxy_config',
                 section: section_id, name: this.section.formvalue(section_id, 'name') || uci.get(confName, section_id, 'name') || section_id }, content);
             uci.set(confName, section_id, 'custom_conf_hash', String(FormUtils.simpleHash(content)));
         };
         o.remove = async function (section_id: string) {
-            await Backend.writeEditor({ resource: confName === LuciFlied.SERVER_CONF_NAME ? 'server_config' : 'proxy_config',
+            await Backend.writeEditor({ resource: 'proxy_config',
                 section: section_id, name: this.section.formvalue(section_id, 'name') || uci.get(confName, section_id, 'name') || section_id }, '');
             uci.set(confName, section_id, 'custom_conf_hash', '');
         };

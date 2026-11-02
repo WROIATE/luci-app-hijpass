@@ -2530,3 +2530,60 @@ msgstr "后台操作失败，请查看主日志"
 
 msgid "Independent DNS requires an enabled proxy node or shunt service"
 msgstr "独立 DNS 需要至少启用一个代理节点或分流服务"
+
+msgid "Core"
+msgstr "核心"
+
+msgid "Select protocol"
+msgstr "请选择协议"
+
+msgid "Listen Address"
+msgstr "监听地址"
+
+msgid "For Shadowsocks 2022, enter a base64 key: 16 bytes for AES-128, 32 bytes for other methods."
+msgstr "Shadowsocks 2022 使用 Base64 编码密钥：AES-128 为 16 字节，其余方式为 32 字节。"
+
+msgid "Transport"
+msgstr "传输方式"
+
+msgid "Transport Security"
+msgstr "传输安全"
+
+msgid "Server Name (SNI)"
+msgstr "服务器名称（SNI）"
+
+msgid "Certificate File"
+msgstr "证书文件路径"
+
+msgid "Private Key File"
+msgstr "私钥文件路径"
+
+msgid "REALITY Handshake Server"
+msgstr "REALITY 握手服务器"
+
+msgid "REALITY Handshake Port"
+msgstr "REALITY 握手端口"
+
+msgid "REALITY Private Key"
+msgstr "REALITY 私钥"
+
+msgid "REALITY Short ID"
+msgstr "REALITY Short ID"
+
+msgid "Salamander Password"
+msgstr "Salamander 混淆密码"
+
+msgid "Upload Bandwidth (Mbps)"
+msgstr "上传带宽（Mbps）"
+
+msgid "Download Bandwidth (Mbps)"
+msgstr "下载带宽（Mbps）"
+
+msgid "Flow"
+msgstr "流控"
+
+msgid "Custom server nodes have been disabled. Edit each node to select a protocol and configure credentials. Original JSON files are retained as .legacy.json."
+msgstr "旧自定义服务端节点已停用。请编辑节点，选择协议并配置凭据。原 JSON 已另存为 .legacy.json 文件。"
+
+msgid "Configuration Preview"
+msgstr "配置预览"

@@ -18,8 +18,8 @@ settings=$(run_data settings "$@") || exit 1
 json_load "$settings" || exit 1
 json_get_vars enabled geo_convert
 if [ "$enabled" = 1 ]; then
+    run_data configs "$@" || exit 1
     if [ -z "$server" ]; then
-        run_data configs "$@" || exit 1
         [ "$geo_convert" != 1 ] || "$HIJPASS_LIB/rules/geoview.sh" --convert "$@" || exit 1
         "$HIJPASS_LIB/rules/geoview.sh" dns "$@" || exit 1
     fi

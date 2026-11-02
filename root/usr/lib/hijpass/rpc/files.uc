@@ -128,21 +128,33 @@ export function log(request) {
         }
         return { ok: true };
     }
-    let file = fs.open(path, 'r');
-    if (!file) {
-        die('cannot open log');
+    let count = 0;
+    if (request.action == 'read') {
+        if (type(request.lines) != 'string' || !match(request.lines, /^[0-9]+$/)) {
+            die('invalid log request');
+        }
+        count = int(request.lines);
+        if (count < 1 || count > 1000) {
+            die('log line count must be between 1 and 1000');
+        }
     }
+    else if (request.action != 'download') {
+        die('invalid log request');
+    }
+    let info = fs.stat(path);
+    if (!info) {
+        let error = fs.error();
+        // 节点尚未启动时没有日志文件；其他打开失败仍返回错误。
+        if (request.action == 'read' && error == 'No such file or directory') return { content: '' };
+        die(`cannot open log: ${error}`);
+    }
+    if (info.type != 'file') die('log is not a regular file');
+    let file = fs.open(path, 'r');
+    if (!file) die('cannot open log');
     try {
         if (request.action == 'download') {
             let content = file.read('all') || ''; file.close();
             return { content, name: fs.basename(path) };
-        }
-        if (request.action != 'read' || type(request.lines) != 'string' || !match(request.lines, /^[0-9]+$/)) {
-            die('invalid log request');
-        }
-        let count = int(request.lines);
-        if (count < 1 || count > 1000) {
-            die('log line count must be between 1 and 1000');
         }
         // 环形缓冲只保留尾部所需的行数，避免为预览加载整份日志。
         let buffer = [], total = 0, line;

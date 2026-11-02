@@ -33,7 +33,8 @@ function read(packageName) { return readConfig(packageName, '${config}'); }`));
         .replaceAll('/etc/hijpass/client', directory).replaceAll('/etc/hijpass/firewall.ut', rules)
         .replaceAll('/etc/hijpass/rules/ip-direct.txt', editor)
         .replaceAll('/etc/hijpass/shunt.json', directory + '/shunt.json')
-        .replaceAll('/tmp/hijpass/log', directory));
+        .replaceAll('/tmp/hijpass/log', directory)
+        .replaceAll('/tmp/hijserver/log', directory + '/server-logs'));
     fs.writeFileSync(editor, 'original\n');
     fs.writeFileSync(log, 'first\nsecond\nthird\n');
     fs.writeFileSync(path.join(config, 'hijpass'), `config hijpass 'global'
@@ -141,6 +142,29 @@ test('RPC logs use section identities and preserve tail, download and clear beha
     assert.equal(fs.readFileSync(f.log, 'utf8'), 'first\nsecond\nthird\n');
     assert.equal(f.invoke('log_clear', { id }).ok, true);
     assert.equal(fs.readFileSync(f.log, 'utf8'), '');
+});
+
+for (const packageName of ['hijpass', 'hijserver']) test(`RPC ${packageName} treats missing logs as empty and reads newly created logs on refresh`, t => {
+    const f = fixture(t), id = packageName + ':node';
+    const log = packageName === 'hijpass' ? f.log : path.join(f.directory, 'server-logs/original-node.log');
+    if (packageName === 'hijserver') {
+        fs.appendFileSync(path.join(f.directory, 'config/hijserver'), "config server_node 'node'\n option name 'original'\n option log_enabled '1'\n");
+    } else {
+        fs.unlinkSync(log);
+    }
+    const request = { id, action: 'read', lines: '200' };
+    assert.deepEqual(f.invoke('log_read', request), { content: '' });
+    assert.equal(fs.existsSync(log), false);
+    assert.ok(f.invoke('log_read', { ...request, lines: '-1' }).error);
+    assert.ok(f.invoke('log_read', { ...request, id: packageName + ':unknown' }).error);
+    assert.ok(f.invoke('log_read', { id, action: 'download' }).error);
+    fs.mkdirSync(path.dirname(log), { recursive: true });
+    fs.writeFileSync(log, 'new log after startup\n');
+    assert.equal(f.invoke('log_read', request).content, 'new log after startup\n');
+    // 无法打开的文件不能被误当作“暂无日志”。
+    fs.unlinkSync(log);
+    fs.symlinkSync(log, log);
+    assert.match(f.invoke('log_read', request).error, /cannot open log:/);
 });
 
 test('Shell RPC keeps arguments separate and returns real command failures', t => {

@@ -10,7 +10,7 @@ function loadNodeLog(logId: string, contentEl: HTMLElement) {
             contentEl.textContent = text || _('No Logs');
             contentEl.scrollTop = contentEl.scrollHeight;
         })
-        .catch(() => { contentEl.textContent = _('Read Failed'); });
+        .catch(error => { contentEl.textContent = _('Read Failed') + ': ' + error.message; });
 }
 
 export function createNodeLogButton(configName: string, sectionId: string): HTMLElement | null {

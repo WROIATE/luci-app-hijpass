@@ -34,5 +34,5 @@ export function createNodeLogButton(configName: string, sectionId: string): HTML
                 ])
             ]);
         }
-    }) as HTMLElement;
+    }, _('Log')) as HTMLElement;
 }

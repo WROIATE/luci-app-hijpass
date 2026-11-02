@@ -117,6 +117,7 @@
  *   RawNetworkOptions &
  *   {
  *     type: 'vless',
+ *     security: string|null,
  *     uuid: string|null,
  *     flow: string|null,
  *     packet_encoding: string|null

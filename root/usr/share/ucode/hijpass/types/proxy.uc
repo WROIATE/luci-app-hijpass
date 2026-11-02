@@ -80,6 +80,7 @@
 /**
  * @typedef {RemoteProxy & TLSOptions & RealityOptions & MultiplexOptions & TransportOptions & {
  *   type: 'vless',
+ *   security: string,
  *   uuid: string,
  *   network: string,
  *   flow: string,

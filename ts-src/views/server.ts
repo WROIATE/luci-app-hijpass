@@ -138,10 +138,14 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
     uuidOption.datatype = 'uuid';
 
     const transportOption = field(form.ListValue, 'transport', _('Transport Protocol'), [{ type: 'vless' }]);
-    for (const [value, label] of [['tcp', 'TCP'], ['ws', 'WebSocket'], ['grpc', 'gRPC'], ['xhttp', 'XHTTP']]) transportOption.value(value, label);
-    transportOption.default = 'tcp';
-    transportOption.rmempty = false;
+    for (const [value, label] of [['', _('Default (TCP)')], ['ws', 'WebSocket'], ['grpc', 'gRPC'], ['xhttp', 'XHTTP']]) transportOption.value(value, label);
+    transportOption.default = '';
+    transportOption.load = (id: string) => {
+        const value = uci.get(configName, id, 'transport');
+        return value === 'tcp' ? '' : value || '';
+    };
     transportOption.validate = function (id: string, value: string) {
+        value ||= 'tcp';
         const core = this.section.formvalue(id, 'core');
         const security = this.section.formvalue(id, 'security');
         if (value === 'xhttp' && core !== 'xray') return _('XHTTP transport is only supported by Xray core');
@@ -172,13 +176,13 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
     xhttpMethod.validate = (_id: string, value: string) => !value || /^[A-Z]+$/.test(value) || _('Invalid HTTP method');
 
     const securityOption = field(form.ListValue, 'security', _('Transport Security'), [{ type: 'vless' }]);
+    securityOption.value('none', _('None'));
     securityOption.value('tls', 'TLS');
     securityOption.value('reality', 'REALITY');
-    securityOption.value('none', _('None'));
     securityOption.default = 'tls';
     securityOption.rmempty = false;
-    const flowOption = field(form.ListValue, 'flow', _('VLESS Flow Control'), [{ type: 'vless', transport: 'tcp', security: 'tls' },
-        { type: 'vless', transport: 'tcp', security: 'reality' }]);
+    const flowOption = field(form.ListValue, 'flow', _('VLESS Flow Control'), [{ type: 'vless', transport: '', security: 'tls' },
+        { type: 'vless', transport: '', security: 'reality' }]);
     flowOption.value('', _('None'));
     flowOption.value('xtls-rprx-vision', 'xtls-rprx-vision');
 

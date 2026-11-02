@@ -1,3 +1,4 @@
+import { vlessSecurity } from "../utils/feature/proxy/security";
 import { Backend } from "../utils/backend";
 import view from "view";
 import uci from "uci";
@@ -475,14 +476,14 @@ function createTransportTypeOption(s: LuCI.form.AbstractSection) {
     // 而非 uci.get（那只能读到上次保存的旧值）
     transportOpt.validate = function (sectionId: string, value: string) {
         const core = this.section.formvalue(sectionId, 'core');
-        const realityEnabled = this.section.formvalue(sectionId, 'tls_reality_enabled');
+        const security = this.section.formvalue(sectionId, 'security');
         if (value === 'xhttp' && core !== CORE_TYPE.XRAY) {
             return _('XHTTP transport is only supported by Xray core');
         }
         if (value === 'http' && core !== CORE_TYPE.SING_BOX) {
             return _('HTTP transport is only supported by sing-box core');
         }
-        if (core === CORE_TYPE.XRAY && realityEnabled === '1' && (value === 'ws' || value === 'httpupgrade')) {
+        if (core === CORE_TYPE.XRAY && security === 'reality' && (value === 'ws' || value === 'httpupgrade')) {
             return _('Xray REALITY only supports RAW, XHTTP and gRPC transports');
         }
         return true;
@@ -597,36 +598,54 @@ function createCommonTlsOptions(s: LuCI.form.AbstractSection) {
     let serverNameOpt = s.option(form.Value, 'tls_server_name', _('TLS Server Name'),
         _('TLS Server Name'));
     serverNameOpt.modalonly = true;
-    serverNameOpt.rmempty = false;
+    serverNameOpt.rmempty = true;
+    serverNameOpt.validate = function (id: string, value: string) {
+        return value || this.section.formvalue(id, 'type') === PROXY_TYPE.VLESS
+            ? true : _('Expecting a non-empty value');
+    };
     ProxyFormUtils.forProtocols(serverNameOpt, [PROXY_TYPE.HYSTERIA2, PROXY_TYPE.TUIC,
-    PROXY_TYPE.SHADOWTLS, PROXY_TYPE.VLESS]);
+    PROXY_TYPE.SHADOWTLS]);
+    for (const security of ['tls', 'reality']) {
+        ProxyFormUtils.forProtocols(serverNameOpt, [PROXY_TYPE.VLESS], { security });
+    }
 
     let insecureOpt = s.option(form.Flag, 'tls_insecure', _('Ignore Certificate Verification'),
         _('Accept Any Certificate'));
     insecureOpt.modalonly = true;
     insecureOpt.depends({ config_type: PROXY_CONFIG_TYPE.GENERATED,  type: PROXY_TYPE.HYSTERIA2, core: CORE_TYPE.SING_BOX });
-    insecureOpt.depends({ config_type: PROXY_CONFIG_TYPE.GENERATED,  type: PROXY_TYPE.VLESS, core: CORE_TYPE.SING_BOX });
+    insecureOpt.depends({ config_type: PROXY_CONFIG_TYPE.GENERATED,  type: PROXY_TYPE.VLESS, core: CORE_TYPE.SING_BOX, security: 'tls' });
     ProxyFormUtils.forProtocols(insecureOpt, [PROXY_TYPE.TUIC, PROXY_TYPE.SHADOWTLS]);
 }
 
 /**
- * 创建TLS Reality配置选项（用于支持Reality的协议：VLESS等）
+ * VLESS 安全方式使用互斥选项；读取旧配置时保留原来的 TLS 行为。
  */
-function createTlsRealityOptions(s: LuCI.form.AbstractSection) {
-    let realityEnabledOpt = s.option(form.Flag, 'tls_reality_enabled', _('Enable TLS Reality'),
-        _('Enable TLS Reality Obfuscation'));
-    realityEnabledOpt.modalonly = true;
-    ProxyFormUtils.forProtocols(realityEnabledOpt, [PROXY_TYPE.VLESS]);
+function createVlessSecurityOption(s: LuCI.form.AbstractSection) {
+    const option = s.option(form.ListValue, 'security', _('Transport Security'));
+    option.value('none', _('None'));
+    option.value('tls', 'TLS');
+    option.value('reality', 'REALITY');
+    option.modalonly = true;
+    option.rmempty = false;
+    option.forcewrite = true;
+    ProxyFormUtils.forProtocols(option, [PROXY_TYPE.VLESS]);
+    option.load = (id: string) => vlessSecurity(uci.get(LuciFlied.CONF_NAME, id) || {});
+    option.write = (id: string, value: string) => {
+        uci.set(LuciFlied.CONF_NAME, id, 'security', value);
+        uci.unset(LuciFlied.CONF_NAME, id, 'tls_reality_enabled');
+    };
+}
 
+function createTlsRealityOptions(s: LuCI.form.AbstractSection) {
     let publicKeyOpt = s.option(form.Value, 'tls_reality_public_key', _('Reality Public Key'),
         _('Server Reality Public Key'));
     publicKeyOpt.modalonly = true;
-    ProxyFormUtils.forProtocols(publicKeyOpt, [PROXY_TYPE.VLESS], { tls_reality_enabled: '1' });
+    ProxyFormUtils.forProtocols(publicKeyOpt, [PROXY_TYPE.VLESS], { security: 'reality' });
 
     let shortIdOpt = s.option(form.Value, 'tls_reality_short_id', _('Reality Short ID'),
         _('Server Reality Short ID'));
     shortIdOpt.modalonly = true;
-    ProxyFormUtils.forProtocols(shortIdOpt, [PROXY_TYPE.VLESS], { tls_reality_enabled: '1' });
+    ProxyFormUtils.forProtocols(shortIdOpt, [PROXY_TYPE.VLESS], { security: 'reality' });
 }
 
 /**
@@ -895,6 +914,7 @@ function createProxyOptions(s: LuCI.form.AbstractSection, instances: any) {
     createPasswordOption(s);
 
     // 通用TLS配置（供所有支持TLS的协议使用）
+    createVlessSecurityOption(s);
     createCommonTlsOptions(s);
 
     createNetworkOption(s);

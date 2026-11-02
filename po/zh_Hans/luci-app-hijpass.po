@@ -2596,3 +2596,6 @@ msgstr "XHTTP 路径必须以 / 开头"
 
 msgid "Invalid HTTP method"
 msgstr "HTTP 方法无效"
+
+msgid "Default (TCP)"
+msgstr "默认（TCP）"

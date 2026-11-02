@@ -1,5 +1,7 @@
 import { CORE_PROTOCOLS, CORE_TYPE, CoreType, PROXY_TYPE, ProxyType, PROXY_CONFIG_TYPE } from "../../../enum/hijpass";
 
+import { vlessSecurity } from "./security";
+
 type ProxyFieldValue = string | string[];
 
 export interface ImportedProxyConfig {
@@ -364,7 +366,8 @@ function parseVless(uri: ParsedUri, core: CoreType): ImportedProxyConfig {
     }
 
     const transport = queryValue(uri.query, 'type');
-    const security = queryValue(uri.query, 'security');
+    const security = queryValue(uri.query, 'security') || 'none';
+    if (!['none', 'tls', 'reality'].includes(security)) throw new Error(_('Invalid VLESS share link'));
     if (transport === 'xhttp' && core !== CORE_TYPE.XRAY) {
         throw new Error(_('XHTTP transport is only supported by Xray core'));
     }
@@ -382,7 +385,7 @@ function parseVless(uri: ParsedUri, core: CoreType): ImportedProxyConfig {
         packet_encoding: queryValue(uri.query, 'packetEncoding', 'packet_encoding'),
         tls_server_name: queryValue(uri.query, 'sni', 'servername'),
         tls_insecure: isTruthy(queryValue(uri.query, 'allowInsecure', 'allow_insecure', 'insecure')) ? '1' : '0',
-        tls_reality_enabled: security === 'reality' ? '1' : '0',
+        security,
         tls_reality_public_key: queryValue(uri.query, 'pbk', 'publicKey', 'public_key'),
         tls_reality_short_id: queryValue(uri.query, 'sid', 'shortId', 'short_id'),
         multiplex_enabled: '0',
@@ -431,19 +434,17 @@ function generateVless(section: any): string {
     }
 
     const transport = String(section.transport_type || 'tcp');
-    const security = section.tls_reality_enabled === '1'
-        ? 'reality'
-        : (section.tls_server_name || section.tls_insecure === '1' ? 'tls' : 'none');
+    const security = vlessSecurity(section);
     const params: Record<string, string | undefined> = {
         encryption: 'none',
         security,
-        sni: section.tls_server_name,
-        allowInsecure: section.tls_insecure === '1' ? '1' : undefined,
+        sni: security !== 'none' ? section.tls_server_name : undefined,
+        allowInsecure: security === 'tls' && section.tls_insecure === '1' ? '1' : undefined,
         flow: section.flow,
         type: transport === '' ? 'tcp' : transport,
         packetEncoding: section.packet_encoding,
-        pbk: section.tls_reality_enabled === '1' ? section.tls_reality_public_key : undefined,
-        sid: section.tls_reality_enabled === '1' ? section.tls_reality_short_id : undefined,
+        pbk: security === 'reality' ? section.tls_reality_public_key : undefined,
+        sid: security === 'reality' ? section.tls_reality_short_id : undefined,
     };
 
     if (transport === 'ws') {

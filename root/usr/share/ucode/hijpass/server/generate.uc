@@ -56,6 +56,7 @@ export function options(section) {
             transport: ['text', 'tcp'], security: ['text', 'tls'] }) };
         if (!match(node.uuid, /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
             die('invalid VLESS UUID');
+        node.transport ||= 'tcp';
         if (index(['tcp', 'ws', 'grpc', 'xhttp'], node.transport) < 0) die('unsupported VLESS transport');
         if (node.transport == 'xhttp' && node.core != 'xray') die('XHTTP transport is only supported by Xray core');
         if (index(['none', 'tls', 'reality'], node.security) < 0) die('unsupported VLESS security');

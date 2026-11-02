@@ -82,6 +82,12 @@ export function decodeProxy(section) {
 	if (!custom && node.type != TYPE.balance && (!node.server || !node.server_port)) {
 		die('invalid server or server_port');
 	}
+	if (node.type == TYPE.vless) {
+		// 旧 sing-box 默认启用 TLS；旧 Xray 仅在填写 SNI 时启用 TLS。
+		node.security ||= node.tls_reality_enabled ? 'reality'
+			: (engine == CORE.singbox || node.tls_server_name ? 'tls' : 'none');
+		if (index(['none', 'tls', 'reality'], node.security) < 0) die('unsupported VLESS security');
+	}
 	if (node.type == TYPE.vless && engine == CORE.xray && node.transport_type == 'grpc'
 		&& (duration(node.transport_grpc_idle_timeout) > 2147483647 || duration(node.transport_grpc_ping_timeout) > 2147483647)) {
 		die('gRPC timeout exceeds 32-bit range');

@@ -115,7 +115,7 @@ export const HijpassValues = {
     ] as const,
     // HTTP 用于 sing-box，XHTTP 用于 Xray；表单按所选核心校验。
     V2RAY_TRANSPORT_TYPES: [
-        {label: 'None', value: ''},
+        {label: 'Default (TCP)', value: ''},
         {label: 'HTTP', value: 'http'},
         {label: 'WebSocket', value: 'ws'},
         {label: 'gRPC', value: 'grpc'},

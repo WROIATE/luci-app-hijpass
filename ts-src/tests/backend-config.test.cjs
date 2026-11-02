@@ -175,7 +175,8 @@ test('LuCI uses the same default core and ignores protocol dependencies on custo
 
 test('share-link imports declare generated configuration and do not normalize legacy core values', () => {
     const enums = loadTS('enum/hijpass.ts', {});
-    const { ProxyShareLinkUtils } = loadTS('utils/feature/proxy/share-link.ts', { '../../../enum/hijpass': enums });
+    const { ProxyShareLinkUtils } = loadTS('utils/feature/proxy/share-link.ts', { '../../../enum/hijpass': enums,
+        './security': loadTS('utils/feature/proxy/security.ts', { '../../../enum/hijpass': enums }) });
     const uri = 'vless://11111111-1111-4111-8111-111111111111@example.org:443?security=tls';
     const imported = ProxyShareLinkUtils.parse(uri, 'sing-box');
     assert.equal(imported.values.config_type, 'generated');

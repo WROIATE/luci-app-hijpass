@@ -130,3 +130,11 @@ test('XHTTP rejects unsupported core, invalid options and Vision instead of gene
         assert.match(process.stderr, message);
     }
 });
+
+test('VLESS omitted or empty transport uses TCP for both cores', () => {
+    for (const core of ['sing-box', 'xray']) {
+        const generate = transport => result('server-render', { section: node('vless', core, { transport }) });
+        assert.deepEqual(generate(''), generate('tcp'));
+        assert.deepEqual(generate(undefined), generate('tcp'));
+    }
+});

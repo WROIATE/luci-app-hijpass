@@ -223,3 +223,22 @@ test('输入读取与 JSON 解析失败保留 RPC/CLI 错误格式，并限制�
     assert.equal(closed.status, 0, closed.stderr);
     assert.match(JSON.parse(closed.stdout).error, /cannot read input/);
 });
+
+test('VLESS 显式安全选项覆盖旧字段，TLS 可省略 SNI，旧节点保持原行为', () => {
+    for (const core of ['sing-box', 'xray']) {
+        const base = node('a', { core, type: 'vless', uuid: '11111111-1111-4111-8111-111111111111' });
+        const outbound = extra => rpc('render', [{ ...base, ...extra }]).nodes.a.outbounds[0];
+        const mode = out => core === 'xray' ? out.streamSettings.security : out.tls?.reality ? 'reality' : out.tls ? 'tls' : 'none';
+        assert.equal(mode(outbound({})), core === 'xray' ? 'none' : 'tls');
+        assert.equal(mode(outbound({ tls_server_name: 'example.org' })), 'tls');
+        const none = outbound({ security: 'none', tls_server_name: 'stale.example', tls_reality_enabled: '1' });
+        assert.equal(mode(none), 'none');
+        const tls = outbound({ security: 'tls', tls_reality_enabled: '1' });
+        assert.equal(mode(tls), 'tls');
+        assert.equal(core === 'xray' ? tls.streamSettings.tlsSettings.serverName : tls.tls.server_name, 'example.org');
+        for (const security of [undefined, 'reality']) {
+            assert.equal(mode(outbound({ security, tls_reality_enabled: '1', tls_reality_public_key: 'test-key' })), 'reality');
+        }
+        assert.match(rpc('render', [{ ...base, security: 'invalid' }]).error, /unsupported VLESS security/);
+    }
+});

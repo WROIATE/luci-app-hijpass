@@ -17,8 +17,8 @@ export function build(n) {
 	if (n.packet_encoding) {
 		out.packet_encoding = n.packet_encoding;
 	}
-	out.tls = tls(n);
-	if (n.tls_reality_enabled) {
+	if (n.security != 'none') out.tls = tls(n);
+	if (n.security == 'reality') {
 		if (!n.tls_reality_public_key) {
 			die('reality public key is required');
 		}

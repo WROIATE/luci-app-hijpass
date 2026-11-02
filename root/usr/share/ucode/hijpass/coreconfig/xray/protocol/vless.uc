@@ -11,16 +11,16 @@ import { apply } from './transport.uc';
  */
 export function build(n) {
 	let stream = { network: 'raw', security: 'none' };
-	if (n.tls_reality_enabled) {
+	if (n.security == 'reality') {
 		stream.security = 'reality';
 		stream.realitySettings = {
 			fingerprint: 'chrome', serverName: n.tls_server_name || n.server,
 			password: n.tls_reality_public_key, shortId: n.tls_reality_short_id,
 		};
 	}
-	else if (n.tls_server_name) {
+	else if (n.security == 'tls') {
 		stream.security = 'tls';
-		stream.tlsSettings = { serverName: n.tls_server_name, alpn: ['h2', 'http/1.1'] };
+		stream.tlsSettings = { serverName: n.tls_server_name || n.server, alpn: ['h2', 'http/1.1'] };
 	}
 	apply(stream, n);
 	return {

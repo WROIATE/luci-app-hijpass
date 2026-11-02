@@ -2605,3 +2605,186 @@ msgstr "HTTP Host 无效"
 
 msgid "HTTP path must start with / and contain no whitespace"
 msgstr "HTTP 路径必须以 / 开头且不能包含空白字符"
+
+msgid "Executed as root. Use {conf_path} for this node configuration file path."
+msgstr "以 root 权限执行；用 {conf_path} 引用此节点的配置文件路径。"
+
+msgid "Configuration passed to the run command; enter the complete file contents."
+msgstr "填写运行命令使用的完整配置文件内容。"
+
+msgid "Remote server IP or domain name, without a URL scheme or port."
+msgstr "远端服务器 IP 或域名，不包含 URL 协议头和端口。"
+
+msgid "Remote listening port; use the public port when port forwarding is configured."
+msgstr "远端监听端口；配置了端口转发时填写公网入口端口。"
+
+msgid "User UUID configured on the server; copy it exactly."
+msgstr "填写服务端配置的用户 UUID，必须完全一致。"
+
+msgid "Must match the server password or key for the selected protocol."
+msgstr "须与服务端所选协议的密码或密钥一致。"
+
+msgid "Leave empty for TCP. HTTP requires sing-box; XHTTP requires Xray. Match the peer transport."
+msgstr "留空使用 TCP；HTTP 仅支持 sing-box，XHTTP 仅支持 Xray。两端传输方式须对应。"
+
+msgid "HTTP Host sent to the server; if the server checks Host, use an accepted value."
+msgstr "发送给服务端的 HTTP Host；服务端启用了 Host 校验时须填写允许的值。"
+
+msgid "Start with /, for example /proxy; match the path configured on the peer."
+msgstr "以 / 开头，例如 /proxy；须与对端配置的路径对应。"
+
+msgid "HTTP request method, for example PUT; match any method restriction on the server."
+msgstr "HTTP 请求方法，例如 PUT；须符合服务端配置的方法限制。"
+
+msgid "Duration such as 15s or 1m; HTTP/2 sends a health-check PING after this idle period."
+msgstr "填写 15s、1m 等时长；HTTP/2 在此空闲时长后发送 PING 检测连接。"
+
+msgid "Duration to wait for an HTTP/2 PING reply, for example 15s."
+msgstr "等待 HTTP/2 PING 响应的时长，例如 15s。"
+
+msgid "Host header sent with the WebSocket handshake; use the value required by the reverse proxy."
+msgstr "WebSocket 握手发送的 Host 请求头；填写反向代理要求的值。"
+
+msgid "Maximum early-data size in bytes; use the same setting on the server."
+msgstr "提前发送数据的最大字节数；须与服务端设置对应。"
+
+msgid "Match the server; use Sec-WebSocket-Protocol for compatibility with Xray."
+msgstr "须与服务端一致；与 Xray 互通时使用 Sec-WebSocket-Protocol。"
+
+msgid "gRPC service name; must match the server exactly."
+msgstr "gRPC 服务名称，须与服务端完全一致。"
+
+msgid "HTTPUpgrade Host; must match the server value when Host verification is enabled."
+msgstr "HTTPUpgrade 的 Host；服务端启用了 Host 校验时须与其一致。"
+
+msgid "HTTP Host used for XHTTP; match the reverse proxy and any server Host restriction."
+msgstr "XHTTP 使用的 HTTP Host；须符合反向代理和服务端的 Host 限制。"
+
+msgid "Prefer auto. packet-up sends separate upload requests; stream-up and stream-one use streaming."
+msgstr "通常选 auto；packet-up 分包上传，stream-up 和 stream-one 使用流式传输。"
+
+msgid "Optional XHTTP upload method, for example PUT; match the server setting."
+msgstr "可选的 XHTTP 上传方法，例如 PUT；须与服务端设置对应。"
+
+msgid "TLS server name (SNI). For VLESS, empty uses the server address; REALITY must use an allowed server name."
+msgstr "TLS 服务器名称（SNI）。VLESS 留空时使用服务器地址；REALITY 须填写服务端允许的名称。"
+
+msgid "Skip server certificate verification; normally leave disabled."
+msgstr "跳过服务端证书校验，通常保持关闭。"
+
+msgid "None adds no transport encryption; TLS verifies a certificate; REALITY uses the server public key."
+msgstr "“无”不增加传输加密；TLS 校验证书；REALITY 使用服务端公钥。"
+
+msgid "Public key paired with the REALITY private key on the server."
+msgstr "填写与服务端 REALITY 私钥配对的公钥。"
+
+msgid "Use the same short ID on both ends: an even number of hexadecimal digits, up to 16; empty is allowed."
+msgstr "两端填写相同的 Short ID：偶数位十六进制字符，最多 16 位，也可留空。"
+
+msgid "Use Vision only with TCP and TLS or REALITY; match the server flow. Leave empty otherwise."
+msgstr "仅在 TCP 搭配 TLS 或 REALITY 时使用 Vision，且须与服务端一致；其他情况留空。"
+
+msgid "One NAME=value entry per line, passed to this node process."
+msgstr "每项填写 NAME=value，作为此节点进程的环境变量。"
+
+msgid "Upload bandwidth in Mbps; use the available uplink capacity."
+msgstr "上传带宽，单位 Mbps；按实际可用上行带宽填写。"
+
+msgid "Download bandwidth in Mbps; use the available downlink capacity."
+msgstr "下载带宽，单位 Mbps；按实际可用下行带宽填写。"
+
+msgid "Salamander password; must match the server."
+msgstr "Salamander 混淆密码，须与服务端一致。"
+
+msgid "Generated uses these form fields; Custom uses your configuration file and run command."
+msgstr "自动生成使用表单字段；自定义使用您填写的配置文件和运行命令。"
+
+msgid "Select the protocol offered by the remote server."
+msgstr "选择远端服务器提供的代理协议。"
+
+msgid "Local transparent-proxy inbound port used by firewall rules; keep it unique."
+msgstr "防火墙规则使用的本机透明代理入口端口，不可与其他监听端口重复。"
+
+msgid "Local SOCKS inbound port for clients and proxy chaining; keep it unique."
+msgstr "供客户端或代理链使用的本机 SOCKS 入口端口，不可与其他监听端口重复。"
+
+msgid "Core used to run this server node; the protocol must be supported by the installed core."
+msgstr "运行此服务端节点的核心，所选协议须由已安装的核心支持。"
+
+msgid "Protocol offered to clients; configure the same protocol on each client."
+msgstr "向客户端提供的代理协议，客户端须选择相同协议。"
+
+msgid "Port listened on by this server; clients connect to this port or its forwarded public port."
+msgstr "此服务端监听的端口；客户端连接此端口或其映射后的公网端口。"
+
+msgid "Allow inbound access through the firewall to this node listening port."
+msgstr "允许外部连接通过防火墙访问此节点的监听端口。"
+
+msgid "Unique node name used to identify its configuration and logs."
+msgstr "节点名称须唯一，用于识别配置文件和日志。"
+
+msgid "Local bind address, for example 0.0.0.0, :: or 127.0.0.1; loopback only accepts local connections."
+msgstr "本机绑定地址，例如 0.0.0.0、:: 或 127.0.0.1；回环地址仅接受本机连接。"
+
+msgid "Set the password or key that clients must use."
+msgstr "设置客户端连接时必须使用的密码或密钥。"
+
+msgid "User UUID accepted by this server; copy the same UUID to clients."
+msgstr "此服务端接受的用户 UUID；客户端须填写相同值。"
+
+msgid "Accepted HTTP Host values; leave empty to skip Host verification."
+msgstr "允许的 HTTP Host 列表；留空不校验 Host。"
+
+msgid "Only accept this HTTP method, for example PUT; leave empty to skip method verification."
+msgstr "仅接受此 HTTP 方法，例如 PUT；留空不校验方法。"
+
+msgid "HTTP/2 server idle timeout, for example 30s or 1m; empty uses the core default."
+msgstr "HTTP/2 服务端空闲超时，例如 30s、1m；留空使用核心默认值。"
+
+msgid "Required HTTPUpgrade Host; leave empty to skip Host verification."
+msgstr "要求客户端使用的 HTTPUpgrade Host；留空不校验 Host。"
+
+msgid "gRPC service name; clients must use the same value."
+msgstr "gRPC 服务名称，客户端须填写相同值。"
+
+msgid "Required XHTTP Host; leave empty to skip Host verification."
+msgstr "要求客户端使用的 XHTTP Host；留空不校验 Host。"
+
+msgid "auto accepts all supported modes; a specific mode restricts clients to that mode."
+msgstr "auto 接受所有支持的模式；指定模式时客户端须使用该模式。"
+
+msgid "Optional upload method restriction, for example PUT; match the client setting."
+msgstr "可选的上传方法限制，例如 PUT；须与客户端设置对应。"
+
+msgid "TLS requires certificate files; REALITY requires a private key and handshake target; None adds no transport encryption."
+msgstr "TLS 需要证书文件；REALITY 需要私钥及握手目标；“无”不增加传输加密。"
+
+msgid "Vision requires TCP with TLS or REALITY; clients must use the matching flow."
+msgstr "Vision 需要 TCP 搭配 TLS 或 REALITY；客户端须使用对应的 Flow。"
+
+msgid "TLS certificate domain; for REALITY, an allowed client SNI covered by the handshake target certificate."
+msgstr "TLS 证书域名；REALITY 下为允许客户端使用的 SNI，须包含在握手目标证书中。"
+
+msgid "Absolute path to the PEM certificate on this router, including intermediate certificates when needed."
+msgstr "此路由器上 PEM 证书文件的绝对路径，需要时包含中间证书链。"
+
+msgid "Absolute path to the PEM private key paired with the certificate."
+msgstr "与证书配对的 PEM 私钥文件绝对路径。"
+
+msgid "TLS handshake target hostname or IP, without a scheme or port."
+msgstr "TLS 握手目标的域名或 IP，不包含协议头和端口。"
+
+msgid "TLS port of the handshake target, usually 443."
+msgstr "握手目标的 TLS 端口，通常为 443。"
+
+msgid "REALITY X25519 private key; give clients its paired public key."
+msgstr "REALITY 的 X25519 私钥；客户端使用其配对公钥。"
+
+msgid "Set a Salamander password to enable obfuscation; clients must use the same password."
+msgstr "填写密码以启用 Salamander 混淆，客户端须使用相同密码。"
+
+msgid "Minimum severity recorded by the core; debug includes more connection details."
+msgstr "核心记录日志的最低级别；debug 包含更多连接详情。"
+
+msgid "Bandwidth in Mbps, from the server perspective; empty or 0 uses the core default."
+msgstr "带宽单位 Mbps，方向以服务端为准；留空或 0 使用核心默认值。"

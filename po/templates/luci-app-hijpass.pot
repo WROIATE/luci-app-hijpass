@@ -3362,3 +3362,186 @@ msgstr ""
 
 msgid "HTTP path must start with / and contain no whitespace"
 msgstr ""
+
+msgid "Executed as root. Use {conf_path} for this node configuration file path."
+msgstr ""
+
+msgid "Configuration passed to the run command; enter the complete file contents."
+msgstr ""
+
+msgid "Remote server IP or domain name, without a URL scheme or port."
+msgstr ""
+
+msgid "Remote listening port; use the public port when port forwarding is configured."
+msgstr ""
+
+msgid "User UUID configured on the server; copy it exactly."
+msgstr ""
+
+msgid "Must match the server password or key for the selected protocol."
+msgstr ""
+
+msgid "Leave empty for TCP. HTTP requires sing-box; XHTTP requires Xray. Match the peer transport."
+msgstr ""
+
+msgid "HTTP Host sent to the server; if the server checks Host, use an accepted value."
+msgstr ""
+
+msgid "Start with /, for example /proxy; match the path configured on the peer."
+msgstr ""
+
+msgid "HTTP request method, for example PUT; match any method restriction on the server."
+msgstr ""
+
+msgid "Duration such as 15s or 1m; HTTP/2 sends a health-check PING after this idle period."
+msgstr ""
+
+msgid "Duration to wait for an HTTP/2 PING reply, for example 15s."
+msgstr ""
+
+msgid "Host header sent with the WebSocket handshake; use the value required by the reverse proxy."
+msgstr ""
+
+msgid "Maximum early-data size in bytes; use the same setting on the server."
+msgstr ""
+
+msgid "Match the server; use Sec-WebSocket-Protocol for compatibility with Xray."
+msgstr ""
+
+msgid "gRPC service name; must match the server exactly."
+msgstr ""
+
+msgid "HTTPUpgrade Host; must match the server value when Host verification is enabled."
+msgstr ""
+
+msgid "HTTP Host used for XHTTP; match the reverse proxy and any server Host restriction."
+msgstr ""
+
+msgid "Prefer auto. packet-up sends separate upload requests; stream-up and stream-one use streaming."
+msgstr ""
+
+msgid "Optional XHTTP upload method, for example PUT; match the server setting."
+msgstr ""
+
+msgid "TLS server name (SNI). For VLESS, empty uses the server address; REALITY must use an allowed server name."
+msgstr ""
+
+msgid "Skip server certificate verification; normally leave disabled."
+msgstr ""
+
+msgid "None adds no transport encryption; TLS verifies a certificate; REALITY uses the server public key."
+msgstr ""
+
+msgid "Public key paired with the REALITY private key on the server."
+msgstr ""
+
+msgid "Use the same short ID on both ends: an even number of hexadecimal digits, up to 16; empty is allowed."
+msgstr ""
+
+msgid "Use Vision only with TCP and TLS or REALITY; match the server flow. Leave empty otherwise."
+msgstr ""
+
+msgid "One NAME=value entry per line, passed to this node process."
+msgstr ""
+
+msgid "Upload bandwidth in Mbps; use the available uplink capacity."
+msgstr ""
+
+msgid "Download bandwidth in Mbps; use the available downlink capacity."
+msgstr ""
+
+msgid "Salamander password; must match the server."
+msgstr ""
+
+msgid "Generated uses these form fields; Custom uses your configuration file and run command."
+msgstr ""
+
+msgid "Select the protocol offered by the remote server."
+msgstr ""
+
+msgid "Local transparent-proxy inbound port used by firewall rules; keep it unique."
+msgstr ""
+
+msgid "Local SOCKS inbound port for clients and proxy chaining; keep it unique."
+msgstr ""
+
+msgid "Core used to run this server node; the protocol must be supported by the installed core."
+msgstr ""
+
+msgid "Protocol offered to clients; configure the same protocol on each client."
+msgstr ""
+
+msgid "Port listened on by this server; clients connect to this port or its forwarded public port."
+msgstr ""
+
+msgid "Allow inbound access through the firewall to this node listening port."
+msgstr ""
+
+msgid "Unique node name used to identify its configuration and logs."
+msgstr ""
+
+msgid "Local bind address, for example 0.0.0.0, :: or 127.0.0.1; loopback only accepts local connections."
+msgstr ""
+
+msgid "Set the password or key that clients must use."
+msgstr ""
+
+msgid "User UUID accepted by this server; copy the same UUID to clients."
+msgstr ""
+
+msgid "Accepted HTTP Host values; leave empty to skip Host verification."
+msgstr ""
+
+msgid "Only accept this HTTP method, for example PUT; leave empty to skip method verification."
+msgstr ""
+
+msgid "HTTP/2 server idle timeout, for example 30s or 1m; empty uses the core default."
+msgstr ""
+
+msgid "Required HTTPUpgrade Host; leave empty to skip Host verification."
+msgstr ""
+
+msgid "gRPC service name; clients must use the same value."
+msgstr ""
+
+msgid "Required XHTTP Host; leave empty to skip Host verification."
+msgstr ""
+
+msgid "auto accepts all supported modes; a specific mode restricts clients to that mode."
+msgstr ""
+
+msgid "Optional upload method restriction, for example PUT; match the client setting."
+msgstr ""
+
+msgid "TLS requires certificate files; REALITY requires a private key and handshake target; None adds no transport encryption."
+msgstr ""
+
+msgid "Vision requires TCP with TLS or REALITY; clients must use the matching flow."
+msgstr ""
+
+msgid "TLS certificate domain; for REALITY, an allowed client SNI covered by the handshake target certificate."
+msgstr ""
+
+msgid "Absolute path to the PEM certificate on this router, including intermediate certificates when needed."
+msgstr ""
+
+msgid "Absolute path to the PEM private key paired with the certificate."
+msgstr ""
+
+msgid "TLS handshake target hostname or IP, without a scheme or port."
+msgstr ""
+
+msgid "TLS port of the handshake target, usually 443."
+msgstr ""
+
+msgid "REALITY X25519 private key; give clients its paired public key."
+msgstr ""
+
+msgid "Set a Salamander password to enable obfuscation; clients must use the same password."
+msgstr ""
+
+msgid "Minimum severity recorded by the core; debug includes more connection details."
+msgstr ""
+
+msgid "Bandwidth in Mbps, from the server perspective; empty or 0 uses the core default."
+msgstr ""

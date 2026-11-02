@@ -444,7 +444,8 @@ const ProxyFormUtils = {
     },
 
     createCoreAndTypeOptions: function (s: LuCI.form.AbstractSection): void {
-        const configTypeOpt = s.option(form.ListValue, 'config_type', _('Configuration Type'));
+        const configTypeOpt = s.option(form.ListValue, 'config_type', _('Configuration Type'),
+        _("Generated uses these form fields; Custom uses your configuration file and run command."));
         configTypeOpt.modalonly = true;
         configTypeOpt.default = PROXY_CONFIG_TYPE.GENERATED;
         configTypeOpt.rmempty = false;
@@ -460,7 +461,7 @@ const ProxyFormUtils = {
         HijpassValues.DUAL_CORES.forEach(c => coreOpt.value(c.value, _(c.label)));
 
         let typeOpt = s.option(form.ListValue, 'type', _('Proxy Type'),
-            _('Select Proxy Type'));
+        _("Select the protocol offered by the remote server."));
         typeOpt.modalonly = true;
         typeOpt.default = PROXY_TYPE.SHADOWSOCKS;
         typeOpt.rmempty = false;
@@ -544,7 +545,7 @@ const ProxyFormUtils = {
         let socksInp: HTMLInputElement | null = null;
 
         let listenPortOpt = s.option(form.Value, 'listen_port', _('Local Listen Port'),
-            _('Local Transparent Proxy Listen Port'));
+        _("Local transparent-proxy inbound port used by firewall rules; keep it unique."));
         listenPortOpt.datatype = 'port';
         listenPortOpt.rmempty = false;
         listenPortOpt.modalonly = true;
@@ -588,7 +589,7 @@ const ProxyFormUtils = {
         };
 
         let socksPortOpt = s.option(form.Value, 'socks_port', _('Local SOCKS Port'),
-            _('Local SOCKS Listen Port'));
+        _("Local SOCKS inbound port for clients and proxy chaining; keep it unique."));
         socksPortOpt.datatype = 'port';
         socksPortOpt.rmempty = false;
         socksPortOpt.modalonly = true;

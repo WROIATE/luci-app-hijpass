@@ -91,6 +91,12 @@ const v = view.extend({
             E('style', {}, `.cbi-value[data-name="custom_conf"] > .cbi-value-title,
                 .cbi-value[data-name="custom_conf"] > .cbi-value-field {
                     display:block; float:none; width:100%; min-width:0; margin-left:0; text-align:left;
+                }
+                .cbi-value[data-name="custom_conf"] > .cbi-value-field {
+                    box-sizing:border-box; max-width:56rem;
+                }
+                .cbi-value[data-name="custom_conf"] .cm-editor {
+                    height:26rem; min-height:min(16rem, 60vh); max-height:60vh;
                 }`),
             await m.render(),
         ]);

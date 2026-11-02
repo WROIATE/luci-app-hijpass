@@ -57,6 +57,12 @@ export default view.extend({
 
 function createOptions(section: LuCI.form.AbstractSection, instances: any) {
     // 每个 UCI 字段只有一个表单选项，列表显示和弹窗编辑共用，避免值被重复解析覆盖。
+    const coreOption = section.option(form.ListValue, 'core', _('Core'));
+    coreOption.value('sing-box', 'sing-box');
+    coreOption.value('xray', 'Xray');
+    coreOption.default = 'sing-box';
+    coreOption.rmempty = false;
+
     const typeOption = section.option(form.ListValue, 'type', _('Protocol'));
     typeOption.value('', _('Select protocol'));
     for (const [value, label] of Object.entries(protocols)) typeOption.value(value, label);
@@ -67,12 +73,6 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
             for (const key of ['legacy_custom', 'command', 'custom_conf_hash', 'procd_env']) uci.unset(configName, id, key);
         }
     };
-
-    const coreOption = section.option(form.ListValue, 'core', _('Core'));
-    coreOption.value('sing-box', 'sing-box');
-    coreOption.value('xray', 'Xray');
-    coreOption.default = 'sing-box';
-    coreOption.rmempty = false;
 
     const listenPortOption = section.option(form.Value, 'listen_port', _('Listen Port'));
     listenPortOption.datatype = 'port';

@@ -2599,3 +2599,9 @@ msgstr "HTTP 方法无效"
 
 msgid "Default (TCP)"
 msgstr "默认（TCP）"
+
+msgid "Invalid HTTP Host"
+msgstr "HTTP Host 无效"
+
+msgid "HTTP path must start with / and contain no whitespace"
+msgstr "HTTP 路径必须以 / 开头且不能包含空白字符"

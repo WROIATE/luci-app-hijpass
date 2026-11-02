@@ -44,6 +44,12 @@
  * @typedef {ServerOptionsBase & ServerTLS & {
  *   uuid: string,
  *   flow: string,
+ *   http_host?: string[],
+ *   http_path?: string,
+ *   http_method?: string,
+ *   http_idle_timeout?: string,
+ *   httpupgrade_host?: string,
+ *   httpupgrade_path?: string,
  *   ws_path?: string,
  *   grpc_service_name?: string,
  *   xhttp_host?: string,

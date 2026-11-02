@@ -20,6 +20,13 @@ export function build(node) {
     }
     else {
         inbound.users = [{ name: node.name, uuid: node.uuid, flow: node.flow }];
+        if (node.transport == 'http') {
+            inbound.transport = { type: 'http', host: node.http_host, path: node.http_path };
+            if (node.http_method) inbound.transport.method = node.http_method;
+            if (node.http_idle_timeout) inbound.transport.idle_timeout = node.http_idle_timeout;
+        }
+        if (node.transport == 'httpupgrade')
+            inbound.transport = { type: 'httpupgrade', host: node.httpupgrade_host, path: node.httpupgrade_path };
         if (node.transport == 'ws') inbound.transport = { type: 'ws', path: node.ws_path };
         if (node.transport == 'grpc') inbound.transport = { type: 'grpc', service_name: node.grpc_service_name };
     }

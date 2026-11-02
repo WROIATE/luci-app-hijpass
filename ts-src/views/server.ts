@@ -3,7 +3,7 @@ import form from "form";
 import uci from "uci";
 import ui from "ui";
 import { Backend } from "../utils/backend";
-import { LuciFlied } from "../enum/hijpass";
+import { HijpassValues, LuciFlied } from "../enum/hijpass";
 import { ServiceUtils } from "../utils/base/luci/service";
 import { FormUtils } from "../utils/base/luci/form";
 import { ValidationUtils } from "../utils/base/luci/validation";
@@ -138,7 +138,7 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
     uuidOption.datatype = 'uuid';
 
     const transportOption = field(form.ListValue, 'transport', _('Transport Protocol'), [{ type: 'vless' }]);
-    for (const [value, label] of [['', _('Default (TCP)')], ['ws', 'WebSocket'], ['grpc', 'gRPC'], ['xhttp', 'XHTTP']]) transportOption.value(value, label);
+    for (const { value, label } of HijpassValues.V2RAY_TRANSPORT_TYPES) transportOption.value(value, _(label));
     transportOption.default = '';
     transportOption.load = (id: string) => {
         const value = uci.get(configName, id, 'transport');
@@ -148,6 +148,7 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
         value ||= 'tcp';
         const core = this.section.formvalue(id, 'core');
         const security = this.section.formvalue(id, 'security');
+        if (value === 'http' && core !== 'sing-box') return _('HTTP transport is only supported by sing-box core');
         if (value === 'xhttp' && core !== 'xray') return _('XHTTP transport is only supported by Xray core');
         if (security === 'reality') {
             if (core === 'sing-box' && value !== 'tcp') return _('sing-box REALITY requires TCP');
@@ -156,6 +157,24 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
         }
         return true;
     };
+    const http = [{ type: 'vless', core: 'sing-box', transport: 'http' }];
+    const httpHosts = field(form.DynamicList, 'http_host', _('HTTP Host'), http);
+    httpHosts.validate = (_id: string, value: string) => !value || !/\s/.test(value) || _('Invalid HTTP Host');
+    const httpMethod = field(form.Value, 'http_method', _('HTTP Method'), http);
+    httpMethod.validate = (_id: string, value: string) => !value || /^[A-Z]+$/.test(value) || _('Invalid HTTP method');
+    field(form.Value, 'http_idle_timeout', _('Idle Timeout'), http);
+    const httpupgrade = [{ type: 'vless', transport: 'httpupgrade' }];
+    const upgradeHost = field(form.Value, 'httpupgrade_host', _('HTTPUpgrade Host'), httpupgrade);
+    upgradeHost.validate = (_id: string, value: string) => !value || !/\s/.test(value) || _('Invalid HTTP Host');
+    for (const [key, label, dependencies] of [
+        ['http_path', _('HTTP Path'), http], ['httpupgrade_path', _('HTTPUpgrade Path'), httpupgrade],
+    ] as const) {
+        const path = field(form.Value, key, label, dependencies);
+        path.default = '/';
+        path.rmempty = false;
+        path.validate = (_id: string, value: string) => value.startsWith('/') && !/\s/.test(value)
+            || _('HTTP path must start with / and contain no whitespace');
+    }
     const wsPathOption = field(form.Value, 'ws_path', _('WebSocket Path'), [{ type: 'vless', transport: 'ws' }]);
     wsPathOption.default = '/';
     wsPathOption.rmempty = false;

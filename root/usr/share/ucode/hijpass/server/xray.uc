@@ -23,6 +23,8 @@ export function build(node) {
         }
         else {
             inbound.settings = { clients: [{ id: node.uuid, flow: node.flow }], decryption: 'none' };
+            if (node.transport == 'httpupgrade')
+                stream.httpupgradeSettings = { host: node.httpupgrade_host, path: node.httpupgrade_path };
             if (node.transport == 'ws') stream.wsSettings = { path: node.ws_path };
             if (node.transport == 'grpc') stream.grpcSettings = { serviceName: node.grpc_service_name };
             if (node.transport == 'xhttp') {

@@ -3356,3 +3356,9 @@ msgstr ""
 
 msgid "Default (TCP)"
 msgstr ""
+
+msgid "Invalid HTTP Host"
+msgstr ""
+
+msgid "HTTP path must start with / and contain no whitespace"
+msgstr ""

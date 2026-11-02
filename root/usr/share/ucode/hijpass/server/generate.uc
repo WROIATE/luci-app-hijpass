@@ -57,7 +57,8 @@ export function options(section) {
         if (!match(node.uuid, /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/))
             die('invalid VLESS UUID');
         node.transport ||= 'tcp';
-        if (index(['tcp', 'ws', 'grpc', 'xhttp'], node.transport) < 0) die('unsupported VLESS transport');
+        if (index(['tcp', 'http', 'ws', 'grpc', 'httpupgrade', 'xhttp'], node.transport) < 0) die('unsupported VLESS transport');
+        if (node.transport == 'http' && node.core != 'sing-box') die('HTTP transport is only supported by sing-box core');
         if (node.transport == 'xhttp' && node.core != 'xray') die('XHTTP transport is only supported by Xray core');
         if (index(['none', 'tls', 'reality'], node.security) < 0) die('unsupported VLESS security');
         if (node.flow != '' && node.flow != 'xtls-rprx-vision') die('unsupported VLESS flow');
@@ -75,6 +76,22 @@ export function options(section) {
             if (index(['auto', 'packet-up', 'stream-up', 'stream-one'], node.xhttp_mode) < 0) die('invalid XHTTP mode');
             if (match(node.xhttp_host, /[\r\n]/)) die('invalid XHTTP Host');
             if (node.xhttp_method && !match(node.xhttp_method, /^[A-Z]+$/)) die('invalid HTTP method');
+        }
+        if (node.transport == 'http') {
+            node = { ...node, ...decode(section, { http_host: ['list', []], http_path: ['text', '/'],
+                http_method: ['text', ''], http_idle_timeout: ['duration', ''] }) };
+            for (let host in node.http_host) {
+                if (type(host) != 'string' || !host || match(host, /[[:space:]]/)) die('invalid HTTP Host');
+            }
+            if (node.http_method && !match(node.http_method, /^[A-Z]+$/)) die('invalid HTTP method');
+        }
+        if (node.transport == 'httpupgrade') {
+            node = { ...node, ...decode(section, { httpupgrade_host: ['text', ''], httpupgrade_path: ['text', '/'] }) };
+            if (match(node.httpupgrade_host, /[[:space:]]/)) die('invalid HTTPUpgrade Host');
+        }
+        if (node.transport == 'http' || node.transport == 'httpupgrade') {
+            let path = node[`${node.transport}_path`];
+            if (substr(path, 0, 1) != '/' || match(path, /[[:space:]]/)) die('HTTP path must start with / and contain no whitespace');
         }
         if (node.transport == 'ws') {
             node.ws_path = decode(section, { ws_path: ['text', '/'] }).ws_path;

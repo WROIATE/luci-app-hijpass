@@ -138,3 +138,63 @@ test('VLESS omitted or empty transport uses TCP for both cores', () => {
         assert.deepEqual(generate(undefined), generate('tcp'));
     }
 });
+
+test('sing-box HTTP server preserves host lists, path, method and server idle timeout', () => {
+    for (const security of ['none', 'tls']) {
+        const section = node('vless', 'sing-box', { transport: 'http', security,
+            http_host: ['one.example', 'two.example'], http_path: '/proxy', http_method: 'PUT', http_idle_timeout: '1m30s' });
+        const inbound = result('server-render', { section }).inbounds[0];
+        assert.deepEqual(inbound.transport, { type: 'http', host: ['one.example', 'two.example'],
+            path: '/proxy', method: 'PUT', idle_timeout: '1m30s' });
+        assert.equal(!!inbound.tls, security === 'tls');
+        assert.deepEqual(result('server-plan', { sections: [global, section] }).ports, { tcp: [16443], udp: [] });
+    }
+    const defaults = result('server-render', { section: node('vless', 'sing-box', { transport: 'http' }) });
+    assert.deepEqual(defaults.inbounds[0].transport, { type: 'http', host: [], path: '/' });
+    const single = result('server-render', { section: node('vless', 'sing-box', { transport: 'http', http_host: 'one.example' }) });
+    assert.deepEqual(single.inbounds[0].transport.host, ['one.example']);
+});
+
+test('HTTPUpgrade server supports both cores with optional Host verification and TLS', () => {
+    for (const core of ['sing-box', 'xray']) for (const security of ['none', 'tls']) {
+        const section = node('vless', core, { transport: 'httpupgrade', security,
+            httpupgrade_host: 'server.example', httpupgrade_path: '/upgrade' });
+        const inbound = result('server-render', { section }).inbounds[0];
+        if (core === 'xray') {
+            assert.equal(inbound.streamSettings.network, 'httpupgrade');
+            assert.equal(inbound.streamSettings.security, security);
+            assert.deepEqual(inbound.streamSettings.httpupgradeSettings, { host: 'server.example', path: '/upgrade' });
+        } else {
+            assert.equal(!!inbound.tls, security === 'tls');
+            assert.deepEqual(inbound.transport, { type: 'httpupgrade', host: 'server.example', path: '/upgrade' });
+        }
+        assert.deepEqual(result('server-plan', { sections: [global, section] }).ports, { tcp: [16443], udp: [] });
+        const defaults = result('server-render', { section: node('vless', core, { transport: 'httpupgrade' }) }).inbounds[0];
+        const transport = core === 'xray' ? defaults.streamSettings.httpupgradeSettings : defaults.transport;
+        assert.equal(transport.path, '/');
+        assert.equal(transport.host, '');
+    }
+});
+
+test('HTTP transports reject unsupported cores, REALITY, Vision and malformed matching fields', () => {
+    const cases = [
+        ['xray', { transport: 'http' }, /only supported by sing-box/],
+        ['sing-box', { transport: 'http', security: 'reality' }, /REALITY requires TCP/],
+        ['sing-box', { transport: 'httpupgrade', security: 'reality' }, /REALITY requires TCP/],
+        ['xray', { transport: 'httpupgrade', security: 'reality' }, /REALITY only supports/],
+        ['sing-box', { transport: 'http', flow: 'xtls-rprx-vision' }, /Vision requires TCP/],
+        ['xray', { transport: 'httpupgrade', flow: 'xtls-rprx-vision' }, /Vision requires TCP/],
+        ['sing-box', { transport: 'http', http_path: 'proxy' }, /HTTP path/],
+        ['xray', { transport: 'httpupgrade', httpupgrade_path: '/bad\r\npath' }, /HTTP path/],
+        ['sing-box', { transport: 'http', http_host: ['valid.example', 123] }, /invalid HTTP Host/],
+        ['sing-box', { transport: 'http', http_host: 'bad\nHost' }, /invalid HTTP Host/],
+        ['xray', { transport: 'httpupgrade', httpupgrade_host: 'bad host' }, /invalid HTTPUpgrade Host/],
+        ['sing-box', { transport: 'http', http_method: 'bad method' }, /invalid HTTP method/],
+        ['sing-box', { transport: 'http', http_idle_timeout: '-1s' }, /invalid duration/],
+    ];
+    for (const [core, overrides, message] of cases) {
+        const process = invoke('server-render', { section: node('vless', core, overrides) });
+        assert.notEqual(process.status, 0);
+        assert.match(process.stderr, message);
+    }
+});

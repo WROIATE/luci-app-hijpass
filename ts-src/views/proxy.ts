@@ -87,7 +87,13 @@ const v = view.extend({
         const instances = data[1] ?? {};
         createProxyOptions(s, instances);
 
-        return m.render();
+        return E('div', {}, [
+            E('style', {}, `.cbi-value[data-name="custom_conf"] > .cbi-value-title,
+                .cbi-value[data-name="custom_conf"] > .cbi-value-field {
+                    display:block; float:none; width:100%; min-width:0; margin-left:0; text-align:left;
+                }`),
+            await m.render(),
+        ]);
     },
 });
 

@@ -98,6 +98,8 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
         return E('span', {style: 'color:' + (running ? 'green' : 'red')}, running ? _('Running') : _('Not Running'));
     };
 
+    createFirewallEnabledOption(s);
+
     o = createEnabledOption(s);
     o.editable = true;
     o.modalonly = false;
@@ -171,7 +173,6 @@ function createProxyOptions(s: LuCI.form.AbstractSection, instances: any) {
     createCommandOption(s);
     createConfContentOption(s);
     createListenPortOption(s);
-    createFirewallEnabledOption(s);
     createProcdEnvOption(s);
     createLogRedirectOption(s);
 }

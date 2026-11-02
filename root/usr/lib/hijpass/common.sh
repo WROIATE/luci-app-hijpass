@@ -14,24 +14,24 @@ hijpass_run_ucode() {
 }
 hijpass_json_error() { hijpass_run_ucode "$HIJPASS_LIB/result.uc" error "$1"; }
 
-# 调用点显式传入 $LINENO；子进程中的日志 CLI 无法恢复 Shell 调用位置。
+# 业务消息直接描述操作，DEBUG 模式附加当前脚本路径。
 hijpass_log() (
-    level=$1 module=$2 source="$HIJPASS_LOG_SOURCE${3:+:$3}"
-    shift 3
+    level=$1
+    shift
     if [ -n "${config_directory:-}" ]; then
-        hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" source "$level" "$source" "[$module] $*" --configdir "$config_directory"
+        hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" source "$level" "$HIJPASS_LOG_SOURCE" "$*" --configdir "$config_directory"
     else
-        hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" source "$level" "$source" "[$module] $*"
+        hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" source "$level" "$HIJPASS_LOG_SOURCE" "$*"
     fi >/dev/null 2>&1 || logger -t hijpass -p daemon.err 'Application logging failed' >/dev/null 2>&1
     exit 0
 )
 
 # 只在实际命令边界处理 stderr，保持业务 stdout 和原始退出状态。
 hijpass_run_logged() {
-    local module="$1" phase="$2" line="$3" source="$HIJPASS_LOG_SOURCE${3:+:$3}" output code
-    shift 3
+    local phase="$1" output code
+    shift
     output=$(mktemp /tmp/hijpass-step.XXXXXX) || {
-        hijpass_log WARN "$module" "$line" "$phase: cannot capture diagnostic output"
+        hijpass_log WARN "$phase: cannot capture diagnostic output"
         "$@" 9>&-
         return $?
     }
@@ -39,9 +39,9 @@ hijpass_run_logged() {
     "$@" 9>&- 2>"$output"
     code=$?
     if [ -n "${config_directory:-}" ]; then
-        hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" command "$module" "$source" "$code" "$phase" "$output" --configdir "$config_directory"
+        hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" command "$HIJPASS_LOG_SOURCE" "$code" "$phase" "$output" --configdir "$config_directory"
     else
-        hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" command "$module" "$source" "$code" "$phase" "$output"
+        hijpass_run_ucode "$HIJPASS_LIB/maintenance/logscli.uc" command "$HIJPASS_LOG_SOURCE" "$code" "$phase" "$output"
     fi >/dev/null 2>&1 || logger -t hijpass -p daemon.err 'Command logging failed' >/dev/null 2>&1
     [ "$code" -eq 0 ] || printf '%s failed; see main log\n' "$phase" >&2
     rm -f "$output"

@@ -186,16 +186,16 @@ export function writeConfigs(files) {
  */
 export function generateAndWriteConfigs(sections) {
 	let log = logger(sections), started = time();
-	log('INFO', '[config] Generating proxy configurations');
+	log('INFO', 'Generating proxy configurations');
 	try {
 		let generated = generate(sections), files = prepareConfigFiles(sections, generated);
 		writeConfigs(files);
-		for (let file in files) log('DEBUG', `[config] Written ${file.path}`);
-		log('INFO', `[config] Wrote ${length(files)} proxy core JSON configuration files in ${time() - started}s`);
+		for (let file in files) log('DEBUG', `Written ${file.path}`);
+		log('INFO', `Wrote ${length(files)} proxy core JSON configuration files in ${time() - started}s`);
 		return generated;
 	}
 	catch (e) {
-		log('ERROR', `[config] Generation or write failed: ${e.message}`);
+		log('ERROR', `Proxy configuration generation or write failed: ${e.message}`);
 		die(e.message);
 	}
 };
@@ -308,7 +308,7 @@ export function main() { run(ARGV,
     if (action == 'prepare') {
         if (server) {
             let result = serverPlan(config);
-            logger([])('INFO', `[server] Prepared ${length(result.instances)} process instance(s)`);
+            logger([])('INFO', `Prepared ${length(result.instances)} hijserver process instance(s)`);
             return result;
         }
         let result = plan(config);
@@ -318,7 +318,7 @@ export function main() { run(ARGV,
                 push(result.instances, dns);
             }
         }
-        logger(config)('INFO', `[service] Prepared ${length(result.instances)} process instance(s)`);
+        logger(config)('INFO', `Prepared ${length(result.instances)} hijpass process instance(s)`);
         return result;
     }
     if (action == 'server-files') {

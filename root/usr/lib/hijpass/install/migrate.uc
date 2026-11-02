@@ -35,7 +35,7 @@ function markLegacyFirewallTemplate(ctx, global) {
         // 不把旧格式文件当作可用的新模板覆盖软件包提供的默认模板。
         ctx.delete('hijpass', global['.name'], 'firewall_template');
         warn(`Legacy firewall template ${source} requires manual migration; see the Firewall page.\n`);
-        logger([])('WARN', '[migration] Legacy firewall template requires manual migration; see the Firewall page');
+        logger([])('WARN', 'Legacy firewall template requires manual migration; see the Firewall page');
     }
 }
 
@@ -393,7 +393,7 @@ try {
     if (version == VERSION) {
         exit(0);
     }
-    log('INFO', `[migration] Schema migration started: ${version} -> ${VERSION}`);
+    log('INFO', `Schema migration started: ${version} -> ${VERSION}`);
     if (index(['0', '1', '2', '3'], version) < 0) {
         die(`unsupported schema_version "${version}"`);
     }
@@ -419,6 +419,6 @@ try {
     if (!ctx.commit('hijpass')) {
         die(`cannot commit hijpass migration: ${ctx.error()}`);
     }
-    log('INFO', `[migration] Schema migration completed: version=${VERSION}, elapsed=${time() - started}s`);
+    log('INFO', `Schema migration completed: version=${VERSION}, elapsed=${time() - started}s`);
 }
-catch (e) { log('ERROR', `[migration] Migration failed: ${e.message}`); warn(e.message + '\n'); exit(1); }
+catch (e) { log('ERROR', `Migration failed: ${e.message}`); warn(e.message + '\n'); exit(1); }

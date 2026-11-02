@@ -12,25 +12,25 @@ NFT_CHAIN='/usr/share/nftables.d/chain-pre/input_wan/hijserver.nft'
 
 start_service() {
     local plan kind instance keys id name log
-    hijpass_log INFO server "${LINENO:-}" 'Starting hijserver...'
-    plan="$(hijpass_run_logged server 'Prepare configurations' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server)" || exit 1
+    hijpass_log INFO 'Starting hijserver...'
+    plan="$(hijpass_run_logged 'Prepare hijserver configurations' "$HIJPASS_LIB/service/prepare.sh" server)" || exit 1
     # 使用独立 JSON 命名空间，避免覆盖 rc.common 正在组装的 procd 消息。
     json_set_namespace hijserver_plan
-    json_load "$plan" || { hijpass_log ERROR server "${LINENO:-}" 'Invalid service plan: malformed JSON'; exit 1; }
+    json_load "$plan" || { hijpass_log ERROR 'Invalid hijserver service plan: malformed JSON'; exit 1; }
     json_get_type kind instances
-    [ "$kind" = array ] || { hijpass_log ERROR server "${LINENO:-}" 'Invalid service plan: instances must be an array'; exit 1; }
+    [ "$kind" = array ] || { hijpass_log ERROR 'Invalid hijserver service plan: instances must be an array'; exit 1; }
     json_select instances
     json_get_keys keys
     instances=
     cron_log=0
     for instance in $keys; do
         json_select "$instance" || {
-            hijpass_log ERROR server "${LINENO:-}" "Invalid instance entry: index=$instance"
+            hijpass_log ERROR "Invalid hijserver instance entry: index=$instance"
             continue
         }
         json_get_vars id name log
         [ -z "$log" ] || cron_log=1
-        if hijpass_run_logged server "Prepare instance $id ($name)" "${LINENO:-}" hijpass_add_instance; then
+        if hijpass_run_logged "Prepare hijserver instance $id ($name)" hijpass_add_instance; then
             instances="$instances $instance"
         fi
         json_select ..
@@ -41,30 +41,30 @@ service_started() {
     # procd 已收到实例描述；按顺序设置辅助功能，不轮询进程状态。
     [ -n "$instances" ] || return 0
     # 规则写入失败不 reload；其他独立阶段仍继续执行。
-    if hijpass_run_logged server 'Write firewall rules' "${LINENO:-}" "$HIJPASS_LIB/service/prepare.sh" server server-files "$NFT_TABLE" "$NFT_CHAIN"; then
-        hijpass_log INFO server "${LINENO:-}" 'Reloading firewall after updating hijserver rules'
-        hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload
+    if hijpass_run_logged 'Write hijserver firewall rules' "$HIJPASS_LIB/service/prepare.sh" server server-files "$NFT_TABLE" "$NFT_CHAIN"; then
+        hijpass_log INFO 'Reloading firewall after updating hijserver rules'
+        hijpass_run_logged 'Reload firewall for hijserver' fw4 reload
     fi
     update_cron enable
 }
 
 stop_service() {
-    hijpass_log INFO server "${LINENO:-}" 'Stopping hijserver...'
+    hijpass_log INFO 'Stopping hijserver...'
     # 文件删除失败不 reload，但仍清理 cron 并交回框架停实例。
-    if hijpass_run_logged server 'Remove firewall rules' "${LINENO:-}" rm -f "$NFT_TABLE" "$NFT_CHAIN"; then
-        hijpass_log INFO server "${LINENO:-}" 'Reloading firewall after removing hijserver rules'
-        hijpass_run_logged server 'Firewall reload' "${LINENO:-}" fw4 reload
+    if hijpass_run_logged 'Remove hijserver firewall rules' rm -f "$NFT_TABLE" "$NFT_CHAIN"; then
+        hijpass_log INFO 'Reloading firewall after removing hijserver rules'
+        hijpass_run_logged 'Reload firewall for hijserver' fw4 reload
     fi
     update_cron disable
 }
 
 update_cron() {
     local logs=0
-    hijpass_log INFO server "${LINENO:-}" "Updating cron entries ($1)"
+    hijpass_log INFO "Updating hijserver cron entries ($1)"
     [ "$1" != enable ] || logs=${cron_log:-0}
-    hijpass_run_logged server 'Write cron entries' "${LINENO:-}" hijpass_run_ucode "$HIJPASS_LIB/service/cron.uc" hijserver '' "$logs" || return 1
-    hijpass_log INFO server "${LINENO:-}" 'Reloading cron'
-    hijpass_run_logged server 'Cron reload' "${LINENO:-}" /etc/init.d/cron restart
+    hijpass_run_logged 'Write hijserver cron entries' hijpass_run_ucode "$HIJPASS_LIB/service/cron.uc" hijserver '' "$logs" || return 1
+    hijpass_log INFO 'Reloading cron for hijserver'
+    hijpass_run_logged 'Reload cron for hijserver' /etc/init.d/cron restart
 }
 
 reload_service() {
@@ -77,6 +77,6 @@ service_triggers() {
 }
 
 boot() {
-    hijpass_run_logged server 'Startup delay' "${LINENO:-}" sleep 10 || return $?
+    hijpass_run_logged 'Wait for hijserver startup delay' sleep 10 || return $?
     start
 }

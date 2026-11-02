@@ -8,11 +8,11 @@ action=$1
 shift
 case "$action" in
     reset)
-        hijpass_run_logged firewall 'Generate rules' "${LINENO:-}" hijpass_run_ucode "$HIJPASS_LIB/firewall/generatecli.uc" "$rules" "$@" || exit $?
-        hijpass_log INFO firewall "${LINENO:-}" 'Reloading firewall after updating hijpass client rules' ;;
+        hijpass_run_logged 'Generate hijpass firewall rules' hijpass_run_ucode "$HIJPASS_LIB/firewall/generatecli.uc" "$rules" "$@" || exit $?
+        hijpass_log INFO 'Reloading firewall after updating hijpass client rules' ;;
     remove)
-        hijpass_run_logged firewall 'Remove rules' "${LINENO:-}" rm -f "$rules" || exit $?
-        hijpass_log INFO firewall "${LINENO:-}" 'Reloading firewall after removing hijpass client rules' ;;
+        hijpass_run_logged 'Remove hijpass firewall rules' rm -f "$rules" || exit $?
+        hijpass_log INFO 'Reloading firewall after removing hijpass client rules' ;;
     *) echo "unknown firewall action: $action" >&2; exit 1 ;;
 esac
-hijpass_run_logged firewall 'Reload rules' "${LINENO:-}" fw4 reload
+hijpass_run_logged 'Reload firewall for hijpass' fw4 reload

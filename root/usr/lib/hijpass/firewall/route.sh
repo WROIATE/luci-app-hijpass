@@ -15,7 +15,7 @@ case "$action" in
     reset|remove) ;;
     *) echo "unknown route action: $action" >&2; exit 1 ;;
 esac
-hijpass_log DEBUG route "${LINENO:-}" "$action: table=$table, mark=$mark"
+hijpass_log DEBUG "Policy route $action: table=$table, mark=$mark"
 
 for family in -4 -6; do
     # 清除重复启动留下的同一标记规则；只匹配本应用的 mark 和 table。
@@ -27,8 +27,8 @@ for family in -4 -6; do
 
     if [ "$action" = reset ]; then
         # 本地路由是策略规则的前提；设置失败即结束本次路由操作。
-        hijpass_run_logged route "Add $family local route" "${LINENO:-}" ip "$family" route add local default dev lo table "$table" || exit $?
-        hijpass_run_logged route "Add $family policy rule" "${LINENO:-}" ip "$family" rule add fwmark "$mark" table "$table" || exit $?
+        hijpass_run_logged "Add $family local route" ip "$family" route add local default dev lo table "$table" || exit $?
+        hijpass_run_logged "Add $family policy rule" ip "$family" rule add fwmark "$mark" table "$table" || exit $?
     fi
 done
-hijpass_log INFO route "${LINENO:-}" "Policy routes $action completed for IPv4 and IPv6"
+hijpass_log INFO "Policy routes $action completed for IPv4 and IPv6"

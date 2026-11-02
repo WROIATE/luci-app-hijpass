@@ -21,7 +21,7 @@ recover_job() {
     if [ "$pid" -eq 0 ] || ! kill -0 "$pid" 2>/dev/null; then
         # 存活检查期间 worker 可能刚写入结果并退出，不能覆盖它的真实结果。
         [ ! -f "$directory/exit" ] || return 0
-        hijpass_log ERROR job "${LINENO:-}" "$(cat "$directory/kind" 2>/dev/null): worker exited without a result"
+        hijpass_log ERROR "$(cat "$directory/kind" 2>/dev/null): worker exited without a result"
         printf 'job exited without a result\n' >>"$directory/stderr"
         printf '1\n' >"$directory/exit.tmp"
         mv "$directory/exit.tmp" "$directory/exit"
@@ -43,7 +43,7 @@ execute_job() {
     local kind="$1" directory="$2" code started
     shift 2
     started=$(date +%s)
-    hijpass_log DEBUG job "${LINENO:-}" "$kind started"
+    hijpass_log DEBUG "$kind task started"
     case "$kind" in
         rules) "$HIJPASS_LIB/rules/update-files.sh" "$@" ;;
         restart) /etc/init.d/hijpass restart ;;
@@ -52,9 +52,9 @@ execute_job() {
     esac >"$directory/stdout" 2>"$directory/stderr"
     code=$?
     if [ "$code" -ne 0 ] && [ ! -s "$directory/stdout" ] && [ "$kind" != restart ]; then
-        hijpass_log ERROR job "${LINENO:-}" "$kind exited without a business result; exit=$code"
+        hijpass_log ERROR "$kind task exited without a business result; exit=$code"
     fi
-    hijpass_log DEBUG job "${LINENO:-}" "$kind finished: exit=$code, elapsed=$(($(date +%s) - started))s"
+    hijpass_log DEBUG "$kind task finished: exit=$code, elapsed=$(($(date +%s) - started))s"
     printf '%s\n' "$code" >"$directory/exit.tmp"
     mv "$directory/exit.tmp" "$directory/exit"
     return "$code"

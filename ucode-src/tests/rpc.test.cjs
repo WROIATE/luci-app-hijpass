@@ -273,7 +273,7 @@ download() {
     echo 'Warning: optional hook unavailable: https://user:private@example.org/path?token=private' >&2
     printf '{"success":true,"version":"test"}\\n'
 }
-hijpass_run_logged core 'Download' "$LINENO" download
+hijpass_run_logged 'Download' download
 `, { mode: 0o755 });
     const start = f.invoke('core_update', { core: 'xray' });
     assert.match(start.id, /^[A-Za-z0-9]{8}$/);
@@ -291,7 +291,7 @@ hijpass_run_logged core 'Download' "$LINENO" download
     assert.equal(f.invoke('job_release', { id: start.id }).ok, true);
     assert.equal(f.invoke('job_status', { id: start.id }).code, 0);
     const log = fs.readFileSync(path.join(f.directory, 'hijpass.log'), 'utf8');
-    assert.match(log, /WARN\s+\[core\]\s+Download: Warning:/);
+    assert.match(log, /WARN\s+Download: Warning:/);
     assert.match(log, /optional hook unavailable/);
     assert.doesNotMatch(log, /\[job\]|task=|diagnostic output/);
     assert.doesNotMatch(log, /private|https:\/\//);

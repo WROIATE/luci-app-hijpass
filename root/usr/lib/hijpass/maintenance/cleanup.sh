@@ -12,10 +12,10 @@ for path in "$directory"/*-"$id".json; do
     [ "$path" != "$keep" ] || continue
     [ ! -d "$path" ] || continue
     if [ -e "$path" ] || [ -L "$path" ]; then
-        rm -f -- "$path" || { hijpass_log ERROR cleanup "${LINENO:-}" "Cannot remove obsolete configuration: section=$id"; exit 1; }
+        rm -f -- "$path" || { hijpass_log ERROR "Cannot remove obsolete configuration: section=$id"; exit 1; }
         removed=$((removed + 1))
     fi
 done
 level=DEBUG
 [ "$removed" -eq 0 ] || level=INFO
-hijpass_log "$level" cleanup "${LINENO:-}" "Obsolete configurations removed: section=$id, files=$removed"
+hijpass_log "$level" "Obsolete configurations removed: section=$id, files=$removed"

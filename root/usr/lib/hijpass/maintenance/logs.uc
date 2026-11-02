@@ -59,7 +59,7 @@ export function logger(sections) {
 		let location = '';
 		if (debug) {
 			source = source || callerLocation();
-			// 原脚本为来源预留 40 列；加入行号后预留 64 列，并保留分隔空格。
+			// 为完整脚本路径保留固定宽度，并与正文保持间隔。
 			location = sprintf('%-64s  ', source || '');
 		}
 		let file;
@@ -71,15 +71,8 @@ export function logger(sections) {
 			if (!date) die('cannot format log timestamp');
 			let stamp = sprintf('%04d-%02d-%02d %02d:%02d:%02d', date.year, date.mon, date.mday, date.hour, date.min, date.sec);
 			let prefix = sprintf('[%s]   %-8s%s', stamp, level, location);
-			let module = match(message, /^(\[[A-Za-z][A-Za-z0-9_-]*\])[ \t]+/);
-			let body = message;
-			if (module) {
-				// 模块标签单独占列，正文与续行保持对齐；较长标签保留完整内容。
-				prefix += sprintf('%-12s  ', module[1]);
-				body = substr(message, length(module[0]));
-			}
 			let indent = replace(prefix, /./g, ' ');
-			let entry = prefix + replace(body, '\n', '\n' + indent) + '\n';
+			let entry = prefix + replace(message, '\n', '\n' + indent) + '\n';
 			if (file.write(entry) != length(entry) || !file.flush()) die('cannot write log');
 			file.close();
 		}
@@ -111,14 +104,13 @@ export function configuredLogger(configDirectory) {
 /**
  * 在执行边界逐条规范化命令诊断；成功时的普通输出只写 DEBUG，保留警告和失败详情。
  * @param {function} log
- * @param {string} module
  * @param {string} source
  * @param {string} phase
  * @param {string} output
  * @param {integer} code
  * @returns {null}
  */
-function logCommandOutput(log, module, source, phase, output, code) {
+function logCommandOutput(log, source, phase, output, code) {
 	for (let line in split(output, '\n')) {
 		if (!trim(line)) continue;
 		let prefix = match(line, /^[ \t]*\[([IWE])\][ \t]*(.*)$/);
@@ -128,10 +120,10 @@ function logCommandOutput(log, module, source, phase, output, code) {
 			line = prefix[2];
 		}
 		else if (match(line, /^[ \t]*(warn|warning)[ :]/i)) level = 'WARN';
-		log(level, `[${module}] ${!prefix || level == 'ERROR' ? phase + ': ' : ''}${line}`, source);
+		log(level, `${phase}: ${line}`, source);
 	}
-	if (code) log('ERROR', `[${module}] ${phase} failed: exit=${code}`, source);
-	else log('DEBUG', `[${module}] ${phase}: exit=0`, source);
+	if (code) log('ERROR', `${phase} failed: exit=${code}`, source);
+	else log('DEBUG', `${phase}: exit=0`, source);
 }
 /**
  * 裁剪过长日志，只保留最后 30000 行。
@@ -203,14 +195,14 @@ export function main() { run(ARGV,
         return configuredLogger(configDirectory)(args[0], join(' ', slice(args, 2)), args[1]);
     }
     if (action == 'command') {
-        let module = args[0] || '', source = args[1] || '', phase = args[3] || '', code = int(args[2]);
-        if (!module || !phase || type(code) != 'int' || code < 0 || code > 255) die('invalid command log arguments');
-        let file = fs.open(args[4], 'r');
+        let source = args[0] || '', phase = args[2] || '', code = int(args[1]);
+        if (!phase || type(code) != 'int' || code < 0 || code > 255) die('invalid command log arguments');
+        let file = fs.open(args[3], 'r');
         if (!file) die('cannot read command diagnostics');
         let output = file.read(8192) || '';
         if (file.read(1)) output += '\n[truncated]';
         file.close();
-        return logCommandOutput(configuredLogger(configDirectory), module, source, phase, output, code);
+        return logCommandOutput(configuredLogger(configDirectory), source, phase, output, code);
     }
     if (action == 'clean') {
         return cleanLogs([], 'clean', args[0] || '');

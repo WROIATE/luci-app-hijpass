@@ -136,7 +136,7 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.equal(f.run('start').status, 0);
         assert.deepEqual(f.events(), [...preparation, service + ':submit', ...setup]);
         const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
-        assert.equal((log.match(service === 'hijpass' ? /Starting service/g : /Starting hijserver/g) || []).length, 2);
+        assert.equal((log.match(service === 'hijpass' ? /Starting hijpass/g : /Starting hijserver/g) || []).length, 2);
         assert.doesNotMatch(log, /Service started|Service setup completed/);
     });
     test(`${service}: 准备失败不提交实例、不设置网络`, t => {
@@ -144,17 +144,16 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.notEqual(f.run('start', 'prepare').status, 0);
         assert.deepEqual(f.events(), [...preparation]);
     });
-    test(`${service}: rc.common 加载的日志使用 init 脚本路径并保留 Shell 行号`, t => {
+    test(`${service}: rc.common 加载的日志使用 init 脚本路径且无需显式行号`, t => {
         const f = fixture(t, service), init = f.directory + '/' + service;
         fs.appendFileSync(f.directory + '/config/hijpass', " option log_level 'DEBUG'\n");
         f.patch('testbin/ucode', 'exec ', `set -- "$@" --configdir '${f.directory}/config'\nexec `);
         assert.equal(f.run('start').status, 0);
         const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
-        for (const message of ['Starting ', 'Prepare configurations']) {
-            // 宿主 BusyBox 1.30 的函数 LINENO 是相对值；设备的 1.37 为文件行号。
-            assert.ok(log.split('\n').some(line => line.includes(`${init}:`) && /:\d+\s/.test(line) && line.includes(message)), log);
+        for (const message of ['Starting ', `Prepare ${service} configurations`]) {
+            assert.ok(log.split('\n').some(line => line.includes(`${init} `) && line.includes(message)), log);
         }
-        assert.doesNotMatch(log, /rc\.common:\d+/);
+        assert.doesNotMatch(log, /rc\.common|hijpass:\d+|hijserver:\d+|\[(service|server)\]/);
     });
     for (const failure of setup) {
         test(`${service}: ${failure} 失败记录日志后继续独立阶段，不停止实例`, t => {
@@ -175,7 +174,7 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.equal(f.run('stop').status, 0);
         assert.deepEqual(f.events(), [...cleanup, service + ':kill']);
         const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
-        assert.match(log, service === 'hijpass' ? /Stopping service/ : /Stopping hijserver/);
+        assert.match(log, service === 'hijpass' ? /Stopping hijpass/ : /Stopping hijserver/);
         assert.doesNotMatch(log, /Service resources removed|Service cleanup completed/);
         assert.equal(f.run('reload').status, 0);
         assert.deepEqual(f.events(), [...cleanup, service + ':kill', ...preparation, service + ':submit', ...setup]);
@@ -200,14 +199,14 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.equal(result.status, 0, result.stderr);
         assert.deepEqual(f.events(), [...cleanup.filter(event => event !== 'fw4:reload'), service + ':kill']);
         const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
-        assert.match(log, /Remove (firewall )?rules failed: exit=1/);
+        assert.match(log, new RegExp(`Remove ${service} firewall rules failed: exit=1`));
         assert.doesNotMatch(log, /Service cleanup completed with errors/);
     });
     test(`${service}: 启动延时失败记日志并终止本次启动`, t => {
         const f = fixture(t, service);
         assert.equal(f.run('boot', 'sleep').status, 1);
         assert.deepEqual(f.events(), service === 'hijpass' ? ['delay:1'] : ['delay:10']);
-        assert.match(fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8'), /Startup delay failed: exit=1/);
+        assert.match(fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8'), new RegExp(`Wait for ${service} startup delay failed: exit=1`));
     });
     if (service === 'hijpass') {
         for (const config of [null, "config hijpass\n option delay_time 'broken\n", "config hijpass\n option delay_time 'invalid'\n"])
@@ -277,9 +276,9 @@ for (const service of ['hijpass', 'hijserver']) {
         const instances = JSON.parse(fs.readFileSync(f.directory + '/submitted.json')).instances;
         assert.deepEqual(Object.keys(instances), ['node-test space', 'last-test space']);
         const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
-        assert.match(log, /Invalid instance entry: index=2/);
-        assert.match(log, /Prepare instance broken \(broken\): Invalid service instance: empty command/);
-        assert.match(log, /Prepare instance broken \(broken\) failed: exit=1/);
+        assert.match(log, /Invalid (?:hijpass|hijserver) instance entry: index=2/);
+        assert.match(log, /Prepare (?:hijpass|hijserver) instance broken \(broken\): Invalid service instance: empty command/);
+        assert.match(log, /Prepare (?:hijpass|hijserver) instance broken \(broken\) failed: exit=1/);
         assert.ok(!f.events().some(event => /:kill$/.test(event)));
     });
     test(`${service}: 全部实例无效仍提交空列表，不重新激活辅助功能`, t => {
@@ -309,8 +308,8 @@ if [ "$CHECK_FAIL" = 1 ]; then echo 'invalid core configuration' >&2; exit 7; fi
         assert.deepEqual(instances['node-test space'].command, [f.runtime + '/service/process.sh', '', ...valid.command]);
         assert.deepEqual(instances['node-test space'].env, valid.env);
         const log = fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8');
-        assert.match(log, /Prepare instance broken \(test space\): invalid core configuration/);
-        assert.match(log, /Prepare instance broken \(test space\) failed: exit=7/);
+        assert.match(log, /Prepare (?:hijpass|hijserver) instance broken \(test space\): invalid core configuration/);
+        assert.match(log, /Prepare (?:hijpass|hijserver) instance broken \(test space\) failed: exit=7/);
     });
 }
 

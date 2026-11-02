@@ -64,7 +64,6 @@ exec `);
         fs.writeFileSync(path.join(runtime, driver), `#!/bin/sh
 . ${quoted(path.join(runtime, 'init-' + service + '.sh'))}
 config_directory=${quoted(config)}
-hijpass_run_ucode() { ucode -S -- "$@" --configdir "$config_directory"; }
 instances=1
 cron_log=\${CRON_LOG:-0}
 uci() { command uci -c "$config_directory" "$@"; }
@@ -132,9 +131,9 @@ i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); don
         assert.deepEqual(JSON.parse(result.stdout), { success: true });
     });
     const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
-    assert.match(content, /WARN\s+\[rules\]\s+chn_domain_list: source 1 unavailable/);
+    assert.match(content, /WARN\s+chn_domain_list: source 1 unavailable/);
     assert.match(content, /sources=1\/2, bytes=12, entries=1/);
-    assert.match(content, /Update finished: installed=1, failed=0, elapsed=\d+s/);
+    assert.match(content, /Rule update finished: installed=1, failed=0, elapsed=\d+s/);
 });
 
 test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变激活结果', t => {
@@ -154,7 +153,7 @@ test('直接启动服务时成功 Hook 的 stderr 也保留为告警，不改变
         assert.equal(result.stderr, '');
     });
     const content = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
-    assert.match(content, /WARN\s+\[service\]\s+DNS Hook start: Warning:/);
+    assert.match(content, /WARN\s+DNS Hook start: Warning:/);
     assert.match(content, /optional DNS service unavailable/);
     assert.doesNotMatch(content, /Service started/);
 });
@@ -164,7 +163,7 @@ test('第三方普通输出只在 DEBUG 显示，告警和失败详情保留且�
     fs.writeFileSync(entry, `#!/bin/sh
 . '${f.runtime}/common.sh'
 config_directory=$1
-hijpass_run_logged test 'command phase' "$LINENO" '${f.directory}/diagnostic-command'
+hijpass_run_logged 'command phase' '${f.directory}/diagnostic-command'
 `);
     f.script('diagnostic-command', 'printf "%s\\n" "$TEST_DIAGNOSTIC" >&2\nexit "$TEST_STATUS"');
     const cases = [['[I] firewall feature enabled', '0', null, 'INFO'],
@@ -184,7 +183,7 @@ hijpass_run_logged test 'command phase' "$LINENO" '${f.directory}/diagnostic-com
             assert.equal(result.stderr, code === '0' ? '' : 'command phase failed; see main log\n');
         });
         const content = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '';
-        if (level) assert.match(content, new RegExp(`${level}.*\\[test\\]`));
+        if (level) assert.match(content, new RegExp(`${level}.*command phase:`));
         else assert.equal(content, '');
         assert.doesNotMatch(content, /\[I\]|\[W\]|\[E\]|diagnostic output/);
         if (code !== '0') assert.match(content, new RegExp(`ERROR.*command phase failed: exit=${code}`));
@@ -195,9 +194,9 @@ hijpass_run_logged test 'command phase' "$LINENO" '${f.directory}/diagnostic-com
     }
 });
 
-test('DEBUG 为所有级别附加真实 Shell 和 ucode 调用位置，普通模式只显示业务消息', t => {
+test('DEBUG 显示 Shell 脚本路径和自动获取的 ucode 调用位置，普通模式只显示正文', t => {
     const f = fixture(t), entry = path.join(f.runtime, 'debug-call.sh');
-    fs.writeFileSync(entry, `. '${f.runtime}/common.sh'\nconfig_directory=$1\nhijpass_log INFO test "$LINENO" 'shell location'\n`);
+    fs.writeFileSync(entry, `. '${f.runtime}/common.sh'\nconfig_directory=$1\nhijpass_log INFO 'shell location'\n`);
     withConfig([{ '.type': 'hijpass', log_level: 'DEBUG' }], config => {
         assert.equal(f.run('debug-call.sh', [config], {
             HIJPASS_TASK_ID: 'Test1234', HIJPASS_LOG_SOURCE: '/etc/init.d/parent',
@@ -207,21 +206,21 @@ test('DEBUG 为所有级别附加真实 Shell 和 ucode 调用位置，普通模
     fs.writeFileSync(native, `import { logger } from './maintenance/logs.uc';
 let log = logger([{ '.type': 'hijpass', log_level: 'DEBUG' }]);
 function business() {
-    log('WARN', '[test] ucode location');
+    log('WARN', 'ucode location');
 }
 business();\n`);
     assert.equal(f.data('debug-call.uc', []).status, 0);
     const log = path.join(f.directory, 'logs/hijpass.log');
     let content = fs.readFileSync(log, 'utf8');
-    assert.doesNotMatch(content, /task=|Test1234/);
-    assert.ok(content.includes(`${entry}:3`) && /:3\s+\[test\]\s+shell location/.test(content), content);
-    assert.ok(content.includes(`${native}:4`) && /:4\s+\[test\]\s+ucode location/.test(content), content);
+    assert.doesNotMatch(content, /task=|Test1234|debug-call\.sh:\d|\[test\]/);
+    assert.ok(content.includes(`${entry} `) && /debug-call\.sh\s+shell location/.test(content), content);
+    assert.ok(content.includes(`${native}:4`) && /:4\s+ucode location/.test(content), content);
     fs.writeFileSync(log, '');
     withConfig([{ '.type': 'hijpass', log_level: 'INFO' }], config => {
         assert.equal(f.run('debug-call.sh', [config], { HIJPASS_TASK_ID: 'Test1234' }).status, 0);
     });
     content = fs.readFileSync(log, 'utf8');
-    assert.match(content, /INFO\s+\[test\]\s+shell location/);
+    assert.match(content, /INFO\s+shell location/);
     assert.doesNotMatch(content, /debug-call|task=/);
 });
 
@@ -393,7 +392,7 @@ else echo reload >>"$TEST_CALLS"; fi`);
         const apply = (extra = {}) => f.init('hijpass', 'service_started', config, { TEST_CALLS: calls, ...extra });
         const unchanged = result => {
             assert.equal(result.status, 0, result.stderr);
-            assert.match(result.stderr, /Generate rules failed/);
+            assert.match(result.stderr, /Generate hijpass firewall rules failed/);
             assert.equal(fs.readFileSync(rules, 'utf8'), 'old rules');
             assert.equal(fs.existsSync(calls), false);
             assert.equal(fs.readdirSync(f.directory).some(name => name.startsWith('rules with spaces.nft.new-')), false);
@@ -459,7 +458,7 @@ echo "$stage" >>"$EVENTS"
     }
 });
 
-test('fw4 通过 sh -c source 加载时，日志保留 include 文件和调用行', t => {
+test('fw4 通过 sh -c source 加载时，日志保留 include 路径且不显示行号', t => {
     const f = fixture(t), entry = f.runtime + '/firewall/fw4.sh';
     f.patch('firewall/fw4.sh', '/etc/hijpass/fw4-rules.nft', f.directory + '/rules.nft');
     f.patch('firewall/fw4.sh', '/etc/hijpass/hook/nft-hook.sh', f.directory + '/nft-hook');
@@ -474,12 +473,10 @@ test('fw4 通过 sh -c source 加载时，日志保留 include 文件和调用�
         assert.equal(result.status, 0, result.stderr);
     });
     const log = fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8');
-    const lines = fs.readFileSync(entry, 'utf8').split('\n');
-    for (const message of ['Remove nft table', 'Apply nft rules', 'NFT Hook', 'Applied hijpass client nft rules']) {
-        const number = lines.findIndex(line => line.includes(message)) + 1;
-        assert.ok(log.split('\n').some(line => line.includes(`${entry}:${number} `) && line.includes(message)), log);
+    for (const message of ['Remove hijpass nft table', 'Apply hijpass nft rules', 'Run hijpass NFT Hook', 'Applied hijpass client nft rules']) {
+        assert.ok(log.split('\n').some(line => line.includes(`${entry} `) && line.includes(message)), log);
     }
-    assert.doesNotMatch(log, /\s(?:sh|ash):\d+/);
+    assert.doesNotMatch(log, /\s(?:sh|ash):\d+|fw4\.sh:\d+|\[firewall\]/);
 });
 
 test('Chinadns 模板保留列表开关、默认 tag、上游和自定义域名的组合行为', t => {
@@ -978,7 +975,7 @@ i=0; while [ "$i" -lt 12 ]; do echo "$line"; i=$((i+1)); done >"$output"`);
         const result = f.run('rules/update.sh', ['update', '--configdir', config]);
         assert.equal(result.status, 1, result.stderr);
         assert.deepEqual(JSON.parse(result.stdout), { success: false, failed: ['restart'] });
-        assert.equal(result.stderr, 'Service restart failed; see main log\n');
+        assert.equal(result.stderr, 'Restart hijpass after rule update failed; see main log\n');
     });
     assert.equal(fs.readFileSync(calls, 'utf8'), 'restart\n');
     const log = fs.readFileSync(path.join(f.directory, 'logs/hijpass.log'), 'utf8');
@@ -1045,34 +1042,25 @@ test('Geo 查询使用 Shell 转小写，保留换行和命令失败状态', t =
     }
 });
 
-test('来源和模块使用固定列宽，正文与续行对齐，完整路径和行号保留', t => {
-    const f = fixture(t);
-    const log = path.join(f.directory, 'logs/hijpass.log');
+test('来源使用固定列宽，正文和续行对齐，不再单独解析模块标签', t => {
+    const f = fixture(t), log = path.join(f.directory, 'logs/hijpass.log');
     for (const level of ['DEBUG', 'INFO']) {
         withConfig([{ '.type': 'hijpass', log_level: level }], config => {
-            for (const [source, message] of [['/usr/lib/hijpass/a.sh:7', '[geo] first\ncontinuation'],
-                ['/usr/lib/hijpass/maintenance/cleanup.sh:123', '[service] second'],
-                ['/usr/lib/hijpass/install/migrate.uc:123', '[migration] third'],
-                ['/usr/lib/hijpass/a.sh:7', '[external-module] long label'],
-                ['/usr/lib/hijpass/a.sh:7', 'plain message\nplain continuation']]) {
+            for (const [source, message] of [['/usr/lib/hijpass/a.sh', 'First operation\ncontinuation'],
+                ['/usr/lib/hijpass/maintenance/cleanup.sh', 'Second operation'],
+                ['/usr/lib/hijpass/install/migrate.uc:123', '[literal] ordinary message']]) {
                 const result = f.run('maintenance/logs.sh', ['source', 'INFO', source, message, '--configdir', config]);
                 assert.equal(result.status, 0, result.stderr);
             }
         });
         const lines = fs.readFileSync(log, 'utf8').trimEnd().split('\n');
-        const moduleColumn = level === 'DEBUG' ? 98 : 32;
-        for (const [index, tag, body] of [[0, '[geo]', 'first'], [2, '[service]', 'second'], [3, '[migration]', 'third']]) {
-            assert.equal(lines[index].indexOf(tag), moduleColumn);
-            assert.equal(lines[index].indexOf(body), moduleColumn + 14);
-        }
-        assert.equal(lines[1].indexOf('continuation'), moduleColumn + 14);
-        assert.equal(lines[4].slice(moduleColumn), '[external-module]  long label');
-        assert.equal(lines[5].slice(moduleColumn), 'plain message');
-        assert.equal(lines[6].indexOf('plain continuation'), moduleColumn);
+        const messageColumn = level === 'DEBUG' ? 98 : 32;
+        for (const [index, body] of [[0, 'First operation'], [1, 'continuation'], [2, 'Second operation'], [3, '[literal] ordinary message']])
+            assert.equal(lines[index].indexOf(body), messageColumn);
         if (level === 'DEBUG') {
-            assert.ok(lines[0].includes('/usr/lib/hijpass/a.sh:7'));
-            assert.ok(lines[2].includes('/usr/lib/hijpass/maintenance/cleanup.sh:123'));
-        }
+            assert.ok(lines[0].includes('/usr/lib/hijpass/a.sh'));
+            assert.ok(lines[2].includes('/usr/lib/hijpass/maintenance/cleanup.sh'));
+        } else assert.doesNotMatch(lines.join('\n'), /\/usr\/lib\/hijpass/);
         fs.unlinkSync(log);
     }
 });
@@ -1226,7 +1214,7 @@ if (getenv('FAIL_STAGE') == 'generate') { warn('generate detail'); exit(1); }`);
         assert.equal(result.status, 0, result.stderr);
     });
     if (fail) {
-        const phase = { route: 'Reset policy routes', generate: 'Generate rules', firewall: 'Reload rules', hook: 'DNS Hook start' }[fail];
+        const phase = { route: 'Reset policy routes', generate: 'Generate hijpass firewall rules', firewall: 'Reload firewall for hijpass', hook: 'DNS Hook start' }[fail];
         const log = fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8');
         assert.match(log, new RegExp(`${phase}: ${fail} detail`));
         assert.match(log, new RegExp(`ERROR.*${phase} failed: exit=1`));
@@ -1349,8 +1337,8 @@ test('防火墙脚本统一删除和重载，删除失败记录原因并停止�
     assert.equal(result.status, 1);
     assert.equal(fs.existsSync(calls), false);
     const log = fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8');
-    assert.match(log, /ERROR.*Remove rules: .*rules\.nft/);
-    assert.match(log, /ERROR.*Remove rules failed: exit=1/);
+    assert.match(log, /ERROR.*Remove hijpass firewall rules: .*rules\.nft/);
+    assert.match(log, /ERROR.*Remove hijpass firewall rules failed: exit=1/);
     fs.rmdirSync(rules);
     fs.writeFileSync(rules, 'old rules');
     result = f.run('firewall/firewall.sh', ['remove']);
@@ -1373,11 +1361,11 @@ for (const failure of ['write', 'reload']) test(`cron ${failure} 失败时普通
     });
     const log = fs.readFileSync(f.directory + '/logs/hijpass.log', 'utf8');
     if (failure === 'write') {
-        assert.match(log, /ERROR.*Write cron entries: .*crontab/);
-        assert.match(log, /ERROR.*Write cron entries failed: exit=1/);
+        assert.match(log, /ERROR.*Write hijpass cron entries: .*crontab/);
+        assert.match(log, /ERROR.*Write hijpass cron entries failed: exit=1/);
         assert.equal(fs.existsSync(calls), false);
     } else {
-        assert.match(log, /ERROR.*Cron reload: cron reload detail/);
-        assert.match(log, /ERROR.*Cron reload failed: exit=7/);
+        assert.match(log, /ERROR.*Reload cron for hijpass: cron reload detail/);
+        assert.match(log, /ERROR.*Reload cron for hijpass failed: exit=7/);
     }
 });

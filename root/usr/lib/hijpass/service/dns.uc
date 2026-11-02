@@ -103,6 +103,6 @@ export function prepare(sections, configDirectory) {
 	let proxyCount = domains(RULE_FILES.domain_proxy, '/tmp/hijpass/domain-proxy.txt');
 	let directCount = domains(RULE_FILES.domain_direct, '/tmp/hijpass/domain-direct.txt');
 	atomic('/etc/hijpass/chinadns-ng.conf', renderTemplate('/usr/lib/hijpass/service/chinadns.ut', { options: settings }), 0o644);
-	logger(sections)('INFO', `[dns] chinadns-ng prepared: port=${settings.listenPort}, direct_domains=${directCount}, proxy_domains=${proxyCount}, chn_list=${settings.useChn}, gfw_list=${settings.useGfw}`);
+	logger(sections)('INFO', `chinadns-ng prepared: port=${settings.listenPort}, direct_domains=${directCount}, proxy_domains=${proxyCount}, chn_list=${settings.useChn}, gfw_list=${settings.useGfw}`);
 	return { id: dns['.name'], name: 'chinadns-ng', command: ['chinadns-ng', '-C', '/etc/hijpass/chinadns-ng.conf'], env: [], user: 'hijpass' };
 };

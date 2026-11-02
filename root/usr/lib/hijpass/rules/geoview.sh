@@ -34,7 +34,7 @@ json_select jobs
 json_get_keys jobs
 completed=0
 staged=
-trap 'code=$?; if [ -n "$staged" ]; then rm -f "$staged"; fi; if [ "$code" -ne 0 ]; then hijpass_log ERROR geo "${LINENO:-}" "$mode failed: job=${job:-none}, exit=$code"; fi' EXIT
+trap 'code=$?; if [ -n "$staged" ]; then rm -f "$staged"; fi; if [ "$code" -ne 0 ]; then hijpass_log ERROR "Geo $mode failed: job=${job:-none}, exit=$code"; fi' EXIT
 for job in $jobs; do
     json_select "$job"
     json_get_var output output
@@ -42,11 +42,11 @@ for job in $jobs; do
     staged=$(mktemp "$output.new.XXXXXX") || exit 1
     if [ "$mode" = convert ]; then
         json_get_vars database tag input
-        hijpass_run_logged geo "Convert $database tag" "${LINENO:-}" geoview -type "$database" -action convert -format ruleset -input "$input" -regex -list "$tag" -output "$staged" || exit 1
+        hijpass_run_logged "Convert $database tag" geoview -type "$database" -action convert -format ruleset -input "$input" -regex -list "$tag" -output "$staged" || exit 1
     else
         json_get_var value value
         if [ -n "$value" ]; then
-            hijpass_run_logged geo 'Extract DNS domains' "${LINENO:-}" geoview -type geosite -action extract -input /usr/share/v2ray/geosite.dat -list "$value" >"$staged" || exit 1
+            hijpass_run_logged 'Extract DNS domains' geoview -type geosite -action extract -input /usr/share/v2ray/geosite.dat -list "$value" >"$staged" || exit 1
         else
             : >"$staged" || exit 1
         fi
@@ -55,11 +55,11 @@ for job in $jobs; do
     mv -f "$staged" "$output" || exit 1
     staged=
     completed=$((completed + 1))
-    hijpass_log DEBUG geo "${LINENO:-}" "$mode: output=$output, bytes=$(wc -c <"$output")"
+    hijpass_log DEBUG "Geo $mode: output=$output, bytes=$(wc -c <"$output")"
     json_select ..
 done
 if [ "$mode" = convert ]; then
-    hijpass_log INFO geo "${LINENO:-}" "Wrote $completed sing-box SRS rule-set files"
+    hijpass_log INFO "Wrote $completed sing-box SRS rule-set files"
 else
-    hijpass_log INFO geo "${LINENO:-}" "Wrote $completed DNS Geo domain list files (proxy/direct)"
+    hijpass_log INFO "Wrote $completed DNS Geo domain list files (proxy/direct)"
 fi

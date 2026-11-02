@@ -810,7 +810,7 @@ test('schema 2 路径迁移保留规则、模板、Hook、自定义配置和日�
         const actual = fs.readFileSync(path.join(target, file), 'utf8');
         if (file === 'logs/hijpass.log') {
             assert.ok(actual.startsWith(content + ' content'));
-            assert.match(actual.slice((content + ' content').length), /\[migration\]\s+Schema migration completed: version=4/);
+            assert.match(actual.slice((content + ' content').length), /Schema migration completed: version=4/);
         } else assert.equal(actual, content + ' content');
     }
     assert.equal(sections.find(s => s['.name'] === 'a').command, 'program --config {conf_path}');

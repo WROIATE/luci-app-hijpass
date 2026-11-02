@@ -79,9 +79,12 @@ service_triggers() {
 
 boot() {
     local delay
-    delay=$(uci -q get 'hijpass.@hijpass[0].delay_time') || delay=0
-    delay=${delay:-0}
-    [ "$delay" -ge 0 ] 2>/dev/null || { hijpass_log ERROR 'Invalid hijpass startup delay'; return 1; }
+    delay=$(uci -q get 'hijpass.@hijpass[0].delay_time') || delay=10
+    delay=${delay:-10}
+    [ "$delay" -ge 0 ] 2>/dev/null || {
+        hijpass_log WARN 'Invalid hijpass startup delay; using default 10 seconds'
+        delay=10
+    }
     [ "$delay" -le 0 ] || hijpass_run_logged 'Wait for hijpass startup delay' sleep "$delay" || return $?
     start
 }

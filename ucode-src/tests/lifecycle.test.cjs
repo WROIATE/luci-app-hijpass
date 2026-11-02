@@ -209,21 +209,25 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.match(fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8'), new RegExp(`Wait for ${service} startup delay failed: exit=1`));
     });
     if (service === 'hijpass') {
-        test('读取到非法启动延时时不再准备实例', t => {
+        for (const delay of ['invalid', '-1', '1.5']) test(`非法启动延时记录警告并使用默认十秒继续启动：${delay}`, t => {
             const f = fixture(t);
-            fs.writeFileSync(f.directory + '/config/hijpass', "config hijpass\n option delay_time 'invalid'\n");
-            assert.equal(f.run('boot').status, 1);
-            assert.deepEqual(f.events(), []);
+            fs.writeFileSync(f.directory + '/config/hijpass', `config hijpass\n option delay_time '${delay}'\n`);
+            const result = f.run('boot');
+            assert.equal(result.status, 0, result.stderr);
+            assert.deepEqual(f.events(), ['delay:10', ...preparation, service + ':submit', ...setup]);
+            assert.match(fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8'),
+                /WARN\s+Invalid hijpass startup delay; using default 10 seconds/);
         });
         for (const [config, delay] of [
             ["config hijpass\n option delay_time '12'\n", '12'],
             ["config hijpass 'global'\n option delay_time '08'\n", '08'],
-            ["config hijpass\n", null],
-            ["config hijpass\n option delay_time ''\n", null],
-            ["config firewall\n", null],
-            [null, null],
-            ["config hijpass\n option delay_time 'broken\n", null],
-        ]) test(`boot 读取延时失败或字段为空时使用零延时：${config}`, t => {
+            ["config hijpass\n option delay_time '0'\n", null],
+            ["config hijpass\n", '10'],
+            ["config hijpass\n option delay_time ''\n", '10'],
+            ["config firewall\n", '10'],
+            [null, '10'],
+            ["config hijpass\n option delay_time 'broken\n", '10'],
+        ]) test(`boot 使用配置延时，读取失败或字段为空时默认十秒：${config}`, t => {
             const f = fixture(t);
             if (config == null) fs.unlinkSync(f.directory + '/config/hijpass');
             else fs.writeFileSync(f.directory + '/config/hijpass', config);

@@ -12,20 +12,9 @@ import { ConfigPreviewUtils } from "../config/preview";
 import { ProxyChainUtils } from "./chain";
 import { ImportedProxyConfig, ProxyShareLinkUtils } from "./share-link";
 import { findProxyDependencyCycleFrom } from "./validation";
+import { createNodeLogButton } from "../log/node";
 
 const PROTOCOL_CORES: CoreType[] = [CORE_TYPE.XRAY, CORE_TYPE.SING_BOX];
-
-function loadProxyLog(logId: string, contentEl: HTMLElement) {
-    contentEl.textContent = _('Loading...');
-    Backend.readLog(logId)
-        .then((result: any) => {
-            let text = result ? result.trim() : '';
-            text = text.replace(/\x1b\[[0-9;]*m/g, '');
-            contentEl.textContent = text || _('No Logs');
-            contentEl.scrollTop = contentEl.scrollHeight;
-        })
-        .catch(() => { contentEl.textContent = _('Read Failed'); });
-}
 
 function updateLatencyButton(el: HTMLElement, ms: number) {
     el.textContent = ms + 'ms';
@@ -394,27 +383,8 @@ const ProxyFormUtils = {
             }, _('Preview')));
         }
 
-        let logEnabled = uci.get(LuciFlied.CONF_NAME, section_id, 'log_enabled');
-        if (logEnabled === '1') {
-            let name = uci.get(LuciFlied.CONF_NAME, section_id, 'name') || section_id;
-            btns.push(E('button', {
-                class: 'btn cbi-button',
-                style: 'background-color:#3d6b5e;border-color:#3d6b5e',
-                click: function () {
-                    let contentEl = E('pre', {
-                        style: 'max-height:500px;overflow:auto;padding:10px;border-radius:4px;white-space:pre;font-size:0.8em'
-                    }, '') as HTMLElement;
-                    loadProxyLog(LuciFlied.CONF_NAME + ':' + section_id, contentEl);
-                    ui.showModal(name + ' - ' + _('Log'), [
-                        E('div', { class: 'cbi-section' }, [contentEl]),
-                        E('div', { class: 'right', style: 'display:flex;justify-content:flex-end;gap:10px' }, [
-                            E('button', { class: 'btn cbi-button', click: ui.hideModal }, _('Close')),
-                            E('button', { class: 'btn cbi-button-action', click: function () { loadProxyLog(LuciFlied.CONF_NAME + ':' + section_id, contentEl); } }, _('Refresh'))
-                        ])
-                    ]);
-                }
-            }, _('Log')));
-        }
+        const logButton = createNodeLogButton(LuciFlied.CONF_NAME, section_id);
+        if (logButton) btns.push(logButton);
 
         let port = uci.get(LuciFlied.CONF_NAME, section_id, 'socks_port');
         let enabled = uci.get(LuciFlied.CONF_NAME, section_id, 'enabled');

@@ -8,6 +8,7 @@ import {ServiceUtils} from "../utils/base/luci/service";
 import {FormUtils} from "../utils/base/luci/form";
 import {ValidationUtils} from "../utils/base/luci/validation";
 import {UciUtils} from "../utils/base/luci/uci";
+import {createNodeLogButton} from "../utils/feature/log/node";
 
 const v = view.extend({
     load: function () {
@@ -100,6 +101,13 @@ function createGridDisplayOptions(s: LuCI.form.AbstractSection, instances: any) 
     o = createEnabledOption(s);
     o.editable = true;
     o.modalonly = false;
+
+    const actionsOpt = s.option(form.TextValue, 'actions', '');
+    actionsOpt.modalonly = false;
+    actionsOpt.textvalue = function (sectionId: string) {
+        const logButton = createNodeLogButton(LuciFlied.SERVER_CONF_NAME, sectionId);
+        return E('span', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, logButton ? [logButton] : []);
+    };
 }
 
 // 创建节点名称编辑选项

@@ -58,12 +58,10 @@ stop_service() {
 update_cron() {
     local schedule='' logs=0
     hijpass_log INFO "Updating hijpass cron entries ($1)"
-    if [ "$1" = enable ]; then
-        schedule=$(uci -q get 'hijpass.@rule[0].update_schedule')
-        # 主日志始终启用，因此服务运行时始终保留日志裁剪任务。
-        logs=1
-    fi
-    hijpass_run_logged 'Write hijpass cron entries' hijpass_run_ucode "$HIJPASS_LIB/service/cron.uc" hijpass "$schedule" "$logs" || return 1
+    schedule=$(uci -q get 'hijpass.@rule[0].update_schedule')
+    [ "$(uci -q get 'hijpass.@hijpass[0].enabled')" = 1 ] || schedule=
+    [ "$1" != enable ] || logs=1
+    hijpass_run_logged 'Write hijpass cron entries' "$HIJPASS_LIB/service/cron.sh" hijpass "$schedule" "$logs" || return 1
     hijpass_log INFO 'Reloading cron for hijpass'
     hijpass_run_logged 'Reload cron for hijpass' /etc/init.d/cron restart
 }

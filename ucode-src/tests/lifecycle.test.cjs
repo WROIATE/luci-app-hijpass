@@ -95,7 +95,7 @@ procd_kill() { echo "$1:kill" >>"$EVENTS"; rm -f "$IPKG_INSTROOT/registered-$1";
 `);
     const init = directory + '/' + service;
     let source = fs.readFileSync(root + '/root/etc/init.d/' + service, 'utf8').replaceAll('/usr/lib/hijpass', runtime);
-    source = source.replace('hijpass_run_ucode "$HIJPASS_LIB/service/cron.uc" ' + service, `'${directory}/cron-write' "$1" ${service}`);
+    source = source.replace('"$HIJPASS_LIB/service/cron.sh" ' + service, `'${directory}/cron-write' "$1" ${service}`);
     // reload_service 的自调用也经过同一份原生 rc.common。
     source = source.replace('/etc/init.d/' + service + ' restart',
         `/usr/bin/busybox ash '${root}/ucode-src/tests/testdata/rc.common' '${init}' restart`);

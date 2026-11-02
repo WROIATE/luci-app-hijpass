@@ -59,10 +59,7 @@ update_cron() {
     local schedule='' logs=0
     hijpass_log INFO "Updating hijpass cron entries ($1)"
     if [ "$1" = enable ]; then
-        schedule=$(uci -q get 'hijpass.@rule[0].update_schedule') || {
-            hijpass_run_logged 'Read hijpass cron configuration' uci export hijpass >/dev/null || return $?
-            schedule=
-        }
+        schedule=$(uci -q get 'hijpass.@rule[0].update_schedule')
         # 主日志始终启用，因此服务运行时始终保留日志裁剪任务。
         logs=1
     fi
@@ -82,11 +79,7 @@ service_triggers() {
 
 boot() {
     local delay
-    delay=$(uci -q get 'hijpass.@hijpass[0].delay_time') || {
-        # 字段未配置采用 0；配置文件本身不可读时终止启动。
-        hijpass_run_logged 'Read hijpass startup configuration' uci export hijpass >/dev/null || return $?
-        delay=0
-    }
+    delay=$(uci -q get 'hijpass.@hijpass[0].delay_time') || delay=0
     delay=${delay:-0}
     [ "$delay" -ge 0 ] 2>/dev/null || { hijpass_log ERROR 'Invalid hijpass startup delay'; return 1; }
     [ "$delay" -le 0 ] || hijpass_run_logged 'Wait for hijpass startup delay' sleep "$delay" || return $?

@@ -209,23 +209,24 @@ for (const service of ['hijpass', 'hijserver']) {
         assert.match(fs.readFileSync(f.directory + '/log/hijpass.log', 'utf8'), new RegExp(`Wait for ${service} startup delay failed: exit=1`));
     });
     if (service === 'hijpass') {
-        for (const config of [null, "config hijpass\n option delay_time 'broken\n", "config hijpass\n option delay_time 'invalid'\n"])
-            test(`启动配置缺失、损坏或延时非法时不再准备实例：${config}`, t => {
-                const f = fixture(t);
-                if (config == null) fs.unlinkSync(f.directory + '/config/hijpass');
-                else fs.writeFileSync(f.directory + '/config/hijpass', config);
-                assert.equal(f.run('boot').status, 1);
-                assert.deepEqual(f.events(), []);
-            });
+        test('读取到非法启动延时时不再准备实例', t => {
+            const f = fixture(t);
+            fs.writeFileSync(f.directory + '/config/hijpass', "config hijpass\n option delay_time 'invalid'\n");
+            assert.equal(f.run('boot').status, 1);
+            assert.deepEqual(f.events(), []);
+        });
         for (const [config, delay] of [
             ["config hijpass\n option delay_time '12'\n", '12'],
             ["config hijpass 'global'\n option delay_time '08'\n", '08'],
             ["config hijpass\n", null],
             ["config hijpass\n option delay_time ''\n", null],
             ["config firewall\n", null],
-        ]) test(`boot 直接读取 UCI，字段缺省时跳过等待：${config}`, t => {
+            [null, null],
+            ["config hijpass\n option delay_time 'broken\n", null],
+        ]) test(`boot 读取延时失败或字段为空时使用零延时：${config}`, t => {
             const f = fixture(t);
-            fs.writeFileSync(f.directory + '/config/hijpass', config);
+            if (config == null) fs.unlinkSync(f.directory + '/config/hijpass');
+            else fs.writeFileSync(f.directory + '/config/hijpass', config);
             const result = f.run('boot');
             assert.equal(result.status, 0, result.stderr);
             assert.deepEqual(f.events(), [...(delay ? ['delay:' + delay] : []), ...preparation, service + ':submit', ...setup]);

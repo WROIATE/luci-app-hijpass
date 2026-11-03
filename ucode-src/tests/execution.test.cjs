@@ -100,6 +100,33 @@ test('主日志按配置级别筛选，保留多行上下文并脱敏 URL 和凭
     assert.doesNotMatch(content, /hidden|private|https:\/\//);
 });
 
+for (const level of ['DEBUG', 'INFO', 'WARN', 'ERROR']) test(`服务端准备与迁移日志遵循主日志配置：${level}`, t => {
+    const f = fixture(t), logFile = path.join(f.directory, 'logs/hijpass.log');
+    withConfig([{ '.type': 'hijpass', log_level: level, schema_version: '4', nft: '/legacy/template.nft' }], config => {
+        fs.writeFileSync(config + '/hijserver', "config hijserver\n option enabled '0'\n");
+        for (const action of ['configs', 'prepare']) {
+            const result = f.data('service/preparecli.uc', ['server', action, '--configdir', config]);
+            assert.equal(result.status, 0, result.stderr);
+        }
+        const migrated = f.data('install/migrate.uc', ['--configdir', config]);
+        assert.equal(migrated.status, 0, migrated.stderr);
+        assert.match(migrated.stderr, /requires manual migration/);
+    });
+    const content = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '';
+    if (level === 'DEBUG' || level === 'INFO') {
+        assert.match(content, /Wrote 0 hijserver core JSON configuration files/);
+        assert.match(content, /Prepared 0 hijserver process instance\(s\)/);
+        assert.match(content, /Schema migration started/);
+        assert.match(content, /Schema migration completed/);
+    } else assert.doesNotMatch(content, /INFO|Wrote|Prepared|Schema migration/);
+    if (level !== 'ERROR') assert.match(content, /WARN.*Legacy firewall template requires manual migration/);
+    else assert.equal(content, '');
+    if (level === 'DEBUG') {
+        for (const line of content.trim().split('\n'))
+            assert.match(line, /(?:service\/prepare|install\/migrate)\.uc:\d+\s+\S/);
+    } else assert.doesNotMatch(content, /\.uc:\d+/);
+});
+
 test('日志目录不可写或磁盘写入失败时回退系统日志，追加命令保持成功', t => {
     const f = fixture(t), fallback = path.join(f.directory, 'fallback');
     f.script('logger', 'printf "%s\\n" "$@" >>"$TEST_FALLBACK"');

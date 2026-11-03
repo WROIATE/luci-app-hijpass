@@ -3,7 +3,7 @@
 import { cursor } from 'uci';
 import * as fs from 'fs';
 import { RULE_FILES, FILES, CLIENT_DIR, SERVER_DIR, nodeConfig, logPath } from 'hijpass.config.paths';
-import { logger } from '../maintenance/logs.uc';
+import { logger, configuredLogger } from '../maintenance/logs.uc';
 
 // 安装专用：历史字段按 schema_version 分阶段转换；业务模块只读取当前格式。
 // 版本号在全部迁移成功后提交；同版本重复安装跳过，失败则保留入口供重试。
@@ -35,7 +35,7 @@ function markLegacyFirewallTemplate(ctx, global) {
         // 不把旧格式文件当作可用的新模板覆盖软件包提供的默认模板。
         ctx.delete('hijpass', global['.name'], 'firewall_template');
         warn(`Legacy firewall template ${source} requires manual migration; see the Firewall page.\n`);
-        logger([])('WARN', 'Legacy firewall template requires manual migration; see the Firewall page');
+        logger([global])('WARN', 'Legacy firewall template requires manual migration; see the Firewall page');
     }
 }
 
@@ -363,15 +363,15 @@ function cleanLegacyCron(path) {
     catch (e) { file.close(); fs.unlink(temp); die(e.message); }
 }
 
-let log = logger([]), started = time();
+let log, directory, started = time();
 try {
-    let directory;
     if (length(ARGV)) {
         if (length(ARGV) != 2 || ARGV[0] != '--configdir' || !ARGV[1]) {
             die('usage: migrate.uc [--configdir DIRECTORY]');
         }
         directory = ARGV[1];
     }
+    log = configuredLogger(directory);
     // 离线目录遵循 etc/config 与相邻 crontabs 的布局；delta 单独存放，避免文件锁冲突。
     if (directory) {
         fs.mkdir(directory + '/.uci', 0o700);
@@ -429,4 +429,4 @@ try {
     }
     log('INFO', `Schema migration completed: version=${VERSION}, elapsed=${time() - started}s`);
 }
-catch (e) { log('ERROR', `Migration failed: ${e.message}`); warn(e.message + '\n'); exit(1); }
+catch (e) { (log || configuredLogger(directory))('ERROR', `Migration failed: ${e.message}`); warn(e.message + '\n'); exit(1); }

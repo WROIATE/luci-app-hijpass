@@ -19,7 +19,7 @@ import { resolve } from '../network/network.uc';
 import { atomic, command, temporary, renderTemplate } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
 import { prepare as prepareDNS } from './dns.uc';
-import { logger } from '../maintenance/logs.uc';
+import { logger, configuredLogger } from '../maintenance/logs.uc';
 
 // 裸占位符和完整的单/双引号占位符统一引用一次；周围语法仍由 Shell 解析。
 function configCommand(source, path) {
@@ -288,7 +288,7 @@ export function main() { run(ARGV,
         if (server) {
             let files = generateServers(config);
             writeConfigs(files);
-            logger([])('INFO', `Wrote ${length(files)} hijserver core JSON configuration files`);
+            configuredLogger(configDirectory)('INFO', `Wrote ${length(files)} hijserver core JSON configuration files`);
         }
         else if (findHijpassSection(config)?.enabled == '1') {
             // 先生成进程描述，确认自定义命令、环境变量和文件名有效，再替换配置。
@@ -303,7 +303,7 @@ export function main() { run(ARGV,
     if (action == 'prepare') {
         if (server) {
             let result = serverPlan(config);
-            logger([])('INFO', `Prepared ${length(result.instances)} hijserver process instance(s)`);
+            configuredLogger(configDirectory)('INFO', `Prepared ${length(result.instances)} hijserver process instance(s)`);
             return result;
         }
         let result = plan(config);

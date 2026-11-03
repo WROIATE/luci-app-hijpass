@@ -2788,3 +2788,12 @@ msgstr "核心记录日志的最低级别；debug 包含更多连接详情。"
 
 msgid "Bandwidth in Mbps, from the server perspective; empty or 0 uses the core default."
 msgstr "带宽单位 Mbps，方向以服务端为准；留空或 0 使用核心默认值。"
+
+msgid "Generate Key"
+msgstr "生成密钥"
+
+msgid "Key Generation Failed"
+msgstr "密钥生成失败"
+
+msgid "Unable to generate a secure random key in this browser."
+msgstr "当前浏览器无法生成安全随机密钥。"

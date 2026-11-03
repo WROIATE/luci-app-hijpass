@@ -140,6 +140,40 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
         _("Set the password or key that clients must use."));
     passwordOption.password = true;
     passwordOption.rmempty = false;
+    // SS2022 使用固定长度随机密钥；只在用户点击时替换当前表单值。
+    function keyLength(section: LuCI.form.AbstractSection, id: string) {
+        const type = section.formvalue(id, 'type');
+        const method = section.formvalue(id, 'method') || methodOption.default;
+        if (type !== 'shadowsocks' || !method?.startsWith('2022-')) return 0;
+        return method === '2022-blake3-aes-128-gcm' ? 16 : 32;
+    }
+    passwordOption.renderWidget = function (id: string, index: number, value: string) {
+        const widget = form.Value.prototype.renderWidget.call(this, id, index, value) as HTMLElement;
+        const input = widget.querySelector('input') as HTMLInputElement;
+        const button = E('button', {
+            id: this.cbid(id) + '-generate', class: 'btn cbi-button', type: 'button',
+            style: keyLength(this.section, id) ? '' : 'display:none',
+            click: () => {
+                const length = keyLength(this.section, id);
+                if (!length) return;
+                try {
+                    const bytes = crypto.getRandomValues(new Uint8Array(length));
+                    this.getUIElement(id)?.setValue(btoa(String.fromCharCode(...bytes)));
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                } catch {
+                    NotificationUtils.error(_('Key Generation Failed'), _('Unable to generate a secure random key in this browser.'));
+                }
+            },
+        }, _('Generate Key'));
+        return E('div', { style: 'display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:100%' }, [widget, button]);
+    };
+    const updateKeyButton = function (this: LuCI.form.Value, _event: Event, id: string) {
+        const button = document.getElementById(passwordOption.cbid(id) + '-generate');
+        if (button) button.style.display = keyLength(this.section, id) ? '' : 'none';
+    };
+    typeOption.onchange = updateKeyButton;
+    methodOption.onchange = updateKeyButton;
     const uuidOption = field(form.Value, 'uuid', _('UUID'), [{ type: 'vless' }],
         _("User UUID accepted by this server; copy the same UUID to clients."));
     uuidOption.rmempty = false;

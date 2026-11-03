@@ -598,7 +598,7 @@ function createRouteOptions(s: LuCI.form.AbstractSection) {
 
     let defaultProxyNode = ShuntFormUtils.createRequiredListValue(routeTypeSection, 'default_proxy_node', _('Default Global Exit'),
         _('Select Default Exit Node'),
-        function (section_id: any, value: any) {
+        function (_section_id: any, value: any) {
             if (!value) {
                 return _('Configure Global Exit First');
             }
@@ -891,7 +891,7 @@ function createDNSOptions(s: LuCI.form.AbstractSection) {
     // 默认全局DNS配置
     let defaultDNSNode = ShuntFormUtils.createRequiredListValue(dnsTypeSection, 'default_dns_node', _('Default Global DNS'),
         _('Select Default DNS'),
-        function (section_id: string, value: any) {
+        function (_section_id: string, value: any) {
             if (!value) {
                 return _('Please configure the global DNS server first');
             }

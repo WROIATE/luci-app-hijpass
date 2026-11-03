@@ -955,51 +955,6 @@ i=0; while [ "$i" -lt 12 ]; do echo "$line"; i=$((i+1)); done >"$output"`);
     assert.doesNotMatch(log, /diagnostic output|\[job\]/);
 });
 
-test('自动更新将下载与应用交给同一执行器，忙或失败不写完成时间，也不重复重启', t => {
-    const f = fixture(t), last = path.join(f.directory, 'last-update'), calls = path.join(f.directory, 'calls');
-    f.patch('rules/auto-update.sh', '/tmp/hijpass_last_update', last);
-    f.patch('rules/auto-update.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
-    f.script('hijpass-init', `echo unexpected-restart >>'${calls}'`);
-    fs.writeFileSync(path.join(f.runtime, 'rules/update.sh'), `#!/bin/sh
-printf '%s\\n' "$1" >>'${calls}'
-[ "$1" = update ] || exit 8
-exit "$AUTO_RESULT"
-`, { mode: 0o755 });
-    withConfig([{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', update_interval: '1' }], config => {
-        for (const code of ['75', '1', '0']) {
-            const result = f.run('rules/auto-update.sh', ['--configdir', config], { AUTO_RESULT: code });
-            assert.equal(result.status, code === '1' ? 1 : 0, result.stderr);
-            assert.equal(fs.existsSync(last), code === '0');
-        }
-    });
-    assert.equal(fs.readFileSync(calls, 'utf8'), 'update\nupdate\nupdate\n');
-});
-
-test('自动更新直接读取 UCI 间隔，缺省不更新，读取失败和非法值报错', t => {
-    const f = fixture(t), last = f.directory + '/last', calls = f.directory + '/calls';
-    f.patch('rules/auto-update.sh', '/tmp/hijpass_last_update', last);
-    fs.writeFileSync(f.runtime + '/rules/update.sh', `#!/bin/sh\necho update >>'${calls}'\n`, { mode: 0o755 });
-    const config = f.directory + '/config';
-    fs.mkdirSync(config);
-    for (const source of [null, "config rule\n option update_interval 'broken\n", "config rule\n option update_interval 'bad'\n"]) {
-        if (source != null) fs.writeFileSync(config + '/hijpass', source);
-        const result = f.run('rules/auto-update.sh', ['--configdir', config]);
-        assert.equal(result.status, 1, result.stderr);
-        assert.equal(fs.existsSync(calls), false);
-        assert.equal(fs.existsSync(last), false);
-    }
-    for (const source of ['config hijpass\n', 'config rule\n', "config rule\n option update_interval ''\n", "config rule\n option update_interval '0'\n"]) {
-        fs.writeFileSync(config + '/hijpass', source);
-        assert.equal(f.run('rules/auto-update.sh', ['--configdir', config]).status, 0);
-        assert.equal(fs.existsSync(calls), false);
-    }
-    fs.writeFileSync(config + '/hijpass', "config rule 'rules'\n option update_interval '08'\n");
-    assert.equal(f.run('rules/auto-update.sh', ['--configdir', config]).status, 0);
-    assert.equal(fs.readFileSync(calls, 'utf8'), 'update\n');
-    assert.equal(f.run('rules/auto-update.sh', ['--configdir', config]).status, 0);
-    assert.equal(fs.readFileSync(calls, 'utf8'), 'update\n');
-});
-
 test('Geo 查询使用 Shell 转小写，保留换行和命令失败状态', t => {
     const f = fixture(t);
     f.script('geoview', `printf 'EXAMPLE.COM\\nCN\\n'; exit "\${GEO_EXIT:-0}"`);

@@ -228,7 +228,7 @@ const ShuntFormUtils = {
             return form.DynamicList.prototype.load.apply(this, [section_id]);
         };
 
-        o.validate = function (section_id: string, value: string) {
+        o.validate = function (_section_id: string, value: string) {
             if (!value || value === '') {
                 return true;
             }

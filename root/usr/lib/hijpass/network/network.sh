@@ -7,7 +7,7 @@ data="$HIJPASS_LIB/network/networkcli.uc"
 action=${1:-}
 [ "$#" -eq 0 ] || shift
 case "$action" in
-    resolve|port|iptype) hijpass_run_ucode "$data" "$action" "$@"; exit $? ;;
+    iptype) hijpass_run_ucode "$data" "$action" "$@"; exit $? ;;
     connect) url=${1:-}; timeout=${2:-5}; socks=${3:-} ;;
     ping) socks=${1:-}; url="https://${2:-www.google.com}"; timeout=5 ;;
     *) hijpass_json_error 'unknown network action'; exit 1 ;;

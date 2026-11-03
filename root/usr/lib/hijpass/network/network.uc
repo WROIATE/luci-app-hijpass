@@ -1,4 +1,3 @@
-/** @typedef {import('../../../share/ucode/hijpass/types/network.uc').PortStatus} PortStatus */
 /** @typedef {import('../../../share/ucode/hijpass/types/network.uc').PingReport} PingReport */
 /** @typedef {import('../../../share/ucode/hijpass/types/network.uc').ProbeRequest} ProbeRequest */
 /** @typedef {import('../../../share/ucode/hijpass/types/network.uc').CurlReport} CurlReport */
@@ -40,31 +39,6 @@ export function resolve(host) {
 	}
 	return address;
 };
-/**
- * 检查指定端口是否已在本机监听 TCP。
- * @param {string[]} values
- * @returns {PortStatus} 端口到布尔值的映射，true 表示 IPv4 或 IPv6 正在监听。
- */
-export function ports(values) {
-	let occupied = {};
-	// /proc 的 TCP 表由内核提供，避免为每个端口重复执行 netstat 和 jq。
-	for (let path in ['/proc/net/tcp', '/proc/net/tcp6']) {
-		for (let line in split(fs.readfile(path) || '', '\n')) {
-			let fields = split(trim(line), /[ \t]+/);
-			if (fields[3] != '0A') {
-				continue;
-			}
-			occupied[hex(split(fields[1] || '', ':')[1])] = true;
-		}
-	}
-	let result = {};
-	for (let value in values) {
-		port(value);
-		result[value] = !!occupied[int(value)];
-	}
-	return result;
-};
-
 /**
  * 把 curl 输出和退出码整理成连接探测报告。
  * @param {CommandOutput} response Shell 提供的标准输出及真实退出状态。
@@ -155,12 +129,6 @@ export function main() { run(ARGV,
     /** @param {string[]} args */
     args => {
     let action = shift(args);
-    if (action == 'resolve') {
-        return { address: resolve(args[0]) };
-    }
-    if (action == 'port') {
-        return ports(args);
-    }
     if (action == 'iptype') {
         let range = parseCIDR(args[0]);
         if (!range) {

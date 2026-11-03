@@ -129,7 +129,6 @@
  *   geosite: string|null,
  *   geoip: string|null,
  *   update_schedule: string|null,
- *   update_interval: string|null,
  *   download_timeout: string|null,
  *   retry_count: string|null
  * }} RuleSection

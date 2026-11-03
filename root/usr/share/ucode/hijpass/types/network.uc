@@ -58,7 +58,6 @@
  * }} CurlReport
  */
 
-/** @typedef {Object<string, boolean>} PortStatus */
 
 /**
  * @typedef {{

@@ -33,5 +33,6 @@ uci -q set firewall.hijpass=include &&
 stage=directories
 mkdir -p /etc/hijpass/client /etc/hijpass/server /tmp/hijpass/log /tmp/hijserver/log || exit 1
 stage=luci-cache
+rm -f /tmp/hijpass_last_update || exit 1
 rm -rf /tmp/luci-*cache || exit 1
 hijpass_log INFO 'Hijpass installation setup completed'

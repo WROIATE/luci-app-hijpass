@@ -1,5 +1,4 @@
 import { vlessSecurity } from "../utils/feature/proxy/security";
-import { Backend } from "../utils/backend";
 import view from "view";
 import editor from "hijpass.editor";
 import uci from "uci";
@@ -55,7 +54,7 @@ const v = view.extend({
         FormUtils.setAnonymousGridSectionMembers(s);
 
         // 重写 handleAdd 方法，使用自定义的唯一 ID 生成器
-        s.handleAdd = function (ev: Event, name?: string) {
+        s.handleAdd = function (ev: Event) {
             let sectionId = UciUtils.generateUniqueSectionId(LuciFlied.CONF_NAME);
             return L.bind(form.GridSection.prototype.handleAdd, this, ev, sectionId)();
         };

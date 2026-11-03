@@ -501,14 +501,6 @@ test('file cleanup matches exact section suffix and log truncation keeps the las
     assert.equal(contents.split('\n').length, 30001);
 });
 
-test('native TCP port lookup sees actual host listeners', async t => {
-    const server = net.createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    t.after(() => new Promise(resolve => server.close(resolve)));
-    const port = String(server.address().port);
-    const result = run('root/usr/lib/hijpass/network/network.sh', ['port', port]);
-    assert.equal(result.status, 0, result.stderr); assert.equal(JSON.parse(result.stdout)[port], true);
-});
-
 test('capture parsing rejects injected/invalid targets and counts TCP payload without counting UDP bytes', () => {
     const config = value({ action: 'trace-parse', args: ['https://[2001:db8::1]:8443/a?b=1'] });
     assert.equal(config.host, '2001:db8::1'); assert.equal(config.targetPort, 8443);
@@ -535,7 +527,7 @@ test('文本工具正常退出，参数错误保持 JSON 工具的错误契约',
         assert.equal(result.stdout, family);
         assert.equal(result.stderr, '');
     }
-    const invalid = run('root/usr/lib/hijpass/network/network.sh', ['resolve', 'example.org', '--configdir']);
+    const invalid = run('root/usr/lib/hijpass/network/network.sh', ['iptype', 'example.org', '--configdir']);
     assert.equal(invalid.status, 1);
     assert.match(JSON.parse(invalid.stdout).error, /missing --configdir/);
     assert.equal(invalid.stderr, '');

@@ -129,7 +129,7 @@ function convertAnsiToHtml(text) {
     let result = text;
     let openTags = [];
 
-    result = result.replace(/\x1b\[([0-9;]*)m/g, function (match, codes) {
+    result = result.replace(/\x1b\[([0-9;]*)m/g, function (_match, codes) {
         if (!codes) codes = '0';
 
         let codeArray = codes.split(';');

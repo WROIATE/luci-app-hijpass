@@ -1,11 +1,13 @@
-import { Backend, RuleUpdateResult } from "../../backend";
+import { formatUpdateProgress } from './progress';
+import { Backend, RuleUpdateResult, UpdateProgress } from "../../backend";
 
 type RuleUpdateStatus = 'success' | 'error' | 'neutral';
 
 function updateRuleFile(statusElement: HTMLElement, updateButton: HTMLButtonElement, taskId?: string) {
     updateButton.disabled = true;
     updateUpdateStatus(statusElement, _('Updating Rule Files'), 'neutral');
-    (taskId ? Backend.resumeRuleUpdate(taskId) : Backend.updateRules())
+    const progress = (value: UpdateProgress) => updateUpdateStatus(statusElement, formatUpdateProgress(value), 'neutral');
+    (taskId ? Backend.resumeRuleUpdate(taskId, progress) : Backend.updateRules(progress))
         .then(function (result: RuleUpdateResult) {
             if (result?.success) {
                 updateUpdateStatus(statusElement, _('Rule Files Updated'), 'success');

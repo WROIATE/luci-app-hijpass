@@ -4,6 +4,9 @@ export type EditorResource = 'ip_direct' | 'ip_proxy' | 'domain_direct' | 'domai
     | 'nft_hook' | 'dns_hook' | 'shunt_conf' | 'firewall_template' | 'proxy_config' | 'server_config';
 export type Editor = { resource: EditorResource; section?: string; name?: string };
 export type Log = { id: string; kind: 'main' | 'shunt' | 'proxy' | 'server'; name: string };
+export type UpdateProgress = { phase: string; resource: string; attempt?: number; bytes?: number | null };
+export type ProgressHandler = (progress: UpdateProgress) => void;
+
 export type RuleUpdateResult = { success: boolean; failed?: string[]; code?: string };
 
 // 页面只使用业务方法。文件布局、命令位置以及参数组装由后端负责。
@@ -26,13 +29,13 @@ const logs = method('log_list');
 const jobStatus = method('job_status', ['id']);
 
 // 每次轮询都是短 RPC；页面等待不会占住一次持续下载的 RPC 请求。
-async function runJob(start: (...args: any[]) => Promise<any>, jsonOutput: boolean, ...args: any[]) {
+async function runJob(start: (...args: any[]) => Promise<any>, jsonOutput: boolean, onProgress?: ProgressHandler, ...args: any[]) {
     const job = await start(...args);
     if (job.success === false) return job;
-    return waitForJob(job.id, jsonOutput);
+    return waitForJob(job.id, jsonOutput, onProgress);
 }
 
-async function waitForJob(id: string, jsonOutput: boolean) {
+async function waitForJob(id: string, jsonOutput: boolean, onProgress?: ProgressHandler) {
     if (typeof id !== 'string' || !/^[A-Za-z0-9]{8}$/.test(id)) throw new Error('Invalid job ID');
     const deadline = Date.now() + 30 * 60 * 1000;
     while (Date.now() < deadline) {
@@ -46,6 +49,7 @@ async function waitForJob(id: string, jsonOutput: boolean) {
             }
             return result;
         }
+        if (status.progress) onProgress?.(status.progress);
         await new Promise(resolve => window.setTimeout(resolve, 1000));
     }
     throw new Error('Timed out waiting for backend job');
@@ -54,7 +58,7 @@ async function waitForJob(id: string, jsonOutput: boolean) {
 const coreCalls = {
     version: method('core_version', ['core']),
     latest: method('core_latest', ['core'], true),
-    update: (core: string) => runJob(method('core_update', ['core']), true, core),
+    update: (core: string, onProgress?: ProgressHandler) => runJob(method('core_update', ['core']), true, onProgress, core),
 };
 
 export const Backend = {
@@ -81,14 +85,16 @@ export const Backend = {
     },
     connect: method('network_connect', ['url', 'timeout']),
     ping: method('network_ping', ['port']),
-    updateRules: (): Promise<RuleUpdateResult> => runJob(method('rule_update'), true),
+    updateRules: (onProgress?: ProgressHandler): Promise<RuleUpdateResult> => runJob(method('rule_update'), true, onProgress),
     ruleUpdateStatus: (): Promise<{ id: string | null }> => method('rule_update_status', [], true)(),
-    resumeRuleUpdate: (id: string): Promise<RuleUpdateResult> => waitForJob(id, true),
+    resumeRuleUpdate: (id: string, onProgress?: ProgressHandler): Promise<RuleUpdateResult> => waitForJob(id, true, onProgress),
     queryRules: method('rule_query', ['keyword']),
     matchRule: method('rule_match', ['keyword']),
     lookupGeo: method('geo_lookup', ['type', 'keyword', 'mode']),
     queryGeo: method('geo_query', ['keyword']),
-    coreAction: (action: 'version' | 'latest' | 'update', core: string) => coreCalls[action](core),
+    coreAction: (action: 'version' | 'latest' | 'update', core: string, onProgress?: ProgressHandler) => coreCalls[action](core, onProgress),
+    coreUpdateStatus: (core: string): Promise<{ id: string | null }> => method('core_update_status', ['core'], true)(core),
+    resumeCoreUpdate: (id: string, onProgress?: ProgressHandler) => waitForJob(id, true, onProgress),
     startTrace: method('trace_start', ['args']),
     traceStatus: method('trace_status', ['id']),
     releaseTrace: method('trace_release', ['id']),

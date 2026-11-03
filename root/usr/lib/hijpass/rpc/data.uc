@@ -20,7 +20,7 @@ const methods = {
     network_connect: { url: '', timeout: '' }, network_ping: { port: '' },
     rule_update: {}, rule_update_status: {}, rule_query: { keyword: '' }, rule_match: { keyword: '' },
     geo_lookup: { type: '', keyword: '', mode: '' }, geo_query: { keyword: '' },
-    core_version: { core: '' }, core_latest: { core: '' }, core_update: { core: '' },
+    core_version: { core: '' }, core_latest: { core: '' }, core_update: { core: '' }, core_update_status: { core: '' },
     job_status: { id: '' },
     trace_start: { args: [] }, trace_status: { id: '' }, trace_release: { id: '' },
 };

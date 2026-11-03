@@ -29,12 +29,13 @@ recover_job() {
     fi
 }
 
-active_rules() {
-    local active directory
-    active=$(cat "$root/rules.active" 2>/dev/null) || return 1
+active_job() {
+    local kind="$1" active directory
+    active=$(cat "$root/$kind.active" 2>/dev/null) || return 1
     valid_id "$active" || return 1
     directory="$root/$active"
     [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
+    [ "$(cat "$directory/kind" 2>/dev/null)" = "$kind" ] || return 1
     recover_job "$directory"
     [ ! -f "$directory/exit" ] || return 1
     printf '%s\n' "$active"
@@ -46,9 +47,9 @@ execute_job() {
     started=$(date +%s)
     hijpass_log DEBUG "$kind task started"
     case "$kind" in
-        rules) "$HIJPASS_LIB/rules/update-files.sh" "$@" ;;
+        rules) HIJPASS_JOB_DIRECTORY="$directory" "$HIJPASS_LIB/rules/update-files.sh" "$@" ;;
         restart) /etc/init.d/hijpass restart ;;
-        xray|sing-box) "$HIJPASS_LIB/core/update.sh" update "$kind" ;;
+        xray|sing-box) HIJPASS_JOB_DIRECTORY="$directory" "$HIJPASS_LIB/core/update.sh" update "$kind" ;;
         *) return 1 ;;
     esac >"$directory/stdout" 2>"$directory/stderr"
     code=$?
@@ -87,8 +88,8 @@ case "$action" in
         # 检查活动任务与发布新 ID 在同一短临界区内，避免检查后再创建的竞态。
         exec 8>"$root/registry.lock"
         flock -x 8 || exit 1
-        if [ "$id" = rules ] && active=$(active_rules); then
-            if [ "$mode" = inline ] || [ "$(cat "$root/$active/scope" 2>/dev/null)" != "$scope" ]; then
+        if [ "$id" != restart ] && active=$(active_job "$id"); then
+            if [ "$mode" = inline ] || { [ "$id" = rules ] && [ "$(cat "$root/$active/scope" 2>/dev/null)" != "$scope" ]; }; then
                 # 部分资源更新不能冒充“更新全部”的成功结果；只报告忙，不排队。
                 if [ "$mode" = async ]; then
                     json_init; json_add_string id "$active"; json_add_boolean success 0
@@ -112,9 +113,9 @@ case "$action" in
         : >"$directory/stderr"
         printf '%s\n' "$id" >"$directory/kind"
         printf '%s\n' "$scope" >"$directory/scope"
-        if [ "$id" = rules ]; then
-            printf '%s\n' "${directory##*/}" >"$root/rules.active.new.$$"
-            mv "$root/rules.active.new.$$" "$root/rules.active" || exit 1
+        if [ "$id" != restart ]; then
+            printf '%s\n' "${directory##*/}" >"$root/$id.active.new.$$"
+            mv "$root/$id.active.new.$$" "$root/$id.active" || exit 1
         fi
         if [ "$mode" = inline ]; then
             printf '%s\n' "$owner" >"$directory/pid"
@@ -127,7 +128,7 @@ case "$action" in
             exec start-stop-daemon -S -b -m -p "$directory/pid" -x "$HIJPASS_LIB/rpc/jobs.sh" -- worker "$id" "$directory"
         ); then
             rm -rf -- "$directory"
-            [ "$id" != rules ] || rm -f "$root/rules.active"
+            [ "$id" = restart ] || rm -f "$root/$id.active"
             hijpass_json_error 'cannot start job'
             exit 1
         fi
@@ -139,11 +140,11 @@ case "$action" in
         else execute_job "$id" "$directory"; fi
         exit $? ;;
     current)
-        [ "$id" = rules ] || { hijpass_json_error 'unknown job'; exit 1; }
+        case "$id" in rules|xray|sing-box) ;; *) hijpass_json_error 'unknown job'; exit 1 ;; esac
         exec 8>"$root/registry.lock"
         flock -x 8 || exit 1
         json_init
-        if active=$(active_rules); then json_add_string id "$active"; else json_add_null id; fi
+        if active=$(active_job "$id"); then json_add_string id "$active"; else json_add_null id; fi
         json_dump ;;
     clear)
         # init 持有更新锁。只清理已结束任务，保留触发重启的调用者收尾所需目录。
@@ -154,7 +155,9 @@ case "$action" in
             recover_job "$directory"
             [ ! -f "$directory/exit" ] || rm -rf -- "$directory"
         done
-        active_rules >/dev/null || rm -f "$root/rules.active"
+        for kind in rules xray sing-box; do
+            active_job "$kind" >/dev/null || rm -f "$root/$kind.active"
+        done
         rm -rf "$root/work" ;;
     status)
         valid_id "$id" || { hijpass_json_error 'invalid job ID'; exit 1; }

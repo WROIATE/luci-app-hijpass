@@ -153,3 +153,20 @@ test('rule-set references remain visible to form prechecks without parsing filen
     assert.equal(parsed.isEmpty('set'), false);
     assert.deepEqual(Array.from(parsed.ruleSet), [reference]);
 });
+
+for (const kind of ['rules', 'xray', 'sing-box']) test(`resume ${kind} exposes progress without launching a new download`, async () => {
+    let polls = 0;
+    const f = backend((method, args) => {
+        if (method === 'core_update_status' || method === 'rule_update_status') return { id: 'Abcd1234' };
+        assert.equal(method, 'job_status');
+        if (++polls === 1) return { running: true, progress: { phase: 'download', resource: kind, bytes: 4096 } };
+        return { running: false, code: 0, stdout: '{"success":true}', stderr: '' };
+    });
+    const { id } = kind === 'rules' ? await f.api.ruleUpdateStatus() : await f.api.coreUpdateStatus(kind);
+    const updates = [];
+    const result = await (kind === 'rules' ? f.api.resumeRuleUpdate : f.api.resumeCoreUpdate)(id, value => updates.push(value));
+    assert.equal(result.success, true);
+    assert.equal(updates[0].bytes, 4096);
+    assert.equal(updates[0].resource, kind);
+    assert.equal(f.calls.some(([method]) => method === 'core_update' || method === 'rule_update'), false);
+});

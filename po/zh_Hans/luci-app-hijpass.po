@@ -2797,3 +2797,27 @@ msgstr "密钥生成失败"
 
 msgid "Unable to generate a secure random key in this browser."
 msgstr "当前浏览器无法生成安全随机密钥。"
+
+msgid "Preparing update..."
+msgstr "正在准备更新…"
+
+msgid "Fetching release information..."
+msgstr "正在获取版本信息…"
+
+msgid "Downloading..."
+msgstr "正在下载…"
+
+msgid "Verifying files..."
+msgstr "正在校验文件…"
+
+msgid "Extracting files..."
+msgstr "正在解压文件…"
+
+msgid "Installing files..."
+msgstr "正在安装文件…"
+
+msgid "Restarting service..."
+msgstr "正在重启服务…"
+
+msgid "Attempt %s"
+msgstr "第 %s 次尝试"

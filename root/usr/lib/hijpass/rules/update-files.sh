@@ -18,6 +18,7 @@ for argument in "$@"; do
     previous=$argument
 done
 started=$(date +%s)
+hijpass_progress prepare
 hijpass_log INFO "Rule update started: action=$action, source=${HIJPASS_UPDATE_SOURCE:-manual}"
 plan=$(hijpass_run_ucode "$data" plan "$action" "$@") || { hijpass_log ERROR 'Cannot prepare rule update plan: invalid configuration'; hijpass_json_error 'invalid rules configuration'; exit 1; }
 json_load "$plan" || exit 1
@@ -68,6 +69,7 @@ for job in $jobs; do
         downloaded=0
         while [ "$attempt" -lt "$retries" ]; do
             exec 7>"$work/curl-error" || fail_resource 'Prepare download diagnostics' "$work/error"
+            hijpass_progress download "$key" "$temp" "$((attempt + 1))"
             if curl -f -sS -L --connect-timeout "$connect_timeout" --max-time "$timeout" -o "$temp" -- "$url" 2>&7; then
                 code=0
             else
@@ -88,6 +90,7 @@ for job in $jobs; do
             hijpass_log WARN "$key: source $source_index unavailable"
             continue
         fi
+        hijpass_progress verify "$key"
         if [ "$kind" = geo ]; then
             probe=example.org
             [ "$key" != geoip ] || probe=1.1.1.1
@@ -111,6 +114,7 @@ for job in $jobs; do
         hijpass_log WARN "$key: source $source_index returned invalid or empty data"
     done
     [ "$sources" -gt 0 ] || fail_resource 'Download' "$work/curl-error"
+    hijpass_progress install "$key"
     staged=$temp
     if [ "$kind" != geo ]; then
         staged=$temp.text
@@ -136,6 +140,7 @@ rm -rf "$work"
 work=
 exec 9>&-
 if [ "$action" = update ] && [ "$enabled" = 1 ] && [ "$completed" -gt 0 ]; then
+    hijpass_progress restart
     hijpass_log INFO 'Applying updated rules: restarting hijpass'
     if ! hijpass_run_logged 'Restart hijpass after rule update' /etc/init.d/hijpass restart; then
         hijpass_run_ucode "$data" result restart

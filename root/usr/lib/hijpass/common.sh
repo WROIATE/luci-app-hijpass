@@ -27,6 +27,20 @@ hijpass_lock_updates() {
     done
 }
 
+# 只更新现有后台任务的内存状态；jshn 在子 Shell 中运行，不影响业务 JSON 游标。
+hijpass_progress() (
+    [ -n "${HIJPASS_JOB_DIRECTORY:-}" ] || exit 0
+    json_init
+    json_add_string phase "$1"
+    json_add_string resource "${2:-}"
+    json_add_string file "${3:-}"
+    json_add_int attempt "${4:-0}"
+    if json_dump >"$HIJPASS_JOB_DIRECTORY/progress.new"; then
+        mv -f "$HIJPASS_JOB_DIRECTORY/progress.new" "$HIJPASS_JOB_DIRECTORY/progress"
+    fi
+    exit 0
+)
+
 # 业务消息直接描述操作，DEBUG 模式附加当前脚本路径。
 hijpass_log() (
     level=$1

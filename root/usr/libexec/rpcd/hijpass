@@ -66,12 +66,13 @@ case "$method" in
         argument keyword
         if "$HIJPASS_LIB/network/network.sh" iptype "$keyword" >/dev/null 2>&1; then type=geoip; else type=geosite; fi
         capture "$HIJPASS_LIB/rules/geoview.sh" -l "$type" "$keyword" ;;
-    core_version|core_latest|core_update)
+    core_version|core_latest|core_update|core_update_status)
         argument core
         action=${method#core_}
         case "$core" in xray|sing-box) ;;
             *) hijpass_json_error 'invalid core action'; exit 0 ;; esac
         if [ "$action" = update ]; then structured "$HIJPASS_LIB/rpc/jobs.sh" start "$core"
+        elif [ "$action" = update_status ]; then structured "$HIJPASS_LIB/rpc/jobs.sh" current "$core"
         else structured "$HIJPASS_LIB/core/update.sh" "$action" "$core"; fi ;;
     job_status)
         argument id

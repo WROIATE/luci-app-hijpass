@@ -19,6 +19,7 @@ if [ "$action" = version ]; then
     exit $?
 fi
 if [ "$action" = update ]; then
+    hijpass_progress metadata "$core"
     hijpass_lock_updates || { hijpass_json_error 'another update or service operation is running'; exit 75; }
     output=$("/usr/bin/$core" version 2>/dev/null) || output=
     current=$(printf '%s\n' "$output" | hijpass_run_ucode "$data" version "$core") || current='{}'
@@ -41,13 +42,16 @@ rm -rf "$work" && mkdir -m 700 "$work" || exit 1
 download="$work/$name"
 hijpass_log INFO "$core downloading target=$number"
 stage=download
+hijpass_progress download "$name" "$download"
 hijpass_run_logged "Download $core archive" curl -f -sS -L --max-time 120 -o "$download" -- "$url" || { hijpass_json_error 'core download failed'; exit 1; }
 stage=checksum
+hijpass_progress verify "$name"
 actual=$(sha256sum "$download") || { hijpass_json_error 'cannot checksum archive'; exit 1; }
 actual=${actual%% *}
 [ "$actual" = "$digest" ] || { hijpass_json_error 'archive checksum verification failed'; exit 1; }
 hijpass_log INFO "$core archive verified: bytes=$(wc -c <"$download")"
 stage=extraction
+hijpass_progress extract "$name"
 # 只提取目标核心，不展开其它归档成员；二进制始终流式复制。
 if [ "$archive" = zip ]; then
     hijpass_run_logged "Extract $core archive" unzip -q "$download" xray -d "$work" || { hijpass_json_error 'cannot extract core'; exit 1; }
@@ -59,6 +63,7 @@ else
     binary="$work/$member"
 fi
 stage=binary-verification
+hijpass_progress verify "$core"
 chmod 755 "$binary" && output=$("$binary" version) || { hijpass_json_error 'binary verification failed'; exit 1; }
 checked=$(printf '%s\n' "$output" | hijpass_run_ucode "$data" version "$core") || exit 1
 json_load "$checked" || exit 1
@@ -68,6 +73,7 @@ json_get_var installed version
 rm -f "$destination".new.* || { hijpass_json_error 'cannot remove old staged core'; exit 1; }
 temp="$destination.new.$$"
 stage=installation
+hijpass_progress install "$core"
 hijpass_run_logged "Save staged $core binary" cp "$binary" "$temp" || { hijpass_json_error 'cannot save staged core'; exit 1; }
 hijpass_run_logged "Set $core binary permissions" chmod 755 "$temp" || { hijpass_json_error 'cannot set core permissions'; exit 1; }
 hijpass_run_logged "Replace installed $core binary" mv -f "$temp" "$destination" || { hijpass_json_error 'cannot replace installed core'; exit 1; }

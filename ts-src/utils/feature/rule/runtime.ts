@@ -1,3 +1,4 @@
+import { formatUpdateProgress } from './progress';
 import { Backend } from "../../backend";
 
 import { CORE_TYPE } from "../../../enum/hijpass";
@@ -27,15 +28,20 @@ function updateCore(
     core: string,
     title: string,
     versionElement: HTMLElement,
-    button: HTMLButtonElement
+    button: HTMLButtonElement,
+    statusElement: HTMLElement,
+    taskId?: string
 ) {
     button.disabled = true;
     button.textContent = _('Updating...');
 
-    Backend.coreAction('update', core)
+    statusElement.textContent = _('Updating...');
+    const progress = value => { statusElement.textContent = formatUpdateProgress(value); };
+    (taskId ? Backend.resumeCoreUpdate(taskId, progress) : Backend.coreAction('update', core, progress))
         .then((result: any) => {
             if (result?.success) {
                 versionElement.textContent = result.version || _('Updated');
+                statusElement.textContent = _('Updated to %s. Restart affected services to use the new version.').format(result.version);
                 NotificationUtils.success(
                     title,
                     _('Updated to %s. Restart affected services to use the new version.').format(result.version),
@@ -44,6 +50,7 @@ function updateCore(
                 return;
             }
 
+            statusElement.textContent = _('Update failed: %s').format(result?.error || 'unknown');
             NotificationUtils.error(
                 title,
                 _('Update failed: %s').format(result?.error || 'unknown'),
@@ -51,7 +58,8 @@ function updateCore(
             );
         })
         .catch((error: any) => {
-            NotificationUtils.error(title, error.message || _('Update failed'), 5000);
+            statusElement.textContent = error.message || _('Update failed');
+            NotificationUtils.error(title, statusElement.textContent, 5000);
         })
         .finally(() => {
             button.disabled = false;
@@ -68,16 +76,28 @@ function createCoreRow(core: string, label: string) {
         'style': 'display:inline-block;min-width:5.5em',
         'aria-live': 'polite'
     }, _('Loading...')) as HTMLElement;
+    const statusElement = E('span', { role: 'status', 'aria-live': 'polite',
+        style: 'flex-basis:100%;overflow-wrap:anywhere' }) as HTMLElement;
     const updateButton = E('button', {
         'class': 'cbi-button cbi-button-action',
         'type': 'button',
         'click': function (event: MouseEvent) {
             event.preventDefault();
-            updateCore(core, label, currentVersionElement, event.currentTarget as HTMLButtonElement);
+            if (updateButton.disabled) return;
+            updateCore(core, label, currentVersionElement, event.currentTarget as HTMLButtonElement, statusElement);
         }
-    }, _('Update')) as HTMLButtonElement;
+    }, _('Checking...')) as HTMLButtonElement;
+    updateButton.disabled = true;
+    const loadStatus = () => Backend.coreUpdateStatus(core).then(({ id }) => {
+        if (id) updateCore(core, label, currentVersionElement, updateButton, statusElement, id);
+        else { updateButton.disabled = false; updateButton.textContent = _('Update'); }
+    }).catch(error => {
+        statusElement.textContent = _('Failed to check update status: %s').format(error.message);
+        updateButton.disabled = false;
+        updateButton.textContent = _('Update');
+    });
 
-    const element = E('div', { 'class': 'cbi-value' }, [
+    const element = E('div', { 'class': 'cbi-value', 'data-core': core }, [
         E('label', { 'class': 'cbi-value-title' }, label),
         E('div', {
             'class': 'cbi-value-field',
@@ -91,10 +111,11 @@ function createCoreRow(core: string, label: string) {
                 E('strong', {}, _('Latest Version') + ':'),
                 latestVersionElement
             ]),
-            updateButton
+            updateButton, statusElement
         ])
     ]);
     return { element, loadVersions: () => {
+        loadStatus();
         loadCoreVersion(currentVersionElement, core);
         loadLatestCoreVersion(latestVersionElement, core);
     } };

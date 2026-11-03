@@ -18,7 +18,8 @@ function panel(updateRules, ruleUpdateStatus = async () => ({ id: null }), resum
         return node;
     }
     const context = vm.createContext({ exports: {}, E, _: value => value,
-        require: () => ({ Backend: { updateRules, ruleUpdateStatus, resumeRuleUpdate } }),
+        require: name => name === './progress' ? { formatUpdateProgress: progress => progress.phase + ': ' + progress.resource }
+            : ({ Backend: { updateRules, ruleUpdateStatus, resumeRuleUpdate } }),
     });
     vm.runInContext('String.prototype.format = function(value) { return this.replace("%s", value); };', context);
     const source = fs.readFileSync(path.join(__dirname, '../utils/feature/rule/panel.ts'), 'utf8');
@@ -94,4 +95,19 @@ test('apply failure is distinguished from download failure', async () => {
     f.button.attributes.click({ preventDefault() {} });
     await new Promise(setImmediate);
     assert.equal(f.status.textContent, 'Rule files updated, but service restart failed; see main log');
+});
+
+ test('refresh restores live resource progress before completion', async () => {
+    let finish;
+    const f = panel(() => assert.fail('must not start another update'), async () => ({ id: 'Task1234' }), (id, progress) => {
+        progress({ phase: 'download', resource: 'geoip', bytes: 4096 });
+        return new Promise(resolve => { finish = resolve; });
+    });
+    await new Promise(setImmediate);
+    assert.equal(f.status.textContent, 'download: geoip');
+    assert.equal(f.button.disabled, true);
+    finish({ success: false, failed: ['geoip'] });
+    await new Promise(setImmediate);
+    assert.equal(f.status.textContent, 'Rule File Update Failed: GeoIP');
+    assert.equal(f.button.disabled, false);
 });

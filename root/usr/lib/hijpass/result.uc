@@ -34,7 +34,13 @@ run(ARGV,
             die('missing result directory');
         }
         if (action == 'job' && !fs.stat(directory + '/exit')) {
-            return { running: true };
+            let progress;
+            try { progress = json(fs.readfile(directory + '/progress') || '{}'); }
+            catch (e) { progress = {}; }
+            if (type(progress) != 'object') progress = {};
+            let bytes = progress.phase == 'download' && progress.file ? fs.stat(progress.file)?.size : null;
+            return { running: true, progress: { phase: progress.phase || 'prepare',
+                resource: progress.resource || '', attempt: progress.attempt || 0, bytes } };
         }
         let code = int(action == 'job' ? text(directory + '/exit') : args[1]);
         if (type(code) != 'int' || code < 0 || code > 255) {

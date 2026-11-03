@@ -27,6 +27,7 @@
           "trace_status",
           "core_version",
           "core_latest",
+          "core_update_status",
           "job_status"
         ]
       }

@@ -847,6 +847,13 @@ i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); don
         await until(() => fs.existsSync(started));
         const active = JSON.parse(f.run('rpc/jobs.sh', ['current', 'rules']).stdout);
         assert.match(active.id, /^[A-Za-z0-9]{8}$/);
+        const progress = JSON.parse(f.run('rpc/jobs.sh', ['status', active.id]).stdout);
+        assert.equal(progress.running, true);
+        assert.equal(progress.progress.phase, 'download');
+        assert.equal(progress.progress.resource, 'chn_domain_list');
+        assert.equal(progress.progress.attempt, 1);
+        assert.equal('file' in progress.progress, false);
+
         for (const args of [['chnlist', '--configdir', config], ['update', '--scheduled', '--configdir', config]]) {
             const duplicate = f.run('rules/update.sh', args);
             assert.equal(duplicate.status, 75, duplicate.stderr);
@@ -1401,4 +1408,31 @@ printf '{"success":true}\\n'
     await until(() => fs.existsSync(jobs + '/' + id + '/exit'));
     assert.equal(f.run('rpc/jobs.sh', ['clear']).status, 0);
     assert.equal(fs.existsSync(jobs + '/' + id), false);
+});
+
+for (const core of ['xray', 'sing-box']) test(`${core} 刷新恢复活动任务，下载大小实时读取且重复点击不会启动第二个任务`, async t => {
+    const f = fixture(t), release = f.directory + '/release', started = f.directory + '/started', download = f.directory + '/download';
+    fs.writeFileSync(f.runtime + '/core/update.sh', `#!/usr/bin/busybox ash
+. '${f.runtime}/common.sh'
+printf started >>'${started}'
+printf 1234 >'${download}'
+hijpass_progress download archive '${download}'
+while [ ! -f '${release}' ]; do sleep 0.05; done
+hijpass_progress install "$2"
+printf '{"success":true}\\n'
+`);
+    const first = JSON.parse(f.run('rpc/jobs.sh', ['start', core]).stdout);
+    try {
+        await until(() => fs.existsSync(download));
+        await until(() => JSON.parse(f.run('rpc/jobs.sh', ['status', first.id]).stdout).progress?.phase === 'download');
+        assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['current', core]).stdout).id, first.id);
+        assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['start', core]).stdout).id, first.id);
+        assert.equal(fs.readFileSync(started, 'utf8'), 'started');
+        assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['status', first.id]).stdout).progress.bytes, 4);
+        fs.appendFileSync(download, '5678');
+        assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['status', first.id]).stdout).progress.bytes, 8);
+    } finally { fs.writeFileSync(release, ''); }
+    await until(() => !JSON.parse(f.run('rpc/jobs.sh', ['status', first.id]).stdout).running);
+    assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['current', core]).stdout).id, null);
+    assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['status', first.id]).stdout).code, 0);
 });

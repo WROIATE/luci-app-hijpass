@@ -2,7 +2,6 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
-const net = require('node:net');
 const { spawnSync } = require('node:child_process');
 const { root, run, runShell, withConfig, shellRuntime } = require('./helpers.cjs');
 
@@ -486,6 +485,7 @@ test('subprocess arguments and connection JSON survive quotes and reject malform
     assert.equal(fs.existsSync(path.join(directory, 'injected')), false);
     script(directory, 'curl', "printf '204\\n192.0.2.1\\n443\\n0.001\\n0.002\\n0.003\\n0.004\\n0.005\\n'");
     const result = value({ action: 'connect', url: 'https://example.org', timeout: '5' }, { PATH: directory + ':' + process.env.PATH });
+    assert.equal(result.url, 'https://example.org');
     assert.equal(result.total_time_ms, 5); assert.equal(result.server_processing_time_ms, 4); assert.equal(result.success, true);
     assert.notEqual(invoke({ action: 'connect', url: 'https://example.org', timeout: '5oops' }).status, 0);
 });
@@ -639,6 +639,7 @@ test('连接失败的 curl 输出仍转换为完整报告，核心与诊断命�
         { PATH: directory + ':' + process.env.PATH });
     assert.equal(result.success, false);
     assert.equal(result.exit_code, 28);
+    assert.equal(result.url, 'https://example.org');
     assert.equal(result.http_code, 0);
     assert.equal(result.remote_ip, '');
     assert.equal(result.total_time_ms, 5);

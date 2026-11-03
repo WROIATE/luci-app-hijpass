@@ -140,7 +140,7 @@ export function main() { run(ARGV,
     }
     if (action == 'report' || action == 'ping-report') {
         let response = { stdout: fs.stdin.read('all'), code: int(args[0]) };
-        return action == 'report' ? curlReport(response, args[2] || '') : pingReport(response, args[2] || '');
+        return action == 'report' ? curlReport(response, args[1] || '') : pingReport(response, args[1] || '');
     }
     die('unknown network data action');
 }, true);

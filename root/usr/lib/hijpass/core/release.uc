@@ -1,6 +1,6 @@
 /** @typedef {import('../../../share/ucode/hijpass/types/release.uc').AssetPlan} AssetPlan */
 /** @typedef {import('../../../share/ucode/hijpass/types/release.uc').CoreRelease} CoreRelease */
-import { text } from 'hijpass.common';
+import * as fs from 'fs';
 import { run } from 'hijpass.command.runtime';
 // CoreRelease：tag_name 为官方版本，assets 含 name/state/browser_download_url/digest。
 // 此处只校验发布元数据，归档和可执行文件的验证由 Shell 执行。
@@ -93,19 +93,19 @@ export function main() { run(ARGV,
         return `https://api.github.com/repos/${repos[core]}/releases/latest\n`;
     }
     if (action == 'member') {
-        let member = filter(split(text(args[0]), '\n'), entry => match(entry, /^sing-box-[A-Za-z0-9.+-]+\/sing-box$/))[0];
+        let member = filter(split(fs.stdin.read('all'), '\n'), entry => match(entry, /^sing-box-[A-Za-z0-9.+-]+\/sing-box$/))[0];
         if (!member) {
             die('binary not found in archive');
         }
         return member + '\n';
     }
     if (action == 'version') {
-        let output = text(args[0]), m = match(output, core == 'xray' ? /Xray ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/ : /sing-box version ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/);
+        let output = fs.stdin.read('all'), m = match(output, core == 'xray' ? /Xray ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/ : /sing-box version ([0-9]+[.][0-9]+[.][0-9]+[^ \n]*)/);
         return { core, version: m ? m[1] : 'unknown' };
     }
     if (action == 'latest' || action == 'plan') {
-        let info = release(core, text(args[0]));
-        return action == 'latest' ? { core, version: info.tag_name } : assetPlan(core, args[1], info);
+        let info = release(core, fs.stdin.read('all'));
+        return action == 'latest' ? { core, version: info.tag_name } : assetPlan(core, args[0], info);
     }
     if (action == 'error') {
         return { success: false, error: args[0] || 'core update failed' };

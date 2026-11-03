@@ -310,7 +310,7 @@ export function main() { run(ARGV,
     }
     if (action == 'match') {
         let config = read('hijpass', configDirectory);
-        return routeMatch(config, args[0] || '', args[1] ? text(args[1]) : '');
+        return routeMatch(config, args[0] || '', fs.stdin.read('all'));
     }
     if (action == 'result') {
         let failed = args;

@@ -5,7 +5,6 @@
 import * as fs from 'fs';
 import { query } from 'resolv';
 import { port } from 'hijpass.config.values';
-import { text } from 'hijpass.common';
 import { run } from 'hijpass.command.runtime';
 import { parseCIDR } from 'hijpass.ip';
 
@@ -140,7 +139,7 @@ export function main() { run(ARGV,
         return request(args[0], args[1], args[2]);
     }
     if (action == 'report' || action == 'ping-report') {
-        let response = { stdout: text(args[0]), code: int(args[1]) };
+        let response = { stdout: fs.stdin.read('all'), code: int(args[0]) };
         return action == 'report' ? curlReport(response, args[2] || '') : pingReport(response, args[2] || '');
     }
     die('unknown network data action');

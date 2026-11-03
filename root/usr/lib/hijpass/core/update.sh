@@ -7,36 +7,35 @@ data="$HIJPASS_LIB/core/releasecli.uc"
 action=${1:-}; core=${2:-}
 case "$core" in xray|sing-box) ;; *) hijpass_json_error 'core action and name are required'; exit 1 ;; esac
 case "$action" in version|latest|update) ;; *) hijpass_json_error 'unknown core update action'; exit 1 ;; esac
-work=$(mktemp -d /tmp/hijpass-update.XXXXXX) || exit 1
+work=
 temp=
 stage=release
 committed=0
 started=$(date +%s)
 trap 'code=$?; if [ -n "$temp" ]; then rm -f "$temp"; fi; rm -rf "$work"; if [ "$action" = update ] && [ "$code" -ne 0 ]; then hijpass_log ERROR "$core update failed: stage=$stage, exit=$code, binary_replaced=$committed"; fi' EXIT
 if [ "$action" = version ]; then
-    : >"$work/version"
-    [ ! -x "/usr/bin/$core" ] || "/usr/bin/$core" version >"$work/version" 2>/dev/null || : >"$work/version"
-    hijpass_run_ucode "$data" version "$core" "$work/version"
+    output=$("/usr/bin/$core" version 2>/dev/null) || output=
+    printf '%s\n' "$output" | hijpass_run_ucode "$data" version "$core"
     exit $?
 fi
 if [ "$action" = update ]; then
-    : >"$work/current"
-    [ ! -x "/usr/bin/$core" ] || "/usr/bin/$core" version >"$work/current" 2>/dev/null || : >"$work/current"
-    current=$(hijpass_run_ucode "$data" version "$core" "$work/current") || current='{}'
+    output=$("/usr/bin/$core" version 2>/dev/null) || output=
+    current=$(printf '%s\n' "$output" | hijpass_run_ucode "$data" version "$core") || current='{}'
     json_load "$current"
     json_get_var current_version version
     hijpass_log INFO "$core update started: current=${current_version:-unknown}, architecture=$(uname -m)"
 fi
 url=$(hijpass_run_ucode "$data" source "$core") || exit 1
 if [ "$action" = update ]; then
-    hijpass_run_logged "Fetch $core release metadata" curl -f -sS -L --max-time 10 "$url" >"$work/release" || { hijpass_json_error 'cannot fetch core release'; exit 1; }
+    release=$(hijpass_run_logged "Fetch $core release metadata" curl -f -sS -L --max-time 10 "$url") || { hijpass_json_error 'cannot fetch core release'; exit 1; }
 else
-    curl -f -sS -L --max-time 10 "$url" >"$work/release" || { hijpass_json_error 'cannot fetch core release'; exit 1; }
+    release=$(curl -f -sS -L --max-time 10 "$url") || { hijpass_json_error 'cannot fetch core release'; exit 1; }
 fi
-if [ "$action" = latest ]; then hijpass_run_ucode "$data" latest "$core" "$work/release"; exit $?; fi
-plan=$(hijpass_run_ucode "$data" plan "$core" "$work/release" "$(uname -m)") || { printf '%s\n' "$plan"; exit 1; }
+if [ "$action" = latest ]; then printf '%s\n' "$release" | hijpass_run_ucode "$data" latest "$core"; exit $?; fi
+plan=$(printf '%s\n' "$release" | hijpass_run_ucode "$data" plan "$core" "$(uname -m)") || { printf '%s\n' "$plan"; exit 1; }
 json_load "$plan" || exit 1
 json_get_vars version number name url digest destination archive
+work=$(mktemp -d /tmp/hijpass-update.XXXXXX) || exit 1
 download="$work/$name"
 hijpass_log INFO "$core downloading target=$number"
 stage=download
@@ -52,14 +51,14 @@ if [ "$archive" = zip ]; then
     hijpass_run_logged "Extract $core archive" unzip -q "$download" xray -d "$work" || { hijpass_json_error 'cannot extract core'; exit 1; }
     binary="$work/xray"
 else
-    hijpass_run_logged "Inspect $core archive" tar -tzf "$download" >"$work/members" || { hijpass_json_error 'invalid core archive'; exit 1; }
-    member=$(hijpass_run_ucode "$data" member "$core" "$work/members") || exit 1
+    members=$(hijpass_run_logged "Inspect $core archive" tar -tzf "$download") || { hijpass_json_error 'invalid core archive'; exit 1; }
+    member=$(printf '%s\n' "$members" | hijpass_run_ucode "$data" member "$core") || exit 1
     hijpass_run_logged "Extract $core archive" tar -xzf "$download" -C "$work" "$member" || { hijpass_json_error 'cannot extract core'; exit 1; }
     binary="$work/$member"
 fi
 stage=binary-verification
-chmod 755 "$binary" && "$binary" version >"$work/version" || { hijpass_json_error 'binary verification failed'; exit 1; }
-checked=$(hijpass_run_ucode "$data" version "$core" "$work/version") || exit 1
+chmod 755 "$binary" && output=$("$binary" version) || { hijpass_json_error 'binary verification failed'; exit 1; }
+checked=$(printf '%s\n' "$output" | hijpass_run_ucode "$data" version "$core") || exit 1
 json_load "$checked" || exit 1
 json_get_var installed version
 [ "$installed" = "$number" ] || { hijpass_json_error 'binary verification failed'; exit 1; }

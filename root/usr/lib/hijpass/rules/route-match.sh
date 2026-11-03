@@ -8,7 +8,6 @@ target=${1:-}
 plan=$(hijpass_run_ucode "$HIJPASS_LIB/rules/rulescli.uc" match-plan "$target" "$@") || exit 1
 json_load "$plan" || exit 1
 json_get_vars kind lookup
-output=$(mktemp /tmp/hijpass-match.XXXXXX) || exit 1
-trap 'rm -f "$output"' EXIT
-if [ "$lookup" = 1 ]; then "$HIJPASS_LIB/rules/geoview.sh" -l "$kind" "$target" >"$output" || exit 1; fi
-hijpass_run_ucode "$HIJPASS_LIB/rules/rulescli.uc" match "$target" "$output" "$@"
+tags=
+if [ "$lookup" = 1 ]; then tags=$("$HIJPASS_LIB/rules/geoview.sh" -l "$kind" "$target") || exit $?; fi
+printf '%s\n' "$tags" | hijpass_run_ucode "$HIJPASS_LIB/rules/rulescli.uc" match "$target" "$@"

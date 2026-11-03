@@ -15,15 +15,13 @@ esac
 plan=$(hijpass_run_ucode "$data" request "$url" "$timeout" "$socks") || { printf '%s\n' "$plan"; exit 1; }
 json_load "$plan" || exit 1
 json_get_vars url timeout socks
-output=$(mktemp /tmp/hijpass-connect.XXXXXX) || exit 1
-trap 'rm -f "$output"' EXIT
 # 单次请求保留真实退出码；curl 失败仍交给 ucode 返回完整测速报告。
 set -- curl -I -sS -o /dev/null --max-time "$timeout" -w '%{http_code}\n%{remote_ip}\n%{remote_port}\n%{time_namelookup}\n%{time_connect}\n%{time_appconnect}\n%{time_starttransfer}\n%{time_total}\n'
 [ -z "$socks" ] || set -- "$@" --socks5 "127.0.0.1:$socks"
-"$@" -- "$url" >"$output" 2>/dev/null
+output=$("$@" -- "$url" 2>/dev/null)
 code=$?
 if [ "$action" = ping ]; then
-    hijpass_run_ucode "$data" ping-report "$output" "$code" "$url"
+    printf '%s\n' "$output" | hijpass_run_ucode "$data" ping-report "$code" "$url"
 else
-    hijpass_run_ucode "$data" report "$output" "$code" "$url"
+    printf '%s\n' "$output" | hijpass_run_ucode "$data" report "$code" "$url"
 fi

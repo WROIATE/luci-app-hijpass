@@ -19,16 +19,17 @@ if [ "$mode" = query ]; then
     json_get_keys entries
     set --
     for entry in $entries; do json_get_var value "$entry"; set -- "$@" "$value"; done
-    output=$(mktemp /tmp/hijpass-geoview.XXXXXX) || exit 1
-    trap 'rm -f "$output"' EXIT
-    if [ "$extract" = 1 ]; then
-        geoview -type "$kind" -action extract -input "$input" -list "$@" >"$output" || exit 1
-    else
-        geoview -type "$kind" -action lookup -input "$input" -value "$@" >"$output" || exit 1
-    fi
-    # 显式 ASCII 映射兼容未启用字符类支持的 BusyBox tr。
-    LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz' <"$output"
-    exit $?
+    # BusyBox ash 的 pipefail 保留 geoview 失败状态；失败时不发布部分查询结果。
+    set -o pipefail
+    output=$({
+        if [ "$extract" = 1 ]; then
+            geoview -type "$kind" -action extract -input "$input" -list "$@"
+        else
+            geoview -type "$kind" -action lookup -input "$input" -value "$@"
+        fi
+    } | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz') || exit $?
+    [ -z "$output" ] || printf '%s\n' "$output"
+    exit 0
 fi
 json_select jobs
 json_get_keys jobs

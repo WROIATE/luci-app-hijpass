@@ -1,3 +1,4 @@
+import ui from 'ui';
 import { parser } from '@lezer/json';
 import { highlightTree, tagHighlighter, tags } from '@lezer/highlight';
 import { codeColors } from '../../base/luci/code';
@@ -28,4 +29,13 @@ function render(source: string, label: string): HTMLElement {
     return content;
 }
 
-export const ConfigPreviewUtils = { render };
+function show(title: string, source: string) {
+    ui.showModal(title, [
+        E('div', { class: 'cbi-section' }, [render(source, _('Config Preview'))]),
+        E('div', { class: 'right' }, [
+            E('button', { class: 'btn cbi-button', click: ui.hideModal }, _('Close')),
+        ]),
+    ]);
+}
+
+export const ConfigPreviewUtils = { render, show };

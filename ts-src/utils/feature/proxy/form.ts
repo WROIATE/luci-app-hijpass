@@ -371,14 +371,8 @@ const ProxyFormUtils = {
                         conf = { error: e.message };
                     }
                     let name = uci.get(LuciFlied.CONF_NAME, section_id, 'name') || section_id;
-                    let contentEl = ConfigPreviewUtils.render(
-                        JSON.stringify(conf, JsonUtils.omitEmptyReplacer, 2), _('Config Preview'));
-                    ui.showModal(name + ' - ' + _('Config Preview'), [
-                        E('div', { class: 'cbi-section' }, [contentEl]),
-                        E('div', { class: 'right' }, [
-                            E('button', { class: 'btn cbi-button', click: ui.hideModal }, _('Close'))
-                        ])
-                    ]);
+                    ConfigPreviewUtils.show(name + ' - ' + _('Config Preview'),
+                        JSON.stringify(conf, JsonUtils.omitEmptyReplacer, 2));
                 }
             }, _('Preview')));
         }

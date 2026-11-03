@@ -105,10 +105,8 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
         const preview = E('button', { class: 'btn cbi-button', click: async () => {
             try {
                 const result = await Backend.renderServer(JSON.stringify(uci.sections(configName, undefined)), id);
-                ui.showModal(_('Configuration Preview'), [
-                    ConfigPreviewUtils.render(JSON.stringify(result.config, null, 2), _('Configuration Preview')),
-                    E('div', { class: 'right' }, E('button', { class: 'btn', click: ui.hideModal }, _('Close'))),
-                ]);
+                const name = uci.get(configName, id, 'name') || id;
+                ConfigPreviewUtils.show(name + ' - ' + _('Config Preview'), JSON.stringify(result.config, null, 2));
             } catch (error) { NotificationUtils.error(_('Configuration Preview'), error.message); }
         } }, _('Preview'));
         return E('span', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, log ? [preview, log] : [preview]);

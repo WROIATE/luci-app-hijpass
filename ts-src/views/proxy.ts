@@ -91,7 +91,10 @@ const v = view.extend({
                     width:100%; min-width:0;
                 }
                 .cbi-value[data-name="custom_conf"] .cm-editor {
-                    max-width:56rem; height:26rem; min-height:min(16rem, 60vh); max-height:60vh;
+                    min-width:18rem; max-width:56rem; height:26rem; min-height:min(16rem, 60vh); max-height:60vh;
+                }
+                @media (max-width:1366px) {
+                    .cbi-value[data-name="custom_conf"] .cm-editor { min-width:16rem; }
                 }`),
             await m.render(),
         ]);

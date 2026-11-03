@@ -6,11 +6,7 @@
 data="$HIJPASS_LIB/rules/rulescli.uc"
 action=${1:-update}
 [ "$#" -eq 0 ] || shift
-if [ "$action" = query ]; then hijpass_run_ucode "$data" query "$@"; exit $?; fi
-# 由实际更新进程持有锁。curl 等短期子进程继承锁，服务启动命令关闭 fd 9。
-mkdir -p "$HIJPASS_JOB_ROOT" && chmod 700 "$HIJPASS_JOB_ROOT" || exit 1
-exec 9>"$HIJPASS_JOB_ROOT/rules.lock"
-if ! flock -n 9; then
+if ! hijpass_lock_updates; then
     hijpass_run_ucode "$data" busy
     exit 75
 fi
@@ -30,7 +26,8 @@ connect_timeout=$timeout
 [ "$connect_timeout" -le 10 ] || connect_timeout=10
 json_select jobs
 json_get_keys jobs
-work=$(mktemp -d /tmp/hijpass-rules.XXXXXX) || { hijpass_json_error 'cannot create rules workspace'; exit 1; }
+work="$HIJPASS_JOB_ROOT/work"
+rm -rf "$work" && mkdir -m 700 "$work" || { hijpass_json_error 'cannot create rules workspace'; exit 1; }
 temp=
 completed=0
 trap 'if [ -n "$temp" ]; then rm -f "$temp" "$temp.text"; fi; rm -rf "$work"' EXIT
@@ -61,6 +58,7 @@ for job in $jobs; do
     : >"$work/curl-error" || fail_resource 'Prepare download diagnostics' "$work/error"
     [ -n "$urls" ] || fail_resource 'Download' "$work/curl-error"
     mkdir -p "$(dirname -- "$path")" 2>"$work/error" || fail_resource 'Prepare destination' "$work/error"
+    rm -f "$path".new.* 2>"$work/error" || fail_resource 'Remove old staged files' "$work/error"
     temp=$(mktemp "$path.new.XXXXXX" 2>"$work/error") || fail_resource 'Create staged file' "$work/error"
     for entry in $urls; do
         source_index=$((source_index + 1))
@@ -133,6 +131,10 @@ for job in $jobs; do
     json_select ..
     json_select ..
 done
+# 所有文件已提交，先清理工作区并释放锁，再调用会等待同一把锁的 init。
+rm -rf "$work"
+work=
+exec 9>&-
 if [ "$action" = update ] && [ "$enabled" = 1 ] && [ "$completed" -gt 0 ]; then
     hijpass_log INFO 'Applying updated rules: restarting hijpass'
     if ! hijpass_run_logged 'Restart hijpass after rule update' /etc/init.d/hijpass restart; then

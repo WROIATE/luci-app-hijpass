@@ -216,7 +216,6 @@ exit 1
 test('completed jobs return large stdout and stderr without environment-variable limits', t => {
     const f = fixture(t), id = 'Large123', job = path.join(f.directory, 'jobs', id);
     fs.mkdirSync(job, { recursive: true });
-    assert.deepEqual(f.invoke('job_status', { id }), { running: true });
     const stdout = 'updated "rule" \\ 规则\n'.repeat(8000);
     const stderr = 'warning "quoted" \\ 警告\n'.repeat(8000);
     fs.writeFileSync(path.join(job, 'stdout'), stdout);
@@ -227,7 +226,6 @@ test('completed jobs return large stdout and stderr without environment-variable
     assert.equal(response.code, 7);
     assert.equal(response.stdout, stdout.replace(/\n+$/, ''));
     assert.equal(response.stderr, stderr.replace(/\n+$/, ''));
-    assert.equal(f.invoke('job_release', { id }).ok, true);
     assert.equal(fs.existsSync(job), true);
     assert.equal(f.invoke('job_status', { id }).code, 7);
 });
@@ -248,7 +246,6 @@ exit 1
     assert.deepEqual(f.invoke('job_status', { id: start.id }), {
         running: false, code: 1, stdout: '', stderr: 'job exited without a result',
     });
-    assert.equal(f.invoke('job_release', { id: start.id }).ok, true);
 });
 
 test('backend writes preserve TLS while resolving chains and reject snapshot storage paths', t => {
@@ -288,7 +285,7 @@ test('backend writes preserve TLS while resolving chains and reject snapshot sto
     }
 });
 
-test('download jobs return immediately, publish results and release only after completion', async t => {
+test('download jobs return immediately, publish results for repeated reads', async t => {
     const f = fixture(t);
     fs.writeFileSync(path.join(f.runtime, 'core/update.sh'), `#!/bin/sh
 . '${f.runtime}/common.sh'
@@ -305,14 +302,12 @@ hijpass_run_logged 'Download' download
     for (let i = 0; i < 40; i++) {
         status = f.invoke('job_status', { id: start.id });
         if (!status.running) break;
-        assert.ok(f.invoke('job_release', { id: start.id }).error);
         await new Promise(resolve => setTimeout(resolve, 50));
     }
     assert.equal(status.running, false);
     assert.equal(status.code, 0, status.stderr);
     assert.equal(JSON.parse(status.stdout).version, 'test');
     assert.equal(status.stderr, '');
-    assert.equal(f.invoke('job_release', { id: start.id }).ok, true);
     assert.equal(f.invoke('job_status', { id: start.id }).code, 0);
     const log = fs.readFileSync(path.join(f.directory, 'hijpass.log'), 'utf8');
     assert.match(log, /WARN\s+Download: Warning:/);

@@ -24,7 +24,6 @@ const firewallShow = method('firewall_show');
 const firewallDefault = method('firewall_template_default');
 const logs = method('log_list');
 const jobStatus = method('job_status', ['id']);
-const jobRelease = method('job_release', ['id']);
 
 // 每次轮询都是短 RPC；页面等待不会占住一次持续下载的 RPC 请求。
 async function runJob(start: (...args: any[]) => Promise<any>, jsonOutput: boolean, ...args: any[]) {
@@ -35,25 +34,21 @@ async function runJob(start: (...args: any[]) => Promise<any>, jsonOutput: boole
 
 async function waitForJob(id: string, jsonOutput: boolean) {
     if (typeof id !== 'string' || !/^[A-Za-z0-9]{8}$/.test(id)) throw new Error('Invalid job ID');
-    let finished = false;
-    try {
-        const deadline = Date.now() + 30 * 60 * 1000;
-        while (Date.now() < deadline) {
-            const status = await jobStatus(id);
-            if (!status.running) {
-                finished = true;
-                const result = jsonOutput ? JSON.parse(status.stdout || '{}') : status;
-                if (result.error) throw new Error(result.error);
-                if (status.code !== 0) {
-                    if (jsonOutput && result.success === false) return result;
-                    throw new Error(_('Backend operation failed; see main log'));
-                }
-                return result;
+    const deadline = Date.now() + 30 * 60 * 1000;
+    while (Date.now() < deadline) {
+        const status = await jobStatus(id);
+        if (!status.running) {
+            const result = jsonOutput ? JSON.parse(status.stdout || '{}') : status;
+            if (result.error) throw new Error(result.error);
+            if (status.code !== 0) {
+                if (jsonOutput && result.success === false) return result;
+                throw new Error(_('Backend operation failed; see main log'));
             }
-            await new Promise(resolve => window.setTimeout(resolve, 1000));
+            return result;
         }
-        throw new Error('Timed out waiting for backend job');
-    } finally { if (finished) await jobRelease(id).catch(console.error); }
+        await new Promise(resolve => window.setTimeout(resolve, 1000));
+    }
+    throw new Error('Timed out waiting for backend job');
 }
 
 const coreCalls = {

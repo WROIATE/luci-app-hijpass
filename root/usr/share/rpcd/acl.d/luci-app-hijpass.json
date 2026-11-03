@@ -50,8 +50,7 @@
           "rule_update",
           "core_update",
           "trace_start",
-          "trace_release",
-          "job_release"
+          "trace_release"
         ]
       }
     }

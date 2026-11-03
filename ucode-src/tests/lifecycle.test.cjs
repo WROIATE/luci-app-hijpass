@@ -327,3 +327,54 @@ for (const log of [null, '/tmp/server.log']) test(`服务端 cron 使用启动�
         ['enable', 'hijserver', '', log ? '1' : '0', '']);
     assert.equal(f.events().filter(event => event === 'hijserver:prepare').length, 1);
 });
+
+for (const action of ['start', 'stop', 'restart', 'reload']) test(`hijpass: ${action} 在更新锁释放前不改变服务`, async t => {
+    const { spawn } = require('node:child_process');
+    const f = fixture(t), ready = f.directory + '/ready', release = f.directory + '/release';
+    const holderFile = f.directory + '/hold-update';
+    f.script(holderFile, `. '${f.runtime}/common.sh'
+hijpass_lock_updates || exit 1
+touch '${ready}'
+while [ ! -f '${release}' ]; do sleep 0.02; done
+`);
+    const holder = spawn('/usr/bin/busybox', ['ash', holderFile], { env: process.env, stdio: 'ignore' });
+    const held = new Promise(resolve => holder.on('exit', resolve));
+    let child;
+    try {
+        for (let i = 0; i < 200 && !fs.existsSync(ready); i++) await new Promise(r => setTimeout(r, 10));
+        assert.ok(fs.existsSync(ready), 'update acquired lock');
+        child = spawn('/usr/bin/busybox', ['ash', root + '/ucode-src/tests/testdata/rc.common', f.directory + '/hijpass', action], {
+            env: { ...process.env, IPKG_INSTROOT: f.directory, EVENTS: f.directory + '/events', PLAN: f.planPath,
+                PATH: f.directory + '/bin:' + f.runtime + '/testbin:' + process.env.PATH }, stdio: 'ignore',
+        });
+        const done = new Promise(resolve => child.on('exit', resolve));
+        await new Promise(r => setTimeout(r, 150));
+        assert.equal(child.exitCode, null);
+        assert.equal(fs.existsSync(f.directory + '/events'), false, 'no preparation, firewall or stop before unlock');
+        fs.writeFileSync(release, '');
+        assert.equal(await held, 0);
+        assert.equal(await done, 0);
+        assert.ok(f.events().length > 0);
+        assert.equal(spawnSync('flock', ['-n', f.runtime + '/jobs/updates.lock', 'true']).status, 0);
+    } finally {
+        fs.writeFileSync(release, '');
+        if (child && child.exitCode === null) child.kill('SIGKILL');
+        if (holder.exitCode === null) holder.kill('SIGTERM');
+    }
+});
+
+test('hijpass: 等待更新超时直接退出，rc.common 不继续停止或启动实例', t => {
+    const f = fixture(t), init = f.directory + '/hijpass';
+    fs.writeFileSync(init, fs.readFileSync(init, 'utf8').replace('hijpass_lock_updates 300', 'hijpass_lock_updates 0'));
+    fs.mkdirSync(f.runtime + '/jobs', { recursive: true });
+    const driver = f.directory + '/locked';
+    f.script(driver, `exec 9>'${f.runtime}/jobs/updates.lock'
+flock -x 9
+export IPKG_INSTROOT='${f.directory}' EVENTS='${f.directory}/events' PLAN='${f.planPath}'
+export PATH='${f.directory}/bin:${f.runtime}/testbin':"$PATH"
+/usr/bin/busybox ash '${root}/ucode-src/tests/testdata/rc.common' '${init}' restart
+`);
+    const blocked = spawnSync('/usr/bin/busybox', ['ash', driver], { encoding: 'utf8', timeout: 5000 });
+    assert.equal(blocked.status, 1, blocked.stderr);
+    assert.equal(fs.existsSync(f.directory + '/events'), false);
+});

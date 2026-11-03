@@ -19,6 +19,7 @@ if [ "$action" = version ]; then
     exit $?
 fi
 if [ "$action" = update ]; then
+    hijpass_lock_updates || { hijpass_json_error 'another update or service operation is running'; exit 75; }
     output=$("/usr/bin/$core" version 2>/dev/null) || output=
     current=$(printf '%s\n' "$output" | hijpass_run_ucode "$data" version "$core") || current='{}'
     json_load "$current"
@@ -35,7 +36,8 @@ if [ "$action" = latest ]; then printf '%s\n' "$release" | hijpass_run_ucode "$d
 plan=$(printf '%s\n' "$release" | hijpass_run_ucode "$data" plan "$core" "$(uname -m)") || { printf '%s\n' "$plan"; exit 1; }
 json_load "$plan" || exit 1
 json_get_vars version number name url digest destination archive
-work=$(mktemp -d /tmp/hijpass-update.XXXXXX) || exit 1
+work="$HIJPASS_JOB_ROOT/work"
+rm -rf "$work" && mkdir -m 700 "$work" || exit 1
 download="$work/$name"
 hijpass_log INFO "$core downloading target=$number"
 stage=download
@@ -63,6 +65,7 @@ json_load "$checked" || exit 1
 json_get_var installed version
 [ "$installed" = "$number" ] || { hijpass_json_error 'binary verification failed'; exit 1; }
 # 同目录临时文件验证成功后再替换，失败始终保留原核心。
+rm -f "$destination".new.* || { hijpass_json_error 'cannot remove old staged core'; exit 1; }
 temp="$destination.new.$$"
 stage=installation
 hijpass_run_logged "Save staged $core binary" cp "$binary" "$temp" || { hijpass_json_error 'cannot save staged core'; exit 1; }

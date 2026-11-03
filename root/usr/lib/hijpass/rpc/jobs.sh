@@ -15,10 +15,11 @@ valid_id() {
 
 recover_job() {
     local directory="$1" pid
-    [ ! -f "$directory/exit" ] && [ -f "$directory/pid" ] || return 0
-    pid=$(cat "$directory/pid")
+    [ ! -f "$directory/exit" ] || return 0
+    pid=$(cat "$directory/pid" 2>/dev/null)
     case "$pid" in ''|*[!0-9]*) pid=0 ;; esac
-    if [ "$pid" -eq 0 ] || ! kill -0 "$pid" 2>/dev/null; then
+    if [ "$pid" -eq 0 ] || ! kill -0 "$pid" 2>/dev/null ||
+        ! tr '\000' '\n' 2>/dev/null <"/proc/$pid/cmdline" | grep -Fqx -- "$HIJPASS_LIB/rpc/jobs.sh"; then
         # 存活检查期间 worker 可能刚写入结果并退出，不能覆盖它的真实结果。
         [ ! -f "$directory/exit" ] || return 0
         hijpass_log ERROR "$(cat "$directory/kind" 2>/dev/null): worker exited without a result"
@@ -101,6 +102,8 @@ case "$action" in
             exit 0
         fi
         for expired in "$root"/*; do
+            [ -d "$expired" ] && valid_id "${expired##*/}" || continue
+            recover_job "$expired"
             [ -f "$expired/exit" ] || continue
             find "$expired" -maxdepth 0 -mmin +60 -exec rm -rf -- '{}' ';'
         done
@@ -142,7 +145,18 @@ case "$action" in
         json_init
         if active=$(active_rules); then json_add_string id "$active"; else json_add_null id; fi
         json_dump ;;
-    status|release)
+    clear)
+        # init 持有更新锁。只清理已结束任务，保留触发重启的调用者收尾所需目录。
+        exec 8>"$root/registry.lock"
+        flock -x 8 || exit 1
+        for directory in "$root"/*; do
+            [ -d "$directory" ] && valid_id "${directory##*/}" || continue
+            recover_job "$directory"
+            [ ! -f "$directory/exit" ] || rm -rf -- "$directory"
+        done
+        active_rules >/dev/null || rm -f "$root/rules.active"
+        rm -rf "$root/work" ;;
+    status)
         valid_id "$id" || { hijpass_json_error 'invalid job ID'; exit 1; }
         directory="$root/$id"
         [ -d "$directory" ] && [ ! -L "$directory" ] || { hijpass_json_error 'job not found'; exit 1; }
@@ -151,12 +165,6 @@ case "$action" in
         recover_job "$directory"
         flock -u 8
         exec 8>&-
-        if [ "$action" = release ]; then
-            [ -f "$directory/exit" ] || { hijpass_json_error 'job still running'; exit 1; }
-            # 多个页面可能观察同一任务；释放是确认读取，结果统一按保留期回收。
-            printf '{"ok":true}\n'
-        else
-            hijpass_run_ucode "$HIJPASS_LIB/result.uc" job "$directory"
-        fi ;;
+        hijpass_run_ucode "$HIJPASS_LIB/result.uc" job "$directory" ;;
     *) hijpass_json_error 'unknown job action'; exit 1 ;;
 esac

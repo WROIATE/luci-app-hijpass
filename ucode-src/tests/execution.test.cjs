@@ -840,7 +840,6 @@ i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); don
         assert.equal(JSON.parse(completed.stdout).success, true);
         assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['current', 'rules']).stdout).id, null);
         for (let i = 0; i < 2; i++) {
-            assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['release', active.id]).stdout).ok, true);
             assert.equal(JSON.parse(f.run('rpc/jobs.sh', ['status', active.id]).stdout).code, 0);
         }
         assert.equal(f.run('rules/update.sh', ['chnlist', '--configdir', config]).status, 0);
@@ -867,7 +866,7 @@ i=0; while [ "$i" -lt 10 ]; do echo server=/example.org/1.1.1.1; i=$((i+1)); don
         assert.equal(JSON.parse(blocked.stdout).code, 'UPDATE_BUSY');
         assert.equal(fs.readFileSync(started, 'utf8'), 'download\n');
         fs.writeFileSync(release, '');
-        await until(() => spawnSync('flock', ['-n', path.join(f.runtime, 'jobs/rules.lock'), 'true']).status === 0);
+        await until(() => spawnSync('flock', ['-n', path.join(f.runtime, 'jobs/updates.lock'), 'true']).status === 0);
         const retry = f.run('rules/update.sh', ['chnlist', '--configdir', config]);
         assert.equal(retry.status, 0, retry.stderr);
         assert.equal(fs.readFileSync(started, 'utf8'), 'download\ndownload\n');
@@ -1296,4 +1295,83 @@ for (const failure of ['write', 'reload']) test(`cron ${failure} 失败时普通
         assert.match(log, /ERROR.*Reload cron for hijpass: cron reload detail/);
         assert.match(log, /ERROR.*Reload cron for hijpass failed: exit=7/);
     }
+});
+
+test('规则提交完成后释放更新锁再重启，保留重启失败的退出状态', t => {
+    const f = fixture(t), calls = f.directory + '/restart';
+    f.patch('ucode/hijpass/config/paths.uc', '/etc/hijpass/rules', f.directory + '/rules');
+    f.patch('rules/rules.uc', '/usr/share/v2ray/', f.directory + '/geo/');
+    f.patch('rules/update-files.sh', '/etc/init.d/hijpass', f.directory + '/hijpass-init');
+    f.script('curl', `while [ "$1" != -o ]; do shift; done
+printf '%s\\n' 'example.org' 'another-example.org' 'yet-another-example.org' 'domain-one.example.org' 'domain-two.example.org' 'domain-three.example.org' >"$2"`);
+    f.script('geoview', 'exit 0');
+    f.script('hijpass-init', `exec 7>'${f.runtime}/jobs/updates.lock'
+flock -n 7 || exit 9
+[ ! -d '${f.runtime}/jobs/work' ] || exit 8
+echo restart >>'${calls}'
+exit "\${RESTART_EXIT:-0}"`);
+    const urls = ['https://example.org/rules'];
+    withConfig([{ '.type': 'hijpass', enabled: '1' }, { '.type': 'rule', retry_count: '1',
+        chn_domain_list: urls, gfw_list: urls, chn_v4_route: urls, chn_v6_route: urls, geoip: urls, geosite: urls }], config => {
+        // 用真实 Geo 资源选择，但替换文本规范化，避免把本测试变成规则格式测试。
+        f.patch('rules/rules.uc', "if (action == 'normalize') {", "if (action == 'normalize') { return text(args[1]);");
+        for (const code of [0, 7]) {
+            const result = f.run('rules/update-files.sh', ['update', '--configdir', config], { RESTART_EXIT: String(code) });
+            assert.equal(result.status, code ? 1 : 0, result.stderr);
+            assert.equal(JSON.parse(result.stdout).success, code === 0);
+        }
+    });
+    assert.equal(fs.readFileSync(calls, 'utf8'), 'restart\nrestart\n');
+});
+
+test('核心更新与规则更新共用锁，旧锁文件存在但无人持有时不阻止新操作', t => {
+    const f = fixture(t);
+    f.script('curl', 'echo contacted >>"$CALLS"; exit 28');
+    const lock = f.runtime + '/jobs/updates.lock';
+    fs.mkdirSync(path.dirname(lock), { recursive: true });
+    fs.writeFileSync(lock, 'old state');
+    f.script('run-locked', `. '${f.runtime}/common.sh'
+hijpass_lock_updates || exit 1
+'${f.runtime}/core/update.sh' update xray`);
+    const busy = f.run('../run-locked', [], { CALLS: f.directory + '/calls' });
+    assert.equal(busy.status, 75, busy.stderr);
+    assert.match(JSON.parse(busy.stdout).error, /running/);
+    assert.equal(fs.existsSync(f.directory + '/calls'), false);
+    const retry = f.run('core/update.sh', ['update', 'xray'], { CALLS: f.directory + '/calls' });
+    assert.equal(retry.status, 1, retry.stderr);
+    assert.match(JSON.parse(retry.stdout).error, /fetch core release/);
+    assert.equal(fs.readFileSync(f.directory + '/calls', 'utf8'), 'contacted\n');
+});
+
+test('启动回收已结束及 PID 被复用的任务，保留仍运行任务和锁文件', async t => {
+    const f = fixture(t), jobs = f.runtime + '/jobs', release = f.directory + '/release';
+    fs.mkdirSync(jobs, { recursive: true });
+    for (const [id, pid] of [['Dead1234', '2147483647'], ['Reuse123', String(process.pid)]]) {
+        const dir = jobs + '/' + id;
+        fs.mkdirSync(dir);
+        fs.writeFileSync(dir + '/pid', pid);
+        fs.writeFileSync(dir + '/kind', 'rules');
+    }
+    fs.writeFileSync(jobs + '/rules.active', 'Dead1234');
+    fs.mkdirSync(jobs + '/work');
+    fs.writeFileSync(jobs + '/work/download', 'unfinished');
+    fs.writeFileSync(f.runtime + '/core/update.sh', `#!/usr/bin/busybox ash
+while [ ! -f '${release}' ]; do sleep 0.05; done
+printf '{"success":true}\\n'
+`);
+    const created = f.run('rpc/jobs.sh', ['start', 'xray']);
+    const id = JSON.parse(created.stdout).id;
+    const inode = fs.statSync(jobs + '/registry.lock').ino;
+    try {
+        assert.equal(f.run('rpc/jobs.sh', ['clear']).status, 0);
+        assert.equal(fs.existsSync(jobs + '/Dead1234'), false);
+        assert.equal(fs.existsSync(jobs + '/Reuse123'), false);
+        assert.equal(fs.existsSync(jobs + '/rules.active'), false);
+        assert.equal(fs.existsSync(jobs + '/work'), false);
+        assert.equal(fs.existsSync(jobs + '/' + id), true);
+        assert.equal(fs.statSync(jobs + '/registry.lock').ino, inode);
+    } finally { fs.writeFileSync(release, ''); }
+    await until(() => fs.existsSync(jobs + '/' + id + '/exit'));
+    assert.equal(f.run('rpc/jobs.sh', ['clear']).status, 0);
+    assert.equal(fs.existsSync(jobs + '/' + id), false);
 });

@@ -73,9 +73,9 @@ case "$method" in
             *) hijpass_json_error 'invalid core action'; exit 0 ;; esac
         if [ "$action" = update ]; then structured "$HIJPASS_LIB/rpc/jobs.sh" start "$core"
         else structured "$HIJPASS_LIB/core/update.sh" "$action" "$core"; fi ;;
-    job_status|job_release)
+    job_status)
         argument id
-        structured "$HIJPASS_LIB/rpc/jobs.sh" "${method#job_}" "$id" ;;
+        structured "$HIJPASS_LIB/rpc/jobs.sh" status "$id" ;;
     trace_start)
         json_get_type arg_type args
         [ "$arg_type" = array ] || { hijpass_json_error 'invalid trace arguments'; exit 0; }

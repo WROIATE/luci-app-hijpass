@@ -14,6 +14,19 @@ hijpass_run_ucode() {
 }
 hijpass_json_error() { hijpass_run_ucode "$HIJPASS_LIB/result.uc" error "$1"; }
 
+# 更新与服务起停共用同一把锁；进程退出自动释放，不删除锁文件。
+# 默认立即返回忙；服务起停最多等待指定次数，每次 2 秒。
+hijpass_lock_updates() {
+    local attempts=${1:-0}
+    mkdir -p "$HIJPASS_JOB_ROOT" && chmod 700 "$HIJPASS_JOB_ROOT" || return 1
+    exec 9>"$HIJPASS_JOB_ROOT/updates.lock" || return 1
+    while ! flock -n 9; do
+        [ "$attempts" -gt 0 ] || { exec 9>&-; return 75; }
+        attempts=$((attempts - 1))
+        command sleep 2 || { exec 9>&-; return 1; }
+    done
+}
+
 # 业务消息直接描述操作，DEBUG 模式附加当前脚本路径。
 hijpass_log() (
     level=$1
@@ -35,7 +48,7 @@ hijpass_run_logged() {
         "$@" 9>&-
         return $?
     }
-    # 更新锁不能传给 procd 启动的长期进程；更新控制进程仍持有锁。
+    # 控制进程持有更新锁；外部命令不能将它传给长期后台进程。
     "$@" 9>&- 2>"$output"
     code=$?
     if [ -n "${config_directory:-}" ]; then

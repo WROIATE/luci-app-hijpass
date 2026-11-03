@@ -45,11 +45,10 @@ test('configuration preview and validation share the hijpass RPC object without 
     assert.deepEqual(Array.from(f.calls[0][1]), [snapshot, 'node']);
 });
 
-for (const code of [0, 7]) test(`long updates poll beyond the RPC limit, report exit ${code} and release results`, async () => {
+for (const code of [0, 7]) test(`long updates poll beyond the RPC limit, report exit ${code} without an extra release request`, async () => {
     const clock = { now: 0 };
     const f = backend(method => {
         if (method === 'rule_update') return { id: 'Abcd1234' };
-        if (method === 'job_release') return { ok: true };
         assert.equal(method, 'job_status');
         if (clock.now < 120000) return { running: true };
         return { running: false, code, stdout: code ? '' : '{"success":true}', stderr: code ? 'download failed' : '' };
@@ -57,13 +56,12 @@ for (const code of [0, 7]) test(`long updates poll beyond the RPC limit, report 
     if (code) await assert.rejects(f.api.updateRules(), /Backend operation failed; see main log/);
     else assert.equal((await f.api.updateRules()).success, true);
     assert.equal(clock.now, 120000);
-    assert.equal(f.calls.at(-1)[0], 'job_release');
+    assert.equal(f.calls.at(-1)[0], 'job_status');
 });
 
 test('structured update failures retain resource names without exposing combined command output', async () => {
     const f = backend(method => {
         if (method === 'rule_update') return { id: 'Abcd1234' };
-        if (method === 'job_release') return { ok: true };
         return { running: false, code: 1, stdout: '{"success":false,"failed":["geoip","geosite"]}',
             stderr: 'curl: (28) timed out\ncustom hook warning' };
     });
@@ -71,30 +69,28 @@ test('structured update failures retain resource names without exposing combined
     assert.equal(result.success, false);
     assert.deepEqual(Array.from(result.failed), ['geoip', 'geosite']);
     assert.equal(result.details, undefined);
-    assert.equal(f.calls.at(-1)[0], 'job_release');
+    assert.equal(f.calls.at(-1)[0], 'job_status');
 });
 
 test('a nonzero script exit cannot be hidden by a success JSON body', async () => {
     const f = backend(method => {
         if (method === 'rule_update') return { id: 'Abcd1234' };
-        if (method === 'job_release') return { ok: true };
         assert.equal(method, 'job_status');
         return { running: false, code: 1, stdout: '{"success":true}', stderr: 'write failed' };
     });
     await assert.rejects(f.api.updateRules(), /Backend operation failed; see main log/);
-    assert.equal(f.calls.at(-1)[0], 'job_release');
+    assert.equal(f.calls.at(-1)[0], 'job_status');
 });
 
-test('resuming an existing update polls and acknowledges it without starting another job', async () => {
+test('resuming an existing update polls it without starting another job', async () => {
     const f = backend(method => {
         if (method === 'rule_update_status') return { id: 'Abcd1234' };
-        if (method === 'job_release') return { ok: true };
         assert.equal(method, 'job_status');
         return { running: false, code: 0, stdout: '{"success":true}', stderr: '[I] informational' };
     });
     assert.equal((await f.api.ruleUpdateStatus()).id, 'Abcd1234');
     assert.equal((await f.api.resumeRuleUpdate('Abcd1234')).success, true);
-    assert.deepEqual(f.calls.map(([method]) => method), ['rule_update_status', 'job_status', 'job_release']);
+    assert.deepEqual(f.calls.map(([method]) => method), ['rule_update_status', 'job_status']);
 });
 
 test('a pending core version lookup does not hold the rule update status response in its RPC batch', async () => {

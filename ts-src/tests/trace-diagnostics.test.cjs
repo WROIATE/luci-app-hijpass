@@ -262,12 +262,12 @@ test('startup cleanup stops active diagnostics, removes retained captures and pr
 
     const jobs = path.join(f.dir, 'jobs');
     mkdirSync(jobs);
-    const updater = spawn('/bin/sh', ['-c', 'exec 9>"$1/rules.lock"; flock -x 9; echo running >"$1/state"; exec sleep 120', 'test', jobs]);
+    const updater = spawn('/bin/sh', ['-c', 'exec 9>"$1/updates.lock"; flock -x 9; echo running >"$1/state"; exec sleep 120', 'test', jobs]);
     t.after(() => updater.kill());
     const deadline = Date.now() + 3000;
     while (!existsSync(jobs + '/state') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
     assert.equal(readFileSync(jobs + '/state', 'utf8'), 'running\n');
-    const lockInode = statSync(jobs + '/rules.lock').ino;
+    const lockInode = statSync(jobs + '/updates.lock').ino;
 
     try {
         const id = run('start', '-c', '192.168.1.100', '-t', '120', '-p').trim();
@@ -301,8 +301,8 @@ test('startup cleanup stops active diagnostics, removes retained captures and pr
         }
         assert.match(readFileSync(f.env.TRACE_TEST_LOG, 'utf8'), /delete rule inet hijpass pre-filter handle 42/);
         assert.equal(readFileSync(jobs + '/state', 'utf8'), 'running\n');
-        assert.equal(statSync(jobs + '/rules.lock').ino, lockInode);
-        assert.equal(spawnSync('flock', ['-n', jobs + '/rules.lock', 'true']).status, 1);
+        assert.equal(statSync(jobs + '/updates.lock').ino, lockInode);
+        assert.equal(spawnSync('flock', ['-n', jobs + '/updates.lock', 'true']).status, 1);
         assert.doesNotThrow(() => process.kill(updater.pid, 0));
         // Clearing again is safe; a subsequent diagnostic can still be registered.
         for (let attempt = 0; attempt < 3; attempt++) {

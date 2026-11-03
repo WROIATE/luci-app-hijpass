@@ -9,8 +9,21 @@ HIJPASS_LOG_SOURCE=${initscript:-/etc/init.d/hijpass}
 
 DNS_HOOK=/etc/hijpass/hook/dns-hook.sh
 
+# 同一次 restart 的 stop/start 共用锁，避免期间插入新的文件更新。
+wait_updates() {
+    [ "${updates_locked:-0}" = 1 ] && return 0
+    hijpass_log DEBUG 'Waiting for rule/core updates before changing hijpass service'
+    hijpass_lock_updates 300 || {
+        hijpass_log ERROR 'Cannot acquire update lock within 600 seconds; service operation cancelled'
+        exit 1
+    }
+    updates_locked=1
+}
+
 start_service() {
     local plan kind instance keys id name
+    wait_updates
+    "$HIJPASS_LIB/rpc/jobs.sh" clear || exit 1
     hijpass_log INFO '===================== Starting hijpass ======================='
     hijpass_run_logged 'Clear previous diagnostics' "$HIJPASS_LIB/diagnostics/task.sh" clear
     plan="$(hijpass_run_logged 'Prepare hijpass configurations' "$HIJPASS_LIB/service/prepare.sh")" || exit 1
@@ -46,6 +59,7 @@ service_started() {
 }
 
 stop_service() {
+    wait_updates
     hijpass_log INFO '===================== Stopping hijpass ======================='
     hijpass_log INFO 'Executing DNS Hook (stop)'
     hijpass_run_logged 'DNS Hook stop' "$DNS_HOOK" stop
@@ -67,7 +81,7 @@ update_cron() {
 }
 
 reload_service() {
-    /etc/init.d/hijpass restart
+    restart
 }
 
 service_triggers() {

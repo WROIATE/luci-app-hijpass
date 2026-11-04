@@ -3453,7 +3453,7 @@ msgstr ""
 msgid "Salamander password; must match the server."
 msgstr ""
 
-msgid "Generated uses these form fields; Custom uses your configuration file and run command."
+msgid "Template configuration uses form fields; handwritten configuration uses your full JSON configuration and run command."
 msgstr ""
 
 msgid "Select the protocol offered by the remote server."
@@ -3544,4 +3544,10 @@ msgid "Minimum severity recorded by the core; debug includes more connection det
 msgstr ""
 
 msgid "Bandwidth in Mbps, from the server perspective; empty or 0 uses the core default."
+msgstr ""
+
+msgid "Configuration Method"
+msgstr ""
+
+msgid "Handwritten Configuration"
 msgstr ""

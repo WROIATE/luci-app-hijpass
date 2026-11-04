@@ -266,7 +266,7 @@ const ProxyFormUtils = {
         let type = uci.get(LuciFlied.CONF_NAME, section_id, 'type');
         let coreValue = ProxyChainUtils.getProxyCore(findProxySection(section_id));
         if (ProxyChainUtils.isCustomProxy(findProxySection(section_id))) {
-            return E('span', {}, _('Custom'));
+            return E('span', {}, _('Handwritten Configuration'));
         }
         let typeLabel = HijpassValues.PROXY_TYPES.find(t => t.value === type)?.label || type || '';
         let coreLabel = HijpassValues.DUAL_CORES.find(c => c.value === coreValue)?.label || coreValue;
@@ -438,13 +438,13 @@ const ProxyFormUtils = {
     },
 
     createCoreAndTypeOptions: function (s: LuCI.form.AbstractSection): void {
-        const configTypeOpt = s.option(form.ListValue, 'config_type', _('Configuration Type'),
-        _("Generated uses these form fields; Custom uses your configuration file and run command."));
+        const configTypeOpt = s.option(form.ListValue, 'config_type', _('Configuration Method'),
+        _("Template configuration uses form fields; handwritten configuration uses your full JSON configuration and run command."));
         configTypeOpt.modalonly = true;
         configTypeOpt.default = PROXY_CONFIG_TYPE.GENERATED;
         configTypeOpt.rmempty = false;
-        configTypeOpt.value(PROXY_CONFIG_TYPE.GENERATED, _('Generated'));
-        configTypeOpt.value(PROXY_CONFIG_TYPE.CUSTOM, _('Custom'));
+        configTypeOpt.value(PROXY_CONFIG_TYPE.GENERATED, _('Template Configuration'));
+        configTypeOpt.value(PROXY_CONFIG_TYPE.CUSTOM, _('Handwritten Configuration'));
 
         let coreOpt = s.option(form.ListValue, 'core', _('Backend Core'),
             _('Select backend core for this proxy node'));

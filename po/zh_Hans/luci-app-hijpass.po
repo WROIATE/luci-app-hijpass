@@ -2696,8 +2696,8 @@ msgstr "下载带宽，单位 Mbps；按实际可用下行带宽填写。"
 msgid "Salamander password; must match the server."
 msgstr "Salamander 混淆密码，须与服务端一致。"
 
-msgid "Generated uses these form fields; Custom uses your configuration file and run command."
-msgstr "自动生成使用表单字段；自定义使用您填写的配置文件和运行命令。"
+msgid "Template configuration uses form fields; handwritten configuration uses your full JSON configuration and run command."
+msgstr "模板配置通过表单填写；手写配置直接填写完整 JSON 配置和运行命令。"
 
 msgid "Select the protocol offered by the remote server."
 msgstr "选择远端服务器提供的代理协议。"
@@ -2821,3 +2821,9 @@ msgstr "正在重启服务…"
 
 msgid "Attempt %s"
 msgstr "第 %s 次尝试"
+
+msgid "Configuration Method"
+msgstr "配置方式"
+
+msgid "Handwritten Configuration"
+msgstr "手写配置"

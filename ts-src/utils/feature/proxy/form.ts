@@ -171,10 +171,7 @@ const ProxyFormUtils = {
         const coreSelect = E('select', {
             class: 'cbi-input-select',
             style: 'min-width:180px'
-        }, [
-            E('option', { value: CORE_TYPE.SING_BOX }, 'sing-box'),
-            E('option', { value: CORE_TYPE.XRAY }, 'xray'),
-        ]) as HTMLSelectElement;
+        }, HijpassValues.DUAL_CORES.map(core => E('option', { value: core.value }, core.label))) as HTMLSelectElement;
         const input = E('textarea', {
             class: 'cbi-input-textarea',
             style: 'width:100%;min-height:120px;box-sizing:border-box',

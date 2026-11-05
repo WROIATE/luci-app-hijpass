@@ -59,8 +59,7 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
     // 每个 UCI 字段只有一个表单选项，列表显示和弹窗编辑共用，避免值被重复解析覆盖。
     const coreOption = section.option(form.ListValue, 'core', _('Core'),
         _("Core used to run this server node; the protocol must be supported by the installed core."));
-    coreOption.value('sing-box', 'sing-box');
-    coreOption.value('xray', 'Xray');
+    HijpassValues.DUAL_CORES.forEach(core => coreOption.value(core.value, core.label));
     coreOption.default = 'sing-box';
     coreOption.rmempty = false;
 

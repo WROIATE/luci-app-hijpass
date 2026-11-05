@@ -18,7 +18,7 @@ function panel(active, backend = {}) {
                 coreAction: async (action, core) => { calls.push([action, core]); return { version: 'test' }; },
                 ...backend,
             } };
-            if (name.endsWith('/enum/hijpass')) return { CORE_TYPE: { SING_BOX: 'sing-box', XRAY: 'xray' } };
+            if (name.endsWith('/enum/hijpass')) return { HijpassValues: { DUAL_CORES: [{ value: 'sing-box', label: 'sing-box' }, { value: 'xray', label: 'xray' }] } };
             if (name === './progress') return { formatUpdateProgress: progress => progress.phase + ': ' + progress.resource };
             return { NotificationUtils: { success() {}, error() {} } };
         },

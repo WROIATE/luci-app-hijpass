@@ -1,7 +1,7 @@
 import { formatUpdateProgress } from './progress';
 import { Backend } from "../../backend";
 
-import { CORE_TYPE } from "../../../enum/hijpass";
+import { HijpassValues } from "../../../enum/hijpass";
 import { NotificationUtils } from "../../base/luci/notification";
 
 function loadCoreVersion(versionElement: HTMLElement, core: string) {
@@ -123,7 +123,7 @@ function createCoreRow(core: string, label: string) {
 
 const RuntimePanelUtils = {
     createCoreVersionPanel: function () {
-        const rows = [createCoreRow(CORE_TYPE.SING_BOX, 'sing-box'), createCoreRow(CORE_TYPE.XRAY, 'Xray')];
+        const rows = HijpassValues.DUAL_CORES.map(core => createCoreRow(core.value, core.label));
         const panel = E('div', { 'class': 'cbi-section' }, [
             E('div', { 'class': 'cbi-section-descr' },
                 _('View installed core versions and update runtime components.')),

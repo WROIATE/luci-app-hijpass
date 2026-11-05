@@ -22,6 +22,14 @@ argument() {
     json_get_var "$1" "$1"
 }
 
+if [ "$method" = trace_capabilities ]; then
+    json_init
+    if command -v tcpdump >/dev/null 2>&1; then json_add_boolean tcpdump 1
+    else json_add_boolean tcpdump 0; fi
+    json_dump
+    exit 0
+fi
+
 directory=$(mktemp -d /tmp/hijpass-rpc.XXXXXX) || exit 1
 trap 'rm -rf -- "$directory"' EXIT
 capture() {

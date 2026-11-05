@@ -95,6 +95,7 @@ export const Backend = {
     coreAction: (action: 'version' | 'latest' | 'update', core: string, onProgress?: ProgressHandler) => coreCalls[action](core, onProgress),
     coreUpdateStatus: (core: string): Promise<{ id: string | null }> => method('core_update_status', ['core'], true)(core),
     resumeCoreUpdate: (id: string, onProgress?: ProgressHandler) => waitForJob(id, true, onProgress),
+    traceCapabilities: (): Promise<{ tcpdump: boolean }> => method('trace_capabilities')(),
     startTrace: method('trace_start', ['args']),
     traceStatus: method('trace_status', ['id']),
     releaseTrace: method('trace_release', ['id']),

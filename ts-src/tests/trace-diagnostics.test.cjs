@@ -143,7 +143,10 @@ case "$*" in
         printf 'meta nftrace set 1 comment "%s" # handle 42\\n' "$comment" ;;
 esac`);
     script('tcpdump', `printf 'tcpdump %s\\n' "$*" >>"$TRACE_TEST_LOG"
+# Model libpcap buffering: no delivery during a short capture without immediate mode.
+case " $* " in *' --immediate-mode '*)
 printf '1.0 br-lan In IP 192.168.1.100.12345 > 8.8.8.8.53: UDP, length 20\\n'
+;; esac
 exec /bin/sleep 180`);
     return { dir, env, trace: path.join(runtime, 'diagnostics/capture.sh'), task: path.join(runtime, 'diagnostics/task.sh') };
 }
@@ -314,3 +317,50 @@ test('startup cleanup stops active diagnostics, removes retained captures and pr
         run('clear');
     }
 });
+
+for (const capability of [true, false, 'error']) {
+    test(`diagnostics only offers tcpdump when dependency detection succeeds: ${capability}`, async () => {
+        const options = new Map();
+        let submitted;
+        const section = {
+            tab() {},
+            taboption(tab, type, name) {
+                const option = { value() {}, depends() {}, formvalue() { return this.default; } };
+                options.set(name, option);
+                return option;
+            },
+        };
+        const context = vm.createContext({ exports: {}, _: value => value, URLSearchParams,
+            window: { location: { search: '?tab=trace' } },
+            require(name) {
+                if (name === 'view') return { extend: value => value };
+                if (name === 'uci') return { load: async () => {} };
+                if (name === 'form') return { Map: class {
+                    section() { return section; }
+                    render() { options.get('_trace_output').render(); }
+                } };
+                if (name.endsWith('/enum/hijpass')) return { LuciFlied: {} };
+                if (name.endsWith('/backend')) return { Backend: { async traceCapabilities() {
+                    if (capability === 'error') throw new Error('RPC unavailable');
+                    return { tcpdump: capability };
+                } } };
+                if (name.endsWith('/log/panel')) return { LogPanelUtils: {
+                    createTraceOutputPanel: () => ({ statusElement: {}, outputElement: {}, node: {} }),
+                    runTraceDiagnostics: values => { submitted = values; },
+                } };
+                return {};
+            },
+        });
+        vm.runInContext(ts.transpileModule(readFileSync(path.join(root, 'ts-src/views/log.ts'), 'utf8'), {
+            compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+        }).outputText, context);
+        const view = context.exports.default;
+        view.render(await view.load());
+        assert.equal(options.has('_trace_tcpdump'), capability === true);
+        assert.equal(options.has('_trace_tcpdump_iface'), capability === true);
+        if (capability === true) options.get('_trace_tcpdump').default = '1';
+        options.get('_trace_run').onclick({ currentTarget: {} }, 'global');
+        assert.equal(submitted.tcpdump, capability === true);
+        assert.equal(submitted.tcpdumpInterface, 'any');
+    });
+}

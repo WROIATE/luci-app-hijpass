@@ -3,6 +3,7 @@ import view from "view";
 import {LuciFlied} from "../enum/hijpass";
 import form from "form";
 import uci from "uci";
+import { Backend } from "../utils/backend";
 import { LogPanelUtils } from "../utils/feature/log/panel";
 import { RulePanelUtils } from "../utils/feature/rule/panel";
 
@@ -10,13 +11,14 @@ const v = view.extend({
     load: function () {
         return Promise.all([
             uci.load(LuciFlied.CONF_NAME),
-            uci.load(LuciFlied.SERVER_CONF_NAME)
+            uci.load(LuciFlied.SERVER_CONF_NAME),
+            Backend.traceCapabilities().catch(() => ({ tcpdump: false }))
         ]);
     },
     handleSaveApply: null,
     handleReset: null,
     handleSave: null,
-    render: function () {
+    render: function (data: [unknown, unknown, { tcpdump: boolean }]) {
 
         let m = new form.Map(LuciFlied.CONF_NAME, _('Diagnostics'),
             _('Inspect logs, trace routing behavior, and query rule resources'));
@@ -92,16 +94,19 @@ const v = view.extend({
         traceDuration.rmempty = false;
         traceDuration.depends('_trace_mode', 'client');
 
-        let traceTcpdump = s.taboption('trace', form.Flag, '_trace_tcpdump', _('Enable tcpdump'),
-            _('Optional. tcpdump must be installed on the router'));
-        traceTcpdump.default = '0';
-        traceTcpdump.rmempty = true;
+        let traceTcpdump: LuCI.form.Value | undefined;
+        let traceTcpdumpIface: LuCI.form.Value | undefined;
+        if (data[2].tcpdump) {
+            traceTcpdump = s.taboption('trace', form.Flag, '_trace_tcpdump', _('Enable tcpdump'));
+            traceTcpdump.default = '0';
+            traceTcpdump.rmempty = true;
 
-        let traceTcpdumpIface = s.taboption('trace', form.Value, '_trace_tcpdump_iface', _('tcpdump Interface'));
-        traceTcpdumpIface.default = 'any';
-        traceTcpdumpIface.placeholder = 'any';
-        traceTcpdumpIface.rmempty = true;
-        traceTcpdumpIface.depends('_trace_tcpdump', '1');
+            traceTcpdumpIface = s.taboption('trace', form.Value, '_trace_tcpdump_iface', _('tcpdump Interface'));
+            traceTcpdumpIface.default = 'any';
+            traceTcpdumpIface.placeholder = 'any';
+            traceTcpdumpIface.rmempty = true;
+            traceTcpdumpIface.depends('_trace_tcpdump', '1');
+        }
 
         let traceVerbose = s.taboption('trace', form.Flag, '_trace_verbose', _('Show raw trace/log tail'));
         traceVerbose.default = '0';
@@ -128,8 +133,8 @@ const v = view.extend({
                 timeout: traceMode.formvalue(sectionId) === 'client'
                     ? String(traceDuration.formvalue(sectionId) || '30')
                     : String(traceTimeout.formvalue(sectionId) || '8'),
-                tcpdump: traceTcpdump.formvalue(sectionId) === '1',
-                tcpdumpInterface: String(traceTcpdumpIface.formvalue(sectionId) || 'any'),
+                tcpdump: traceTcpdump?.formvalue(sectionId) === '1',
+                tcpdumpInterface: String(traceTcpdumpIface?.formvalue(sectionId) || 'any'),
                 verbose: traceVerbose.formvalue(sectionId) === '1'
             }, traceStatusElement, traceOutputElement, ev.currentTarget as HTMLButtonElement);
         };

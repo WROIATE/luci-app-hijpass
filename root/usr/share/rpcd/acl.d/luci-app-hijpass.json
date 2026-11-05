@@ -24,6 +24,7 @@
           "rule_match",
           "geo_lookup",
           "geo_query",
+          "trace_capabilities",
           "trace_status",
           "core_version",
           "core_latest",

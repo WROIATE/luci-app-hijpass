@@ -22,7 +22,7 @@ const methods = {
     geo_lookup: { type: '', keyword: '', mode: '' }, geo_query: { keyword: '' },
     core_version: { core: '' }, core_latest: { core: '' }, core_update: { core: '' }, core_update_status: { core: '' },
     job_status: { id: '' },
-    trace_start: { args: [] }, trace_status: { id: '' }, trace_release: { id: '' },
+    trace_capabilities: {}, trace_start: { args: [] }, trace_status: { id: '' }, trace_release: { id: '' },
 };
 
 try {

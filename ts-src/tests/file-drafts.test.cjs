@@ -128,13 +128,11 @@ test('a new login preserves live RPC sessions and cleans expired sessions withou
     const f = fixture();
     await f.api.save(editor, 'new', 'dns', 'hash');
     const next = fixture({ ...f, sid: 'new-login' });
-    next.document.dispatchEvent(new Event('luci-loaded'));
     await tick();
     assert.equal((await f.store.list()).length, 1);
     assert.equal(await next.api.read(editor), 'original');
     const expired = fixture({ ...f, sid: 'another-login' });
     expired.state.deniedSessions.add('session-one');
-    expired.document.dispatchEvent(new Event('luci-loaded'));
     await tick();
     assert.equal((await f.store.list()).length, 0);
 });

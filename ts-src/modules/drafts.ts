@@ -156,7 +156,7 @@ async function initialize() {
     if ((await store.list()).length) await transfer('session');
     await refresh();
 }
-if (L.loaded) initialize().catch(notice);
-else document.addEventListener('luci-loaded', () => { initialize().catch(notice); }, { once: true });
+// preload 在 DOM 就绪后加载，直接初始化，避免等待已触发的 luci-loaded。
+initialize().catch(notice);
 
 export default baseclass.extend({ read, save }) as { read: typeof read; save: typeof save };

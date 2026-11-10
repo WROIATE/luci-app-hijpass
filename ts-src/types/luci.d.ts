@@ -21,7 +21,6 @@ declare namespace LuCI {
 
     interface L {
         env: { sessionid: string; cgi_base?: string };
-        loaded: boolean;
         Poll: LuCI.poll.Poll
         dom: LuCI.dom.DOM
 

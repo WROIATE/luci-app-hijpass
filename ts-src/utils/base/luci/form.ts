@@ -1,5 +1,6 @@
 import { LuciFlied, ShuntTag } from "../../../enum/hijpass";
-import { Backend, Editor } from "../../backend";
+import { Editor } from "../../backend";
+import drafts from "hijpass.drafts";
 import form from "form";
 import uci from "uci";
 
@@ -27,34 +28,12 @@ const FormUtils = {
         subsection.addremove = false;
     },
 
-    simpleHash: function (str: string) {
-        let hash = 0;
-        str = str ? str : '';
-        for (let i = 0; i < str.length; i++) {
-            hash = ((hash << 5) - hash) + str.charCodeAt(i);
-            hash |= 0;
-        }
-        return hash;
-    },
-
     setEditorOptionMembers: function (o: LuCI.form.TextValue, editor: Editor, fieldName: string) {
         o.rows = 30;
-        o.load = function (_) {
-            return Backend.readEditor(editor).then(content => content.trim());
-        };
-
-        async function writeFile(sectionId: string, formvalue?: string) {
-            let currentHash = String(FormUtils.simpleHash(formvalue))
-            let oldHash = uci.get(LuciFlied.CONF_NAME, sectionId, fieldName)
-            if (currentHash === oldHash) {
-                return
-            }
-            await Backend.writeEditor(editor, formvalue || '');
-            uci.set(LuciFlied.CONF_NAME, sectionId, fieldName, currentHash);
-        }
-
-        o.write = writeFile
-        o.remove = writeFile
+        o.load = () => drafts.read(editor);
+        o.write = (sectionId: string, content: string) =>
+            drafts.save(editor, content, sectionId, fieldName);
+        o.remove = (sectionId: string) => o.write(sectionId, '');
         o.monospace = true;
 
         return o;
@@ -67,21 +46,13 @@ const FormUtils = {
         o.monospace = true;
         o.rows = 20;
 
-        o.load = async function (section_id: string) {
-            return Backend.readEditor({ resource: 'proxy_config', section: section_id });
+        o.load = (sectionId: string) => drafts.read({ resource: 'proxy_config', section: sectionId });
+        o.write = function (sectionId: string, content: string) {
+            return drafts.save({ resource: 'proxy_config', section: sectionId,
+                name: this.section.formvalue(sectionId, 'name') || uci.get(confName, sectionId, 'name') || sectionId },
+                content, sectionId, 'custom_conf_hash');
         };
-        o.write = async function (section_id: string, value: string) {
-            const text = (value || '').trim().replace(/\r\n/g, '\n');
-            const content = text ? text + '\n' : '';
-            await Backend.writeEditor({ resource: 'proxy_config',
-                section: section_id, name: this.section.formvalue(section_id, 'name') || uci.get(confName, section_id, 'name') || section_id }, content);
-            uci.set(confName, section_id, 'custom_conf_hash', String(FormUtils.simpleHash(content)));
-        };
-        o.remove = async function (section_id: string) {
-            await Backend.writeEditor({ resource: 'proxy_config',
-                section: section_id, name: this.section.formvalue(section_id, 'name') || uci.get(confName, section_id, 'name') || section_id }, '');
-            uci.set(confName, section_id, 'custom_conf_hash', '');
-        };
+        o.remove = (sectionId: string) => o.write(sectionId, '');
     },
 
     createTextOption: function (s: LuCI.form.AbstractSection, tabName: string,

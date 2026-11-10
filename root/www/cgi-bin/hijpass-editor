@@ -1,0 +1,67 @@
+#!/usr/bin/ucode -S
+// 大文件不经过 ubus 的消息大小限制；仍使用 rpcd session 与原有编辑器 ACL。
+import * as fs from 'fs';
+import * as ubus from 'ubus';
+import { editor } from '/usr/lib/hijpass/rpc/files.uc';
+
+let status = '400 Bad Request', result;
+try {
+    if (getenv('REQUEST_METHOD') != 'POST' || getenv('CONTENT_TYPE') != 'application/json')
+        die('JSON POST required');
+    let size = int(getenv('CONTENT_LENGTH'));
+    if (!size || size < 0 || size > 40 * 1024 * 1024) die('editor request exceeds 40 MiB');
+    let session = replace(getenv('HTTP_AUTHORIZATION') || '', /^Bearer /, ''), action = getenv('QUERY_STRING');
+    if (!session || !match(session, /^[a-f0-9]{32}$/)) die('invalid session');
+    if (index(['session', 'read', 'check', 'write'], action) < 0) die('invalid editor action');
+    let bus = ubus.connect();
+    if (!bus) die('cannot connect to rpcd');
+    let access = bus.call('session', 'access', {
+        ubus_rpc_session: session, scope: 'ubus', object: 'hijpass',
+        function: action == 'read' ? 'editor_read' : 'editor_write',
+    });
+    if (!access?.access) {
+        status = '403 Forbidden';
+        die('login session expired or editor access denied');
+    }
+    let body = [], remaining = size;
+    while (remaining > 0) {
+        let chunk = fs.stdin.read(min(remaining, 1024 * 1024));
+        if (!length(chunk)) die('incomplete editor request');
+        push(body, chunk); remaining -= length(chunk);
+    }
+    let request = json(join('', body));
+    if (type(request) != 'object') die('invalid editor request');
+    if (action == 'session') {
+        result = { ok: true };
+        if (request.sessions != null) {
+            if (type(request.sessions) != 'array' || length(request.sessions) > 64 ||
+                length(filter(request.sessions, id => type(id) != 'string' || !match(id, /^[a-f0-9]{32}$/))))
+                die('invalid session list');
+            // 不传 session ID：原生 list 只枚举，不续期旧会话。只返回调用方已提供的 ID。
+            let sessions = bus.call('session', 'list', {}, 'multiple');
+            if (type(sessions) != 'array') die('cannot list rpcd sessions');
+            let active = map(sessions, item => item.ubus_rpc_session);
+            result.sessions = filter(request.sessions, id => index(active, id) >= 0);
+        }
+    }
+    else {
+        if (type(request.editor) != 'object') die('invalid editor resource');
+        if (action == 'read') result = editor(request.editor, false);
+        else {
+            if (type(request.content) != 'string' || type(request.original) != 'string')
+                die('editor content must be a string');
+            if (length(request.content) > 16 * 1024 * 1024) die('editor file exceeds 16 MiB');
+            let current = replace(trim(editor(request.editor, false).content), /\r\n/g, '\n');
+            let content = replace(trim(request.content), /\r\n/g, '\n');
+            if (current != request.original && current != content) {
+                status = '409 Conflict';
+                die(`file changed since editing: ${request.editor.resource}`);
+            }
+            result = action == 'check' ? { ok: true } : editor({ ...request.editor, content }, true);
+        }
+    }
+    bus.disconnect();
+    status = '200 OK';
+}
+catch (e) { result = { error: e.message }; }
+printf('Status: %s\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n\r\n%s', status, result);

@@ -15,7 +15,7 @@ const runtimePackages = new Set();
 
 // 限定哪些 from 模块名当作 luci 模块（name = require name）
 const luciModuleNames = new Set(
-    ['view', 'fs', 'form', 'uci', 'ui', 'network', 'baseclass', 'rpc', 'poll', 'hijpass.editor']);
+    ['view', 'fs', 'form', 'uci', 'ui', 'network', 'baseclass', 'rpc', 'poll', 'hijpass.editor', 'hijpass.drafts', 'request', 'session']);
 
 /**
  * 扫描 views 目录下的所有 .ts 文件，返回绝对路径列表
@@ -115,6 +115,7 @@ return LuciView.default;
  */
 async function bundleAll() {
     await buildOne(path.join(__dirname, 'modules/editor.ts'), path.join(DIST_DIR, '../../hijpass/editor.js'));
+    await buildOne(path.join(__dirname, 'modules/drafts.ts'), path.join(DIST_DIR, '../../hijpass/drafts.js'));
     const entries = scanEntryFiles(VIEWS_DIR);
     if (entries.length === 0) {
         console.warn('No .ts files found in views/ directory');

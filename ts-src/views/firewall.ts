@@ -152,12 +152,6 @@ function createTextOptions(s: LuCI.form.AbstractSection) {
         FirewallEditorUtils.mount(widget, _('Firewall Template'));
         return widget;
     };
-    editor.write = async function (sectionId: string, content: string) {
-        // 文件也可能从命令行编辑，恢复后的保存不能只凭旧 hash 跳过写入。
-        await Backend.writeEditor({ resource: 'firewall_template' }, content || '');
-        uci.set(LuciFlied.CONF_NAME, sectionId, 'nft_hash', String(FormUtils.simpleHash(content)));
-    };
-    editor.remove = async function (sectionId: string) { await editor.write(sectionId, ''); };
 
     FirewallFormUtils.createNftViewOption(s);
 

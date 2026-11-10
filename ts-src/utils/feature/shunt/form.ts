@@ -1,5 +1,4 @@
 import editor from 'hijpass.editor';
-import { Backend } from "../../backend";
 import form from "form";
 import uci from "uci";
 import ui from "ui";
@@ -33,22 +32,7 @@ function canUseAsDnsExit(node: string) {
 
 const ShuntFormUtils = {
     configureConfigEditor: function (o: LuCI.form.TextValue) {
-        o.rows = 30;
-        o.monospace = true;
-        o.load = async function (_: string) {
-            return Backend.readEditor({ resource: 'shunt_conf' });
-        };
-        o.write = async function (sectionId: string, value: string) {
-            const content = (value || '').trim().replace(/\r\n/g, '\n');
-            await Backend.writeEditor({ resource: 'shunt_conf' }, content);
-            uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_hash', String(FormUtils.simpleHash(content)));
-        };
-        o.remove = async function (sectionId: string) {
-            if (uci.get_first(LuciFlied.CONF_NAME, LuciFlied.SHUNT_SECTION_TYPE, 'config_type') !== 'tmpl') {
-                await Backend.writeEditor({ resource: 'shunt_conf' }, '');
-                uci.set(LuciFlied.CONF_NAME, sectionId, 'shunt_hash', '-1');
-            }
-        };
+        FormUtils.setEditorOptionMembers(o, { resource: 'shunt_conf' }, 'shunt_hash');
         o.rmempty = false;
         editor.configure(o, 'json', _('Edit Shunt Configuration File'));
     },

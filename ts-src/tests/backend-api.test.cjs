@@ -12,6 +12,12 @@ function backend(handler, clock = { now: 0 }) {
         Date: class extends Date { static now() { return clock.now; } },
         window: { setTimeout(fn, ms) { clock.now += ms; fn(); } },
         require(name) {
+            if (name === 'hijpass.drafts') return { read: async editor => {
+                calls.push(['draft_read', [editor.resource, editor.section || '', editor.name || '']]);
+                const result = handler('draft_read', [editor]);
+                if (result.error) throw new Error(result.error);
+                return result.content;
+            } };
             assert.equal(name, 'rpc');
             return { declare: options => async (...args) => {
                 assert.equal(options.object, 'hijpass');
@@ -27,12 +33,13 @@ function backend(handler, clock = { now: 0 }) {
     return { api: context.exports.Backend, calls };
 }
 
-test('editors send resource identities and propagate backend failures', async () => {
-    const f = backend((method, args) => method === 'editor_read' ? { content: 'template' } : { error: 'write failed' });
-    assert.equal(await f.api.readEditor({ resource: 'firewall_template' }), 'template');
+test('editor reads use the shared draft module and expose no immediate file write', async () => {
+    const f = backend(() => ({ content: 'draft template' }));
+    assert.equal(await f.api.readEditor({ resource: 'firewall_template' }), 'draft template');
     assert.deepEqual(Array.from(f.calls[0][1]), ['firewall_template', '', '']);
-    await assert.rejects(f.api.writeEditor({ resource: 'proxy_config', section: 'node', name: 'renamed' }, '{}'), /write failed/);
-    assert.deepEqual(Array.from(f.calls[1][1]), ['proxy_config', 'node', 'renamed', '{}']);
+    assert.equal(f.api.writeEditor, undefined);
+    const failed = backend(() => ({ error: 'read failed' }));
+    await assert.rejects(failed.api.readEditor({ resource: 'proxy_config' }), /read failed/);
 });
 
 test('configuration preview and validation share the hijpass RPC object without a file-writing API', async () => {

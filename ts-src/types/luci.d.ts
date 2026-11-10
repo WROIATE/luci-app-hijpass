@@ -20,6 +20,8 @@ declare namespace LuCI {
     }
 
     interface L {
+        env: { sessionid: string; cgi_base?: string };
+        loaded: boolean;
         Poll: LuCI.poll.Poll
         dom: LuCI.dom.DOM
 
@@ -227,6 +229,9 @@ declare namespace LuCI {
 
     declare namespace ui {
         interface UI {
+            showIndicator(id: string, label: string, handler?: (event: Event) => void): void;
+            hideIndicator(id: string): void;
+            addNotification(title: string | null, content: Node, severity?: string): void;
             changes: {
                 apply(checked?: boolean): void;
             };
@@ -265,6 +270,7 @@ declare namespace LuCI {
 
     declare namespace uci {
         interface UCI {
+            unload(config: string): void;
             state: object;
 
             load(config: string): Promise<void>;
@@ -415,4 +421,18 @@ declare module 'hijpass.editor' {
         configure(option: LuCI.form.TextValue, language: Language, label: string): void;
     };
     export default editor;
+}
+
+// 与 LuCI 原生应用请求共用实例，文件草稿在确认应用后才上传。
+declare module 'request' {
+    const request: { request(url: string, options?: any): Promise<any> };
+    export default request;
+}
+declare module 'session' {
+    const session: { getLocalData(key: string): any; setLocalData(key: string, value: any): void };
+    export default session;
+}
+declare module 'hijpass.drafts' {
+    const drafts: typeof import('../modules/drafts').default;
+    export default drafts;
 }

@@ -29,10 +29,11 @@ function formFixture(defaultTemplate = async () => 'default template\n') {
             if (name === 'hijpass.editor') return { configure() {} };
             if (name.endsWith('/hijpass')) return { LuciFlied: { CONF_NAME: 'hijpass' } };
             if (name.endsWith('/base/luci/form')) return { FormUtils: {
-                simpleHash: () => 123,
                 createTextOption(section, tab, field, title, description, editor) {
                     resources.push(editor);
-                    return section.taboption(tab, 'editor', field, title);
+                    const option = section.taboption(tab, 'editor', field, title);
+                    option.write = async (_, content) => writes.push([editor.resource, content]);
+                    return option;
                 },
             } };
             if (name.endsWith('/firewall/editor')) return { FirewallEditorUtils: { mount(widget, label) { widget.querySelector('textarea').setAttribute('aria-label', label); } } };
@@ -64,7 +65,7 @@ test('firewall presents one untitled, labelled template editor and a native rest
     assert.equal(f.resources.some(editor => 'path' in editor), false);
 });
 
-test('restore changes the editor first, disables repeat clicks and persists only when saved', async () => {
+test('restore changes the editor first, disables repeat clicks and delegates saving to the shared file draft editor', async () => {
     let complete;
     const f = formFixture(() => new Promise(resolve => { complete = resolve; }));
     const restore = f.options.find(option => option.field === '_restore_template');
@@ -79,7 +80,7 @@ test('restore changes the editor first, disables repeat clicks and persists only
     assert.deepEqual(f.hashes, []);
     await f.options.find(option => option.field === 'nft_hash').write('fw', f.value);
     assert.deepEqual(f.writes, [['firewall_template', 'default template']]);
-    assert.deepEqual(f.hashes, [['hijpass', 'fw', 'nft_hash', '123']]);
+    assert.deepEqual(f.hashes, []);
 });
 
 test('failed restore preserves current edits and re-enables the button', async () => {

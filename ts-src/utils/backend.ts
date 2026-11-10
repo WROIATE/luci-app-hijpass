@@ -1,4 +1,5 @@
 import rpc from 'rpc';
+import drafts from 'hijpass.drafts';
 
 export type EditorResource = 'ip_direct' | 'ip_proxy' | 'domain_direct' | 'domain_proxy'
     | 'nft_hook' | 'dns_hook' | 'shunt_conf' | 'firewall_template' | 'proxy_config' | 'server_config';
@@ -20,8 +21,6 @@ function method(name: string, params: string[] = [], nobatch = false) {
     };
 }
 
-const editorRead = method('editor_read', ['resource', 'section', 'name']);
-const editorWrite = method('editor_write', ['resource', 'section', 'name', 'content']);
 const logRead = method('log_read', ['id', 'action', 'lines']);
 const firewallShow = method('firewall_show');
 const firewallDefault = method('firewall_template_default');
@@ -63,10 +62,7 @@ const coreCalls = {
 
 export const Backend = {
     defaultFirewallTemplate: async (): Promise<string> => (await firewallDefault()).content,
-    readEditor: async (editor: Editor): Promise<string> =>
-        (await editorRead(editor.resource, editor.section || '', editor.name || '')).content,
-    writeEditor: (editor: Editor, content: string) =>
-        editorWrite(editor.resource, editor.section || '', editor.name || '', content),
+    readEditor: (editor: Editor): Promise<string> => drafts.read(editor),
     renderConfigs: method('config_render', ['sections', 'target']),
     validateConfigs: method('config_validate', ['sections']),
     logList: async (): Promise<Log[]> => (await logs()).logs,

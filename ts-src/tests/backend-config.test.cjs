@@ -39,6 +39,7 @@ test('LuCI sends staged sections and propagates backend errors', async () => {
     const sections = fixtures[0].sections;
     let response = { config: { outbounds: [] } };
     const { Backend } = loadTS('utils/backend.ts', {
+        'hijpass.drafts': {},
         rpc: { declare: options => async (...args) => { calls.push([options, args]); return response; } },
     });
     const context = vm.createContext({ exports: {}, require(name) {

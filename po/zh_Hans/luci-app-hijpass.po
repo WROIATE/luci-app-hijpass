@@ -2827,3 +2827,33 @@ msgstr "配置方式"
 
 msgid "Handwritten Configuration"
 msgstr "手写配置"
+
+msgid "Pending configuration files"
+msgstr "待应用配置文件"
+
+msgid "Pending files: %d"
+msgstr "待应用文件：%d"
+
+msgid "Discard file drafts"
+msgstr "丢弃文件草稿"
+
+msgid "Cannot access configuration file"
+msgstr "无法访问配置文件"
+
+msgid "Configuration file exceeds 16 MiB"
+msgstr "配置文件不能超过 16 MiB"
+
+msgid "Configuration apply is already in progress"
+msgstr "正在应用配置，请稍候"
+
+msgid "Firewall Hook"
+msgstr "防火墙 Hook"
+
+msgid "DNS Hook"
+msgstr "DNS Hook"
+
+msgid "Proxy Configuration"
+msgstr "代理配置"
+
+msgid "Server Configuration"
+msgstr "服务端配置"

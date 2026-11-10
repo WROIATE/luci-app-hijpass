@@ -411,7 +411,7 @@ declare module 'network' {
 declare module 'hijpass.editor' {
     type Language = 'json' | 'shell' | 'firewall';
     const editor: {
-        mount(widget: HTMLElement, language: Language, label: string): { focusRange(start: number, end: number): void };
+        mount(widget: HTMLElement, language: Language, label: string): void;
         configure(option: LuCI.form.TextValue, language: Language, label: string): void;
     };
     export default editor;

@@ -2909,17 +2909,11 @@ msgstr "路由器 DNS 转发"
 msgid "Editor view"
 msgstr "编辑视图"
 
-msgid "Structured"
-msgstr "结构化"
 
 msgid "Raw template"
 msgstr "Raw 模板"
 
-msgid "Custom code / template logic"
-msgstr "自定义代码 / 模板逻辑"
 
-msgid "Edit source"
-msgstr "编辑源码"
 
 msgid "Edit Failed"
 msgstr "编辑失败"
@@ -2927,8 +2921,6 @@ msgstr "编辑失败"
 msgid "This template cannot be safely displayed as structured rules. Edit it in Raw template view."
 msgstr "此模板无法可靠地转换为结构化视图，请使用 Raw 模板编辑。"
 
-msgid "Template code and sets"
-msgstr "模板代码与集合"
 
 msgid "Ports"
 msgstr "端口"
@@ -2936,8 +2928,13 @@ msgstr "端口"
 msgid "Use ports from 1 to 65535, separated by commas; ranges use a hyphen."
 msgstr "请输入 1 至 65535 的端口，用逗号分隔；端口范围用连字符连接。"
 
-msgid "Rule source"
-msgstr "规则源码"
 
-msgid "The template is empty. Edit Raw template or restore the default template."
-msgstr "模板为空，请编辑 Raw 模板或恢复默认模板。"
+
+msgid "Template editor"
+msgstr "模板编辑"
+
+msgid "Rule categories"
+msgstr "规则分类"
+
+msgid "No preset rules found. Use Raw template to edit this configuration."
+msgstr "没有可识别的预设项，请切换 Raw 模板编辑。"

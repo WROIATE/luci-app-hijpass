@@ -61,6 +61,10 @@ function mount(widget: HTMLElement, language: Extension, label: string) {
         observer.disconnect();
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    return { focusRange(start: number, end: number) {
+        view.dispatch({ selection: { anchor: start, head: end }, scrollIntoView: true });
+        view.focus();
+    } };
 }
 
 

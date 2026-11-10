@@ -146,6 +146,7 @@ function createTextOptions(s: LuCI.form.AbstractSection) {
     const editor = FormUtils.createTextOption(s, 'nftables', 'nft_hash', null, null,
         { resource: 'firewall_template' });
     editor.rows = 38;
+    editor.load = () => Backend.readEditor({ resource: 'firewall_template' });
     const renderEditor = editor.renderWidget;
     editor.renderWidget = function (...args: any[]) {
         const widget = renderEditor.apply(this, args) as HTMLElement;

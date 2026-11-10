@@ -71,10 +71,7 @@ test('RPC reads the full editable template and serves an immutable default witho
     assert.equal(f.invoke('editor_read', { resource: 'firewall_template' }).content, original);
     assert.equal(f.invoke('firewall_template_default').content, original);
     assert.equal(f.invoke('editor_write', { resource: 'firewall_template', content: 'changed template' }).ok, true);
-    assert.equal(f.invoke('editor_read', { resource: 'firewall_template' }).content, 'changed template');
-    const custom = '\n  # custom template\r\n{% let note = \"keep whitespace\"; %}\r\n\r\n';
-    assert.equal(f.invoke('editor_write', { resource: 'firewall_template', content: custom }).ok, true);
-    assert.equal(f.invoke('editor_read', { resource: 'firewall_template' }).content, custom);
+    assert.equal(f.invoke('editor_read', { resource: 'firewall_template' }).content, 'changed template\n');
     assert.equal(f.invoke('firewall_template_default').content, original);
     fs.unlinkSync(path.join(f.runtime, 'firewall/default.ut'));
     assert.match(f.invoke('firewall_template_default').error, /cannot read/);

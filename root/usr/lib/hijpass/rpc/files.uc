@@ -68,12 +68,10 @@ export function editor(request, write) {
     if (type(request.content) != 'string') {
         die('editor content must be a string');
     }
-    // 防火墙两种编辑视图共用原文，保存时也保留用户的空白与换行。
-    let content = request.resource == 'firewall_template' ? request.content : replace(trim(request.content), /\r\n/g, '\n');
-    let output = request.resource == 'firewall_template' ? content : content ? content + '\n' : '';
+    let content = replace(trim(request.content), /\r\n/g, '\n');
     let writeLog = configuredLogger();
     try {
-        atomic(path, output, fs.stat(path)?.mode || 0o600);
+        atomic(path, content ? content + '\n' : '', fs.stat(path)?.mode || 0o600);
         writeLog('INFO', `[editor] Resource saved: resource=${request.resource}, section=${request.section || '-'}, bytes=${length(content)}`);
     }
     catch (e) {

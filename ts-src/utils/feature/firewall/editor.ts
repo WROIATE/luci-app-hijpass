@@ -1,4 +1,4 @@
-import { mountTemplateEditor } from './structured';
+import editor from 'hijpass.editor';
 import ui from 'ui';
 
 function showParameters(event: Event) {
@@ -52,7 +52,7 @@ function showParameters(event: Event) {
 }
 
 function mount(widget: HTMLElement, label: string) {
-    mountTemplateEditor(widget, label);
+    editor.mount(widget, 'firewall', label);
 }
 
 export const FirewallEditorUtils = { mount, showParameters };

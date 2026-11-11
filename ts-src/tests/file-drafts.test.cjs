@@ -51,6 +51,7 @@ function fixture({ indexedDB = new IDBFactory(), sid = 'session-one', files = ne
         ui: { changes: { apply() {} }, addNotification: (_, node) => events.push(['error', node]), showIndicator() {}, hideIndicator() {} },
         request, session: { getLocalData: () => [], setLocalData() {} },
         '../utils/feature/config/drafts': storage,
+        '../utils/feature/config/diff': { fileDiff: () => ({ lines: [], truncated: false }) },
     }).default;
     return { api, store, events, files, indexedDB, document, request, state, sections };
 }

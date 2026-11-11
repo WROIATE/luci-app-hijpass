@@ -4,6 +4,7 @@ import ui from 'ui';
 import request from 'request';
 import session from 'session';
 import type { Editor } from '../utils/backend';
+import { fileDiff } from '../utils/feature/config/diff';
 import { DraftStore, FileDraft, normalizeFile } from '../utils/feature/config/drafts';
 
 const sid: string = L.env.sessionid;
@@ -107,22 +108,43 @@ function label(editor: Editor) {
 
 async function showDrafts() {
     const drafts = await store.list();
-    ui.showModal(_('Pending configuration files'), [
-        E('ul', {}, drafts.map(draft => E('li', {}, label(draft.editor)))),
-        E('div', { class: 'right' }, [
-            E('button', { class: 'btn', click: ui.hideModal }, _('Close')), ' ',
-            E('button', { class: 'btn cbi-button-reset', click: async () => {
-                await store.clear(); channel?.postMessage('changed'); location.reload();
-            } }, _('Discard file drafts')), ' ',
-            E('button', { class: 'btn cbi-button-positive', click: () => changes.apply(true) }, _('Save & Apply')),
+    const list = E('div', { class: 'uci-change-list' });
+    for (const draft of drafts) {
+        const diff = fileDiff(draft.original, draft.content);
+        list.appendChild(E('h5', {}, document.createTextNode('# ' + label(draft.editor))));
+        list.appendChild(E('pre', { style: 'max-height:50vh;overflow:auto;white-space:pre;margin:0' },
+            E('var', {}, diff.lines.map(line => E(line.startsWith('+') ? 'ins' : line.startsWith('-') ? 'del' : 'span',
+                { style: 'display:block;min-height:1em;font-style:normal' }, document.createTextNode(line))))));
+        if (diff.truncated) list.appendChild(E('p', {}, _('Diff preview is limited; open the editor to view the full content.')));
+    }
+    const dialog = ui.showModal(_('Configuration files') + ' / ' + _('Changes'), [
+        E('div', { class: 'cbi-section' }, [
+            E('strong', {}, _('Legend:')),
+            E('div', { class: 'uci-change-legend' }, [
+                E('div', { class: 'uci-change-legend-label' }, [E('ins', {}, '\u00a0'), ' ', _('Added lines')]),
+                E('div', { class: 'uci-change-legend-label' }, [E('del', {}, '\u00a0'), ' ', _('Removed lines')]),
+            ]),
+            E('br'), list,
+            E('div', { class: 'button-row' }, [
+                E('button', { class: 'btn cbi-button', click: ui.hideModal }, _('Close')), ' ',
+                new ui.ComboButton('0', { 0: [_('Save & Apply')], 1: [_('Apply unchecked')] }, {
+                    classes: { 0: 'btn cbi-button cbi-button-positive important', 1: 'btn cbi-button cbi-button-negative important' },
+                    click: (_event: Event, mode: string) => changes.apply(mode === '0'),
+                }).render(), ' ',
+                E('button', { class: 'btn cbi-button cbi-button-reset', click: () => {
+                    store.clear().then(() => { channel?.postMessage('changed'); location.reload(); }).catch(notice);
+                } }, _('Revert')),
+            ]),
         ]),
     ]);
+    dialog.classList.add('uci-dialog');
 }
 
 async function refresh() {
     const drafts = await store.list();
-    if (drafts.length) ui.showIndicator('hijpass-files', _('Pending files: %d').format(String(drafts.length)), () => showDrafts().catch(notice));
-    else ui.hideIndicator('hijpass-files');
+    // 原生提示按 ID 排序：poll-status、uci-changes、uci-file-changes。
+    if (drafts.length) ui.showIndicator('uci-file-changes', _('Pending files: %d').format(String(drafts.length)), () => showDrafts().catch(notice));
+    else ui.hideIndicator('uci-file-changes');
 }
 
 // 不复制 LuCI 的确认、回滚和重连逻辑。只在用户确认后、原生应用 POST 发出前上传。

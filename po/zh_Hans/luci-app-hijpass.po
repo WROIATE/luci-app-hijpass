@@ -2857,3 +2857,15 @@ msgstr "代理配置"
 
 msgid "Server Configuration"
 msgstr "服务端配置"
+
+msgid "Configuration files"
+msgstr "配置文件"
+
+msgid "Added lines"
+msgstr "新增行"
+
+msgid "Removed lines"
+msgstr "删除行"
+
+msgid "Diff preview is limited; open the editor to view the full content."
+msgstr "差异预览已限制显示范围，请在编辑器中查看完整内容。"

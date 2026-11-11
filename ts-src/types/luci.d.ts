@@ -228,6 +228,10 @@ declare namespace LuCI {
 
     declare namespace ui {
         interface UI {
+            ComboButton: new (value: string, choices: Record<string, string[]>, options: {
+                classes: Record<string, string>;
+                click: (event: Event, value: string) => void;
+            }) => { render(): Node };
             showIndicator(id: string, label: string, handler?: (event: Event) => void): void;
             hideIndicator(id: string): void;
             addNotification(title: string | null, content: Node, severity?: string): void;

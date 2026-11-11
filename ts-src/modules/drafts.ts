@@ -106,6 +106,25 @@ function label(editor: Editor) {
     return names[editor.resource] + (editor.section ? ': ' + (editor.name || editor.section) : '');
 }
 
+async function revertFiles() {
+    const drafts = await store.list();
+    // 先读取正式文件；失败时保留草稿和当前表单，供用户重试。
+    const contents = await Promise.all(drafts.map(async draft =>
+        normalizeFile((await transfer('read', { editor: draft.editor })).content)));
+    await store.clear();
+    for (const [index, draft] of drafts.entries()) {
+        for (const map of document.querySelectorAll('.cbi-map')) {
+            const option = L.dom.callClassMethod(map, 'lookupOption', draft.field, draft.section)?.[0] as LuCI.form.AbstractValue;
+            if (!option) continue;
+            option.cfgvalue(draft.section, contents[index]);
+            option.getUIElement(draft.section)?.setValue(contents[index]);
+        }
+    }
+    await refresh();
+    channel?.postMessage('changed');
+    ui.hideModal();
+}
+
 async function showDrafts() {
     const drafts = await store.list();
     const list = E('div', { class: 'uci-change-list' });
@@ -132,8 +151,12 @@ async function showDrafts() {
                     classes: { 0: 'btn cbi-button cbi-button-positive important', 1: 'btn cbi-button cbi-button-negative important' },
                     click: (_event: Event, mode: string) => changes.apply(mode === '0'),
                 }).render(), ' ',
-                E('button', { class: 'btn cbi-button cbi-button-reset', click: () => {
-                    store.clear().then(() => { channel?.postMessage('changed'); location.reload(); }).catch(notice);
+                E('button', { class: 'btn cbi-button cbi-button-reset', click: async (event: Event) => {
+                    const button = event.currentTarget as HTMLButtonElement;
+                    button.disabled = true;
+                    try { await revertFiles(); }
+                    catch (error) { notice(error); }
+                    finally { button.disabled = false; }
                 } }, _('Revert')),
             ]),
         ]),

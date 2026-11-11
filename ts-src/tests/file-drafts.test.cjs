@@ -20,20 +20,30 @@ function fixture({ indexedDB = new IDBFactory(), sid = 'session-one', files = ne
     const globals = { indexedDB, IDBKeyRange };
     const storage = load('utils/feature/config/drafts.ts', globals);
     const store = new storage.DraftStore(sid), events = [], document = new EventTarget();
-    const state = { authorized: true, failWrite: false, deniedSessions: new Set() };
+    const state = { authorized: true, failWrite: false, failRead: false, deniedSessions: new Set() };
     const sections = { dns: { '.type': 'dns' }, node: { '.type': 'proxy_node', name: 'renamed' } };
     const key = editor => editor.resource + (editor.section ? ':' + editor.section + ':' + editor.name : '');
     const request = { request: async url => { events.push(['apply', url]); return { status: 200 }; } };
-    const api = load('modules/drafts.ts', { ...globals, document, location: { reload() {} },
-        L: { env: { sessionid: sid }, url: s => '/' + s, loaded: false },
-        _: s => s, E: (tag, attrs, ...children) => ({ tag, attrs, children }),
+    const node = (tag, attrs, ...children) => ({ tag, attrs, children,
+        appendChild(child) { this.children.push(child); }, classList: { add() {} } });
+    const fields = new Map();
+    document.querySelectorAll = () => [{}];
+    document.createTextNode = text => text;
+    const ui = { changes: { apply() {} }, addNotification: (_, value) => events.push(['error', value]),
+        showIndicator(_id, _label, handler) { this.open = handler; }, hideIndicator() {},
+        ComboButton: class { render() { return node('combo'); } },
+        showModal(_title, children) { return this.modal = node('modal', {}, ...children); },
+        hideModal() { this.modal = null; } };
+    const api = load('modules/drafts.ts', { ...globals, document, location: { reload() { events.push(['reload']); } },
+        L: { env: { sessionid: sid }, url: s => '/' + s, loaded: false, dom: { callClassMethod: (_map, _method, field) => fields.has(field) ? [fields.get(field)] : null } },
+        _: s => s, E: node,
         fetch: async (url, options) => {
             const action = url.split('?')[1], data = JSON.parse(options.body);
             events.push([action, data.editor?.resource]);
             let result = { ok: true }, status = 200;
             if (!state.authorized || state.deniedSessions.has(options.headers.Authorization.slice(7))) { result = { error: 'session expired' }; status = 403; }
             else if (action === 'session') result = { ok: true, sessions: (data.sessions || []).filter(sid => !state.deniedSessions.has(sid)) };
-            else if (action === 'read') result = { content: files.get(key(data.editor)) || '' };
+            else if (action === 'read') { if (state.failRead) { result = { error: 'read failed' }; status = 500; } else result = { content: files.get(key(data.editor)) || '' }; }
             else if (action === 'check' || action === 'write') {
                 const current = files.get(key(data.editor)) || '';
                 if (current !== data.original && current !== data.content) { result = { error: 'file changed' }; status = 409; }
@@ -48,12 +58,12 @@ function fixture({ indexedDB = new IDBFactory(), sid = 'session-one', files = ne
         baseclass: { extend: value => value },
         uci: { unload() {}, load: async () => {}, get: (_, id) => sections[id],
             set: (...args) => events.push(['hash', ...args]), save: async () => events.push(['uci-save']) },
-        ui: { changes: { apply() {} }, addNotification: (_, node) => events.push(['error', node]), showIndicator() {}, hideIndicator() {} },
+        ui,
         request, session: { getLocalData: () => [], setLocalData() {} },
         '../utils/feature/config/drafts': storage,
         '../utils/feature/config/diff': { fileDiff: () => ({ lines: [], truncated: false }) },
     }).default;
-    return { api, store, events, files, indexedDB, document, request, state, sections };
+    return { api, store, events, files, indexedDB, document, request, state, sections, ui, fields };
 }
 const editor = { resource: 'domain_proxy' };
 const tick = () => new Promise(resolve => setTimeout(resolve, 15));
@@ -186,4 +196,47 @@ test('switching a custom node back to a template discards its draft on Apply', a
     await f.request.request('/admin/uci/apply_rollback', { method: 'post' });
     assert.equal((await f.store.list()).length, 0);
     assert.equal(f.events.some(([kind]) => kind === 'write'), false);
+});
+
+function findRevert(node) {
+    if (node?.attrs?.class?.includes('cbi-button-reset')) return node.attrs.click;
+    for (const child of [node?.children || []].flat(Infinity)) {
+        const result = typeof child === 'object' && findRevert(child);
+        if (result) return result;
+    }
+}
+
+test('file Revert updates editor and its saved baseline without page reload or UCI writes', async () => {
+    const f = fixture();
+    await f.api.save(editor, 'draft', 'dns', 'hash');
+    let baseline = 'draft', input = 'draft';
+    f.fields.set('hash', { cfgvalue: (_section, value) => baseline = value,
+        getUIElement: () => ({ setValue: value => input = value }) });
+    f.files.set('domain_proxy', 'current file');
+    await f.ui.open();
+    const button = {};
+    await findRevert(f.ui.modal)({ currentTarget: button });
+    assert.equal(input, 'current file');
+    assert.equal(baseline, input);
+    assert.equal((await f.store.list()).length, 0);
+    assert.equal(f.ui.modal, null);
+    assert.equal(button.disabled, false);
+    assert.equal(f.events.some(([kind]) => ['reload', 'write', 'hash', 'uci-save', 'apply'].includes(kind)), false);
+    await f.api.save(editor, input, 'dns', 'hash');
+    assert.equal((await f.store.list()).length, 0);
+});
+
+test('failed file Revert keeps drafts and inputs and allows retry', async () => {
+    const f = fixture();
+    await f.api.save(editor, 'draft', 'dns', 'hash');
+    f.fields.set('hash', { cfgvalue: () => assert.fail('must not alter editor baseline') });
+    await f.ui.open();
+    f.state.failRead = true;
+    const button = {};
+    await findRevert(f.ui.modal)({ currentTarget: button });
+    assert.equal((await f.store.list()).length, 1);
+    assert.ok(f.ui.modal);
+    assert.equal(button.disabled, false);
+    assert.equal(f.events.filter(([kind]) => kind === 'error').length, 1);
+    assert.equal(f.events.some(([kind]) => kind === 'reload'), false);
 });

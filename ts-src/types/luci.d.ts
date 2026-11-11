@@ -79,7 +79,7 @@ declare namespace LuCI {
 
             cbid(section_id: string): string
 
-            cfgvalue(section_id: string): any
+            cfgvalue(section_id: string, value?: any): any
 
             depends(field: (string | Object.<string, (string | RegExp)>), value?: (string | RegExp)): void
 

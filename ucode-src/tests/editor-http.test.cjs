@@ -2,7 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
+const { setTimeout: delay } = require('node:timers/promises');
 const { root, interpreter, shellRuntime } = require('./helpers.cjs');
 
 function fixture(t) {
@@ -28,18 +29,40 @@ function fixture(t) {
             return { access: getenv('TEST_ACCESS') != 'deny' && (getenv('TEST_ACCESS') != 'read' || args.function == 'editor_read') };
         }, disconnect: () => null };
     };`);
-    function call(action, payload = {}, env = {}) {
-        const input = JSON.stringify(payload);
-        const result = spawnSync(interpreter, ['-S', '-L', path.join(runtime, 'ucode'), '--', cgi], {
-            input, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024,
+    const args = ['-S', '-L', path.join(runtime, 'ucode'), '--', cgi];
+    function options(action, input, env = {}) {
+        return { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024,
             env: { ...process.env, REQUEST_METHOD: 'POST', CONTENT_TYPE: 'application/json',
-                CONTENT_LENGTH: String(Buffer.byteLength(input)), HTTP_AUTHORIZATION: 'Bearer ' + 'a'.repeat(32), QUERY_STRING: action, ...env },
-        });
-        assert.equal(result.status, 0, result.stderr);
-        const [headers, body] = result.stdout.split('\r\n\r\n');
+                CONTENT_LENGTH: String(Buffer.byteLength(input)), HTTP_AUTHORIZATION: 'Bearer ' + 'a'.repeat(32), QUERY_STRING: action, ...env } };
+    }
+    function parse(output) {
+        const [headers, body] = output.split('\r\n\r\n');
         return { status: Number(headers.match(/Status: (\d+)/)[1]), ...JSON.parse(body) };
     }
-    return { call, file };
+    function call(action, payload = {}, env = {}) {
+        const input = JSON.stringify(payload);
+        const result = spawnSync(interpreter, args, { ...options(action, input, env), input });
+        assert.equal(result.status, 0, result.stderr || result.signal || String(result.error || ''));
+        return parse(result.stdout);
+    }
+    function start(action, payload) {
+        const input = JSON.stringify(payload), child = spawn(interpreter, args, options(action, input));
+        t.after(() => child.kill());
+        child.stdout.setEncoding('utf8');
+        child.stderr.setEncoding('utf8');
+        const response = new Promise((resolve, reject) => {
+            let stdout = '', stderr = '';
+            child.stdout.on('data', chunk => { stdout += chunk; });
+            child.stderr.on('data', chunk => { stderr += chunk; });
+            child.on('error', reject);
+            child.on('close', (code, signal) => {
+                try { assert.equal(code, 0, stderr || signal); resolve(parse(stdout)); }
+                catch (error) { reject(error); }
+            });
+        });
+        return { child, input, response };
+    }
+    return { call, start, file };
 }
 const editor = { resource: 'domain_proxy' };
 
@@ -82,4 +105,35 @@ test('session cleanup only reports supplied live IDs and does not renew old sess
     assert.equal(response.status, 200);
     assert.deepEqual(response.sessions, [sessions[0]]);
     assert.equal(f.call('session', { sessions: ['invalid'] }).status, 400);
+});
+
+
+test('an incomplete request ending at EOF fails without writing', t => {
+    const f = fixture(t), payload = { editor, original: 'original', content: 'new' };
+    const response = f.call('write', payload, { CONTENT_LENGTH: String(Buffer.byteLength(JSON.stringify(payload)) + 1) });
+    assert.equal(response.status, 400);
+    assert.match(response.error, /incomplete/);
+    assert.equal(fs.readFileSync(f.file, 'utf8'), 'original\n');
+});
+
+test('a stalled request releases its CGI slot without waiting for stdin to close', { timeout: 9000 }, async t => {
+    const f = fixture(t), { child, input, response } = f.start('write', { editor, original: 'original', content: 'new' });
+    const began = Date.now();
+    child.stdin.write(input.slice(0, -1));
+    const result = await response;
+    assert.equal(result.status, 408);
+    assert.match(result.error, /timed out/);
+    assert.ok(Date.now() - began < 8000);
+    assert.equal(fs.readFileSync(f.file, 'utf8'), 'original\n');
+});
+
+test('request timeout measures inactivity, not total upload duration', { timeout: 11000 }, async t => {
+    const f = fixture(t), { child, input, response } = f.start('write', { editor, original: 'original', content: 'new' });
+    child.stdin.write(input.slice(0, 10));
+    await delay(3000);
+    child.stdin.write(input.slice(10, 20));
+    await delay(3000);
+    child.stdin.write(input.slice(20));
+    assert.equal((await response).status, 200);
+    assert.equal(fs.readFileSync(f.file, 'utf8'), 'new\n');
 });

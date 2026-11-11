@@ -2,7 +2,32 @@
 // 大文件不经过 ubus 的消息大小限制；仍使用 rpcd session 与原有编辑器 ACL。
 import * as fs from 'fs';
 import * as ubus from 'ubus';
+import * as uloop from 'uloop';
+import * as io from 'io';
 import { editor } from '/usr/lib/hijpass/rpc/files.uc';
+
+function readBody(size) {
+    // uhttpd 在客户端中断请求后可能直到脚本超时才关闭 stdin。
+    // 非阻塞读取，连续 5 秒没有数据就退出，避免占满共享 CGI 名额。
+    let body = [], remaining = size, timedOut = false, input = io.from(fs.stdin);
+    uloop.init();
+    let idle = uloop.timer(5000, () => { timedOut = true; uloop.end(); });
+    let reader = uloop.handle(input, () => {
+        let chunk = input.read(min(remaining, 1024 * 1024));
+        if (!length(chunk)) { uloop.end(); return; }
+        push(body, chunk); remaining -= length(chunk);
+        if (remaining == 0) uloop.end();
+        else idle.set(5000);
+    }, uloop.ULOOP_READ);
+    if (!reader || !idle) { uloop.done(); die('cannot read editor request'); }
+    uloop.run();
+    reader.delete();
+    idle.cancel();
+    uloop.done();
+    if (timedOut) return null;
+    if (remaining > 0) die('incomplete editor request');
+    return join('', body);
+}
 
 let status = '400 Bad Request', result;
 try {
@@ -23,13 +48,12 @@ try {
         status = '403 Forbidden';
         die('login session expired or editor access denied');
     }
-    let body = [], remaining = size;
-    while (remaining > 0) {
-        let chunk = fs.stdin.read(min(remaining, 1024 * 1024));
-        if (!length(chunk)) die('incomplete editor request');
-        push(body, chunk); remaining -= length(chunk);
+    let body = readBody(size);
+    if (body == null) {
+        status = '408 Request Timeout';
+        die('editor request body timed out');
     }
-    let request = json(join('', body));
+    let request = json(body);
     if (type(request) != 'object') die('invalid editor request');
     if (action == 'session') {
         result = { ok: true };

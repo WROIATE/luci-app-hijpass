@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-hijpass
 PKG_VERSION:=26.9.6
-PKG_RELEASE:=68
+PKG_RELEASE:=69
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
 # esbuild 已压缩 JS；再次经过 jsmin 会改写 CodeMirror 中的正则表达式。
@@ -20,7 +20,7 @@ LUCI_DEPENDS:= +ca-bundle +curl +firewall4 +ip-full +rpcd +ubus +jshn \
 	+sing-box +unzip +xray-core \
 	+kmod-nft-socket +kmod-nft-tproxy +kmod-nft-nat \
 	+v2ray-geosite +v2ray-geoip +geoview +chinadns-ng \
-	+ucode +ucode-mod-fs +ucode-mod-uci +ucode-mod-resolv +ucode-mod-ubus
+	+ucode +ucode-mod-fs +ucode-mod-uci +ucode-mod-resolv +ucode-mod-ubus +ucode-mod-uloop +ucode-mod-io
 
 define Package/$(PKG_NAME)/config
 menu "Configuration"

@@ -112,17 +112,18 @@ async function showDrafts() {
     for (const draft of drafts) {
         const diff = fileDiff(draft.original, draft.content);
         list.appendChild(E('h5', {}, document.createTextNode('# ' + label(draft.editor))));
-        list.appendChild(E('pre', { style: 'max-height:50vh;overflow:auto;white-space:pre;margin:0' },
-            E('var', {}, diff.lines.map(line => E(line.startsWith('+') ? 'ins' : line.startsWith('-') ? 'del' : 'span',
-                { style: 'display:block;min-height:1em;font-style:normal' }, document.createTextNode(line))))));
+        list.appendChild(E('var', { style: 'max-height:50vh;overflow:auto;white-space:pre' },
+            diff.lines.map(line => E(line.startsWith('+') ? 'ins' : line.startsWith('-') ? 'del' : 'span',
+                { style: 'display:block;min-height:1em' }, document.createTextNode(line)))));
         if (diff.truncated) list.appendChild(E('p', {}, _('Diff preview is limited; open the editor to view the full content.')));
     }
+    list.appendChild(E('br'));
     const dialog = ui.showModal(_('Configuration files') + ' / ' + _('Changes'), [
         E('div', { class: 'cbi-section' }, [
             E('strong', {}, _('Legend:')),
             E('div', { class: 'uci-change-legend' }, [
-                E('div', { class: 'uci-change-legend-label' }, [E('ins', {}, '\u00a0'), ' ', _('Added lines')]),
-                E('div', { class: 'uci-change-legend-label' }, [E('del', {}, '\u00a0'), ' ', _('Removed lines')]),
+                E('div', { class: 'uci-change-legend-label' }, [E('var', {}, E('ins', {}, '\u00a0')), ' ', _('Added lines')]),
+                E('div', { class: 'uci-change-legend-label' }, [E('var', {}, E('del', {}, '\u00a0')), ' ', _('Removed lines')]),
             ]),
             E('br'), list,
             E('div', { class: 'button-row' }, [

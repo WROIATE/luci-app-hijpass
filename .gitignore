@@ -9,3 +9,7 @@ graphify-out/
 /scripts/sync-openwrt.sh
 /scripts/po2lmo.py
 ts-src/node_modules/
+
+# Local documentation and independently maintained development tools
+/.local-docs/
+/tools/vscode-ucode-typedef/

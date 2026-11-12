@@ -310,6 +310,8 @@ declare namespace LuCI {
 
             write(path: string, content: string): Promise<void>;
 
+            read_direct(path: string, type?: "blob" | "text" | "json"): Promise<any>;
+
             trimmed(path: string): Promise<string>;
 
             read(logFile: any): any;

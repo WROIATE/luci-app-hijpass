@@ -10,7 +10,7 @@ export type ProgressHandler = (progress: UpdateProgress) => void;
 
 export type RuleUpdateResult = { success: boolean; failed?: string[]; code?: string };
 
-// 页面只使用业务方法。文件布局、命令位置以及参数组装由后端负责。
+// 页面只使用业务方法；编辑文件由 drafts 模块通过 LuCI 原生接口读写。
 function method(name: string, params: string[] = [], nobatch = false) {
     const call = rpc.declare({ object: 'hijpass', method: name, params, reject: true, nobatch,
         expect: { '': { error: 'Invalid backend response' } } });

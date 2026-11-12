@@ -7,7 +7,7 @@ const ts = require('typescript');
 const { IDBFactory, IDBKeyRange } = require('fake-indexeddb');
 
 function load(file, globals, modules = {}) {
-    const context = vm.createContext({ exports: {}, console, structuredClone, Blob, ...globals,
+    const context = vm.createContext({ exports: {}, console, structuredClone, Blob, FormData, ...globals,
         require: name => { if (!(name in modules)) throw new Error('Unexpected import: ' + name); return modules[name]; },
     });
     vm.runInContext('String.prototype.format = function(v) { return this.replace(/%[sd]/, v); };', context);
@@ -22,8 +22,20 @@ function fixture({ indexedDB = new IDBFactory(), sid = 'session-one', files = ne
     const store = new storage.DraftStore(sid), events = [], document = new EventTarget();
     const state = { authorized: true, failWrite: false, failRead: false, deniedSessions: new Set() };
     const sections = { dns: { '.type': 'dns' }, node: { '.type': 'proxy_node', name: 'renamed' } };
-    const key = editor => editor.resource + (editor.section ? ':' + editor.section + ':' + editor.name : '');
-    const request = { request: async url => { events.push(['apply', url]); return { status: 200 }; } };
+    const resources = { '/etc/hijpass/rules/domain-proxy.txt': 'domain_proxy', '/etc/hijpass/hook/dns-hook.sh': 'dns_hook' };
+    const key = filename => resources[filename] || 'proxy_config:node:' + filename.split('/').pop().replace(/-node\.json$/, '');
+    const request = { request: async (url, options) => {
+        if (!url.endsWith('/cgi-upload')) { events.push(['apply', url]); return { status: 200 }; }
+        assert.ok(options.content instanceof FormData);
+        const data = options.content;
+        assert.ok(data.get('filedata').size > 0, 'native upload rejects zero-byte files');
+        assert.equal(data.get('sessionid'), sid);
+        events.push(['write', data.get('filename')]);
+        if (state.failWrite) return { ok: true, json: () => ({ failure: [5], message: 'write failed' }) };
+        if (!state.authorized) return { ok: false, json: () => ({ failure: [13], message: 'session expired' }) };
+        files.set(key(data.get('filename')), (await data.get('filedata').text()).trim());
+        return { ok: true, json: () => ({ size: data.get('filedata').size }) };
+    } };
     const node = (tag, attrs, ...children) => ({ tag, attrs, children,
         appendChild(child) { this.children.push(child); }, classList: { add() {} } });
     const fields = new Map();
@@ -37,28 +49,27 @@ function fixture({ indexedDB = new IDBFactory(), sid = 'session-one', files = ne
     const api = load('modules/drafts.ts', { ...globals, document, location: { reload() { events.push(['reload']); } },
         L: { env: { sessionid: sid }, url: s => '/' + s, loaded: false, dom: { callClassMethod: (_map, _method, field) => fields.has(field) ? [fields.get(field)] : null } },
         _: s => s, E: node,
-        fetch: async (url, options) => {
-            const action = url.split('?')[1], data = JSON.parse(options.body);
-            events.push([action, data.editor?.resource]);
-            let result = { ok: true }, status = 200;
-            if (!state.authorized || state.deniedSessions.has(options.headers.Authorization.slice(7))) { result = { error: 'session expired' }; status = 403; }
-            else if (action === 'session') result = { ok: true, sessions: (data.sessions || []).filter(sid => !state.deniedSessions.has(sid)) };
-            else if (action === 'read') { if (state.failRead) { result = { error: 'read failed' }; status = 500; } else result = { content: files.get(key(data.editor)) || '' }; }
-            else if (action === 'check' || action === 'write') {
-                const current = files.get(key(data.editor)) || '';
-                if (current !== data.original && current !== data.content) { result = { error: 'file changed' }; status = 409; }
-                else if (action === 'write') {
-                    if (state.failWrite) { result = { error: 'write failed' }; status = 400; }
-                    else files.set(key(data.editor), data.content);
-                }
-            }
-            return { ok: status === 200, status, json: async () => result };
-        },
+
     }, {
         baseclass: { extend: value => value },
-        uci: { unload() {}, load: async () => {}, get: (_, id) => sections[id],
+        uci: { unload() {}, load: async () => {}, get: (_, id, field) => field ? sections[id]?.[field] : sections[id],
             set: (...args) => events.push(['hash', ...args]), save: async () => events.push(['uci-save']) },
         ui,
+        fs: { read_direct: async filename => {
+            events.push(['read', filename]);
+            if (!state.authorized) throw Object.assign(new Error('session expired'), { name: 'PermissionError' });
+            if (state.failRead) throw new Error('read failed');
+            if (!files.has(key(filename))) throw Object.assign(new Error('not found'), { name: 'NotFoundError' });
+            return files.get(key(filename));
+        } },
+        rpc: { declare: spec => async (...args) => {
+            if (spec.object === 'session' && spec.method === 'access') {
+                if (state.accessError) throw state.accessError;
+                return state.authorized;
+            }
+            assert.equal(spec.method, 'editor_sessions');
+            return { sessions: args[0].filter(id => !state.deniedSessions.has(id)) };
+        } },
         request, session: { getLocalData: () => [], setLocalData() {} },
         '../utils/feature/config/drafts': storage,
         '../utils/feature/config/diff': { fileDiff: () => ({ lines: [], truncated: false }) },
@@ -112,7 +123,7 @@ test('global Apply writes files then hashes then native request; confirmation cl
     assert.equal((await f.store.list()).length, 0);
 });
 
-test('failed upload and external file conflict retain drafts and block native apply', async () => {
+test('failed upload retains drafts; retry overwrites external edits without a conflict check', async () => {
     const f = fixture();
     await f.api.save(editor, 'new', 'dns', 'hash');
     f.state.failWrite = true;
@@ -121,9 +132,9 @@ test('failed upload and external file conflict retain drafts and block native ap
     assert.equal((await f.store.list()).length, 1);
     f.state.failWrite = false;
     f.files.set('domain_proxy', 'edited outside browser');
-    assert.equal((await f.request.request('/admin/uci/apply_unchecked', { method: 'post' })).status, 409);
-    assert.equal(f.files.get('domain_proxy'), 'edited outside browser');
-    assert.equal(f.events.some(([kind]) => kind === 'apply'), false);
+    assert.equal((await f.request.request('/admin/uci/apply_unchecked', { method: 'post' })).status, 200);
+    assert.equal(f.files.get('domain_proxy'), 'new');
+    assert.equal(f.events.some(([kind]) => kind === 'apply'), true);
 });
 
 test('native Revert clears drafts; unrelated requests never upload', async () => {
@@ -140,7 +151,7 @@ test('expired session cannot read or apply a cached draft and clears its data', 
     const f = fixture();
     await f.api.save(editor, 'new', 'dns', 'hash');
     f.state.authorized = false;
-    await assert.rejects(f.api.read(editor), /session expired/);
+    await assert.rejects(f.api.read(editor), /session expired/i);
     assert.equal((await f.store.list()).length, 0);
     assert.equal(f.files.get('domain_proxy'), 'original');
 });
@@ -248,4 +259,47 @@ test('failed file Revert keeps drafts and inputs and allows retry', async () => 
     assert.equal(button.disabled, false);
     assert.equal(f.events.filter(([kind]) => kind === 'error').length, 1);
     assert.equal(f.events.some(([kind]) => kind === 'reload'), false);
+});
+
+
+test('empty content uses native upload with a trailing newline', async () => {
+    const f = fixture();
+    await f.api.save(editor, '', 'dns', 'hash');
+    await f.request.request('/admin/uci/apply_unchecked', { method: 'post' });
+    assert.equal(f.files.get('domain_proxy'), '');
+});
+
+test('node reads use UCI names and apply uploads directly to the renamed destination', async () => {
+    const f = fixture();
+    f.files.set('proxy_config:node:renamed', 'old');
+    const node = { resource: 'proxy_config', section: 'node' };
+    assert.equal(await f.api.read(node), 'old');
+    await f.api.save({ ...node, name: 'renamed' }, '{}', 'node', 'hash');
+    f.sections.node.name = 'new name';
+    await f.request.request('/admin/uci/apply_unchecked', { method: 'post' });
+    assert.equal(f.files.get('proxy_config:node:new name'), '{}');
+    assert.equal(f.files.get('proxy_config:node:renamed'), 'old');
+});
+
+test('missing fixed files fail; new nodes are empty; invalid node paths and server writes are rejected', async () => {
+    const f = fixture();
+    await assert.rejects(f.api.read({ resource: 'dns_hook' }), /not found/);
+    assert.equal(await f.api.read({ resource: 'proxy_config', section: 'node' }), '');
+    for (const name of ['../outside', 'x/y', 'x\\y', 'x\0y'])
+        await assert.rejects(f.api.read({ resource: 'proxy_config', section: 'node', name }), /Invalid node/);
+    await f.api.save({ resource: 'server_config', section: 'node', name: 'server' }, '{}', 'node', 'hash');
+    assert.equal((await f.request.request('/admin/uci/apply_unchecked', { method: 'post' })).status, 409);
+    assert.equal(f.events.some(([kind]) => kind === 'write'), false);
+});
+
+
+test('native expired-session errors clear drafts, but network failures preserve them', async () => {
+    for (const error of [new Error('network unavailable'), Object.assign(new Error('Login session is expired'), { name: 'SessionError' }),
+        Object.assign(new Error('RPC call to session/access failed with error -32002: Access denied'), { name: 'RPCError' })]) {
+        const f = fixture();
+        await f.api.save(editor, 'draft', 'dns', 'hash');
+        f.state.accessError = error;
+        await assert.rejects(f.api.read(editor));
+        assert.equal((await f.store.list()).length, error.name === 'Error' ? 1 : 0);
+    }
 });

@@ -3,6 +3,8 @@ import uci from 'uci';
 import ui from 'ui';
 import request from 'request';
 import session from 'session';
+import fs from 'fs';
+import rpc from 'rpc';
 import type { Editor } from '../utils/backend';
 import { fileDiff } from '../utils/feature/config/diff';
 import { DraftStore, FileDraft, normalizeFile } from '../utils/feature/config/drafts';
@@ -14,37 +16,80 @@ const notice = (error: Error) => ui.addNotification(null, E('p', {}, error.messa
 let uploaded: FileDraft[] = [];
 let applying: Promise<void> | null = null;
 
-async function transfer(action: 'session' | 'read' | 'check' | 'write', data: object = {}) {
-    const response = await fetch((L.env.cgi_base || '/cgi-bin') + '/hijpass-editor?' + action, {
-        method: 'POST', credentials: 'same-origin', cache: 'no-store',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sid },
-        body: JSON.stringify(data),
+const access = rpc.declare({ object: 'session', method: 'access',
+    params: ['scope', 'object', 'function'], expect: { access: false } });
+const activeSessions = rpc.declare({ object: 'hijpass', method: 'editor_sessions',
+    params: ['sessions'], expect: { '': {} }, reject: true });
+
+async function checkSession() {
+    const allowed = await access('access-group', 'luci-app-hijpass', 'write').catch(async error => {
+        // 原生 LuCI 可能在返回 access=false 前直接拒绝过期会话；网络故障保留草稿。
+        if (error.name === 'SessionError' || (error.name === 'RPCError' && /-32002/.test(error.message))) await store.clear();
+        throw error;
     });
-    const result = await response.json();
-    if (!response.ok || result.error) {
-        if (response.status === 403) await store.clear();
-        throw Object.assign(new Error(result.error || _('Cannot access configuration file')), { status: response.status });
+    if (!allowed) {
+        await store.clear();
+        throw new Error(_('Login session expired or file access denied'));
     }
-    return result;
+}
+
+function filePath(editor: Editor): string {
+    const paths = {
+        ip_direct: '/etc/hijpass/rules/ip-direct.txt', ip_proxy: '/etc/hijpass/rules/ip-proxy.txt',
+        domain_direct: '/etc/hijpass/rules/domain-direct.txt', domain_proxy: '/etc/hijpass/rules/domain-proxy.txt',
+        firewall_template: '/etc/hijpass/firewall.ut', nft_hook: '/etc/hijpass/hook/nft-hook.sh',
+        dns_hook: '/etc/hijpass/hook/dns-hook.sh', shunt_conf: '/etc/hijpass/shunt.json',
+    };
+    if (Object.hasOwn(paths, editor.resource)) return paths[editor.resource];
+    if (!['proxy_config', 'server_config'].includes(editor.resource)) throw new Error('Unknown editor resource');
+    const server = editor.resource === 'server_config', id = editor.section;
+    const name = editor.name || uci.get(server ? 'hijserver' : 'hijpass', id, 'name') || id;
+    if (!id || !/^[A-Za-z0-9_-]+$/.test(id) || typeof name !== 'string' || /[\/\\\r\n\0]/.test(name))
+        throw new Error('Invalid node name or section ID');
+    return `/etc/hijpass/${server ? 'server' : 'client'}/${name}-${id}.json`;
+}
+
+async function readFile(editor: Editor): Promise<string> {
+    try { return normalizeFile(await fs.read_direct(filePath(editor))); }
+    catch (error) {
+        if (error.name === 'NotFoundError' && ['proxy_config', 'server_config', 'shunt_conf'].includes(editor.resource)) return '';
+        throw error;
+    }
+}
+
+async function writeFile(draft: FileDraft) {
+    if (draft.editor.resource === 'server_config') throw new Error('Server configurations are generated from UCI');
+    const data = new FormData();
+    data.append('sessionid', sid);
+    data.append('filename', filePath(draft.editor));
+    data.append('filemode', ['dns_hook', 'nft_hook'].includes(draft.editor.resource) ? '0755' : '0600');
+    // 与 LuCI 文本编辑器一致，空内容也保留末尾换行，原生上传不接受零字节文件。
+    data.append('filedata', new Blob([draft.content + '\n']), 'config');
+    const response = await request.request((L.env.cgi_base || '/cgi-bin') + '/cgi-upload', {
+        method: 'POST', content: data, timeout: 0,
+    });
+    const result = response.json();
+    if (!response.ok || result.failure || result.error)
+        throw new Error(result.message || result.error || _('Cannot write configuration file'));
 }
 
 async function read(editor: Editor): Promise<string> {
     const draft = await store.get(editor);
     if (draft) {
-        await transfer('session');
+        await checkSession();
         return draft.content;
     }
-    return normalizeFile((await transfer('read', { editor })).content);
+    return readFile(editor);
 }
 
 async function save(editor: Editor, value: string, section: string, field: string) {
-    await transfer('session');
+    await checkSession();
     const content = normalizeFile(value);
     if (new Blob([content]).size > 16 * 1024 * 1024) throw new Error(_('Configuration file exceeds 16 MiB'));
     const previous = await store.get(editor);
     // 重命名节点时，比较新文件的内容；不能沿用原文件的基线。
     const original = previous && previous.editor.name === editor.name ? previous.original
-        : normalizeFile((await transfer('read', { editor })).content);
+        : await readFile(editor);
     if (content === original) {
         if (previous) await store.remove(previous);
     } else {
@@ -65,7 +110,7 @@ async function upload() {
     uploaded = [];
     const drafts = await store.list();
     if (!drafts.length) return;
-    await transfer('session');
+    await checkSession();
     // 全局应用可能发生在其他页面；重新读取同一 RPC session 的待提交 UCI。
     uci.unload('hijpass');
     await uci.load('hijpass');
@@ -81,11 +126,10 @@ async function upload() {
                 draft.original = '';
             }
         }
-        await transfer('check', draft);
         uploaded.push(draft);
     }
     for (const draft of uploaded) {
-        await transfer('write', draft);
+        await writeFile(draft);
         uci.set('hijpass', draft.section, draft.field, hash(draft.content));
     }
     await uci.save();
@@ -110,7 +154,7 @@ async function revertFiles() {
     const drafts = await store.list();
     // 先读取正式文件；失败时保留草稿和当前表单，供用户重试。
     const contents = await Promise.all(drafts.map(async draft =>
-        normalizeFile((await transfer('read', { editor: draft.editor })).content)));
+        readFile(draft.editor)));
     await store.clear();
     for (const [index, draft] of drafts.entries()) {
         for (const map of document.querySelectorAll('.cbi-map')) {
@@ -196,10 +240,11 @@ async function initialize() {
     // 原生 session.list 不触碰其他会话的超时；只清理 rpcd 已销毁的会话草稿。
     const previous = (await store.sessions()).filter(value => value !== sid);
     if (previous.length) {
-        const result = await transfer('session', { sessions: previous });
+        const result = await activeSessions(previous);
+        if (result.error || !Array.isArray(result.sessions)) throw new Error(result.error || 'Invalid session response');
         for (const id of previous) if (!result.sessions.includes(id)) await store.clear(id);
     }
-    if ((await store.list()).length) await transfer('session');
+    if ((await store.list()).length) await checkSession();
     await refresh();
 }
 // preload 在 DOM 就绪后加载，直接初始化，避免等待已触发的 luci-loaded。

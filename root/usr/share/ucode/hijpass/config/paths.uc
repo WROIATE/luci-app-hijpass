@@ -1,4 +1,4 @@
-// 应用管理的文件位置只在后端定义；UCI 保存业务选项，不保存内部路径。
+// 后端使用的文件位置；编辑器的原生文件接口和 ACL 与此保持一致。
 // RULE_FILES 为可编辑/下载的规则文件，FILES 为模板、Hook 和分流配置。
 export const RULE_FILES = {
     ip_direct: '/etc/hijpass/rules/ip-direct.txt',

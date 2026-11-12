@@ -62,20 +62,16 @@ config proxy_node 'node'
     return { invoke, directory, runtime, rules, editor, log };
 }
 
-test('RPC reads the full editable template and serves an immutable default without paths', t => {
+test('RPC serves an immutable default and no longer transports editor content', t => {
     const f = fixture(t), schema = f.invoke('list');
     assert.ok(schema.firewall_template_default);
-    assert.equal(schema.firewall_chains, undefined);
-    assert.deepEqual(Object.keys(schema.editor_read), ['resource', 'section', 'name']);
+    assert.equal(schema.editor_read, undefined);
+    assert.equal(schema.editor_write, undefined);
     const original = fs.readFileSync(f.rules, 'utf8');
-    assert.equal(f.invoke('editor_read', { resource: 'firewall_template' }).content, original);
-    assert.equal(f.invoke('firewall_template_default').content, original);
-    assert.equal(f.invoke('editor_write', { resource: 'firewall_template', content: 'changed template' }).ok, true);
-    assert.equal(f.invoke('editor_read', { resource: 'firewall_template' }).content, 'changed template\n');
+    fs.writeFileSync(f.rules, 'changed template');
     assert.equal(f.invoke('firewall_template_default').content, original);
     fs.unlinkSync(path.join(f.runtime, 'firewall/default.ut'));
     assert.match(f.invoke('firewall_template_default').error, /cannot read/);
-    assert.match(f.invoke('editor_read', { resource: '/etc/shadow' }).error, /unknown editor resource/);
     assert.equal(f.invoke('not_a_method').error, 'unknown RPC method');
 });
 
@@ -110,25 +106,6 @@ test('one RPC object exposes configuration preview and validation with matching 
     fs.writeFileSync(path.join(f.directory, 'config/hijpass'), "config hijpass 'global'\n option enabled '0'\n");
     assert.deepEqual(f.invoke('config_validate'), { ok: true });
     assert.ok(f.invoke('config_validate', { sections: '' }).error);
-});
-
-test('RPC resolves backend directories and renamed/new node names without client file paths', t => {
-    const f = fixture(t);
-    assert.equal(f.invoke('editor_read', { resource: 'ip_direct' }).content, 'original\n');
-    fs.chmodSync(f.editor, 0o640);
-    assert.equal(f.invoke('editor_write', { resource: 'ip_direct', content: '  changed\r\nsecond  ' }).ok, true);
-    assert.equal(fs.readFileSync(f.editor, 'utf8'), 'changed\nsecond\n');
-    assert.equal(fs.statSync(f.editor).mode & 0o777, 0o640);
-    assert.equal(f.invoke('editor_read', { resource: 'proxy_config', section: 'newnode' }).content, '');
-    assert.equal(f.invoke('editor_write', { resource: 'proxy_config', section: 'newnode', name: 'renamed node', content: '{}' }).ok, true);
-    assert.equal(fs.readFileSync(path.join(f.directory, 'renamed node-newnode.json'), 'utf8'), '{}\n');
-    for (const request of [
-        { resource: 'proxy_config', section: '../node', content: '' },
-        { resource: 'proxy_config', section: 'node', name: '../secret', content: '' },
-        { resource: 'proxy_config', section: 'node', name: 'x\u0000y', content: '' },
-        { resource: 'ip_direct', content: {} },
-    ]) assert.ok(f.invoke('editor_write', request).error);
-    assert.equal(fs.readFileSync(f.editor, 'utf8'), 'changed\nsecond\n');
 });
 
 test('RPC logs use section identities and preserve tail, download and clear behavior', t => {

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
+import * as ubus from 'ubus';
 import { defaultTemplate } from '../firewall/generate.uc';
-import { editor, logs, log } from './files.uc';
+import { logs, log } from './files.uc';
 import { generate, validate } from 'hijpass.config.generate';
 import { generate as generateServers, render as renderServer } from 'hijpass.server.generate';
 import { validateSections, filterServerNodeSections } from 'hijpass.config.sections';
@@ -9,8 +10,7 @@ import { writeOutput } from 'hijpass.command.runtime';
 
 // RPC 参数是业务数据。没有文件路径或通用 command/argv 入口。
 const methods = {
-    firewall_template_default: {}, editor_read: { resource: '', section: '', name: '' },
-    editor_write: { resource: '', section: '', name: '', content: '' },
+    firewall_template_default: {}, editor_sessions: { sessions: [] },
     config_render: { sections: '', target: '' }, config_validate: { sections: '' },
     log_list: {}, log_read: { id: '', action: '', lines: '' },
     log_clear: { id: '' },
@@ -54,8 +54,17 @@ try {
     if (method == 'firewall_template_default') {
         result = { content: defaultTemplate() };
     }
-    else if (method == 'editor_read' || method == 'editor_write') {
-        result = editor(request, method == 'editor_write');
+    else if (method == 'editor_sessions') {
+        if (length(request.sessions) > 64 || length(filter(request.sessions,
+            id => type(id) != 'string' || !match(id, /^[a-f0-9]{32}$/)))) die('invalid session list');
+        let bus = ubus.connect();
+        if (!bus) die('cannot connect to rpcd');
+        // 枚举不会延长旧会话寿命；只返回浏览器已经持有的 ID。
+        let sessions = bus.call('session', 'list', {}, 'multiple');
+        bus.disconnect();
+        if (type(sessions) != 'array') die('cannot list rpcd sessions');
+        let active = map(sessions, item => item.ubus_rpc_session);
+        result = { sessions: filter(request.sessions, id => index(active, id) >= 0) };
     }
     else if (method == 'log_list') {
         result = logs();

@@ -94,7 +94,7 @@ test('server RPC validates hijserver independently and rejects custom JSON write
     assert.deepEqual(validate({ sections: JSON.stringify(sections) }), { ok: true });
     assert.match(validate({ sections: JSON.stringify([global, node('custom', 'xray')]) }).error, /select a server protocol/);
     const write = run('root/usr/lib/hijpass/rpc/data.uc', ['call', 'editor_write'], { resource: 'server_config', section: 'node', content: '{}' });
-    assert.match(JSON.parse(write.stdout).error, /generated from UCI/);
+    assert.match(JSON.parse(write.stdout).error, /unknown RPC method/);
 });
 
 test('Xray XHTTP servers generate all modes with TLS or REALITY and keep matching HTTP fields', () => {

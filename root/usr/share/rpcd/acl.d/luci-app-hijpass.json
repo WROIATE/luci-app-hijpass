@@ -13,7 +13,6 @@
         ],
         "hijpass": [
           "firewall_template_default",
-          "editor_read",
           "log_list",
           "log_read",
           "firewall_show",
@@ -29,9 +28,45 @@
           "core_version",
           "core_latest",
           "core_update_status",
-          "job_status"
+          "job_status",
+          "editor_sessions"
         ]
-      }
+      },
+      "file": {
+        "/etc/hijpass/rules/ip-direct.txt": [
+          "read"
+        ],
+        "/etc/hijpass/rules/ip-proxy.txt": [
+          "read"
+        ],
+        "/etc/hijpass/rules/domain-direct.txt": [
+          "read"
+        ],
+        "/etc/hijpass/rules/domain-proxy.txt": [
+          "read"
+        ],
+        "/etc/hijpass/firewall.ut": [
+          "read"
+        ],
+        "/etc/hijpass/hook/nft-hook.sh": [
+          "read"
+        ],
+        "/etc/hijpass/hook/dns-hook.sh": [
+          "read"
+        ],
+        "/etc/hijpass/shunt.json": [
+          "read"
+        ],
+        "/etc/hijpass/client/*.json": [
+          "read"
+        ],
+        "/etc/hijpass/server/*.json": [
+          "read"
+        ]
+      },
+      "cgi-io": [
+        "download"
+      ]
     },
     "write": {
       "uci": [
@@ -40,7 +75,6 @@
       ],
       "ubus": {
         "hijpass": [
-          "editor_write",
           "config_render",
           "config_validate",
           "server_render",
@@ -54,7 +88,39 @@
           "trace_start",
           "trace_release"
         ]
-      }
+      },
+      "file": {
+        "/etc/hijpass/rules/ip-direct.txt": [
+          "write"
+        ],
+        "/etc/hijpass/rules/ip-proxy.txt": [
+          "write"
+        ],
+        "/etc/hijpass/rules/domain-direct.txt": [
+          "write"
+        ],
+        "/etc/hijpass/rules/domain-proxy.txt": [
+          "write"
+        ],
+        "/etc/hijpass/firewall.ut": [
+          "write"
+        ],
+        "/etc/hijpass/hook/nft-hook.sh": [
+          "write"
+        ],
+        "/etc/hijpass/hook/dns-hook.sh": [
+          "write"
+        ],
+        "/etc/hijpass/shunt.json": [
+          "write"
+        ],
+        "/etc/hijpass/client/*.json": [
+          "write"
+        ]
+      },
+      "cgi-io": [
+        "upload"
+      ]
     }
   }
 }

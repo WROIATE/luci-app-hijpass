@@ -1,21 +1,10 @@
-/** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').EditorResponse} EditorResponse */
 /** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').LogList} LogList */
 /** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').LogResponse} LogResponse */
 /** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').LogRequest} LogRequest */
-/** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').EditorRequest} EditorRequest */
-/** @typedef {import('../../../share/ucode/hijpass/types/rpc.uc').EditorResource} EditorResource */
 import * as fs from 'fs';
 import { read } from 'hijpass.uci.read';
-import { atomic } from 'hijpass.common';
-import { RULE_FILES, FILES, nodeConfig, logPath } from 'hijpass.config.paths';
-import { configuredLogger } from '../maintenance/logs.uc';
+import { logPath } from 'hijpass.config.paths';
 
-// 编辑器只传资源名、section ID 和可选的新名称；目录和文件命名始终由后端决定。
-const resources = {
-    ip_direct: RULE_FILES.ip_direct, ip_proxy: RULE_FILES.ip_proxy,
-    domain_direct: RULE_FILES.domain_direct, domain_proxy: RULE_FILES.domain_proxy,
-    ...FILES,
-};
 /**
  * 校验前端传入的 UCI section ID，拒绝非法字符。
  * @param {string|null} value
@@ -30,57 +19,6 @@ function identifier(value) {
     }
     return value;
 }
-/**
- * 根据资源名和节点标识定位后端文件。
- * @param {EditorResource} request
- * @returns {string} 资源或节点配置的绝对路径。
- */
-function editorPath(request) {
-    let kind = request.resource;
-    let packageName = kind == 'server_config' ? 'hijserver' : 'hijpass';
-    if (exists(resources, kind)) {
-        return resources[kind];
-    }
-    let config = read(packageName);
-    if (kind != 'proxy_config' && kind != 'server_config') {
-        die('unknown editor resource');
-    }
-    let id = identifier(request.section), section = filter(config, item => item['.name'] == id)[0];
-    return nodeConfig({ '.name': id, name: request.name || section?.name }, kind == 'server_config');
-}
-/**
- * 按资源名读取或保存编辑器内容。
- * @param {EditorRequest} request
- * @param {boolean} write
- * @returns {EditorResponse} 读取返回 {content}，保存返回 {ok: true}；尚未创建的节点或分流文件内容为空。
- */
-export function editor(request, write) {
-    if (write && request.resource == 'server_config') die('server configurations are generated from UCI');
-    let path = editorPath(request);
-    if (!write) {
-        let content = fs.readfile(path);
-        // 节点配置在首次保存前不存在；规则和 hook 的读取错误不能伪装为空内容。
-        if (content == null && index(['proxy_config', 'server_config', 'shunt_conf'], request.resource) < 0) {
-            die(`cannot read editor resource: ${request.resource}`);
-        }
-        return { content: content || '' };
-    }
-    if (type(request.content) != 'string') {
-        die('editor content must be a string');
-    }
-    let content = replace(trim(request.content), /\r\n/g, '\n');
-    let writeLog = configuredLogger();
-    try {
-        atomic(path, content ? content + '\n' : '', fs.stat(path)?.mode || 0o600);
-        writeLog('INFO', `[editor] Resource saved: resource=${request.resource}, section=${request.section || '-'}, bytes=${length(content)}`);
-    }
-    catch (e) {
-        writeLog('ERROR', `[editor] Save failed: resource=${request.resource}, section=${request.section || '-'}: ${e.message}`);
-        die(e.message);
-    }
-    return { ok: true };
-};
-
 // Log：id 为 package:section 的业务标识；客户端不能提交任意日志路径。
 /**
  * 列出可供前端查看的日志，不暴露文件路径。

@@ -93,12 +93,17 @@ test('failed restore preserves current edits and re-enables the button', async (
     assert.deepEqual(f.writes, []);
 });
 
-test('ACL exposes defaults for reading without granting filesystem access', () => {
+test('ACL limits native editor access to configuration files and keeps server JSON read-only', () => {
     const acl = JSON.parse(readFileSync(path.join(__dirname, '../../root/usr/share/rpcd/acl.d/luci-app-hijpass.json'), 'utf8'))['luci-app-hijpass'];
     assert.ok(acl.read.ubus.hijpass.includes('firewall_template_default'));
     assert.equal(acl.read.ubus.hijpass.includes('firewall_chains'), false);
-    assert.equal(acl.read.file, undefined);
-    assert.equal(acl.write.file, undefined);
+    assert.deepEqual(acl.read.file['/etc/hijpass/firewall.ut'], ['read']);
+    assert.deepEqual(acl.write.file['/etc/hijpass/firewall.ut'], ['write']);
+    assert.deepEqual(acl.read.file['/etc/hijpass/server/*.json'], ['read']);
+    assert.equal(acl.write.file['/etc/hijpass/server/*.json'], undefined);
+    assert.equal(acl.write.file['/etc/*'], undefined);
+    assert.deepEqual(acl.write['cgi-io'], ['upload']);
+    assert.deepEqual(acl.read['cgi-io'], ['download']);
     assert.equal(acl.read.ubus.hijpass.includes('editor_write'), false);
-    assert.ok(acl.write.ubus.hijpass.includes('editor_write'));
+    assert.equal(acl.write.ubus.hijpass.includes('editor_write'), false);
 });

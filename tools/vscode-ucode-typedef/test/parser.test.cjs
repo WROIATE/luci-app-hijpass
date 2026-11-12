@@ -14,10 +14,10 @@ function lookup(code, text, occurrence = 'last') {
     return definitions?.length ? { reference, definitions } : undefined;
 }
 
-test('the actual path annotations reference shared NodeSection and LogSection definitions', () => {
+test('the actual path annotations reference shared NodeIdentity and LogSource definitions', () => {
     const file = path.resolve(__dirname, '../../../root/usr/share/ucode/hijpass/config/paths.uc');
     const code = fs.readFileSync(file, 'utf8');
-    for (const name of ['NodeSection', 'LogSection']) {
+    for (const name of ['NodeIdentity', 'LogSource']) {
         const match = lookup(code, name);
         assert.equal(match.definitions.length, 1);
         const alias = match.definitions[0].alias;

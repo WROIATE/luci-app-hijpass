@@ -67,6 +67,16 @@ function fixture({ indexedDB = new IDBFactory(), sid = 'session-one', files = ne
 }
 const editor = { resource: 'domain_proxy' };
 const tick = () => new Promise(resolve => setTimeout(resolve, 15));
+async function eventually(check) {
+    const deadline = Date.now() + 2000;
+    for (;;) {
+        try { await check(); return; }
+        catch (error) {
+            if (Date.now() >= deadline) throw error;
+            await tick();
+        }
+    }
+}
 
 test('Save persists draft across pages in the same session without file or UCI writes', async () => {
     const f = fixture();
@@ -144,8 +154,7 @@ test('a new login preserves live RPC sessions and cleans expired sessions withou
     assert.equal(await next.api.read(editor), 'original');
     const expired = fixture({ ...f, sid: 'another-login' });
     expired.state.deniedSessions.add('session-one');
-    await tick();
-    assert.equal((await f.store.list()).length, 0);
+    await eventually(async () => assert.equal((await f.store.list()).length, 0));
 });
 
 test('apply confirmation preserves a draft edited in another tab during apply', async () => {

@@ -80,7 +80,7 @@ function mappedLibrary(paths) {
 
 function run(script, args = [], input, extra = {}) {
     if (script.endsWith('.sh')) return runShell(script, args, extra);
-    if (script === 'ucode-src/tests/runtime.uc') {
+    if (script === 'tests/backend/runtime.uc') {
         const directory = shellRuntime();
         const driver = fs.readFileSync(path.join(root, script), 'utf8')
             .replaceAll('../../root/usr/lib/hijpass', directory)

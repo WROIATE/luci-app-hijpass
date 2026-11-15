@@ -9,7 +9,7 @@ const node = (type, core, overrides = {}) => ({ '.name': 'node', '.type': 'serve
     type, core, enabled: '1', allow_firewall: '1', listen: '127.0.0.1', listen_port: '16443',
     method: 'aes-128-gcm', password: 'test-password', uuid, certificate_path: '/tmp/test-cert.pem',
     key_path: '/tmp/test-key.pem', ...overrides });
-function invoke(action, values, extra) { return run('ucode-src/tests/runtime.uc', [], { action, ...values }, extra); }
+function invoke(action, values, extra) { return run('tests/backend/runtime.uc', [], { action, ...values }, extra); }
 function result(action, values) {
     const process = invoke(action, values);
     assert.equal(process.status, 0, process.stderr);

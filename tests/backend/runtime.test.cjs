@@ -11,7 +11,7 @@ function invoke(request, env) {
     if (request.action === 'migrate') {
         const migrated = run('root/usr/lib/hijpass/install/migrate.uc', ['--configdir', request.directory], undefined, extra);
         if (migrated.status !== 0) return migrated;
-        return run('ucode-src/tests/runtime.uc', [], { action: 'read', directory: request.directory });
+        return run('tests/backend/runtime.uc', [], { action: 'read', directory: request.directory });
     }
     if (request.action === 'connect') return runShell('root/usr/lib/hijpass/network/network.sh',
         ['connect', request.url, request.timeout || '5'], extra);
@@ -21,7 +21,7 @@ function invoke(request, env) {
         runShell('root/usr/lib/hijpass/maintenance/logs.sh', [request.operation, ...(request.path ? [request.path] : []), '--configdir', directory], extra));
     if (request.action === 'cleanup') return runShell('root/usr/lib/hijpass/maintenance/cleanup.sh',
         [request.kind, request.id, request.name || ''], extra);
-    return run('ucode-src/tests/runtime.uc', [], request, extra);
+    return run('tests/backend/runtime.uc', [], request, extra);
 }
 function value(request, env) {
     const result = invoke(request, env);

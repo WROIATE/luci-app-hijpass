@@ -9,8 +9,8 @@ const ts = require('typescript');
 const root = path.resolve(__dirname, '../..');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hijpass-backend-test-'));
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
-const { config } = require('../../ucode-src/tests/helpers.cjs');
-const fixtures = require('../../ucode-src/tests/testdata/compatibility.json');
+const { config } = require('../../tests/backend/helpers.cjs');
+const fixtures = require('../../tests/backend/testdata/compatibility.json');
 function rpc(method, request) {
     const result = config(['call', method], request);
     assert.equal(result.status, 0, result.stderr);

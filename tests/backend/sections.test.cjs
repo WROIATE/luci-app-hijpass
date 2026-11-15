@@ -73,7 +73,7 @@ printf('%J', results);`);
 test('absent optional services produce no instances, DNS settings or firewall rules', () => {
     for (const [action, expected] of [['plan', { instances: [] }], ['server-plan', { instances: [], ports: { tcp: [], udp: [] } }],
         ['dns-options', null], ['firewall', '']]) {
-        const result = run('ucode-src/tests/runtime.uc', [], { action, sections: [], dnsmasq: null });
+        const result = run('tests/backend/runtime.uc', [], { action, sections: [], dnsmasq: null });
         assert.equal(result.status, 0, result.stderr);
         assert.deepEqual(JSON.parse(result.stdout), expected);
     }
@@ -90,7 +90,7 @@ test('a missing shunt is optional for rendering but a missing target ID fails ex
 });
 
 test('a missing DNS section does not enable DNS-maintained firewall sets', () => {
-    const result = run('ucode-src/tests/runtime.uc', [], { action: 'firewall',
+    const result = run('tests/backend/runtime.uc', [], { action: 'firewall',
         sections: [{ '.type': 'firewall', '.name': 'firewall', proxy_port: '10001', tproxy_proto: 'tcp,udp' }],
         state: { wan: [], local4: [], local6: [], dns4: [], dns6: [] } },
     { paths: { '/etc/hijpass/firewall.ut': path.join(root, 'root/etc/hijpass/firewall.ut') } });
@@ -109,7 +109,7 @@ printf('%J', { message, dns: dnsPlan([]) });`);
 });
 
 test('chinadns uses its default dnsmasq port when the optional section is absent', () => {
-    const result = run('ucode-src/tests/runtime.uc', [], { action: 'dns-options', dnsmasq: null,
+    const result = run('tests/backend/runtime.uc', [], { action: 'dns-options', dnsmasq: null,
         sections: [{ '.type': 'dns', '.name': 'dns', dns_service: 'chinadns-ng', cdg_port: '5353',
             direct_dns: 'dnsmasq', proxy_dns: '1.1.1.1' }] });
     assert.equal(result.status, 0, result.stderr);

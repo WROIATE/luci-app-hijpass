@@ -98,7 +98,7 @@ procd_kill() { echo "$1:kill" >>"$EVENTS"; rm -f "$IPKG_INSTROOT/registered-$1";
     source = source.replace('"$HIJPASS_LIB/service/cron.sh" ' + service, `'${directory}/cron-write' "$1" ${service}`);
     // reload_service 的自调用也经过同一份原生 rc.common。
     source = source.replace('/etc/init.d/' + service + ' restart',
-        `/usr/bin/busybox ash '${root}/ucode-src/tests/testdata/rc.common' '${init}' restart`);
+        `/usr/bin/busybox ash '${root}/tests/backend/testdata/rc.common' '${init}' restart`);
     source = source.replace('/etc/hijpass/hook/dns-hook.sh', directory + '/dns-hook')
         .replace('/etc/init.d/cron', directory + '/cron-init')
         .replace('/usr/share/nftables.d/table-post/hijserver.nft', directory + '/server.nft')
@@ -111,7 +111,7 @@ exit(getenv('FAIL_PHASE') == 'firewall:generate' ? 1 : 0);
     fs.writeFileSync(init, source);
     function run(action, fail = '', extra = {}) {
         fs.writeFileSync(events, '');
-        return spawnSync('/usr/bin/busybox', ['ash', root + '/ucode-src/tests/testdata/rc.common', init, action], {
+        return spawnSync('/usr/bin/busybox', ['ash', root + '/tests/backend/testdata/rc.common', init, action], {
             encoding: 'utf8', timeout: 10000, env: { ...process.env, IPKG_INSTROOT: directory, EVENTS: events, PLAN: planPath,
                 FAIL_PHASE: fail, ...extra, PATH: directory + '/bin:' + runtime + '/testbin:' + process.env.PATH },
         });
@@ -343,7 +343,7 @@ while [ ! -f '${release}' ]; do sleep 0.02; done
     try {
         for (let i = 0; i < 200 && !fs.existsSync(ready); i++) await new Promise(r => setTimeout(r, 10));
         assert.ok(fs.existsSync(ready), 'update acquired lock');
-        child = spawn('/usr/bin/busybox', ['ash', root + '/ucode-src/tests/testdata/rc.common', f.directory + '/hijpass', action], {
+        child = spawn('/usr/bin/busybox', ['ash', root + '/tests/backend/testdata/rc.common', f.directory + '/hijpass', action], {
             env: { ...process.env, IPKG_INSTROOT: f.directory, EVENTS: f.directory + '/events', PLAN: f.planPath,
                 PATH: f.directory + '/bin:' + f.runtime + '/testbin:' + process.env.PATH }, stdio: 'ignore',
         });
@@ -372,7 +372,7 @@ test('hijpass: 等待更新超时直接退出，rc.common 不继续停止或启�
 flock -x 9
 export IPKG_INSTROOT='${f.directory}' EVENTS='${f.directory}/events' PLAN='${f.planPath}'
 export PATH='${f.directory}/bin:${f.runtime}/testbin':"$PATH"
-/usr/bin/busybox ash '${root}/ucode-src/tests/testdata/rc.common' '${init}' restart
+/usr/bin/busybox ash '${root}/tests/backend/testdata/rc.common' '${init}' restart
 `);
     const blocked = spawnSync('/usr/bin/busybox', ['ash', driver], { encoding: 'utf8', timeout: 5000 });
     assert.equal(blocked.status, 1, blocked.stderr);

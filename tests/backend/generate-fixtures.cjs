@@ -1,4 +1,4 @@
-// Run with: node ucode-src/tests/generate-fixtures.cjs
+// Run with: node tests/backend/generate-fixtures.cjs
 // The last browser-side TS generator is the source of expected behavior.
 // Execute that historical TS code directly, independently of the ucode implementation.
 const fs = require('node:fs');

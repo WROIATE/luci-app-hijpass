@@ -20,7 +20,7 @@ for (const fixture of fixtures) {
             sections = withConfig(sections, directory => {
                 const migrated = run('root/usr/lib/hijpass/install/migrate.uc', ['--configdir', directory]);
                 assert.equal(migrated.status, 0, migrated.stderr);
-                const read = run('ucode-src/tests/runtime.uc', [], { action: 'read', directory });
+                const read = run('tests/backend/runtime.uc', [], { action: 'read', directory });
                 assert.equal(read.status, 0, read.stderr);
                 return JSON.parse(read.stdout);
             });
@@ -90,7 +90,7 @@ test('CLI 按原生 UCI 生成的匿名 section ID 预览分流', () => {
     const sections = structuredClone(fixture.sections);
     delete sections.find(section => section['.type'] === 'shunt')['.name'];
     withConfig(sections, directory => {
-        const read = run('ucode-src/tests/runtime.uc', [], { action: 'read', directory });
+        const read = run('tests/backend/runtime.uc', [], { action: 'read', directory });
         assert.equal(read.status, 0, read.stderr);
         const id = JSON.parse(read.stdout).find(section => section['.type'] === 'shunt')['.name'];
         const preview = config(['render', '--configdir', directory, '--target', id]);

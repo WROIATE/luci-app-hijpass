@@ -7,7 +7,7 @@ const path = require('node:path');
 const ts = require('typescript');
 
 const root = path.resolve(__dirname, '../..');
-const { interpreter } = require('../../ucode-src/tests/helpers.cjs');
+const { interpreter } = require('../../tests/backend/helpers.cjs');
 const shellQuote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 const defaults = {
     mode: 'client', clientIp: '192.168.1.100', protocol: 'all', port: '',

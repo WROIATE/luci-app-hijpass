@@ -176,6 +176,25 @@ function createOptions(section: LuCI.form.AbstractSection, instances: any) {
     uuidOption.rmempty = false;
     uuidOption.datatype = 'uuid';
 
+    const multiplex = ['shadowsocks', 'vless'].map(type => ({ core: 'sing-box', type }));
+    field(form.Flag, 'multiplex_enabled', _('Enable Multiplexing'), multiplex,
+        _('Accept sing-box multiplex connections; enable multiplexing on the client too.'));
+    const multiplexEnabled = multiplex.map(dependency => ({ ...dependency, multiplex_enabled: '1' }));
+    field(form.Flag, 'multiplex_padding', _('Require Multiplex Padding'), multiplexEnabled,
+        _('Reject multiplex connections without padding; clients must enable padding.'));
+    field(form.Flag, 'multiplex_brutal_enabled', _('Enable TCP Brutal'), multiplexEnabled,
+        _('Requires the TCP Brutal kernel module on this server.'));
+    for (const [key, label] of [
+        ['multiplex_brutal_up_mbps', _('Uplink Bandwidth')],
+        ['multiplex_brutal_down_mbps', _('Downlink Bandwidth')],
+    ]) {
+        const bandwidth = field(form.Value, key, label,
+            multiplexEnabled.map(dependency => ({ ...dependency, multiplex_brutal_enabled: '1' })),
+            _('Server bandwidth in Mbps; must be greater than zero.'));
+        bandwidth.datatype = 'and(uinteger,range(1,2147483647))';
+        bandwidth.rmempty = false;
+    }
+
     const transportOption = field(form.ListValue, 'transport', _('Transport Protocol'), [{ type: 'vless' }],
         _("Leave empty for TCP. HTTP requires sing-box; XHTTP requires Xray. Match the peer transport."));
     for (const { value, label } of HijpassValues.V2RAY_TRANSPORT_TYPES) transportOption.value(value, _(label));

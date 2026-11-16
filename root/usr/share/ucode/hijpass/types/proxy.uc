@@ -1,3 +1,12 @@
+/**
+ * @typedef {{
+ *   mux_enabled?: boolean,
+ *   mux_concurrency?: integer,
+ *   mux_xudp_concurrency?: integer,
+ *   mux_udp443?: string
+ * }} XrayMuxOptions
+ */
+
 /** @typedef {import('./transport.uc').TransportOptions} TransportOptions */
 // 已解码的节点与能力字段；原始 UCI 字段声明位于 config/protocol/。
 
@@ -54,6 +63,7 @@
  * 经 config/values.decode 转换的字段；布尔、整数与时长字符串不再混用。
  * @typedef {{
  *   multiplex_enabled: boolean,
+ *   multiplex_padding: boolean,
  *   multiplex_protocol: string,
  *   multiplex_max_connections: integer|null,
  *   multiplex_min_streams: integer|null,
@@ -66,7 +76,7 @@
 
 
 /**
- * @typedef {RemoteProxy & MultiplexOptions & {
+ * @typedef {RemoteProxy & MultiplexOptions & XrayMuxOptions & {
  *   type: 'shadowsocks',
  *   password: string,
  *   network: string,
@@ -78,7 +88,7 @@
  */
 
 /**
- * @typedef {RemoteProxy & TLSOptions & RealityOptions & MultiplexOptions & TransportOptions & {
+ * @typedef {RemoteProxy & TLSOptions & RealityOptions & MultiplexOptions & XrayMuxOptions & TransportOptions & {
  *   type: 'vless',
  *   security: string,
  *   uuid: string,

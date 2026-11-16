@@ -242,3 +242,41 @@ test('VLESS 显式安全选项覆盖旧字段，TLS 可省略 SNI，旧节点保
         assert.match(rpc('render', [{ ...base, security: 'invalid' }]).error, /unsupported VLESS security/);
     }
 });
+
+test('Xray SS and VLESS emit native Mux settings independently of sing-box multiplex', () => {
+    for (const type of ['shadowsocks', 'vless']) {
+        const proxy = node('mux', { core: 'xray', type, security: 'none', method: 'aes-128-gcm',
+            password: 'test', uuid: '11111111-1111-4111-8111-111111111111' });
+        const render = options => rpc('render', [{ ...proxy, ...options }], 'mux');
+        assert.equal(render({ multiplex_enabled: '1' }).config.outbounds[0].mux, undefined);
+        assert.deepEqual(render({ mux_enabled: '1' }).config.outbounds[0].mux,
+            { enabled: true, concurrency: 8, xudpConcurrency: 16, xudpProxyUDP443: 'reject' });
+        for (const value of ['-1', '0', '128']) for (const policy of ['reject', 'allow', 'skip']) {
+            assert.deepEqual(render({ mux_enabled: '1', mux_concurrency: value,
+                mux_xudp_concurrency: '1024', mux_udp443: policy }).config.outbounds[0].mux,
+                { enabled: true, concurrency: Number(value), xudpConcurrency: 1024, xudpProxyUDP443: policy });
+        }
+        for (const options of [{ mux_concurrency: '1.5' }, { mux_concurrency: '-2' }, { mux_concurrency: '129' },
+            { mux_xudp_concurrency: '1025' }, { mux_udp443: 'invalid' }]) {
+            assert.ok(render({ mux_enabled: '1', ...options }).error);
+            assert.equal(render({ mux_enabled: '0', ...options }).config.outbounds[0].mux, undefined);
+        }
+        const sing = render({ core: 'sing-box', mux_enabled: '1', mux_concurrency: 'invalid', multiplex_enabled: '1' });
+        assert.equal(sing.config.outbounds[0].mux, undefined);
+        assert.equal(sing.config.outbounds[0].multiplex.enabled, true);
+    }
+});
+
+test('Xray Vision permits XUDP with TCP Mux disabled, and rejects TCP Mux', () => {
+    const proxy = node('vision', { core: 'xray', type: 'vless', security: 'tls',
+        uuid: '11111111-1111-4111-8111-111111111111', flow: 'xtls-rprx-vision', mux_enabled: '1' });
+    assert.match(rpc('render', [proxy], 'vision').error, /Vision requires/);
+    assert.deepEqual(rpc('render', [{ ...proxy, mux_concurrency: '-1', mux_xudp_concurrency: '16' }], 'vision').config.outbounds[0].mux,
+        { enabled: true, concurrency: -1, xudpConcurrency: 16, xudpProxyUDP443: 'reject' });
+});
+
+test('sing-box client padding is emitted only when enabled', () => {
+    const proxy = node('padding', { method: 'aes-128-gcm', password: 'test', multiplex_enabled: '1' });
+    assert.equal(rpc('render', [proxy], 'padding').config.outbounds[0].multiplex.padding, undefined);
+    assert.equal(rpc('render', [{ ...proxy, multiplex_padding: '1' }], 'padding').config.outbounds[0].multiplex.padding, true);
+});

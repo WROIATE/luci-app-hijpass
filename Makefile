@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-hijpass
 PKG_VERSION:=26.11.12
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 LUCI_TITLE:=LuCI support for HiJpass
 LUCI_PKGARCH:=all
 # esbuild 已压缩 JS；再次经过 jsmin 会改写 CodeMirror 中的正则表达式。

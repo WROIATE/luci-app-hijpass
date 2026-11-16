@@ -102,6 +102,19 @@ export function options(section) {
             if (!node.grpc_service_name) die('gRPC service name is required');
         }
     }
+    if (node.core == 'sing-box' && index(['shadowsocks', 'vless'], node.type) >= 0) {
+        node.multiplex_enabled = decode(section, { multiplex_enabled: ['bool', false] }).multiplex_enabled;
+        if (node.multiplex_enabled) {
+            node = { ...node, ...decode(section, { multiplex_padding: ['bool', false],
+                multiplex_brutal_enabled: ['bool', false] }) };
+            if (node.multiplex_brutal_enabled) {
+                node = { ...node, ...decode(section, { multiplex_brutal_up_mbps: ['integer', 0, 2147483647],
+                    multiplex_brutal_down_mbps: ['integer', 0, 2147483647] }) };
+                if (!node.multiplex_brutal_up_mbps || !node.multiplex_brutal_down_mbps)
+                    die('TCP Brutal upload and download bandwidth must be greater than zero');
+            }
+        }
+    }
     if (node.security != 'none') {
         node.server_name = decode(section, { server_name: ['text', ''] }).server_name;
         if (node.security == 'tls') {

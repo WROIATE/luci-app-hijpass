@@ -1,3 +1,12 @@
+/**
+ * @typedef {{
+ *   mux_enabled?: string|null,
+ *   mux_concurrency?: string|null,
+ *   mux_xudp_concurrency?: string|null,
+ *   mux_udp443?: string|null
+ * }} RawXrayMuxOptions
+ */
+
 /** @typedef {import('./transport.uc').RawTransportOptions} RawTransportOptions */
 /** @typedef {import('./sections.uc').NamedNodeSection} NamedNodeSection */
 /** @typedef {import('./sections.uc').RawCommandOptions} RawCommandOptions */
@@ -77,6 +86,7 @@
  * 原始 MultiplexOptions 能力；布尔、整数和时长均在解码时转换。
  * @typedef {{
  *   multiplex_enabled: string|null,
+ *   multiplex_padding: string|null,
  *   multiplex_protocol: string|null,
  *   multiplex_max_connections: string|null,
  *   multiplex_min_streams: string|null,
@@ -93,7 +103,7 @@
  * shadowsocks 协议的原始字段；只组合该协议实际解码的能力。
  * @typedef {
  *   ChainableProxySectionBase &
- *   RawMultiplexOptions &
+ *   RawMultiplexOptions & RawXrayMuxOptions &
  *   RawNetworkOptions &
  *   RawPasswordOptions &
  *   {
@@ -112,7 +122,7 @@
  *   ChainableProxySectionBase &
  *   RawTLSOptions &
  *   RawRealityOptions &
- *   RawMultiplexOptions &
+ *   RawMultiplexOptions & RawXrayMuxOptions &
  *   RawTransportOptions &
  *   RawNetworkOptions &
  *   {

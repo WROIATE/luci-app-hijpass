@@ -1,4 +1,14 @@
 /**
+ * @typedef {{
+ *   multiplex_enabled?: boolean,
+ *   multiplex_padding?: boolean,
+ *   multiplex_brutal_enabled?: boolean,
+ *   multiplex_brutal_up_mbps?: integer,
+ *   multiplex_brutal_down_mbps?: integer
+ * }} ServerMultiplex
+ */
+
+/**
  * 转换后的公共服务端选项；数字已校验，缺失值已填充。
  * @typedef {{
  *   name: string,
@@ -25,7 +35,7 @@
  */
 
 /**
- * @typedef {ServerOptionsBase & {
+ * @typedef {ServerOptionsBase & ServerMultiplex & {
  *   password: string,
  *   method: string
  * }} ShadowsocksServerOptions
@@ -41,7 +51,7 @@
  */
 
 /**
- * @typedef {ServerOptionsBase & ServerTLS & {
+ * @typedef {ServerOptionsBase & ServerMultiplex & ServerTLS & {
  *   uuid: string,
  *   flow: string,
  *   http_host?: string[],

@@ -32,10 +32,11 @@ export const REALITY_FIELDS = {
 
 export const MULTIPLEX_FIELDS = {
 	multiplex_enabled: ["bool", false], // 0/1；启用连接复用
+	multiplex_padding: ["bool", false], // sing-box 复用填充
 	multiplex_protocol: ["text", "h2mux"], // sing-box 复用协议（h2mux/smux/yamux）
 	multiplex_max_connections: ["integer", null, 2147483647], // sing-box 最大底层连接数；0 使用核心默认值
 	multiplex_min_streams: ["integer", null, 2147483647], // sing-box 每连接最小流数；0 使用核心默认值
-	multiplex_max_streams: ["integer", null, 2147483647], // sing-box 每连接最大流数；Xray 用作 mux concurrency
+	multiplex_max_streams: ["integer", null, 2147483647], // sing-box 每连接最大流数
 	multiplex_brutal_enabled: ["bool", false], // 0/1；启用 sing-box Brutal 复用拥塞控制
 	multiplex_brutal_up_mbps: ["integer", null, 2147483647], // Brutal 上行带宽，单位 Mbps
 	multiplex_brutal_down_mbps: ["integer", null, 2147483647], // Brutal 下行带宽，单位 Mbps

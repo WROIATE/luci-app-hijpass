@@ -198,3 +198,26 @@ test('HTTP transports reject unsupported cores, REALITY, Vision and malformed ma
         assert.match(process.stderr, message);
     }
 });
+
+for (const type of ['shadowsocks', 'vless']) test(`sing-box ${type}: inbound multiplex options and disabled defaults`, () => {
+    const section = node(type, 'sing-box');
+    const render = options => result('server-render', { section: { ...section, ...options } }).inbounds[0];
+    assert.equal(render({}).multiplex, undefined);
+    assert.deepEqual(render({ multiplex_enabled: '1' }).multiplex, { enabled: true, padding: false });
+    assert.deepEqual(render({ multiplex_enabled: '1', multiplex_padding: '1', multiplex_brutal_enabled: '1',
+        multiplex_brutal_up_mbps: '100', multiplex_brutal_down_mbps: '200', multiplex_protocol: 'invalid' }).multiplex,
+        { enabled: true, padding: true, brutal: { enabled: true, up_mbps: 100, down_mbps: 200 } });
+    assert.equal(render({ multiplex_enabled: '0', multiplex_brutal_up_mbps: 'invalid' }).multiplex, undefined);
+    assert.equal(render({ core: 'xray', multiplex_enabled: '1', multiplex_brutal_up_mbps: 'invalid' }).multiplex, undefined);
+    for (const bandwidth of ['', '0', '-1', '1.5']) {
+        const response = invoke('server-render', { section: { ...section, multiplex_enabled: '1',
+            multiplex_brutal_enabled: '1', multiplex_brutal_up_mbps: bandwidth, multiplex_brutal_down_mbps: '100' } });
+        assert.notEqual(response.status, 0);
+    }
+});
+
+test('Hysteria2 ignores stale sing-box multiplex options', () => {
+    const inbound = result('server-render', { section: node('hysteria2', 'sing-box', {
+        multiplex_enabled: '1', multiplex_brutal_up_mbps: 'invalid' }) }).inbounds[0];
+    assert.equal(inbound.multiplex, undefined);
+});

@@ -1,3 +1,13 @@
+/**
+ * @typedef {{
+ *   multiplex_enabled?: string|null,
+ *   multiplex_padding?: string|null,
+ *   multiplex_brutal_enabled?: string|null,
+ *   multiplex_brutal_up_mbps?: string|null,
+ *   multiplex_brutal_down_mbps?: string|null
+ * }} RawServerMultiplex
+ */
+
 /** @typedef {import('./sections.uc').EnabledSection} EnabledSection */
 
 /**
@@ -25,7 +35,7 @@
  */
 
 /**
- * @typedef {ServerBaseSection & {
+ * @typedef {ServerBaseSection & RawServerMultiplex & {
  *   type: 'shadowsocks',
  *   method: string|null,
  *   password: string|null
@@ -43,7 +53,7 @@
  */
 
 /**
- * @typedef {ServerBaseSection & ServerTLSOptions & {
+ * @typedef {ServerBaseSection & RawServerMultiplex & ServerTLSOptions & {
  *   type: 'vless',
  *   uuid: string|null,
  *   flow: string|null,

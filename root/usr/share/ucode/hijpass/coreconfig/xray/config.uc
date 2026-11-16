@@ -93,6 +93,8 @@ export function build(n) {
 			die(`unsupported Xray protocol "${n.type}"`);
 		}
 		let out = builder(n);
+		if (n.mux_enabled) out.mux = { enabled: true, concurrency: n.mux_concurrency,
+			xudpConcurrency: n.mux_xudp_concurrency, xudpProxyUDP443: n.mux_udp443 };
 		push(config.outbounds, out);
 		if (n.upstream) {
 			let tag = TAG.upstream + n.upstream.name;

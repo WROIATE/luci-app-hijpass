@@ -92,5 +92,21 @@ export function decodeProxy(section) {
 		&& (duration(node.transport_grpc_idle_timeout) > 2147483647 || duration(node.transport_grpc_ping_timeout) > 2147483647)) {
 		die('gRPC timeout exceeds 32-bit range');
 	}
+	if (engine == CORE.xray && index([TYPE.shadowsocks, TYPE.vless], node.type) >= 0) {
+		node.mux_enabled = decode(section, { mux_enabled: ['bool', false] }).mux_enabled;
+		if (node.mux_enabled) {
+			let mux = decode(section, { mux_concurrency: ['text', '8'], mux_xudp_concurrency: ['text', '16'],
+				mux_udp443: ['text', 'reject'] });
+			for (let key, maximum in { mux_concurrency: 128, mux_xudp_concurrency: 1024 }) {
+				if (!match(mux[key], /^-?[0-9]+$/) || +mux[key] < -1 || +mux[key] > maximum)
+					die(`${key} must be an integer from -1 to ${maximum}`);
+				mux[key] = int(mux[key]);
+			}
+			if (index(['reject', 'allow', 'skip'], mux.mux_udp443) < 0) die('invalid Mux UDP/443 policy');
+			if (node.type == TYPE.vless && node.flow && mux.mux_concurrency >= 0)
+				die('Vision requires Mux TCP concurrency -1; use XUDP for UDP multiplexing');
+			node = { ...node, ...mux };
+		}
+	}
 	return node;
 };

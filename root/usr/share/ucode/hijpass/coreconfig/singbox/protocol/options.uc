@@ -34,6 +34,7 @@ export function multiplex(n) {
 		return null;
 	}
 	let out = { enabled: true, protocol: n.multiplex_protocol };
+	if (n.multiplex_padding) out.padding = true;
 	for (let key in ['max_connections', 'min_streams', 'max_streams']) optional(out, key, n[`multiplex_${key}`]);
 	if (n.multiplex_brutal_enabled) {
 		out.brutal = { enabled: true };

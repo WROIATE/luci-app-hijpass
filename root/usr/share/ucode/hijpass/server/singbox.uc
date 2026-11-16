@@ -30,6 +30,11 @@ export function build(node) {
         if (node.transport == 'ws') inbound.transport = { type: 'ws', path: node.ws_path };
         if (node.transport == 'grpc') inbound.transport = { type: 'grpc', service_name: node.grpc_service_name };
     }
+    if (node.multiplex_enabled) {
+        inbound.multiplex = { enabled: true, padding: node.multiplex_padding };
+        if (node.multiplex_brutal_enabled) inbound.multiplex.brutal = { enabled: true,
+            up_mbps: node.multiplex_brutal_up_mbps, down_mbps: node.multiplex_brutal_down_mbps };
+    }
     if (node.security != 'none') {
         inbound.tls = { enabled: true, server_name: node.server_name };
         if (node.security == 'tls') {

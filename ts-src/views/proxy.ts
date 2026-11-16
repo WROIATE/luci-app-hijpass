@@ -706,6 +706,43 @@ function createUuidOption(s: LuCI.form.AbstractSection) {
 function createMultiplexOptions(s: LuCI.form.AbstractSection) {
     const muxTypes: ProxyType[] = [PROXY_TYPE.SHADOWSOCKS, PROXY_TYPE.VLESS];
 
+    const xrayEnabled = s.option(form.Flag, 'mux_enabled', _('Enable Multiplexing'),
+        _('Use Xray Mux.Cool; the server handles it automatically.'));
+    xrayEnabled.modalonly = true;
+    ProxyFormUtils.forCoreProtocols(xrayEnabled, CORE_TYPE.XRAY, muxTypes);
+    const xrayDependencies = muxTypes.map(type => ({ config_type: PROXY_CONFIG_TYPE.GENERATED,
+        type, core: CORE_TYPE.XRAY, mux_enabled: '1' }));
+    for (const [key, label, maximum, value, description] of [
+        ['mux_concurrency', _('TCP Multiplex Concurrency'), 128, '8',
+            _('Streams per TCP connection (1–128); 0 uses 8, -1 disables TCP multiplexing. Vision requires -1.')],
+        ['mux_xudp_concurrency', _('XUDP Concurrency'), 1024, '16',
+            _('UDP streams per XUDP connection (1–1024); 0 shares the TCP path, -1 uses native UDP handling.')],
+    ] as const) {
+        const option = s.option(form.Value, key, label, description);
+        option.modalonly = true;
+        option.default = value;
+        option.rmempty = false;
+        option.datatype = `range(-1,${maximum})`;
+        xrayDependencies.forEach(dependency => option.depends(dependency));
+        option.validate = function (id: string, value: string) {
+            if (!/^-?\d+$/.test(value) || Number(value) < -1 || Number(value) > maximum)
+                return _('Invalid multiplex concurrency');
+            if (key === 'mux_concurrency' && this.section.formvalue(id, 'type') === PROXY_TYPE.VLESS
+                && this.section.formvalue(id, 'flow') && Number(value) >= 0)
+                return _('Vision requires Mux TCP concurrency -1; use XUDP for UDP multiplexing');
+            return true;
+        };
+    }
+    const udp443 = s.option(form.ListValue, 'mux_udp443', _('Mux UDP/443 Policy'),
+        _('Handle QUIC traffic: reject, carry over Mux, or bypass Mux using the proxy protocol.'));
+    udp443.modalonly = true;
+    udp443.default = 'reject';
+    udp443.rmempty = false;
+    udp443.value('reject', _('Reject'));
+    udp443.value('allow', _('Allow over Mux'));
+    udp443.value('skip', _('Bypass Mux'));
+    xrayDependencies.forEach(dependency => udp443.depends(dependency));
+
     let enabledOpt = s.option(form.Flag, 'multiplex_enabled', _('Enable Multiplexing'),
         _('Enable Multiplexing for Better Efficiency'));
     enabledOpt.modalonly = true;
@@ -735,6 +772,12 @@ function createMultiplexOptions(s: LuCI.form.AbstractSection) {
     maxStreamsOpt.datatype = 'uinteger';
     maxStreamsOpt.modalonly = true;
     muxTypes.forEach(t => maxStreamsOpt.depends({ config_type: PROXY_CONFIG_TYPE.GENERATED,  type: t, core: CORE_TYPE.SING_BOX, multiplex_enabled: '1' }));
+
+    const paddingOpt = s.option(form.Flag, 'multiplex_padding', _('Multiplex Padding'),
+        _('Enable padding when required by the sing-box server.'));
+    paddingOpt.modalonly = true;
+    muxTypes.forEach(type => paddingOpt.depends({ config_type: PROXY_CONFIG_TYPE.GENERATED,
+        type, core: CORE_TYPE.SING_BOX, multiplex_enabled: '1' }));
 
     let brutalEnabledOpt = s.option(form.Flag, 'multiplex_brutal_enabled', _('Enable TCP Brutal'),
         _('Enable TCP Brutal Congestion Control'));

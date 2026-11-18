@@ -29,3 +29,22 @@ jobs:
           name: luci-app-hijpass-apks
           path: apk-output/*.apk
           if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download APKs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: luci-app-hijpass-apks
+          path: apk-output
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" apk-output/*.apk \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
